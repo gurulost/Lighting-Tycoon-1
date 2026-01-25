@@ -20,6 +20,7 @@ import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
 import { LockoutModal } from "@/components/game/LockoutModal";
 import { SettingsModal } from "@/components/game/SettingsModal";
+import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
@@ -204,6 +205,8 @@ export default function GameScreen() {
       </Modal>
 
       {state.lockoutActive ? <LockoutModal onClose={() => {}} /> : null}
+
+      {!state.tutorialComplete ? <TutorialOverlay /> : null}
     </LinearGradient>
   );
 }
