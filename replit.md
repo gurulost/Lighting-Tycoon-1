@@ -69,3 +69,29 @@ Preferred communication style: Simple, everyday language.
 - `tsx` - TypeScript execution for server
 - `esbuild` - Server bundling for production
 - `drizzle-kit` - Database migrations
+
+## Recent Changes (January 2026)
+
+### Graphics Overhaul
+- **Generated 19 custom neon-styled game assets**: Part sprites for all 5 tiers × 2 families (Open/Locked), station icons, Bulb Baron portrait, Freedom Controller, and particle effects
+- **Premium visual styling**: Linear gradients, glow effects, and animated pulses throughout the UI
+- **Enhanced components**:
+  - `PartItem`: Displays sprite images with tier badges, family indicators, and pulsing glow animations
+  - `MergeBoard`: Neon grid lines, gradient tile backgrounds, animated station icons
+  - `CurrencyDisplay`: Premium gradient styling with animated value changes
+  - `DependencyMeter`: Dynamic color transitions, warning pulses, and Bulb Baron portrait at high dependency
+  - `OrderCard`: Gradient backgrounds, requirement chips, pulsing glow when fulfillable
+  - `OrdersModal`: Premium header styling with stats row
+  - `SettingsModal`: Toggle switches for sound, haptics, and notifications
+
+### Tutorial System
+- **TutorialOverlay component**: 6-step onboarding guide for new players
+- Steps cover: Welcome, Merge Board, Part Families, Customer Orders, Dependency Meter, Getting Started
+- Skip option and progress dots for navigation
+
+### Asset Files
+All game assets are stored in `assets/images/`:
+- Part sprites: `part-{tier}-{family}.png` (e.g., `part-clip-open.png`, `part-premium-locked.png`)
+- Station icons: `station-workbench.png`, `station-inbox.png`, `station-rd.png`
+- Characters: `bulb-baron.png`, `freedom-controller.png`
+- Effects: `particle-merge-open.png`, `particle-merge-locked.png`
