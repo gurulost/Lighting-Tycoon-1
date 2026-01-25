@@ -6,12 +6,19 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
+  withRepeat,
   interpolateColor,
+  interpolate,
+  Extrapolation,
 } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+
+const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
 
 interface DependencyMeterProps {
   value: number;
@@ -23,31 +30,51 @@ export function DependencyMeter({ value }: DependencyMeterProps) {
   const progress = useSharedValue(value / 100);
   const pulseScale = useSharedValue(1);
   const prevValue = useSharedValue(value);
+  const warningPulse = useSharedValue(0);
+  const baronOpacity = useSharedValue(0);
 
   useEffect(() => {
     progress.value = withSpring(value / 100, { damping: 15 });
-    
+
     const crossedThreshold = THRESHOLDS.some(
       (t) => prevValue.value < t && value >= t
     );
-    
+
     if (crossedThreshold) {
       pulseScale.value = withSequence(
-        withTiming(1.05, { duration: 100 }),
+        withTiming(1.03, { duration: 100 }),
         withTiming(1, { duration: 100 }),
-        withTiming(1.05, { duration: 100 }),
-        withTiming(1, { duration: 100 }),
-        withTiming(1.05, { duration: 100 }),
+        withTiming(1.03, { duration: 100 }),
         withTiming(1, { duration: 100 })
       );
     }
-    
+
+    if (value >= 60) {
+      warningPulse.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1000 }),
+          withTiming(0, { duration: 1000 })
+        ),
+        -1,
+        true
+      );
+      baronOpacity.value = withTiming(interpolate(value, [60, 100], [0.3, 1], Extrapolation.CLAMP), {
+        duration: 500,
+      });
+    } else {
+      warningPulse.value = 0;
+      baronOpacity.value = withTiming(0, { duration: 300 });
+    }
+
     prevValue.value = value;
   }, [value]);
 
   const progressStyle = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%`,
-    backgroundColor: interpolateColor(
+    width: `${Math.max(2, progress.value * 100)}%`,
+  }));
+
+  const progressColorStyle = useAnimatedStyle(() => {
+    const color = interpolateColor(
       progress.value,
       [0, 0.4, 0.6, 0.8, 1],
       [
@@ -57,11 +84,24 @@ export function DependencyMeter({ value }: DependencyMeterProps) {
         GameColors.ui.danger,
         "#FF0000",
       ]
-    ),
-  }));
+    );
+    return { backgroundColor: color };
+  });
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
+  }));
+
+  const warningGlowStyle = useAnimatedStyle(() => {
+    const glowOpacity = interpolate(warningPulse.value, [0, 1], [0, 0.3], Extrapolation.CLAMP);
+    return {
+      borderColor: `rgba(255, 77, 77, ${glowOpacity})`,
+      shadowOpacity: glowOpacity,
+    };
+  });
+
+  const baronStyle = useAnimatedStyle(() => ({
+    opacity: baronOpacity.value,
   }));
 
   const getStatusText = () => {
@@ -80,81 +120,154 @@ export function DependencyMeter({ value }: DependencyMeterProps) {
     return "#FF0000";
   };
 
-  return (
-    <Animated.View style={[styles.container, containerStyle]}>
-      <View style={styles.header}>
-        <View style={styles.labelContainer}>
-          <Feather name="lock" size={12} color={getStatusColor()} />
-          <ThemedText style={styles.label}>Dependency</ThemedText>
-        </View>
-        <ThemedText style={[styles.status, { color: getStatusColor() }]}>
-          {getStatusText()}
-        </ThemedText>
-      </View>
-      
-      <View style={styles.trackContainer}>
-        <View style={styles.track}>
-          <Animated.View style={[styles.progress, progressStyle]} />
-        </View>
-        
-        <View style={styles.thresholds}>
-          {THRESHOLDS.map((threshold) => (
-            <View
-              key={threshold}
-              style={[
-                styles.thresholdMarker,
-                { left: `${threshold}%` },
-                value >= threshold && styles.thresholdMarkerActive,
-              ]}
-            />
-          ))}
-        </View>
-      </View>
+  const getStatusIcon = (): keyof typeof Feather.glyphMap => {
+    if (value < 20) return "shield";
+    if (value < 40) return "eye";
+    if (value < 60) return "alert-circle";
+    if (value < 80) return "alert-triangle";
+    return "lock";
+  };
 
-      <View style={styles.valueContainer}>
-        <ThemedText style={styles.value}>{value}%</ThemedText>
-      </View>
+  return (
+    <Animated.View
+      style={[
+        styles.container,
+        containerStyle,
+        warningGlowStyle,
+        { shadowColor: GameColors.ui.danger },
+      ]}
+    >
+      <LinearGradient
+        colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+        style={styles.innerContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.header}>
+          <View style={styles.labelContainer}>
+            <View style={[styles.statusIcon, { backgroundColor: getStatusColor() + "30" }]}>
+              <Feather name={getStatusIcon()} size={12} color={getStatusColor()} />
+            </View>
+            <ThemedText style={styles.label}>Dependency</ThemedText>
+          </View>
+          <View style={styles.statusContainer}>
+            <ThemedText style={[styles.status, { color: getStatusColor() }]}>
+              {getStatusText()}
+            </ThemedText>
+            <ThemedText style={[styles.percentage, { color: getStatusColor() }]}>
+              {value}%
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.trackContainer}>
+          <View style={styles.track}>
+            <Animated.View style={[styles.progressBackground, progressStyle]}>
+              <Animated.View style={[styles.progressFill, progressColorStyle]} />
+            </Animated.View>
+          </View>
+
+          <View style={styles.thresholds}>
+            {THRESHOLDS.map((threshold) => (
+              <View
+                key={threshold}
+                style={[
+                  styles.thresholdMarker,
+                  { left: `${threshold}%` },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.thresholdDot,
+                    value >= threshold && styles.thresholdDotActive,
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <Animated.View style={[styles.baronContainer, baronStyle]}>
+          <Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />
+        </Animated.View>
+      </LinearGradient>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+    elevation: 5,
+    overflow: "hidden",
+  },
+  innerContainer: {
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    position: "relative",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   labelContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
   },
+  statusIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   label: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: "600",
     color: GameColors.text.secondary,
   },
+  statusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
   status: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  percentage: {
+    fontSize: 14,
+    fontWeight: "800",
   },
   trackContainer: {
     position: "relative",
-    height: 8,
+    height: 12,
   },
   track: {
-    height: 8,
-    backgroundColor: GameColors.ui.surface,
-    borderRadius: 4,
+    height: 12,
+    backgroundColor: "#1A1A2E",
+    borderRadius: 6,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+  },
+  progressBackground: {
+    height: "100%",
+    borderRadius: 5,
     overflow: "hidden",
   },
-  progress: {
-    height: "100%",
-    borderRadius: 4,
+  progressFill: {
+    flex: 1,
+    borderRadius: 5,
   },
   thresholds: {
     position: "absolute",
@@ -165,21 +278,35 @@ const styles = StyleSheet.create({
   },
   thresholdMarker: {
     position: "absolute",
-    top: -2,
-    bottom: -2,
+    top: -4,
+    bottom: -4,
     width: 2,
-    backgroundColor: GameColors.text.disabled,
+    justifyContent: "center",
+    alignItems: "center",
     transform: [{ translateX: -1 }],
   },
-  thresholdMarkerActive: {
+  thresholdDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: GameColors.text.disabled,
+    borderWidth: 1,
+    borderColor: "#1A1A2E",
+  },
+  thresholdDotActive: {
     backgroundColor: GameColors.text.secondary,
   },
-  valueContainer: {
-    alignItems: "flex-end",
-    marginTop: Spacing.xs,
+  baronContainer: {
+    position: "absolute",
+    right: Spacing.sm,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    opacity: 0,
   },
-  value: {
-    fontSize: 10,
-    color: GameColors.text.secondary,
+  baronIcon: {
+    width: 32,
+    height: 32,
+    opacity: 0.6,
   },
 });

@@ -1,7 +1,16 @@
 import React, { useState } from "react";
 import { View, StyleSheet, Modal, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 
 import { MergeBoard } from "@/components/game/MergeBoard";
 import { CurrencyDisplay } from "@/components/game/CurrencyDisplay";
@@ -10,11 +19,78 @@ import { OrdersModal } from "@/components/game/OrdersModal";
 import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
 import { LockoutModal } from "@/components/game/LockoutModal";
+import { SettingsModal } from "@/components/game/SettingsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
-type ModalType = "orders" | "upgrades" | "rd" | null;
+const freedomControllerImage = require("../../assets/images/freedom-controller.png");
+
+type ModalType = "orders" | "upgrades" | "rd" | "settings" | null;
+
+interface BottomButtonProps {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  color: string;
+  onPress: () => void;
+  badge?: number;
+  disabled?: boolean;
+}
+
+function BottomButton({ icon, label, color, onPress, badge, disabled }: BottomButtonProps) {
+  const pulseAnim = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (badge && badge > 0) {
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1000 }),
+          withTiming(0, { duration: 1000 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseAnim.value = 0;
+    }
+  }, [badge]);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    shadowOpacity: pulseAnim.value * 0.6,
+  }));
+
+  return (
+    <Pressable
+      style={[styles.bottomButton, disabled && styles.bottomButtonDisabled]}
+      onPress={disabled ? undefined : onPress}
+    >
+      <Animated.View
+        style={[
+          styles.buttonIconContainer,
+          { shadowColor: color },
+          glowStyle,
+        ]}
+      >
+        <LinearGradient
+          colors={[`${color}30`, `${color}10`, `${color}30`]}
+          style={styles.buttonGradient}
+        >
+          <Feather name={icon} size={22} color={disabled ? GameColors.text.disabled : color} />
+        </LinearGradient>
+        {badge && badge > 0 ? (
+          <View style={styles.badge}>
+            <ThemedText style={styles.badgeText}>{badge}</ThemedText>
+          </View>
+        ) : null}
+      </Animated.View>
+      <ThemedText
+        style={[styles.buttonLabel, { color: disabled ? GameColors.text.disabled : color }]}
+      >
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
 
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
@@ -24,7 +100,7 @@ export default function GameScreen() {
   const closeModal = () => setActiveModal(null);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
         <CurrencyDisplay
           cash={state.cash}
@@ -32,8 +108,16 @@ export default function GameScreen() {
           research={state.research}
           onCashPress={() => setActiveModal("upgrades")}
         />
-        <Pressable style={styles.settingsButton}>
-          <Feather name="settings" size={22} color={GameColors.text.secondary} />
+        <Pressable
+          style={styles.settingsButton}
+          onPress={() => setActiveModal("settings")}
+        >
+          <LinearGradient
+            colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+            style={styles.settingsGradient}
+          >
+            <Feather name="settings" size={20} color={GameColors.text.secondary} />
+          </LinearGradient>
         </Pressable>
       </View>
 
@@ -47,47 +131,40 @@ export default function GameScreen() {
         />
       </View>
 
-      <View style={styles.bottomBar}>
-        <Pressable
-          style={styles.bottomButton}
+      <LinearGradient
+        colors={["#1A1A2E", "#252542", "#1A1A2E"]}
+        style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md }]}
+      >
+        <BottomButton
+          icon="inbox"
+          label="Orders"
+          color={GameColors.currency.reputation}
           onPress={() => setActiveModal("orders")}
-        >
-          <View style={styles.buttonIcon}>
-            <Feather name="inbox" size={20} color={GameColors.currency.reputation} />
-            {state.orders.length > 0 && (
-              <View style={styles.badge}>
-                <ThemedText style={styles.badgeText}>{state.orders.length}</ThemedText>
-              </View>
-            )}
-          </View>
-          <ThemedText style={styles.buttonLabel}>Orders</ThemedText>
-        </Pressable>
+          badge={state.orders.length}
+        />
 
-        <Pressable
-          style={styles.bottomButton}
+        <BottomButton
+          icon="shopping-cart"
+          label="Shop"
+          color={GameColors.currency.cash}
           onPress={() => setActiveModal("upgrades")}
-        >
-          <Feather name="shopping-cart" size={20} color={GameColors.currency.cash} />
-          <ThemedText style={styles.buttonLabel}>Shop</ThemedText>
-        </Pressable>
+        />
 
-        {state.upgrades["rd_unlock"] >= 1 && (
-          <Pressable
-            style={styles.bottomButton}
-            onPress={() => setActiveModal("rd")}
-          >
-            <Feather name="zap" size={20} color={GameColors.currency.research} />
-            <ThemedText style={styles.buttonLabel}>R&D</ThemedText>
-          </Pressable>
-        )}
+        <BottomButton
+          icon="cpu"
+          label="R&D"
+          color={GameColors.currency.research}
+          onPress={() => setActiveModal("rd")}
+          disabled={state.upgrades["rd_unlock"] < 1}
+        />
 
-        {state.freedomControllerCount > 0 && (
+        {state.freedomControllerCount > 0 ? (
           <View style={styles.freedomIndicator}>
-            <Feather name="unlock" size={16} color={GameColors.ui.success} />
+            <Image source={freedomControllerImage} style={styles.freedomIcon} contentFit="contain" />
             <ThemedText style={styles.freedomCount}>{state.freedomControllerCount}</ThemedText>
           </View>
-        )}
-      </View>
+        ) : null}
+      </LinearGradient>
 
       <Modal
         visible={activeModal === "orders"}
@@ -116,15 +193,23 @@ export default function GameScreen() {
         <RDModal onClose={closeModal} />
       </Modal>
 
-      {state.lockoutActive && <LockoutModal onClose={() => {}} />}
-    </View>
+      <Modal
+        visible={activeModal === "settings"}
+        animationType="fade"
+        transparent
+        onRequestClose={closeModal}
+      >
+        <SettingsModal onClose={closeModal} />
+      </Modal>
+
+      {state.lockoutActive ? <LockoutModal onClose={() => {}} /> : null}
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: GameColors.ui.background,
   },
   topBar: {
     flexDirection: "row",
@@ -134,12 +219,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   settingsButton: {
+    borderRadius: 22,
+    overflow: "hidden",
+  },
+  settingsGradient: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: GameColors.ui.surface,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   boardContainer: {
     flex: 1,
@@ -151,40 +241,56 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: Spacing.xl,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    paddingBottom: Spacing.xl,
-    backgroundColor: GameColors.ui.surface,
+    paddingTop: Spacing.md,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: "#2A2A4A",
   },
   bottomButton: {
     alignItems: "center",
     gap: Spacing.xs,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
   },
-  buttonIcon: {
+  bottomButtonDisabled: {
+    opacity: 0.5,
+  },
+  buttonIconContainer: {
     position: "relative",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  buttonGradient: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   buttonLabel: {
     fontSize: 12,
-    color: GameColors.text.secondary,
+    fontWeight: "600",
   },
   badge: {
     position: "absolute",
-    top: -6,
-    right: -10,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: GameColors.ui.danger,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#1A1A2E",
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
     color: "#FFF",
   },
   freedomIndicator: {
@@ -195,10 +301,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: GameColors.ui.success + "40",
+  },
+  freedomIcon: {
+    width: 24,
+    height: 24,
   },
   freedomCount: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
     color: GameColors.ui.success,
   },
 });

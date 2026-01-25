@@ -4,8 +4,15 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withRepeat,
+  withSequence,
+  withTiming,
   FadeIn,
+  interpolate,
+  Extrapolation,
 } from "react-native-reanimated";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -15,6 +22,10 @@ import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { WORKBENCH_SLOT, ORDER_INBOX_SLOT, RD_BENCH_SLOT } from "@/types/game";
 
+const stationWorkbench = require("../../../assets/images/station-workbench.png");
+const stationInbox = require("../../../assets/images/station-inbox.png");
+const stationRd = require("../../../assets/images/station-rd.png");
+
 const GRID_COLS = 6;
 const GRID_ROWS = 5;
 
@@ -22,6 +33,61 @@ interface MergeBoardProps {
   onWorkbenchPress: () => void;
   onOrderInboxPress: () => void;
   onRDBenchPress: () => void;
+}
+
+function AnimatedStation({
+  children,
+  isActive,
+  onPress,
+  tileSize,
+  accentColor,
+}: {
+  children: React.ReactNode;
+  isActive: boolean;
+  onPress: () => void;
+  tileSize: number;
+  accentColor: string;
+}) {
+  const pulseAnim = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (isActive) {
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 800 }),
+          withTiming(0, { duration: 800 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseAnim.value = 0;
+    }
+  }, [isActive]);
+
+  const animatedGlow = useAnimatedStyle(() => {
+    const glowOpacity = interpolate(pulseAnim.value, [0, 1], [0.3, 0.8], Extrapolation.CLAMP);
+    return { shadowOpacity: glowOpacity };
+  });
+
+  return (
+    <Pressable onPress={onPress}>
+      <Animated.View
+        style={[
+          styles.stationTile,
+          {
+            width: tileSize,
+            height: tileSize,
+            shadowColor: accentColor,
+            borderColor: accentColor + "80",
+          },
+          animatedGlow,
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
 }
 
 export function MergeBoard({
@@ -55,6 +121,7 @@ export function MergeBoard({
   const handleDragStart = useCallback(
     (index: number) => {
       setDragFromIndex(index);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const validTargets: number[] = [];
       for (let i = 0; i < state.boardSize; i++) {
         if (i === index) continue;
@@ -89,11 +156,14 @@ export function MergeBoard({
       if (toIndex !== fromIndex && !isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
         if (state.board[toIndex] !== null) {
           const merged = mergeParts(fromIndex, toIndex);
-          if (!merged) {
+          if (merged) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } else {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           }
         } else {
           movePart(fromIndex, toIndex);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }
 
@@ -125,10 +195,21 @@ export function MergeBoard({
             { width: tileSize, height: tileSize },
           ]}
         >
-          <Feather name="lock" size={20} color={GameColors.text.disabled} />
+          <LinearGradient
+            colors={["#1A1A2E", "#252542", "#1A1A2E"]}
+            style={styles.blockedGradient}
+          >
+            <Feather name="lock" size={18} color={GameColors.text.disabled} />
+          </LinearGradient>
         </View>
       );
     }
+
+    const tileColors = isHighlighted
+      ? isMergeTarget
+        ? ["#00D9FF20", "#00D9FF40", "#00D9FF20"]
+        : ["#4DFF8820", "#4DFF8840", "#4DFF8820"]
+      : ["#1E1E36", "#252542", "#1E1E36"];
 
     return (
       <Animated.View
@@ -139,28 +220,32 @@ export function MergeBoard({
           {
             width: tileSize,
             height: tileSize,
-            backgroundColor: isHighlighted
-              ? isMergeTarget
-                ? GameColors.ui.primary + "40"
-                : GameColors.board.tile
-              : GameColors.board.tileEmpty,
             borderColor: isHighlighted
               ? isMergeTarget
                 ? GameColors.ui.primary
                 : GameColors.ui.success
-              : "transparent",
-            borderWidth: isHighlighted ? 2 : 0,
+              : "#2A2A4A",
+            borderWidth: isHighlighted ? 2 : 1,
           },
         ]}
       >
-        {part ? (
-          <PartItem
-            part={part}
-            size={tileSize - 8}
-            onDragStart={() => handleDragStart(index)}
-            onDragEnd={(tx, ty) => handleDragEnd(index, tx, ty)}
-          />
-        ) : null}
+        <LinearGradient
+          colors={tileColors as [string, string, string]}
+          style={styles.tileGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {part ? (
+            <PartItem
+              part={part}
+              size={tileSize - 10}
+              onDragStart={() => handleDragStart(index)}
+              onDragEnd={(tx, ty) => handleDragEnd(index, tx, ty)}
+            />
+          ) : (
+            <View style={styles.emptySlotIndicator} />
+          )}
+        </LinearGradient>
       </Animated.View>
     );
   };
@@ -172,84 +257,92 @@ export function MergeBoard({
         : 1 - state.workbenchCooldown / state.workbenchMaxCooldown;
 
       return (
-        <Pressable
+        <AnimatedStation
           key={index}
-          style={[
-            styles.tile,
-            styles.stationTile,
-            { width: tileSize, height: tileSize },
-          ]}
+          isActive={state.workbenchReady}
           onPress={() => {
             if (state.workbenchReady) {
               spawnPart();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             }
           }}
+          tileSize={tileSize}
+          accentColor={GameColors.ui.primary}
         >
-          <View style={styles.stationContent}>
-            <Feather
-              name="tool"
-              size={24}
-              color={state.workbenchReady ? GameColors.ui.primary : GameColors.text.disabled}
+          <LinearGradient
+            colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
+            style={styles.stationGradient}
+          >
+            <Image
+              source={stationWorkbench}
+              style={[styles.stationIcon, { opacity: state.workbenchReady ? 1 : 0.5 }]}
+              contentFit="contain"
             />
-            {!state.workbenchReady && (
-              <View style={styles.cooldownOverlay}>
+            {!state.workbenchReady ? (
+              <View style={styles.cooldownBar}>
                 <View
                   style={[
                     styles.cooldownProgress,
-                    { height: `${cooldownProgress * 100}%` },
+                    { width: `${cooldownProgress * 100}%` },
                   ]}
                 />
               </View>
-            )}
-          </View>
-        </Pressable>
+            ) : null}
+          </LinearGradient>
+        </AnimatedStation>
       );
     }
 
     if (index === ORDER_INBOX_SLOT) {
       return (
-        <Pressable
+        <AnimatedStation
           key={index}
-          style={[
-            styles.tile,
-            styles.stationTile,
-            { width: tileSize, height: tileSize },
-          ]}
+          isActive={state.orders.length > 0}
           onPress={onOrderInboxPress}
+          tileSize={tileSize}
+          accentColor={GameColors.currency.reputation}
         >
-          <Feather name="inbox" size={24} color={GameColors.currency.reputation} />
-          {state.orders.length > 0 && (
-            <View style={styles.badge}>
-              <ThemedText style={styles.badgeText}>{state.orders.length}</ThemedText>
-            </View>
-          )}
-        </Pressable>
+          <LinearGradient
+            colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
+            style={styles.stationGradient}
+          >
+            <Image source={stationInbox} style={styles.stationIcon} contentFit="contain" />
+            {state.orders.length > 0 ? (
+              <View style={styles.badge}>
+                <ThemedText style={styles.badgeText}>{state.orders.length}</ThemedText>
+              </View>
+            ) : null}
+          </LinearGradient>
+        </AnimatedStation>
       );
     }
 
     if (index === RD_BENCH_SLOT) {
       const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
       return (
-        <Pressable
+        <AnimatedStation
           key={index}
-          style={[
-            styles.tile,
-            styles.stationTile,
-            { width: tileSize, height: tileSize },
-          ]}
-          onPress={rdUnlocked ? onRDBenchPress : undefined}
+          isActive={rdUnlocked && state.research > 0}
+          onPress={rdUnlocked ? onRDBenchPress : () => {}}
+          tileSize={tileSize}
+          accentColor={GameColors.currency.research}
         >
-          <Feather
-            name="zap"
-            size={24}
-            color={rdUnlocked ? GameColors.currency.research : GameColors.text.disabled}
-          />
-          {!rdUnlocked && (
-            <View style={styles.lockOverlay}>
-              <Feather name="lock" size={14} color={GameColors.text.disabled} />
-            </View>
-          )}
-        </Pressable>
+          <LinearGradient
+            colors={["#1A1A2E", "#9D4EDD10", "#1A1A2E"]}
+            style={styles.stationGradient}
+          >
+            <Image
+              source={stationRd}
+              style={[styles.stationIcon, { opacity: rdUnlocked ? 1 : 0.4 }]}
+              contentFit="contain"
+            />
+            {!rdUnlocked ? (
+              <View style={styles.lockOverlay}>
+                <Feather name="lock" size={12} color={GameColors.text.disabled} />
+              </View>
+            ) : null}
+          </LinearGradient>
+        </AnimatedStation>
       );
     }
 
@@ -263,16 +356,47 @@ export function MergeBoard({
 
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.grid,
-          {
-            width: GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap,
-          },
-        ]}
+      <LinearGradient
+        colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
+        style={styles.boardBackground}
       >
-        {tiles}
-      </View>
+        <View style={styles.gridLines}>
+          {Array.from({ length: GRID_COLS + 1 }).map((_, i) => (
+            <View
+              key={`v-${i}`}
+              style={[
+                styles.gridLineVertical,
+                {
+                  left: i * (tileSize + Spacing.tileGap) - 1,
+                  height: GRID_ROWS * (tileSize + Spacing.tileGap),
+                },
+              ]}
+            />
+          ))}
+          {Array.from({ length: GRID_ROWS + 1 }).map((_, i) => (
+            <View
+              key={`h-${i}`}
+              style={[
+                styles.gridLineHorizontal,
+                {
+                  top: i * (tileSize + Spacing.tileGap) - 1,
+                  width: GRID_COLS * (tileSize + Spacing.tileGap),
+                },
+              ]}
+            />
+          ))}
+        </View>
+        <View
+          style={[
+            styles.grid,
+            {
+              width: GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap,
+            },
+          ]}
+        >
+          {tiles}
+        </View>
+      </LinearGradient>
     </View>
   );
 }
@@ -282,6 +406,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.md,
   },
+  boardBackground: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    borderColor: "#2A2A4A",
+    position: "relative",
+  },
+  gridLines: {
+    position: "absolute",
+    top: Spacing.md,
+    left: Spacing.md,
+  },
+  gridLineVertical: {
+    position: "absolute",
+    width: 1,
+    backgroundColor: "#2A2A4A40",
+  },
+  gridLineHorizontal: {
+    position: "absolute",
+    height: 1,
+    backgroundColor: "#2A2A4A40",
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -289,61 +435,87 @@ const styles = StyleSheet.create({
   },
   tile: {
     borderRadius: BorderRadius.xs,
+    overflow: "hidden",
+  },
+  tileGradient: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  emptySlotIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#2A2A4A60",
   },
   blockedTile: {
-    backgroundColor: GameColors.board.background,
     borderWidth: 1,
-    borderColor: GameColors.text.disabled,
+    borderColor: "#2A2A4A",
     borderStyle: "dashed",
   },
-  stationTile: {
-    backgroundColor: GameColors.ui.surface,
-    borderWidth: 2,
-    borderColor: GameColors.ui.surfaceElevated,
-  },
-  stationContent: {
-    position: "relative",
+  blockedGradient: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  cooldownOverlay: {
+  stationTile: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 2,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  stationGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  stationIcon: {
+    width: "70%",
+    height: "70%",
+  },
+  cooldownBar: {
     position: "absolute",
-    bottom: -20,
-    left: -15,
-    right: -15,
+    bottom: 4,
+    left: 4,
+    right: 4,
     height: 4,
-    backgroundColor: GameColors.text.disabled,
+    backgroundColor: "#1A1A2E",
     borderRadius: 2,
     overflow: "hidden",
   },
   cooldownProgress: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    height: "100%",
     backgroundColor: GameColors.ui.primary,
+    borderRadius: 2,
   },
   badge: {
     position: "absolute",
-    top: -4,
-    right: -4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -2,
+    right: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: GameColors.ui.danger,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#0F0F1F",
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
     color: "#FFF",
   },
   lockOverlay: {
     position: "absolute",
-    bottom: 2,
-    right: 2,
+    bottom: 4,
+    right: 4,
+    backgroundColor: "#00000080",
+    borderRadius: 8,
+    padding: 2,
   },
 });
