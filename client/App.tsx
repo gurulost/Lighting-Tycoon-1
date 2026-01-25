@@ -11,6 +11,8 @@ import { queryClient } from "@/lib/query-client";
 
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GameProvider } from "@/context/GameContext";
+import { GameColors } from "@/constants/theme";
 
 export default function App() {
   return (
@@ -19,10 +21,12 @@ export default function App() {
         <SafeAreaProvider>
           <GestureHandlerRootView style={styles.root}>
             <KeyboardProvider>
-              <NavigationContainer>
-                <RootStackNavigator />
-              </NavigationContainer>
-              <StatusBar style="auto" />
+              <GameProvider>
+                <NavigationContainer>
+                  <RootStackNavigator />
+                </NavigationContainer>
+              </GameProvider>
+              <StatusBar style="light" />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </SafeAreaProvider>
@@ -34,5 +38,6 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: GameColors.ui.background,
   },
 });

@@ -1,0 +1,641 @@
+Lighting Tycoon — Full Mobile App Plan (Merge Tycoon with a “Lock‑In Villain”)
+One‑line pitch
+Run a neon-lit lighting workshop where you drag-to-merge parts into install kits, fulfill house orders for cash + reputation, and decide whether to use the Bulb Baron’s shiny locked components (fast gains, long-term dependency) or build open-standard tech and eventually a Freedom Controller to break the lock-in.
+
+1) Design pillars (non‑negotiables)
+One crisp verb:
+Drag-to-merge on a single board. Everything else supports it.
+Micro-sessions by default:
+30–90 seconds of “merge → fulfill → upgrade → done,” with instant pause/resume.
+Clarity in the first minute:
+The first 60 seconds are scripted to guarantee success: merge twice, complete one order, upgrade once, see the villain choice once.
+“Juice” is functional feedback:
+Every merge produces readable change (tier label + icon + glow), and felt change (haptic tick + snap sound + particle burst).
+Meaningful choice with real tradeoffs:
+Locked parts feel great early but raise Dependency that later forces locked installs or refunds. Open-standard is slower early but stable late.
+Progression is the product:
+Players return for: bigger board, better drops, new orders, story beats with the Bulb Baron, and the long-term R&D goal.
+Ethical monetization posture:
+No forced ads, no pain-to-sell-relief traps. If monetized: opt-in rewarded ads and cosmetics, with transparent value.
+
+2) The core loop and how it feels in 30–90 seconds
+Core loop (seconds–minutes)
+Generate parts (tap workbench / open crates)
+Merge up the chain
+Clips → Tracks → Segments → Smart Kits → Premium Systems
+Fulfill orders (consume kits)
+Earn cash + reputation + research
+Upgrade workshop (more board space, better drop table, faster generator)
+Repeat (new orders appear; occasional villain offers / lockout pressure)
+Meta loop (hours–days)
+Unlock neighborhoods (new customer “house styles” + order templates)
+Build your reputation tier (more lucrative orders)
+Choose supplier strategy (Locked vs Open)
+Advance R&D toward the Freedom Controller
+Face periodic Bulb Baron story events that test your build choices
+
+3) Core gameplay systems (MVP-ready)
+3.1 Merge board (single board, mobile-native)
+Grid: start 5×6 (30 slots).
+24 usable slots
+3 “fixed stations” (Workbench, Order Inbox, R&D Bench placeholder lock)
+3 blocked slots unlocked via upgrades (immediate visible growth)
+Interactions (one-thumb friendly):
+Drag an item onto a same-tier item → merges instantly.
+Long-press item → tooltip (tier, family, value, dependency impact).
+Swipe to pan? Avoid unless needed; keep board fully visible.
+Quality-of-life (must-have):
+“Auto-snap” highlight: when dragging, valid merge targets pulse.
+“Undo last move” (very limited: 1 step, cooldown) to reduce fat-finger frustration.
+Overflow protection: if board is near full, workbench pauses generation and shows a clear “Merge or fulfill an order.”
+3.2 Part families: Standard vs Locked (the strategic heart)
+You have two parallel families that share the same tier ladder:
+Open-Standard parts (blue/white glow): slower value early, stable long-term.
+Locked parts (gold/purple glow, Bulb Baron branding): better output early, but increase Dependency.
+How Locked is “better” in a clean, understandable way:
+Locked merges have a higher chance to produce a bonus byproduct (cash chip or research chip).
+Locked drops start slightly higher tier more often (e.g., Tracks instead of Clips) once the Baron “hooks” you.
+This preserves the same verb (merge) while making Locked feel visibly superior—without adding confusing rules.
+3.3 Generator (Workbench) — the “spawn” mechanic
+The Workbench produces parts on tap with a short cooldown. Typical merge-game pattern, but tuned for respectful pacing.
+Tap Workbench → spawns 1 part into an empty slot.
+Cooldown is short (seconds) and reduces with upgrades.
+Drop table depends on your workshop tier + your current Dependency (subtle villain pressure).
+Drop table rules (simple):
+Default: mostly Clips, some Tracks
+Upgrades: improve odds of Tracks and Segments
+High Dependency: increases odds of Locked drops and Locked “promo crates”
+3.4 Orders from houses (the “sink” that creates purpose)
+Orders are card-like requests displayed in an “Order Inbox” panel.
+Each order:
+Required items (e.g., 2 Smart Kits + 1 Segment)
+Accept/complete button (consumes items)
+Rewards: cash + reputation + sometimes research
+Order types (MVP):
+Basic Install (no trick): teaches loop
+Style Match: requires all Standard or all Locked items (teaches families)
+Rush: higher payout but soft timer (timer reduces bonus, not hard fail)
+Premium Client: requires higher-tier kit, big reputation payout
+Order slots:
+Start with 2 visible orders, can upgrade to 3–4.
+3.5 Workshop upgrades (your main “spend”)
+Upgrades are immediate and visual, so spending feels satisfying.
+Upgrade categories:
+Space: unlock blocked slots / expand board (most tangible)
+Workbench: faster cooldown, better drop odds
+Quality Tools: small bonus cash on merges
+Logistics: more order slots; occasional “priority order”
+R&D Bench: unlock research earning and the Freedom Controller path
+
+4) The villain mechanic: Dependency (clean, legible, and fair)
+4.1 Dependency meter
+A single meter 0–100 shown near the top bar with clear thresholds.
+Dependency increases when you:
+Use Locked parts in merges
+Buy/accept Bulb Baron “locked crates”
+Fulfill orders with Locked kits (small increase)
+Dependency decreases when you:
+Fulfill orders using Open-Standard kits (small decrease)
+Invest in Open-Standard upgrades (one-time decrease + cap reduction)
+Spend Research to “refactor” your supply chain (mid-game)
+Use Freedom Controller (late-game)
+4.2 What Dependency does
+ (the pressure curve)
+Dependency is only meaningful if it changes play—not just flavor text.
+Threshold effects (example):
+20+: Baron offers appear more frequently (temptation)
+40+: 1 in ~5 new orders becomes “Baron Certified” (Locked preferred for full reward)
+60+: Some installs are Locked Required (if you complete with Standard, you take a refund/reputation hit)
+80+: Locked generator bias increases; Open parts drop less often
+100: Lockout Event triggers (the boss moment)
+This creates a readable arc: the player feels the hook tightening.
+4.3 Fairness rules (so it doesn’t feel like a trap)
+You always have some path out (Open upgrades + R&D).
+“Locked Required” orders never appear before the player has seen:
+the Dependency meter,
+a warning threshold message,
+the R&D tease (“Freedom Controller blueprint discovered”).
+Refund penalties are soft early (cash loss), only later include reputation hits.
+
+5) R&D and the “Freedom Controller” (long-term aspiration)
+5.1 Research points (separate from cash)
+Research is earned primarily through:
+Open-Standard merges
+Completing Open-Standard orders
+Occasional “Lab Request” order cards
+This is deliberate: it makes Open playstyle feel like “slow money, fast independence.”
+5.2 R&D tree (MVP version)
+Keep it tiny but meaningful.
+Nodes:
+Open Standardization I: reduces Dependency gain from locked merges slightly
+Open Standardization II: increases Open drop odds slightly
+Freedom Controller Blueprint: unlocks crafting recipe
+Freedom Controller Build: craft an item that can “unlock” a locked kit
+5.3 What the Freedom Controller does (simple and powerful)
+It is a consumable or tool (pick one for MVP; I recommend consumable for clarity).
+Use it on a Locked Smart Kit / Premium System → converts it into an Open-Compatible Kit.
+Open-Compatible Kits can satisfy “Locked Required” orders without penalties.
+This makes the late game feel like liberation: you can still exploit locked value, but you’re no longer owned by it.
+
+6) MVP content spec (exactly aligned with your scope)
+MVP features (ship-worthy core)
+1 merge board
+2 families (Open vs Locked)
+5-tier merge ladder (Clips → Premium Systems)
+Workbench generator + upgrade path
+Dependency meter + thresholds
+R&D mini-tree + Freedom Controller
+20 order cards (templates) with 4 order types
+1 villain lockout boss event
+Onboarding scripted first minute
+Basic settings (sound/haptics, accessibility text size)
+20 Order Cards (MVP set, ready to implement)
+Below are templates you can literally encode as data objects. Rewards scale with tier.
+Tier key: C=Clip, T=Track, S=Segment, K=Smart Kit, P=Premium System
+Family tags: O=Open, L=Locked, Any=either family allowed
+Starter Install: 2C (Any)
+Starter Install+: 3C (Any)
+Neat Routing: 2T (Any)
+Under-Cabinet Basic: 1T + 2C (Any)
+Clean Corners: 2S (Any)
+Mood Lighting: 1S + 2T (Any)
+Smart Upgrade: 1K (Any)
+Smart Upgrade+: 1K + 1T (Any)
+Premium Client Tease: 1P (Any)
+Premium Client: 1P + 1S (Any)
+Family-learning orders:
+11. “Open Homeowner”: 1K (O only)
+12. “Baron Fan”: 1K (L only)
+13. Match the Set (Open): 2S (O only)
+14. Match the Set (Locked): 2S (L only)
+Rush (soft timer = bonus decay):
+15. Rush Job: 1K (Any), bonus if <60s
+16. Rush Job+: 1P (Any), bonus if <90s
+Dependency-pressure orders (appear only after threshold):
+17. Baron Certified: 1K (L preferred; Open allowed for reduced reward)
+18. Baron Certified+: 1P (L preferred; Open reduced reward)
+19. Locked Required (late): 1K (L required unless Freedom Controller used)
+20. Locked Required+ (boss lead-in): 1P (L required unless Freedom Controller used)
+This set teaches every concept without extra mechanics.
+
+7) The Lockout Event (the “boss moment”)
+Trigger
+When Dependency hits 100 (or a scripted story milestone in MVP).
+Fiction
+The Bulb Baron pushes a “firmware update” that breaks compatibility: certain installs reject Open kits unless they’re certified.
+Gameplay structure (3 short phases)
+Phase 1 — Shock (30 seconds):
+A forced new order appears: “Locked Required.” The player attempts completion, gets blocked/refund warning. Clear messaging: “Your workshop is dependent.”
+Phase 2 — Response choice (2–5 micro-sessions):
+Option A: Buy Baron’s “Emergency Locked Crate” to brute-force (fast but deepens dependency)
+Option B: Complete 2–3 “Lab Request” orders to earn Research and craft Freedom Controller
+Phase 3 — Liberation payoff (instant):
+Use Freedom Controller on a locked kit or to satisfy the locked requirement, ending the lockout. Dependency drops to a safer threshold (e.g., 60) and the player unlocks ongoing R&D nodes.
+Why this works: it turns the theme into consequences the player feels, not a cutscene.
+
+8) First 60 seconds onboarding (scripted, instrumented)
+Goal: verb → reward → next goal, without menus.
+Spawn 2 Clips (forced): “Tap Workbench”
+Forced merge: drag Clip onto Clip → Track
+haptic tick, bright merge burst, coin pop
+Show order card: “Install Starter Strip: 1 Track”
+Drag Track into order slot → complete
+cash+rep animation, progress bar fill
+“Upgrade Workshop Space” button glows → tap to unlock one blocked tile
+Villain tease appears as a small offer card:
+“Bulb Baron offers a Locked Part Crate: faster merges… increases Dependency.”
+Player can accept or dismiss; both paths continue.
+Analytics to capture here (must):
+tutorial step completion
+time per step
+first order completion rate
+first upgrade rate
+accept/dismiss villain offer rate
+
+9) Feedback (“juice”) checklist (build as a system)
+Micro feedback (every touch)
+Tap workbench: click + tiny bounce + light haptic
+Drag: subtle lift shadow + snap-to-grid
+Merge: snap sound + particle burst + tier banner (0.5 sec)
+Order complete: satisfying “stamp” + cash/reputation fly-up
+Meso feedback (short streaks)
+“Merge chain” bonus if you merge 3+ times within 10 seconds (tiny, optional)
+“Perfect install” if order completed without overfilling board
+Macro feedback (goals)
+Workshop upgrade visually changes the room (new shelves, neon signage)
+New neighborhood unlock introduces new house silhouettes
+
+10) Difficulty and pacing (mobile-friendly)
+Difficulty is mainly constraint-based, not fail-based:
+Early: generous board space, easy orders
+Mid: tighter space, higher-tier requirements, family constraints
+Late: dependency pressure, “locked required” moments, R&D planning
+Failure is “soft” whenever possible:
+If board is full: generation pauses; no hard game over
+If you complete an order incorrectly (when allowed): reduced payout instead of total failure
+Refunds happen only when the player ignores clear warnings at high Dependency
+
+11) Economy design (faucets, sinks, and anti-inflation)
+Currencies (MVP)
+Cash (soft): upgrades, rerolls, expansions
+Reputation (XP): unlocks neighborhoods/orders
+Research: R&D tree and Freedom Controller crafting
+(If you monetize later, add premium currency carefully; don’t pollute MVP.)
+Faucets
+Orders (primary)
+Merge byproducts (small)
+Daily “3 quick jobs” bonus (optional MVP+)
+Sinks
+Workshop upgrades (primary)
+Order reroll (soft, optional)
+R&D node unlocks (research sink)
+Inventory cleanup tools (optional; be careful)
+Inflation control
+Upgrade costs scale with reputation tier
+Higher-tier orders reward more but require exponentially more merges
+Research remains scarce enough that Freedom Controller feels earned
+
+12) UI/UX layout (tiny screen, noisy environment)
+Main Workshop Screen (single screen philosophy)
+Top bar: Cash | Reputation | Dependency meter
+Center: Merge board (dominant)
+Bottom tray: Orders (2 cards visible with swipe)
+Side button: Upgrades (small badge)
+Side button: R&D (locked until early milestone)
+Rule: no early menus before play. Settings tucked behind a gear icon.
+Readability rules
+Tap targets 44px+
+Big tier icons (C/T/S/K/P)
+Color + shape differentiation for Open vs Locked (don’t rely only on color)
+Accessibility
+Colorblind mode swaps family indicators to patterns/icons
+Text scaling
+Toggle haptics and “reduced motion”
+
+13) Monetization plan (ethical, optional, and non-destructive)
+If you monetize after MVP validation, the least harmful mix is:
+Rewarded ads (opt-in)
+“Instant crate” once per session
+“Double rewards” for a completed order (clearly labeled)
+Never show in first session; introduce after player understands loop
+Cosmetics (IAP)
+Workshop skins (neon themes)
+House neighborhood themes
+Merge particle styles
+Convenience that doesn’t create pain
+Extra order slot (permanent unlock)
+Extra storage row (not required to progress)
+Avoid: forced interstitials, punitive energy systems, “pay to reduce dependency” (that’s literally selling relief from the villain you created).
+
+14) Analytics and telemetry (instrument from day one)
+Funnel metrics
+Tutorial completion rate by step
+First session length distribution
+Time to first order completion
+Time to first upgrade
+D1 / D7 retention
+Economy metrics
+Cash earned vs spent per session
+Merge counts per tier
+Drop table outcomes (Open vs Locked ratio)
+Dependency distribution across players
+Refund frequency + trigger conditions
+Design sanity metrics
+Board full occurrences per minute (friction proxy)
+Order completion fail/reduced payout rate
+R&D engagement rate (if too low, Freedom Controller becomes invisible)
+Live tuning readiness
+Store all tuning values in data (JSON / ScriptableObjects)
+Remote-config flags for:
+drop odds
+dependency gain rates
+order reward multipliers
+lockout trigger threshold
+
+15) Technical plan (what separates prototype from shipped)
+Engine recommendation (pragmatic)
+Unity (most common path for mobile casual/merge)
+Deterministic-ish simulation not required, but save integrity is
+Save system requirements
+Save after every merge, order completion, upgrade purchase
+Versioned save schema (migrations)
+Test “kill app mid-reward” and “kill app mid-purchase” cases
+Performance budget
+Keep UI batching clean; avoid heavy overdraw (merge games are UI-heavy)
+Limit particle bursts and keep them pooled
+60fps target; never drop below 30fps on older devices
+Content pipeline (systems-first)
+Orders are data-driven templates
+Parts are enumerations with tier+family+value metadata
+Event scripts are data/state-machine driven (not hard-coded cutscenes)
+
+16) Production roadmap (phased, MVP-first)
+Phase A — Core verb prototype
+Merge board drag + merge
+Basic generator
+Basic VFX/haptics feedback
+Phase B — One full loop
+Orders consume items
+Cash + one upgrade category
+Save/load stability
+Phase C — Strategic layer
+Add Locked family
+Dependency meter + thresholds
+R&D + Freedom Controller
+Phase D — MVP content
+20 order cards
+One lockout event
+Polished onboarding (first 60 seconds)
+Phase E — Soft launch iteration
+Tune early churn and board friction using telemetry
+Adjust dependency pressure so it feels tense but fair
+
+17) Key risks and how this plan avoids them
+Risk: Dependency feels punitive / like a trap
+Mitigation: clear meter, threshold warnings, early R&D tease, soft penalties early, always-visible path out.
+Risk: Board gets clogged → frustration
+Mitigation: early space upgrades, generation pause on near-full, limited undo, order slot upgrades.
+Risk: Locked is obviously optimal (no real choice)
+Mitigation: locked boosts cash, open boosts research; long-term freedom requires research.
+Risk: Too many screens / menus for mobile
+Mitigation: one main screen, shallow side panels, no early mode selection.
+
+18) What “success” looks like in the player’s head
+In 30 seconds: “I merged and built something satisfying.”
+In 3 minutes: “I upgraded my shop and can do bigger installs.”
+In 3 days: “I’m either riding the Baron’s power… or I’m close to breaking free.”
+
+
+
+
+1. The Core Style: Isometric Minimalism
+The most accurate term for this is Isometric Minimalist Art. It’s defined by a lack of perspective (lines don't vanish into the distance), which allows for the "impossible" geometry puzzles seen in the game.
+Key Visual Pillars:
+Low-Poly (Refined): While the models have low polygon counts, they aren't "blocky" like Minecraft. They are clean, smooth, and precisely engineered.
+Flat Shading & Soft Gradients: There are no gritty textures (no dirt, wood grain, or stone cracks). Instead, depth is created through subtle color gradients and clean shadows.
+Pastel & Triadic Palettes: The colors are often soft, curated, and high-contrast, making the interactive elements (like the red character) pop against the teal background.
+
+2. Similar & Related Styles
+To provide you with a broader "mood board," these are important related aesthetic movements you can draw from:
+Style
+Description
+Why mention it?
+M.C. Escher Inspired
+Art based on impossible loops and optical illusions.
+If your gameplay involves shifting gravity or paths.
+Vector 3D
+3D models that look like 2D vector illustrations.
+For a "sharp" and infinitely scalable look.
+Voxel Art
+Art built out of 3D pixels (cubes).
+If you want a more "retro-modern" or grid-based feel.
+Architectural Brutalism
+Focus on raw shapes, repetitive patterns, and scale.
+To emphasize the "monument" feel of the levels.
+
+
+3. The "Developer Checklist"
+To make the request crystal clear, to you the developer, I want:
+Orthographic/Isometric Camera: This removes perspective distortion.
+Baked Lighting: Since the world is static and clean, "baking" the light creates those soft, beautiful shadows without killing the phone's battery.
+Stylized Geometry: Prioritize silhouette and form over realistic textures.
+Atmospheric Fog/Depth: Notice how the bottom of the image fades into the background color? That’s "height fog," used to create a sense of floating in an endless space.
+Pro Tip: Mention the game "Gris" if you want a more hand-drawn/watercolor feel, or "Crossy Road" if you want a more playful, chunky version of this look. You use your best judgement of when and where what styles would be best. These are suggestions. Feel free to ignore and embrace what would be best for this game and when. Don’t do anything that would be a bad fit, do things that make it beautiful and engaging and fit great. 
+
+
+Narrative Elements: 
+The narrative/story part of this game should be an important part of this game. 
+
+​​Addendum: Narrative & Villain Story Layer (built for mobile merge play)
+A quick note on how this is loosely based on a real life enterprise
+This is loosely based on a real life company I will refert to as “The enterprise” (don’t call them “the enterprise in the real game. Give the company a name).
+The enterprise describes itself as a permanent, programmable outdoor lighting company, with an origin story starting in 2010 tied to founder (redacted) wanting a better solution than climbing ladders in winter; it also emphasizes a patented channel solution and growth to hundreds of authorized dealers.  
+The enterprise “Become a Dealer” materials describe a dealer licensing / protected territory model: territories can start around a zip code, expansion requests are at The enterprise’s discretion, and they describe quotas and the possibility of opening/resizing a territory if performance is low.  
+The enterprise markets a controller + app ecosystem (e.g., “Edge” remote access app, “millions of colors, patterns, animations”).  
+A enterprise dealership flyer (hosted on a enterprise-related domain) describes exclusivity being contingent on conditions and states they “reserve the right to reassign” non-compliant/poor-performing dealership areas.  
+What is visible is a fairly typical centralized model: protected territories, rules/quotas, and a proprietary app/controller ecosystem. So the best approach is: use those structural ingredients as satire (zip-code baronies, “certified controllers,” “firmware updates”), while keeping the villain fully fictional and gameplay-first.
+To avoid legal/ethical pitfalls and keep this shippable:
+Don’t use the name of any real company in the real world, real logos, or real person likenesses in-game.
+Don’t imply the real company/founder is “villainous” or doing wrongdoing.
+Do lean into universal lock-in dynamics (exclusive territories, certification, app updates, quotas) as the villain’s tactics.
+Everything below is designed to preserve playability and micro-session flow.
+
+1) Narrative design rules for merge games (what to do and what not to do)
+Do (best practice)
+Deliver story in 2–6 second bites
+Story is a “seasoning,” not the meal. If it interrupts the merge loop, it hurts retention.
+Tie story to mechanics, not cutscenes
+The villain shouldn’t monologue; the villain should appear as the offer card that raises Dependency, the “certification” requirement on orders, and the lockout event.
+Use “story as reward”
+Completing an order unlocks a tiny beat: a customer reaction, a neighborhood postcard, or a villain memo. Story should feel earned.
+Make every story moment skippable + re-readable
+One tap to skip; a “Story Log” to reread later. This respects adults, noisy environments, and repeat sessions.
+Repeat a few motifs until they become satisfying
+Players love recurring jokes and predictable formats:
+“BaronFax” memos with absurd fine print
+“GlowMail” from customers
+“Workshop radio” announcements when Dependency hits thresholds
+Keep character count tiny in MVP
+MVP cast = 3–5 recurring characters. Everyone else appears as flavor text on orders.
+Make choices feel like “I did this”
+If I choose locked parts, the Baron praises me, the meter rises, and later I face certification installs. Consequences should be legible and narratively acknowledged.
+Don’t (common failures)
+Don’t put lore before the first merge
+No intro cinematic you can’t skip. Your first 10 seconds must be merging.
+Don’t force reading to understand rules
+Tutorials must be forced actions + feedback, with story as a wrapper.
+Don’t over-write
+Mobile narrative should be punchy. Long paragraphs are churn fuel.
+Don’t make the villain purely evil
+“Pure evil CEO” gets old fast. Better: the villain is charming, rational, and sincerely believes “standardization” is good—while still pressuring lock-in.
+Don’t punish without warning
+If Dependency causes refunds, the game must warn clearly with both UI + a narrative beat (“Baron Certified clients won’t accept unlicensed kits”).
+
+2) Narrative premise (fun + mechanically aligned)
+Theme
+Convenience now vs independence later—played as a cheerful neon small-business story with corporate satire.
+Setting
+A cozy-but-busy “Glow Workshop” in a town where every neighborhood competes for the best roofline glow. People don’t just buy lighting; they buy status, celebration, and belonging.
+Core cast (MVP)
+Player (you): New owner of “Glow Workshop.”
+Mentor: A retired installer/inventor-type who teaches basics (warm, practical).
+Rival/Villain: The Bulb Baron—a charismatic supplier mogul who sells “Certified Locked Components” and “Protected Territories.”
+Customer voice: Rotating “house personalities” via order cards.
+R&D buddy (optional for MVP): An enthusiastic tinkerer who introduces Freedom Controller.
+Villain inspiration ingredients (structural, not accusatory)
+Borrowed as fictional satire from publicly described elements:
+Protected territories / exclusivity / expansion discretion  
+Quotas / performance conditions / “reserve right to open/reassign territory”  
+Controller + app ecosystem / feature updates  
+Founder-origin “cold ladder” frustration as the player’s motivation  
+
+3) How narrative is delivered (never breaking the loop)
+Story surfaces (all lightweight)
+Tap-to-dismiss speech bubbles (max 1–2 lines)
+Order card flavor text (one sentence, optional)
+“GlowMail” inbox (a list the player can ignore during micro sessions)
+“BaronFax” memos as villain offer cards (these are gameplay choices)
+Neighborhood “postcards” unlocked as collectibles (story log)
+Hard constraints
+No story pop-up while dragging.
+No forced story during board-full emergencies.
+No more than one narrative beat per 30 seconds unless the player opens the Story Log.
+
+4) Intro/onboarding story script (teaches play in under a minute)
+Episode 0: “The Ladder, The Glow, The Offer”
+Format: quick comic panel (optional) → immediate play.
+Cold open (2 seconds, skippable):
+Panel shows you on a ladder in wind/snow. A string of lights tangles into a knot shaped like a sad face.
+Caption: “There has to be a better way.”
+Step-by-step tutorial with micro-dialogue
+Tap Workbench → spawn 2 Clips
+Mentor bubble: “Start small. Parts first.”
+Drag Clip onto Clip → merge into Track
+Mentor: “That’s it. Two become one. Keep climbing the chain.”
+Order card appears: “Starter Install: 1 Track”
+Customer bubble: “Please—no flicker. My neighbors judge.”
+Drag Track into Order slot → complete
+Rewards pop.
+Mentor: “Cash pays rent. Reputation gets you better houses.”
+Upgrade prompt (unlock 1 board slot)
+Mentor: “Space is oxygen. Buy oxygen.”
+Villain arrives as an offer card (choice moment, still onboarding-simple)
+Card: “Bulb Baron’s ‘Certified Starter Crate’”
+Benefit (big text): “Better parts. Faster merges.”
+Cost (big text): “+Dependency”
+Bulb Baron bubble (fictional, in-game): “A signature is just a hug… in legal form.”
+Important onboarding best practice:
+Whether the player accepts or declines, they should still succeed immediately:
+Accept: they get a Locked Track (instant delight) and the Dependency meter appears with a friendly warning.
+Decline: they get an Open-Standard bonus Clip drop as “Mentor’s stash.”
+This ensures the game never “punishes curiosity” in minute one.
+
+5) Ongoing narrative structure (chapters that map to mechanics)
+Chapter model: Neighborhoods as episodes
+Each neighborhood introduces one gameplay twist plus a story beat.
+Neighborhood 1 — “Starter Street” (learn loop)
+Story: locals just want reliable glow.
+Mechanic: basic orders + upgrades.
+Neighborhood 2 — “HOA Heights” (constraints arrive)
+Story: the HOA president is obsessed with uniformity.
+Mechanic: “Style Match” orders (all Open or all Locked).
+Neighborhood 3 — “Downtown Display District” (rush + reputation)
+Story: businesses want game-day colors in 30 seconds.
+Mechanic: Rush orders (bonus decay timer).
+Neighborhood 4 — “The Certified Zone” (Dependency pressure)
+Story: the Baron sponsors “Certified Install Week.”
+Mechanic: Baron Certified orders appear if Dependency crosses threshold.
+Neighborhood 5 — “Lockout Lane” (boss event)
+Story: “Firmware Friday”—the Baron pushes an update that breaks compatibility.
+Mechanic: Lockout Event (your existing boss design).
+Neighborhood 6 — “Open Spark Workshop” (liberation arc)
+Story: you build the Freedom Controller and start converting locked kits.
+Mechanic: Freedom Controller crafting + Dependency relief.
+
+6) Villain personality & recurring antics (fun, not cringe)
+Villain: The Bulb Baron (fictional)
+Vibe: charming, corporate-slick, genuinely believes he’s “protecting quality” through standardization… while quietly building dependence.
+Signature comedic gimmick:
+He speaks in “terms and conditions” and treats territories like medieval fiefdoms:
+“Your area is… protected. Provided you remain… compliant.”
+Villain tactics (each mapped to a mechanic)
+“Protected Territory” offers (cosmetic + reward bundles)
+Narrative: “I grant you exclusive glow rights to Maple Circle.”
+Mechanic: special crate offer; increases Dependency.
+“Certification” badges
+Narrative: customers start asking for “certified installs.”
+Mechanic: Baron Certified orders (Locked preferred).
+“Quota Season” pressure
+Narrative: Baron reminds you to “hit your numbers.”
+Mechanic: increases Locked drop bias at high Dependency (your design).
+“Firmware Friday” lockout
+Narrative: a forced update with absurd patch notes.
+Mechanic: lockout boss event.
+“Reassignment Threat” (use carefully; keep it playful)
+Narrative: “We might… redistribute your opportunities.”
+Mechanic: threat is metaphorical in your game; manifests as refunds/requirements, not literally taking territory (unless you want a “lose a neighborhood temporarily” event later).
+Why this fits the loose real-world inspiration: The enterprise’s public dealer materials discuss protected territories, expansion discretion, quotas, and reserving rights around territory status.  
+In-game, we exaggerate it into a “zip-code baron” caricature for comedy and clarity.
+
+7) Narrative beats tied to Dependency thresholds (so the story explains the system)
+Instead of a dry tooltip, each threshold gets a tiny “in-world” moment.
+Dependency 20:
+Mentor: “He’s being friendly because you’re small.”
+BaronFax: “A complimentary crate… because I believe in you.”
+Dependency 40:
+Customer: “My cousin says only certified kits won’t glitch.”
+UI: “Baron Certified orders may appear.”
+Dependency 60:
+Baron broadcast: “For your convenience, certification is now… required.”
+UI: “Some installs require Locked parts or payouts drop.”
+Dependency 80:
+Mentor: “Notice your Workbench? It’s… ‘suggesting’ his parts.”
+UI: “Locked drop chance increased.”
+Dependency 100 (Lockout Event):
+Baron: “A routine update. Nothing to fear. Please do not resist.”
+UI: Lockout boss begins.
+This is best practice: the narrative teaches the rule at the moment it matters.
+
+8) Freedom Controller story arc (make the “break free” moment emotionally satisfying)
+R&D beats (micro)
+Unlock R&D:
+Mentor: “We stop begging when we can build.”
+Blueprint discovered:
+R&D buddy: “He locked the controller. So… we unlock the lock.”
+Build step:
+“Freedom Controller (prototype)” appears as a special item on the merge board (feels tangible).
+Payoff moment (big but still fast)
+First time the player uses Freedom Controller on a Locked Smart Kit:
+Animation: chains snap / sticker peels off / glow shifts to Open color palette.
+Sound: “click → clean chime”
+Dialogue:
+Mentor: “That’s what independence sounds like.”
+This is your “Act 2 climax” without a cutscene.
+
+9) Content factory: repeatable story templates (so it stays fresh cheaply)
+A) Order card flavor text templates (1 line)
+“HOA says: ‘Warm white only.’ HOA says a lot of things.”
+“Client wants ‘subtle.’ Their neighbor wants ‘bright enough to be seen from space.’”
+“Birthday party. Kid requested ‘dragon mode.’ Please don’t ask.”
+B) Customer micro-archetypes (reused across orders)
+The HOA Enforcer
+The Party Planner
+The Sports Superfan
+The Cozy Minimalist
+The Tech Dad who wants app features
+The “I don’t trust subscriptions” skeptic
+C) BaronFax memo templates (2 lines max)
+“Congratulations! Your glow has been upgraded.”
+“Reminder: ‘exclusive’ is a feeling. Compliance is a requirement.”
+D) Mentor templates (supportive but not verbose)
+“Merge first. Think later.”
+“Space is power.”
+“If it feels too good early, check the fine print.”
+This gives you variety with low writing cost.
+
+10) “Greatness” checklist specifically for narrative in a merge tycoon
+Must-have for greatness
+A villain who is also a UI system (the Baron is Dependency + offers + lockout)
+Story beats that always coincide with a reward or a new mechanic
+A re-readable story log (for players who care)
+Narrative clarity that reduces perceived unfairness (refunds feel “caused,” not random)
+Humor with restraint (chuckle, not cringe)
+Avoid if you want greatness
+Long dialogue trees (merge players didn’t come for that)
+Heavy lore dumps
+Unskippable sequences
+Punishment framed as moral judgment (“you were greedy”)—instead frame it as system dynamics (“the Baron tightened the contract”)
+Too many named NPCs before the player is emotionally invested
+
+11) Implementation notes (how to build it without derailing production)
+Narrative system as data (recommended)
+Create a simple “Story Beat” data object:
+trigger_type: tutorial_step / dependency_threshold / upgrade_purchased / order_completed / neighborhood_unlocked / event_started
+priority: blocks_play (never) / overlays / inbox_only
+text_line_1, text_line_2
+speaker: mentor / baron / customer / system
+once_only: true/false
+cooldown_seconds: prevent spam
+This lets you iterate narrative without engineering churn.
+
+

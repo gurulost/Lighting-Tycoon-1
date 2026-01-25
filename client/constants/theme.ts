@@ -1,30 +1,72 @@
 import { Platform } from "react-native";
 
-const tintColorLight = "#007AFF";
-const tintColorDark = "#0A84FF";
+export const GameColors = {
+  openStandard: {
+    primary: "#4A9EFF",
+    glow: "#FFFFFF",
+  },
+  locked: {
+    primary: "#FFB84D",
+    accent: "#A855F7",
+  },
+  board: {
+    background: "#1A1A2E",
+    tile: "#252542",
+    tileEmpty: "#1E1E36",
+  },
+  ui: {
+    background: "#0F0F1F",
+    surface: "#1F1F2E",
+    surfaceElevated: "#2A2A3E",
+    primary: "#00D9FF",
+    danger: "#FF4D4D",
+    success: "#4DFF88",
+    warning: "#FFB84D",
+  },
+  currency: {
+    cash: "#FFD700",
+    reputation: "#00D9FF",
+    research: "#9D4EDD",
+  },
+  text: {
+    primary: "#FFFFFF",
+    secondary: "#A0A0B8",
+    disabled: "#505064",
+  },
+  tiers: {
+    1: "#8B9DC3",
+    2: "#4A9EFF",
+    3: "#00D9FF",
+    4: "#4DFF88",
+    5: "#FFD700",
+  },
+};
+
+const tintColorLight = "#00D9FF";
+const tintColorDark = "#00D9FF";
 
 export const Colors = {
   light: {
-    text: "#11181C",
-    buttonText: "#FFFFFF",
+    text: "#FFFFFF",
+    buttonText: "#0F0F1F",
     tabIconDefault: "#687076",
     tabIconSelected: tintColorLight,
-    link: "#007AFF",
-    backgroundRoot: "#FFFFFF", // Elevation 0
-    backgroundDefault: "#F2F2F2", // Elevation 1
-    backgroundSecondary: "#E6E6E6", // Elevation 2
-    backgroundTertiary: "#D9D9D9", // Elevation 3
+    link: "#00D9FF",
+    backgroundRoot: "#0F0F1F",
+    backgroundDefault: "#1F1F2E",
+    backgroundSecondary: "#2A2A3E",
+    backgroundTertiary: "#353548",
   },
   dark: {
-    text: "#ECEDEE",
-    buttonText: "#FFFFFF",
+    text: "#FFFFFF",
+    buttonText: "#0F0F1F",
     tabIconDefault: "#9BA1A6",
     tabIconSelected: tintColorDark,
-    link: "#0A84FF",
-    backgroundRoot: "#1F2123", // Elevation 0
-    backgroundDefault: "#2A2C2E", // Elevation 1
-    backgroundSecondary: "#353739", // Elevation 2
-    backgroundTertiary: "#404244", // Elevation 3
+    link: "#00D9FF",
+    backgroundRoot: "#0F0F1F",
+    backgroundDefault: "#1F1F2E",
+    backgroundSecondary: "#2A2A3E",
+    backgroundTertiary: "#353548",
   },
 };
 
@@ -40,6 +82,9 @@ export const Spacing = {
   "5xl": 48,
   inputHeight: 48,
   buttonHeight: 52,
+  tileSize: 64,
+  tileGap: 4,
+  partSize: 56,
 };
 
 export const BorderRadius = {
@@ -84,6 +129,16 @@ export const Typography = {
     lineHeight: 20,
     fontWeight: "400" as const,
   },
+  micro: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "500" as const,
+  },
+  tier: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "700" as const,
+  },
   link: {
     fontSize: 16,
     lineHeight: 24,
@@ -93,13 +148,9 @@ export const Typography = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: "system-ui",
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: "ui-serif",
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: "ui-rounded",
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: "ui-monospace",
   },
   default: {
