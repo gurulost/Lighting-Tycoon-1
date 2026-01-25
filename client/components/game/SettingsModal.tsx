@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Switch, Platform } from "react-native";
+import React from "react";
+import { View, StyleSheet, Pressable, Switch } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { useGame } from "@/context/GameContext";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -44,9 +45,8 @@ function SettingRow({ icon, label, description, value, onValueChange, color }: S
 }
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { state, dispatch } = useGame();
+  const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
 
   return (
     <Pressable style={styles.overlay} onPress={onClose} testID="settings-modal">
@@ -68,7 +68,9 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               label="Sound Effects"
               description="Play sounds during gameplay"
               value={soundEnabled}
-              onValueChange={setSoundEnabled}
+              onValueChange={(value) =>
+                dispatch({ type: "UPDATE_SETTINGS", settings: { soundEnabled: value } })
+              }
               color={GameColors.ui.primary}
             />
 
@@ -77,16 +79,20 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               label="Haptic Feedback"
               description="Vibrate on actions"
               value={hapticsEnabled}
-              onValueChange={setHapticsEnabled}
+              onValueChange={(value) =>
+                dispatch({ type: "UPDATE_SETTINGS", settings: { hapticsEnabled: value } })
+              }
               color={GameColors.currency.research}
             />
 
             <SettingRow
-              icon="bell"
-              label="Notifications"
-              description="Get order alerts when away"
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              icon="activity"
+              label="Reduced Motion"
+              description="Tone down animations and effects"
+              value={reducedMotion}
+              onValueChange={(value) =>
+                dispatch({ type: "UPDATE_SETTINGS", settings: { reducedMotion: value } })
+              }
               color={GameColors.currency.cash}
             />
           </View>

@@ -23,6 +23,7 @@ interface OrderCardProps {
   order: Order;
   onFulfill: () => void;
   onDismiss: () => void;
+  dismissible?: boolean;
 }
 
 const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
@@ -33,22 +34,28 @@ const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
   5: "star",
 };
 
-export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
-  const { state, getPartsForOrder } = useGame();
+export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: OrderCardProps) {
+  const { state, getFulfillmentIndices } = useGame();
+  const hapticsEnabled = state.settings.hapticsEnabled;
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const scale = useSharedValue(1);
   const glowPulse = useSharedValue(0);
   const urgentPulse = useSharedValue(0);
 
-  const availableParts = getPartsForOrder(order);
+  const fulfillmentIndices = getFulfillmentIndices(order);
+  const canFulfill = fulfillmentIndices !== null;
 
-  const canFulfill = order.requirements.every((req) => {
-    const matching = availableParts.filter((p) => {
-      if (p.tier !== req.tier) return false;
-      if (req.family !== "any" && p.family !== req.family) return false;
-      return true;
-    });
-    return matching.length >= req.count;
+  const isPartValidForRequirement = (part: Part, req: { tier: PartTier; family: "open" | "locked" | "any" }) => {
+    if (part.tier !== req.tier) return false;
+    if (req.family === "any") return true;
+    if (part.family === req.family) return true;
+    if (req.family === "locked" && order.type === "locked_required" && part.compatible) return true;
+    return false;
+  };
+
+  const availableParts = state.board.filter((p): p is Part => {
+    if (!p) return false;
+    return order.requirements.some((req) => isPartValidForRequirement(p, req));
   });
 
   useEffect(() => {
@@ -98,6 +105,8 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
         return GameColors.currency.cash;
       case "style_match":
         return GameColors.ui.primary;
+      case "lab_request":
+        return GameColors.currency.research;
       case "baron_certified":
       case "locked_required":
         return GameColors.locked.primary;
@@ -114,6 +123,8 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
         return "award";
       case "style_match":
         return "layers";
+      case "lab_request":
+        return "zap";
       case "baron_certified":
       case "locked_required":
         return "lock";
@@ -134,6 +145,8 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
         return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
       case "premium":
         return [`${GameColors.currency.cash}15`, "#1A1A2E", `${GameColors.currency.cash}15`];
+      case "lab_request":
+        return [`${GameColors.currency.research}15`, "#1A1A2E", `${GameColors.currency.research}15`];
       default:
         return ["#1A1A2E", "#252542", "#1A1A2E"];
     }
@@ -197,11 +210,22 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
               <Feather name={getOrderTypeIcon()} size={14} color={typeColor} />
             </LinearGradient>
             <ThemedText style={styles.title}>{order.title}</ThemedText>
+            {order.isLockout ? (
+              <View style={styles.lockoutBadge}>
+                <ThemedText style={styles.lockoutBadgeText}>LOCKOUT</ThemedText>
+              </View>
+            ) : null}
           </View>
-          <Pressable onPress={onDismiss} style={styles.dismissButton}>
-            <Feather name="x" size={16} color={GameColors.text.disabled} />
-          </Pressable>
+          {dismissible ? (
+            <Pressable onPress={onDismiss} style={styles.dismissButton}>
+              <Feather name="x" size={16} color={GameColors.text.disabled} />
+            </Pressable>
+          ) : null}
         </View>
+
+        {order.flavorText ? (
+          <ThemedText style={styles.flavorText}>{order.flavorText}</ThemedText>
+        ) : null}
 
         {order.type === "rush" && timeRemaining !== null ? (
           <Animated.View style={[styles.rushTimer, urgentStyle]}>
@@ -219,11 +243,7 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
 
         <View style={styles.requirements}>
           {order.requirements.map((req, index) => {
-            const matching = availableParts.filter((p) => {
-              if (p.tier !== req.tier) return false;
-              if (req.family !== "any" && p.family !== req.family) return false;
-              return true;
-            });
+            const matching = availableParts.filter((p) => isPartValidForRequirement(p, req));
             const hasEnough = matching.length >= req.count;
             const familyColor =
               req.family === "open"
@@ -269,7 +289,11 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
                         { color: familyColor },
                       ]}
                     >
-                      {req.family === "open" ? "Open-Standard" : "Locked"}
+                      {req.family === "open"
+                        ? "Open-Standard"
+                        : order.type === "locked_required"
+                        ? "Locked / Compatible"
+                        : "Locked"}
                     </ThemedText>
                   ) : null}
                 </View>
@@ -308,8 +332,8 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
                 </ThemedText>
               </LinearGradient>
             ) : null}
-            {order.rewards.research > 0 ? (
-              <LinearGradient
+        {order.rewards.research > 0 ? (
+          <LinearGradient
                 colors={[`${GameColors.currency.research}20`, `${GameColors.currency.research}10`]}
                 style={styles.rewardChip}
               >
@@ -325,10 +349,14 @@ export function OrderCard({ order, onFulfill, onDismiss }: OrderCardProps) {
         <Pressable
           onPress={() => {
             if (canFulfill) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              if (hapticsEnabled) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
               onFulfill();
             } else {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              if (hapticsEnabled) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              }
             }
           }}
           style={styles.fulfillButtonContainer}
@@ -404,6 +432,25 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: GameColors.text.primary,
     flex: 1,
+  },
+  lockoutBadge: {
+    backgroundColor: GameColors.ui.danger + "30",
+    borderRadius: BorderRadius.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: GameColors.ui.danger + "60",
+  },
+  lockoutBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: GameColors.ui.danger,
+    letterSpacing: 0.5,
+  },
+  flavorText: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+    marginBottom: Spacing.sm,
   },
   dismissButton: {
     width: 32,

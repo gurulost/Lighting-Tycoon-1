@@ -15,9 +15,17 @@ export interface Part {
   family: PartFamily;
   tier: PartTier;
   position: number;
+  compatible?: boolean;
 }
 
-export type OrderType = "basic" | "style_match" | "rush" | "premium" | "baron_certified" | "locked_required";
+export type OrderType =
+  | "basic"
+  | "style_match"
+  | "rush"
+  | "premium"
+  | "baron_certified"
+  | "locked_required"
+  | "lab_request";
 
 export interface OrderRequirement {
   tier: PartTier;
@@ -35,6 +43,8 @@ export interface Order {
     reputation: number;
     research: number;
   };
+  flavorText?: string;
+  isLockout?: boolean;
   rushDeadline?: number;
   rushStartTime?: number;
   familyPreference?: PartFamily;
@@ -87,9 +97,53 @@ export interface GameState {
   
   tutorialStep: number;
   tutorialComplete: boolean;
+  tutorialSpawnCount: number;
+  tutorialOrderId?: string;
   
   lockoutActive: boolean;
   lockoutPhase: number;
+  lockoutOrderId?: string;
+  lockoutLabOrdersRemaining: number;
+  lockoutChoice?: "baron" | "lab";
+
+  baronOfferAvailable: boolean;
+  baronOfferSeen: boolean;
+  baronOfferCooldownUntil: number;
+
+  settings: {
+    soundEnabled: boolean;
+    hapticsEnabled: boolean;
+    reducedMotion: boolean;
+  };
+
+  undoSnapshot?: {
+    board: (Part | null)[];
+    cash: number;
+    reputation: number;
+    research: number;
+    dependency: number;
+    lockoutActive: boolean;
+    lockoutPhase: number;
+    mergeChainCount: number;
+    mergeChainExpiresAt: number;
+    lastMergeBonusId: number;
+    lastMergeBonusCash: number;
+  };
+  undoCooldownUntil: number;
+
+  mergeChainCount: number;
+  mergeChainExpiresAt: number;
+  lastMergeBonusId: number;
+  lastMergeBonusCash: number;
+
+  storyQueue: string[];
+  storyLog: { id: string; timestamp: number }[];
+  storySeen: Record<string, boolean>;
+  activeStoryBeatId?: string;
+  lastStoryShownAt: number;
+
+  reputationTier: number;
+  currentNeighborhoodId: string;
 }
 
 export const INITIAL_BOARD_SIZE = 30;
@@ -121,6 +175,8 @@ export const ORDER_TEMPLATES: Omit<Order, "id">[] = [
   { title: "Baron Certified+", type: "baron_certified", requirements: [{ tier: 5, family: "any", count: 1 }], rewards: { cash: 650, reputation: 130, research: 0 }, familyPreference: "locked", penaltyIfWrongFamily: true },
   { title: "Locked Required", type: "locked_required", requirements: [{ tier: 4, family: "locked", count: 1 }], rewards: { cash: 350, reputation: 70, research: 0 } },
   { title: "Locked Required+", type: "locked_required", requirements: [{ tier: 5, family: "locked", count: 1 }], rewards: { cash: 800, reputation: 160, research: 0 } },
+  { title: "Lab Request", type: "lab_request", requirements: [{ tier: 3, family: "open", count: 1 }], rewards: { cash: 80, reputation: 10, research: 20 } },
+  { title: "Lab Request+", type: "lab_request", requirements: [{ tier: 4, family: "open", count: 1 }], rewards: { cash: 120, reputation: 15, research: 30 } },
 ];
 
 export const UPGRADE_DEFINITIONS: Upgrade[] = [
@@ -130,6 +186,7 @@ export const UPGRADE_DEFINITIONS: Upgrade[] = [
   { id: "workbench_speed_1", category: "workbench", name: "Quick Hands I", description: "Reduce workbench cooldown", cost: 150, level: 0, maxLevel: 3, effect: "cooldown_-500" },
   { id: "workbench_quality_1", category: "workbench", name: "Better Parts I", description: "Improve drop quality", cost: 200, level: 0, maxLevel: 3, effect: "drop_quality_+10" },
   { id: "quality_bonus_1", category: "quality", name: "Quality Tools I", description: "Bonus cash on merges", cost: 250, level: 0, maxLevel: 3, effect: "merge_cash_+5" },
+  { id: "open_standard_initiative", category: "quality", name: "Open Standards Initiative", description: "Reduce Dependency by 10", cost: 300, level: 0, maxLevel: 1, effect: "dependency_reduce_10" },
   { id: "logistics_orders_1", category: "logistics", name: "More Orders I", description: "Increase order slots", cost: 300, level: 0, maxLevel: 2, effect: "max_orders_+1" },
   { id: "rd_unlock", category: "rd", name: "R&D Access", description: "Unlock research bench", cost: 500, level: 0, maxLevel: 1, effect: "unlock_rd" },
 ];

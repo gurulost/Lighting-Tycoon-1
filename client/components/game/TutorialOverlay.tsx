@@ -28,48 +28,48 @@ interface TutorialStep {
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 0,
-    title: "Welcome to Lighting Tycoon!",
-    description: "Run your own lighting workshop and become the industry leader. Let's learn how to play!",
-    icon: "zap",
-    highlight: null,
-    color: GameColors.currency.cash,
+    title: "Tap the Workbench",
+    description: "Spawn two Clips to get started. Tap the glowing Workbench tile on the board.",
+    icon: "tool",
+    highlight: "board",
+    color: GameColors.ui.primary,
   },
   {
     id: 1,
-    title: "The Merge Board",
-    description: "This is where you combine parts. Drag matching parts together to merge them into higher-tier items.",
-    icon: "grid",
+    title: "Merge to Upgrade",
+    description: "Drag one Clip onto another to make a Track.",
+    icon: "layers",
     highlight: "board",
     color: GameColors.openStandard.primary,
   },
   {
     id: 2,
-    title: "Part Families",
-    description: "Blue parts are Open-Standard (interoperable). Gold parts are Locked (proprietary). Choose wisely!",
-    icon: "layers",
-    highlight: "board",
-    color: GameColors.locked.primary,
-  },
-  {
-    id: 3,
-    title: "Customer Orders",
-    description: "Customers will request specific parts. Fulfill orders to earn coins, reputation, and research points.",
+    title: "Complete an Order",
+    description: "Open the Order Inbox and fulfill the Starter Install to earn rewards.",
     icon: "inbox",
     highlight: "orders",
     color: GameColors.currency.reputation,
   },
   {
+    id: 3,
+    title: "Upgrade Your Space",
+    description: "Use your coins to unlock a new board slot. Space is oxygen.",
+    icon: "grid",
+    highlight: "currency",
+    color: GameColors.currency.cash,
+  },
+  {
     id: 4,
-    title: "Dependency Meter",
-    description: "Using Locked parts increases your dependency on proprietary systems. Watch this meter - at 100%, something big happens!",
-    icon: "alert-triangle",
+    title: "The Baron’s Offer",
+    description: "Decide whether to take the locked crate or stay open-standard.",
+    icon: "lock",
     highlight: "dependency",
-    color: GameColors.ui.danger,
+    color: GameColors.locked.primary,
   },
   {
     id: 5,
     title: "You're Ready!",
-    description: "Tap the board to spawn new parts, merge them to upgrade, and fulfill orders. Good luck, Tycoon!",
+    description: "Merge, fulfill orders, and choose your strategy. Good luck, Tycoon!",
     icon: "star",
     highlight: null,
     color: GameColors.ui.success,
@@ -92,14 +92,6 @@ export function TutorialOverlay() {
 
   const isLastStep = state.tutorialStep === TUTORIAL_STEPS.length - 1;
 
-  const handleNext = () => {
-    if (isLastStep) {
-      dispatch({ type: "COMPLETE_TUTORIAL" });
-    } else {
-      dispatch({ type: "ADVANCE_TUTORIAL" });
-    }
-  };
-
   const handleSkip = () => {
     dispatch({ type: "COMPLETE_TUTORIAL" });
   };
@@ -108,8 +100,11 @@ export function TutorialOverlay() {
     <Animated.View
       entering={FadeIn.duration(300)}
       exiting={FadeOut.duration(200)}
+      pointerEvents="box-none"
       style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
     >
+      <View pointerEvents="none" style={styles.backdrop} />
+
       <Pressable style={styles.skipButton} onPress={handleSkip}>
         <ThemedText style={styles.skipText}>Skip Tutorial</ThemedText>
       </Pressable>
@@ -153,23 +148,27 @@ export function TutorialOverlay() {
               ))}
             </View>
 
-            <Pressable onPress={handleNext} style={styles.nextButtonContainer}>
-              <LinearGradient
-                colors={[currentStep.color, `${currentStep.color}CC`, currentStep.color]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.nextButton}
+            {isLastStep ? (
+              <Pressable
+                onPress={() => dispatch({ type: "COMPLETE_TUTORIAL" })}
+                style={styles.nextButtonContainer}
               >
-                <ThemedText style={styles.nextButtonText}>
-                  {isLastStep ? "Start Playing!" : "Next"}
-                </ThemedText>
-                <Feather
-                  name={isLastStep ? "play" : "chevron-right"}
-                  size={20}
-                  color="#0F0F1F"
-                />
-              </LinearGradient>
-            </Pressable>
+                <LinearGradient
+                  colors={[currentStep.color, `${currentStep.color}CC`, currentStep.color]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.nextButton}
+                >
+                  <ThemedText style={styles.nextButtonText}>Start Playing!</ThemedText>
+                  <Feather name="play" size={20} color="#0F0F1F" />
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              <View style={styles.waitingContainer}>
+                <Feather name="chevron-down" size={18} color={GameColors.text.secondary} />
+                <ThemedText style={styles.waitingText}>Complete the step to continue</ThemedText>
+              </View>
+            )}
           </LinearGradient>
         </Animated.View>
       </View>
@@ -190,10 +189,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(10, 10, 20, 0.95)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10, 10, 20, 0.75)",
   },
   skipButton: {
     position: "absolute",
@@ -286,6 +288,17 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     color: "#0F0F1F",
+  },
+  waitingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+  },
+  waitingText: {
+    fontSize: 13,
+    color: GameColors.text.secondary,
+    fontWeight: "600",
   },
   stepIndicator: {
     position: "absolute",

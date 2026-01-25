@@ -17,7 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
-import { PartItem } from "./PartItem";
+import { PartItem, MergeAnimation } from "./PartItem";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { WORKBENCH_SLOT, ORDER_INBOX_SLOT, RD_BENCH_SLOT } from "@/types/game";
@@ -30,9 +30,10 @@ const GRID_COLS = 6;
 const GRID_ROWS = 5;
 
 interface MergeBoardProps {
-  onWorkbenchPress: () => void;
+  onWorkbenchPress: (result: "spawned" | "blocked" | "cooldown") => void;
   onOrderInboxPress: () => void;
   onRDBenchPress: () => void;
+  onPartLongPress?: (index: number) => void;
 }
 
 function AnimatedStation({
@@ -94,10 +95,18 @@ export function MergeBoard({
   onWorkbenchPress,
   onOrderInboxPress,
   onRDBenchPress,
+  onPartLongPress,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, spawnPart } = useGame();
+  const hapticsEnabled = state.settings.hapticsEnabled;
+  const reducedMotion = state.settings.reducedMotion;
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [highlightedSlots, setHighlightedSlots] = useState<number[]>([]);
+  const [mergeEffect, setMergeEffect] = useState<{
+    index: number;
+    tier: number;
+    family: "open" | "locked";
+  } | null>(null);
 
   const screenWidth = Dimensions.get("window").width;
   const boardPadding = Spacing.lg * 2;
@@ -121,7 +130,9 @@ export function MergeBoard({
   const handleDragStart = useCallback(
     (index: number) => {
       setDragFromIndex(index);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (hapticsEnabled) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
       const validTargets: number[] = [];
       for (let i = 0; i < state.boardSize; i++) {
         if (i === index) continue;
@@ -135,7 +146,7 @@ export function MergeBoard({
       }
       setHighlightedSlots(validTargets);
     },
-    [state.board, state.boardSize, isSlotBlocked, isStationSlot, canMerge]
+    [state.board, state.boardSize, isSlotBlocked, isStationSlot, canMerge, hapticsEnabled]
   );
 
   const handleDragEnd = useCallback(
@@ -155,22 +166,46 @@ export function MergeBoard({
 
       if (toIndex !== fromIndex && !isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
         if (state.board[toIndex] !== null) {
+          const fromPart = state.board[fromIndex];
+          const toPart = state.board[toIndex];
           const merged = mergeParts(fromIndex, toIndex);
-          if (merged) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          } else {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          if (hapticsEnabled) {
+            if (merged) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            }
+          }
+          if (merged && fromPart && toPart && !reducedMotion) {
+            const mergedFamily =
+              fromPart.family === "locked" || toPart.family === "locked" ? "locked" : "open";
+            setMergeEffect({
+              index: toIndex,
+              tier: fromPart.tier + 1,
+              family: mergedFamily,
+            });
           }
         } else {
           movePart(fromIndex, toIndex);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (hapticsEnabled) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
         }
       }
 
       setDragFromIndex(null);
       setHighlightedSlots([]);
     },
-    [tileSize, isSlotBlocked, isStationSlot, state.board, mergeParts, movePart]
+    [
+      tileSize,
+      isSlotBlocked,
+      isStationSlot,
+      state.board,
+      mergeParts,
+      movePart,
+      hapticsEnabled,
+      reducedMotion,
+    ]
   );
 
   const renderTile = (index: number) => {
@@ -241,6 +276,7 @@ export function MergeBoard({
               size={tileSize - 10}
               onDragStart={() => handleDragStart(index)}
               onDragEnd={(tx, ty) => handleDragEnd(index, tx, ty)}
+              onLongPress={() => onPartLongPress?.(index)}
             />
           ) : (
             <View style={styles.emptySlotIndicator} />
@@ -262,8 +298,23 @@ export function MergeBoard({
           isActive={state.workbenchReady}
           onPress={() => {
             if (state.workbenchReady) {
-              spawnPart();
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              const didSpawn = spawnPart();
+              if (didSpawn) {
+                if (hapticsEnabled) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                }
+                onWorkbenchPress("spawned");
+              } else {
+                if (hapticsEnabled) {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                }
+                onWorkbenchPress("blocked");
+              }
+            } else {
+              if (hapticsEnabled) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              }
+              onWorkbenchPress("cooldown");
             }
           }}
           tileSize={tileSize}
@@ -396,6 +447,31 @@ export function MergeBoard({
         >
           {tiles}
         </View>
+        {mergeEffect ? (
+          <View style={[styles.mergeOverlay, { top: Spacing.md, left: Spacing.md }]}>
+            <View
+              style={[
+                styles.mergeAnimationWrapper,
+                {
+                  width: tileSize,
+                  height: tileSize,
+                  left:
+                    (mergeEffect.index % GRID_COLS) * (tileSize + Spacing.tileGap),
+                  top:
+                    Math.floor(mergeEffect.index / GRID_COLS) *
+                    (tileSize + Spacing.tileGap),
+                },
+              ]}
+            >
+              <MergeAnimation
+                tier={mergeEffect.tier as 1 | 2 | 3 | 4 | 5}
+                family={mergeEffect.family}
+                size={tileSize}
+                onComplete={() => setMergeEffect(null)}
+              />
+            </View>
+          </View>
+        ) : null}
       </LinearGradient>
     </View>
   );
@@ -432,6 +508,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: Spacing.tileGap,
+  },
+  mergeOverlay: {
+    position: "absolute",
+    pointerEvents: "none",
+  },
+  mergeAnimationWrapper: {
+    position: "absolute",
+    justifyContent: "center",
+    alignItems: "center",
   },
   tile: {
     borderRadius: BorderRadius.xs,

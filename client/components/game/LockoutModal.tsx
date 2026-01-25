@@ -21,6 +21,7 @@ interface LockoutModalProps {
 
 export function LockoutModal({ onClose }: LockoutModalProps) {
   const { state, dispatch } = useGame();
+  const hapticsEnabled = state.settings.hapticsEnabled;
   const pulseScale = useSharedValue(1);
 
   React.useEffect(() => {
@@ -32,18 +33,39 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
       -1,
       true
     );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  }, []);
+    if (hapticsEnabled) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+  }, [hapticsEnabled]);
+
+  const handleAdvance = () => {
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    dispatch({ type: "LOCKOUT_ADVANCE" });
+    onClose();
+  };
 
   const handleBaronChoice = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    dispatch({ type: "RESOLVE_LOCKOUT", choice: "baron" });
-    dispatch({ type: "ACCEPT_BARON_OFFER" });
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }
+    dispatch({ type: "LOCKOUT_CHOOSE_BARON" });
+    onClose();
+  };
+
+  const handleLabChoice = () => {
+    if (hapticsEnabled) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    dispatch({ type: "LOCKOUT_CHOOSE_LAB" });
     onClose();
   };
 
   const handleFreedomChoice = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (hapticsEnabled) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
     dispatch({ type: "RESOLVE_LOCKOUT", choice: "freedom" });
     onClose();
   };
@@ -52,7 +74,11 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
     transform: [{ scale: pulseScale.value }],
   }));
 
-  const canUseFreedom = state.freedomControllerCount > 0 || state.rdNodes["freedom_build"];
+  const canUseFreedom = state.freedomControllerCount > 0;
+  const isPhase1 = state.lockoutPhase === 1;
+  const isPhase2 = state.lockoutPhase === 2;
+  const isPhase3 = state.lockoutPhase === 3;
+  const labRemaining = state.lockoutLabOrdersRemaining;
 
   return (
     <View style={styles.overlay}>
@@ -77,23 +103,67 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           </ThemedText>
         </View>
 
-        <ThemedText style={styles.choiceTitle}>Choose Your Response:</ThemedText>
-
-        <View style={styles.choices}>
-          <Pressable style={styles.baronChoice} onPress={handleBaronChoice}>
-            <View style={[styles.choiceIcon, { backgroundColor: GameColors.locked.primary + "30" }]}>
-              <Feather name="package" size={24} color={GameColors.locked.primary} />
-            </View>
-            <ThemedText style={styles.choiceName}>Emergency Crate</ThemedText>
-            <ThemedText style={styles.choiceDescription}>
-              Accept Baron's help. Get locked parts fast, but deepen your dependency.
-            </ThemedText>
-            <View style={styles.choiceTag}>
-              <Feather name="alert-circle" size={12} color={GameColors.ui.danger} />
-              <ThemedText style={styles.choiceTagText}>+5 Dependency</ThemedText>
-            </View>
+        {isPhase1 ? (
+          <Pressable style={styles.primaryButton} onPress={handleAdvance}>
+            <Feather name="chevron-right" size={18} color="#0F0F1F" />
+            <ThemedText style={styles.primaryButtonText}>Continue</ThemedText>
           </Pressable>
+        ) : null}
 
+        {isPhase2 && !state.lockoutChoice ? (
+          <>
+            <ThemedText style={styles.choiceTitle}>Choose Your Response:</ThemedText>
+            <View style={styles.choices}>
+              <Pressable style={styles.baronChoice} onPress={handleBaronChoice}>
+                <View style={[styles.choiceIcon, { backgroundColor: GameColors.locked.primary + "30" }]}>
+                  <Feather name="package" size={24} color={GameColors.locked.primary} />
+                </View>
+                <ThemedText style={styles.choiceName}>Emergency Crate</ThemedText>
+                <ThemedText style={styles.choiceDescription}>
+                  Accept Baron's help. Get locked parts fast, but deepen your dependency.
+                </ThemedText>
+                <View style={styles.choiceTag}>
+                  <Feather name="alert-circle" size={12} color={GameColors.ui.danger} />
+                  <ThemedText style={styles.choiceTagText}>+5 Dependency</ThemedText>
+                </View>
+              </Pressable>
+
+              <Pressable style={styles.labChoice} onPress={handleLabChoice}>
+                <View style={[styles.choiceIcon, { backgroundColor: GameColors.currency.research + "30" }]}>
+                  <Feather name="zap" size={24} color={GameColors.currency.research} />
+                </View>
+                <ThemedText style={styles.choiceName}>Lab Requests</ThemedText>
+                <ThemedText style={styles.choiceDescription}>
+                  Complete lab requests to earn Research and craft a Freedom Controller.
+                </ThemedText>
+                <View style={[styles.choiceTag, { backgroundColor: GameColors.currency.research + "20" }]}>
+                  <Feather name="zap" size={12} color={GameColors.currency.research} />
+                  <ThemedText style={[styles.choiceTagText, { color: GameColors.currency.research }]}>
+                    3 Requests
+                  </ThemedText>
+                </View>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+
+        {isPhase2 && state.lockoutChoice === "baron" ? (
+          <View style={styles.phaseHint}>
+            <ThemedText style={styles.choiceDescription}>
+              Complete the Locked Required order using Baron parts to end the lockout.
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {isPhase2 && state.lockoutChoice === "lab" ? (
+          <View style={styles.phaseHint}>
+            <ThemedText style={styles.choiceDescription}>
+              Complete {labRemaining + 1} lab requests, then craft a Freedom Controller.
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {isPhase3 ? (
           <Pressable
             style={[styles.freedomChoice, !canUseFreedom && styles.choiceDisabled]}
             onPress={canUseFreedom ? handleFreedomChoice : undefined}
@@ -104,8 +174,8 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
             <ThemedText style={styles.choiceName}>Break Free</ThemedText>
             <ThemedText style={styles.choiceDescription}>
               {canUseFreedom
-                ? "Use your Freedom Controller to break the lock-in and reduce dependency."
-                : "Unlock the Freedom Controller in R&D to use this option."}
+                ? "Use a Freedom Controller to break the lock-in and reduce dependency."
+                : "Craft a Freedom Controller in R&D to use this option."}
             </ThemedText>
             <View style={[styles.choiceTag, { backgroundColor: GameColors.ui.success + "20" }]}>
               <Feather name="trending-down" size={12} color={GameColors.ui.success} />
@@ -114,7 +184,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
               </ThemedText>
             </View>
           </Pressable>
-        </View>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -186,12 +256,35 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: Spacing.md,
   },
+  primaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    backgroundColor: GameColors.ui.primary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.lg,
+  },
+  primaryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F0F1F",
+  },
   baronChoice: {
     backgroundColor: GameColors.locked.primary + "15",
     borderRadius: BorderRadius.md,
     padding: Spacing.lg,
     borderWidth: 1,
     borderColor: GameColors.locked.primary + "40",
+  },
+  labChoice: {
+    backgroundColor: GameColors.currency.research + "15",
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: GameColors.currency.research + "40",
   },
   freedomChoice: {
     backgroundColor: GameColors.ui.success + "15",
@@ -222,6 +315,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GameColors.text.secondary,
     marginBottom: Spacing.sm,
+  },
+  phaseHint: {
+    backgroundColor: GameColors.ui.surfaceElevated,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
   },
   choiceTag: {
     flexDirection: "row",

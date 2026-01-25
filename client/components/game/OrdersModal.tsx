@@ -16,29 +16,14 @@ interface OrdersModalProps {
 
 export function OrdersModal({ onClose }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
-  const { state, fulfillOrder, dispatch } = useGame();
+  const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
 
   const handleFulfillOrder = (orderId: string) => {
     const order = state.orders.find((o) => o.id === orderId);
     if (!order) return;
 
-    const partsToUse: number[] = [];
-    const usedIndices = new Set<number>();
-
-    for (const req of order.requirements) {
-      let count = 0;
-      for (let i = 0; i < state.board.length && count < req.count; i++) {
-        const part = state.board[i];
-        if (!part || usedIndices.has(i)) continue;
-        if (part.tier !== req.tier) continue;
-        if (req.family !== "any" && part.family !== req.family) continue;
-        partsToUse.push(i);
-        usedIndices.add(i);
-        count++;
-      }
-    }
-
-    if (partsToUse.length > 0) {
+    const partsToUse = getFulfillmentIndices(order);
+    if (partsToUse) {
       fulfillOrder(orderId, partsToUse);
     }
   };
@@ -105,6 +90,7 @@ export function OrdersModal({ onClose }: OrdersModalProps) {
               order={order}
               onFulfill={() => handleFulfillOrder(order.id)}
               onDismiss={() => handleDismissOrder(order.id)}
+              dismissible={!order.isLockout}
             />
           ))
         ) : (

@@ -31,6 +31,8 @@ function RDNodeCard({
   canUnlock: boolean;
   onUnlock: () => void;
 }) {
+  const { state } = useGame();
+  const hapticsEnabled = state.settings.hapticsEnabled;
   const scale = useSharedValue(1);
   const glow = useSharedValue(0);
 
@@ -52,7 +54,9 @@ function RDNodeCard({
       scale.value = withSpring(0.95, { damping: 15 });
       setTimeout(() => {
         scale.value = withSpring(1, { damping: 15 });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (hapticsEnabled) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         onUnlock();
       }, 100);
     }
@@ -148,6 +152,7 @@ function RDNodeCard({
 
 export function RDTree({ onCraftFreedomController }: RDTreeProps) {
   const { state, unlockRDNode, craftFreedomController } = useGame();
+  const hapticsEnabled = state.settings.hapticsEnabled;
 
   const canUnlockNode = (node: RDNode): boolean => {
     if (state.rdNodes[node.id]) return false;
@@ -203,7 +208,9 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           <Pressable
             onPress={() => {
               if (canCraft) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                if (hapticsEnabled) {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
                 craftFreedomController();
                 onCraftFreedomController();
               }

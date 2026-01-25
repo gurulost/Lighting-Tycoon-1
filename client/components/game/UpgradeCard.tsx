@@ -36,6 +36,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   const { state } = useGame();
+  const hapticsEnabled = state.settings.hapticsEnabled;
   const scale = useSharedValue(1);
 
   const currentLevel = state.upgrades[upgrade.id] || 0;
@@ -52,11 +53,15 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
       scale.value = withSpring(0.95, { damping: 15 });
       setTimeout(() => {
         scale.value = withSpring(1, { damping: 15 });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (hapticsEnabled) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
         onPurchase();
       }, 100);
     } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (hapticsEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     }
   };
 

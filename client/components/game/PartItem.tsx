@@ -182,6 +182,12 @@ export function PartItem({
           </View>
         ) : null}
 
+        {part.compatible ? (
+          <View style={[styles.compatibleIndicator, { backgroundColor: GameColors.ui.success }]}>
+            <ThemedText style={styles.compatibleText}>C</ThemedText>
+          </View>
+        ) : null}
+
         <View style={[styles.glowRing, { borderColor: primaryColor }]} />
       </Animated.View>
     </GestureDetector>
@@ -310,6 +316,21 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
     color: "#FFF",
+  },
+  compatibleIndicator: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  compatibleText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#0F0F1F",
   },
   mergeAnimation: {
     borderRadius: BorderRadius.md,
