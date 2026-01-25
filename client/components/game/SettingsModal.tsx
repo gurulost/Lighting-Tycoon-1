@@ -49,7 +49,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   return (
-    <Pressable style={styles.overlay} onPress={onClose}>
+    <Pressable style={styles.overlay} onPress={onClose} testID="settings-modal">
       <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
         <LinearGradient
           colors={["#1A1A2E", "#252542", "#1A1A2E"]}

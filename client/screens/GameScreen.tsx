@@ -111,6 +111,7 @@ export default function GameScreen() {
         <Pressable
           style={styles.settingsButton}
           onPress={() => setActiveModal("settings")}
+          testID="settings-button"
         >
           <LinearGradient
             colors={["#1F1F2E", "#252542", "#1F1F2E"]}

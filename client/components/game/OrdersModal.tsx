@@ -1,7 +1,9 @@
 import React from "react";
 import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
 import { OrderCard } from "./OrderCard";
@@ -46,27 +48,54 @@ export function OrdersModal({ onClose }: OrdersModalProps) {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <ThemedText style={styles.title}>Orders</ThemedText>
+        <View style={styles.headerContent}>
+          <LinearGradient
+            colors={[`${GameColors.currency.reputation}30`, `${GameColors.currency.reputation}10`]}
+            style={styles.headerIcon}
+          >
+            <Feather name="inbox" size={24} color={GameColors.currency.reputation} />
+          </LinearGradient>
+          <View>
+            <ThemedText style={styles.title}>Orders</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              Fulfill orders to earn rewards
+            </ThemedText>
+          </View>
+        </View>
         <Pressable onPress={onClose} style={styles.closeButton}>
           <Feather name="x" size={24} color={GameColors.text.primary} />
         </Pressable>
       </View>
 
-      <View style={styles.stats}>
-        <View style={styles.statItem}>
-          <Feather name="inbox" size={16} color={GameColors.currency.reputation} />
+      <View style={styles.statsRow}>
+        <LinearGradient
+          colors={[`${GameColors.currency.reputation}20`, `${GameColors.currency.reputation}08`]}
+          style={styles.statItem}
+        >
+          <Feather name="inbox" size={18} color={GameColors.currency.reputation} />
           <ThemedText style={styles.statValue}>
             {state.orders.length}/{state.maxOrders}
           </ThemedText>
           <ThemedText style={styles.statLabel}>Active</ThemedText>
-        </View>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={[`${GameColors.currency.cash}20`, `${GameColors.currency.cash}08`]}
+          style={styles.statItem}
+        >
+          <Feather name="dollar-sign" size={18} color={GameColors.currency.cash} />
+          <ThemedText style={[styles.statValue, { color: GameColors.currency.cash }]}>
+            {state.cash}
+          </ThemedText>
+          <ThemedText style={styles.statLabel}>Coins</ThemedText>
+        </LinearGradient>
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing["4xl"] }]}
         showsVerticalScrollIndicator={false}
       >
         {state.orders.length > 0 ? (
@@ -79,59 +108,96 @@ export function OrdersModal({ onClose }: OrdersModalProps) {
             />
           ))
         ) : (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
+          <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
+            <LinearGradient
+              colors={["#1A1A2E", "#252542", "#1A1A2E"]}
+              style={styles.emptyIconContainer}
+            >
               <Feather name="inbox" size={48} color={GameColors.text.disabled} />
-            </View>
+            </LinearGradient>
             <ThemedText style={styles.emptyTitle}>No Orders Yet</ThemedText>
             <ThemedText style={styles.emptyDescription}>
               New orders will appear automatically. Keep merging parts to be ready!
             </ThemedText>
-          </View>
+            <View style={styles.tipContainer}>
+              <Feather name="info" size={14} color={GameColors.ui.primary} />
+              <ThemedText style={styles.tipText}>
+                Tip: Orders arrive faster as your reputation grows
+              </ThemedText>
+            </View>
+          </Animated.View>
         )}
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: GameColors.ui.background,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: GameColors.ui.surface,
+    borderBottomColor: "#2A2A4A",
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: GameColors.text.secondary,
+    marginTop: 2,
   },
   closeButton: {
-    padding: Spacing.sm,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#1A1A2E",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
-  stats: {
+  statsRow: {
     flexDirection: "row",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    gap: Spacing.lg,
+    gap: Spacing.md,
   },
   statItem: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    backgroundColor: GameColors.ui.surface,
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
     color: GameColors.currency.reputation,
   },
@@ -144,24 +210,25 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.lg,
-    paddingBottom: Spacing["4xl"],
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: Spacing["5xl"],
+    paddingVertical: Spacing["4xl"],
   },
-  emptyIcon: {
+  emptyIconContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: GameColors.ui.surface,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "700",
+    color: GameColors.text.primary,
     marginBottom: Spacing.sm,
   },
   emptyDescription: {
@@ -169,5 +236,21 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     textAlign: "center",
     paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.xl,
+  },
+  tipContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: `${GameColors.ui.primary}15`,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}30`,
+  },
+  tipText: {
+    fontSize: 13,
+    color: GameColors.ui.primary,
   },
 });
