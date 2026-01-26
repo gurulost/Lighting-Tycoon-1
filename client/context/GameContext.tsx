@@ -329,11 +329,18 @@ function generateOrder(
   currentNeighborhoodId: string
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
+  const currentNeighborhood =
+    NEIGHBORHOODS.find((n) => n.id === currentNeighborhoodId) || NEIGHBORHOODS[0];
   const rushActive = orders.some((o) => o.rushDeadline);
   const certifiedActive = orders.some((o) => o.type === "locked_required");
 
   const availableTemplates = ORDER_LIBRARY.filter((t) => {
     if (getNeighborhoodIndex(t.minNeighborhoodId) > neighborhoodIndex) return false;
+    if (
+      currentNeighborhood.allowedOrderTypes &&
+      !currentNeighborhood.allowedOrderTypes.includes(t.type)
+    )
+      return false;
     if (t.type === "baron_certified" && dependency < 40) return false;
     if (t.type === "locked_required" && (dependency < 60 || !rdUnlocked)) return false;
     if (t.type === "lab_request" && !rdUnlocked) return false;
@@ -1947,7 +1954,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.firstSessionSecondOfferTriggered === "boolean"
           ? action.state.firstSessionSecondOfferTriggered
           : base.firstSessionSecondOfferTriggered;
-      return {
+      let restoredState: GameState = {
         ...base,
         ...action.state,
         settings: {
@@ -1996,6 +2003,56 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? action.state.reputationTier
             : NEIGHBORHOODS.findIndex((n) => n.id === computedNeighborhood.id),
       };
+
+      if (restoredState.lockoutActive) {
+        let orders = Array.isArray(restoredState.orders) ? [...restoredState.orders] : [];
+        let lockoutOrderId = restoredState.lockoutOrderId;
+        const lockoutIndex = orders.findIndex(
+          (order) => order.isLockout || (lockoutOrderId && order.id === lockoutOrderId)
+        );
+        if (lockoutIndex === -1) {
+          const lockoutOrder = createLockoutOrder();
+          lockoutOrderId = lockoutOrder.id;
+          orders = [lockoutOrder, ...orders];
+        } else if (!lockoutOrderId) {
+          lockoutOrderId = orders[lockoutIndex].id;
+        }
+
+        if (
+          restoredState.lockoutChoice === "lab" &&
+          restoredState.lockoutLabOrdersRemaining > 0
+        ) {
+          const hasLabRequest = orders.some((order) => order.type === "lab_request");
+          if (!hasLabRequest) {
+            orders = [createLockoutLabOrder(), ...orders];
+          }
+        }
+
+        if (orders.length > restoredState.maxOrders) {
+          const required = orders.filter(
+            (order) => order.isLockout || order.type === "lab_request"
+          );
+          const others = orders.filter(
+            (order) => !order.isLockout && order.type !== "lab_request"
+          );
+          orders = [...required, ...others].slice(0, restoredState.maxOrders);
+        }
+
+        const highlightStillValid =
+          restoredState.highlightedOrderId &&
+          orders.some((order) => order.id === restoredState.highlightedOrderId);
+
+        restoredState = {
+          ...restoredState,
+          orders,
+          lockoutOrderId,
+          highlightedOrderId: highlightStillValid
+            ? restoredState.highlightedOrderId
+            : undefined,
+        };
+      }
+
+      return restoredState;
     }
 
     default:

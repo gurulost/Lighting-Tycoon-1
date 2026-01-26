@@ -37,3 +37,10 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Second Baron offer appears once.
   - Story beat “baron_offer_return” appears.
 
+## Lockout Recovery on Load
+- Force `lockoutActive = true` in saved state while removing the lockout order entry.
+- Reload the game.
+- Verify:
+  - A lockout order is re-inserted (locked-required order appears).
+  - If lab choice is active with remaining lab orders, a lab request is added.
+  - Orders list is capped to maxOrders with lockout/lab orders preserved.

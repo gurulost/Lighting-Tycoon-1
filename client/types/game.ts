@@ -192,31 +192,6 @@ export const WORKBENCH_SLOT = 0;
 export const ORDER_INBOX_SLOT = 5;
 export const RD_BENCH_SLOT = 24;
 
-export const ORDER_TEMPLATES: Omit<Order, "id">[] = [
-  { title: "Starter Install", type: "basic", requirements: [{ tier: 1, family: "any", count: 2 }], rewards: { cash: 20, reputation: 5, research: 0 } },
-  { title: "Starter Install+", type: "basic", requirements: [{ tier: 1, family: "any", count: 3 }], rewards: { cash: 30, reputation: 8, research: 0 } },
-  { title: "Neat Routing", type: "basic", requirements: [{ tier: 2, family: "any", count: 2 }], rewards: { cash: 50, reputation: 10, research: 0 } },
-  { title: "Under-Cabinet Basic", type: "basic", requirements: [{ tier: 2, family: "any", count: 1 }, { tier: 1, family: "any", count: 2 }], rewards: { cash: 45, reputation: 12, research: 0 } },
-  { title: "Clean Corners", type: "basic", requirements: [{ tier: 3, family: "any", count: 2 }], rewards: { cash: 100, reputation: 20, research: 0 } },
-  { title: "Mood Lighting", type: "basic", requirements: [{ tier: 3, family: "any", count: 1 }, { tier: 2, family: "any", count: 2 }], rewards: { cash: 120, reputation: 25, research: 0 } },
-  { title: "Smart Upgrade", type: "basic", requirements: [{ tier: 4, family: "any", count: 1 }], rewards: { cash: 200, reputation: 40, research: 5 } },
-  { title: "Smart Upgrade+", type: "basic", requirements: [{ tier: 4, family: "any", count: 1 }, { tier: 2, family: "any", count: 1 }], rewards: { cash: 250, reputation: 50, research: 8 } },
-  { title: "Premium Client Tease", type: "premium", requirements: [{ tier: 5, family: "any", count: 1 }], rewards: { cash: 500, reputation: 100, research: 15 } },
-  { title: "Premium Client", type: "premium", requirements: [{ tier: 5, family: "any", count: 1 }, { tier: 3, family: "any", count: 1 }], rewards: { cash: 700, reputation: 150, research: 20 } },
-  { title: "Open Homeowner", type: "style_match", requirements: [{ tier: 4, family: "open", count: 1 }], rewards: { cash: 180, reputation: 45, research: 15 } },
-  { title: "Baron Fan", type: "style_match", requirements: [{ tier: 4, family: "locked", count: 1 }], rewards: { cash: 250, reputation: 35, research: 0 } },
-  { title: "Match the Set (Open)", type: "style_match", requirements: [{ tier: 3, family: "open", count: 2 }], rewards: { cash: 130, reputation: 30, research: 10 } },
-  { title: "Match the Set (Locked)", type: "style_match", requirements: [{ tier: 3, family: "locked", count: 2 }], rewards: { cash: 160, reputation: 25, research: 0 } },
-  { title: "Rush Job", type: "rush", requirements: [{ tier: 4, family: "any", count: 1 }], rewards: { cash: 300, reputation: 60, research: 5 }, rushDeadline: 60000 },
-  { title: "Rush Job+", type: "rush", requirements: [{ tier: 5, family: "any", count: 1 }], rewards: { cash: 600, reputation: 120, research: 10 }, rushDeadline: 90000 },
-  { title: "Baron Certified", type: "baron_certified", requirements: [{ tier: 4, family: "any", count: 1 }], rewards: { cash: 280, reputation: 55, research: 0 }, familyPreference: "locked", penaltyIfWrongFamily: true },
-  { title: "Baron Certified+", type: "baron_certified", requirements: [{ tier: 5, family: "any", count: 1 }], rewards: { cash: 650, reputation: 130, research: 0 }, familyPreference: "locked", penaltyIfWrongFamily: true },
-  { title: "Locked Required", type: "locked_required", requirements: [{ tier: 4, family: "locked", count: 1 }], rewards: { cash: 350, reputation: 70, research: 0 } },
-  { title: "Locked Required+", type: "locked_required", requirements: [{ tier: 5, family: "locked", count: 1 }], rewards: { cash: 800, reputation: 160, research: 0 } },
-  { title: "Lab Request", type: "lab_request", requirements: [{ tier: 3, family: "open", count: 1 }], rewards: { cash: 80, reputation: 10, research: 20 } },
-  { title: "Lab Request+", type: "lab_request", requirements: [{ tier: 4, family: "open", count: 1 }], rewards: { cash: 120, reputation: 15, research: 30 } },
-];
-
 export const UPGRADE_DEFINITIONS: Upgrade[] = [
   { id: "space_1", category: "space", name: "Unlock Slot 1", description: "Unlock an extra board slot", cost: 100, level: 0, maxLevel: 1, effect: "unlock_slot_27" },
   { id: "space_2", category: "space", name: "Unlock Slot 2", description: "Unlock another board slot", cost: 200, level: 0, maxLevel: 1, effect: "unlock_slot_28" },
