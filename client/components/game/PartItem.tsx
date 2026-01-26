@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     left: "-20%",
     right: "-20%",
     bottom: "-20%",
-    opacity: 0.55,
+    opacity: 0.35,
     transform: [{ rotate: "-25deg" }],
   },
   sprite: {

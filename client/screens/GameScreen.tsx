@@ -98,7 +98,7 @@ function BottomButton({
         ]}
       >
         <LinearGradient
-          colors={[`${color}30`, `${color}10`, `${color}30`]}
+          colors={[`${color}20`, `${color}08`, `${color}20`]}
           style={styles.buttonGradient}
         >
           <Feather name={icon} size={22} color={disabled ? GameColors.text.disabled : color} />
@@ -776,8 +776,8 @@ const styles = StyleSheet.create({
   buttonIconContainer: {
     position: "relative",
     shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 12,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 3,
   },
   buttonGradient: {
     width: 50,

@@ -204,7 +204,11 @@ export function OrderCard({
     }
     if (order.rushDeadline) {
       const label =
-        timeRemaining !== null ? `${formatTime(timeRemaining)} +${rushBonus}%` : "RUSH";
+        timeRemaining !== null
+          ? selected
+            ? `${formatTime(timeRemaining)} +${rushBonus}%`
+            : `${formatTime(timeRemaining)}`
+          : "RUSH";
       return { label, color: GameColors.ui.danger, icon: "clock" as const };
     }
     if (order.type === "locked_required" || order.type === "baron_certified") {
