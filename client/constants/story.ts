@@ -112,6 +112,14 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     category: "tutorial",
   },
+  baron_offer_return: {
+    id: "baron_offer_return",
+    speaker: "baron",
+    line1: "Still glowing? Let’s talk certification.",
+    line2: "Protected territory included.",
+    onceOnly: true,
+    category: "baron_fax",
+  },
   tutorial_merge_1: {
     id: "tutorial_merge_1",
     speaker: "mentor",

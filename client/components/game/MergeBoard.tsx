@@ -191,12 +191,18 @@ export function MergeBoard({
     opacity: 0.3 + orderPulse.value * 0.4,
   }));
 
-  const { orderHighlightSlots, ghostSlotMap, orderHighlightColor } = useMemo(() => {
+  const {
+    orderHighlightSlots,
+    ghostSlotMap,
+    orderHighlightColor,
+    backpackHighlightSlots,
+  } = useMemo(() => {
     if (!highlightedOrder) {
       return {
         orderHighlightSlots: [] as number[],
         ghostSlotMap: {} as Record<number, PartTier>,
         orderHighlightColor: GameColors.ui.primary,
+        backpackHighlightSlots: [] as number[],
       };
     }
 
@@ -219,6 +225,7 @@ export function MergeBoard({
     };
 
     const slots: number[] = [];
+    const backpackSlots: number[] = [];
     const missingTiers: PartTier[] = [];
     highlightedOrder.requirements.forEach((req) => {
       let matchCount = 0;
@@ -234,6 +241,16 @@ export function MergeBoard({
       const missing = Math.max(0, req.count - matchCount);
       for (let i = 0; i < missing; i += 1) {
         missingTiers.push(req.tier);
+      }
+    });
+
+    state.backpack.forEach((part, index) => {
+      if (!part) return;
+      const matches = highlightedOrder.requirements.some((req) =>
+        isPartValidForRequirement(part, req)
+      );
+      if (matches) {
+        backpackSlots.push(index);
       }
     });
 
@@ -272,8 +289,9 @@ export function MergeBoard({
       orderHighlightSlots: slots,
       ghostSlotMap: ghostMap,
       orderHighlightColor: highlightColor,
+      backpackHighlightSlots: backpackSlots,
     };
-  }, [highlightedOrder, state.board, isStationSlot, isSlotBlocked]);
+  }, [highlightedOrder, state.board, state.backpack, isStationSlot, isSlotBlocked]);
 
   const measureGrid = useCallback(() => {
     gridRef.current?.measureInWindow((x, y, width, height) => {
@@ -850,47 +868,65 @@ export function MergeBoard({
               },
             ]}
           >
-            {state.backpack.map((part, index) => (
-              <View
-                key={`backpack-${index}`}
-                style={[
-                  styles.backpackSlot,
-                  {
-                    width: backpackSlotSize,
-                    height: backpackSlotSize,
-                    borderColor: state.backpackUnlocked ? "#2A2A4A" : "#2A2A4A60",
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={["#1E1E36", "#252542", "#1E1E36"]}
-                  style={styles.backpackGradient}
+            {state.backpack.map((part, index) => {
+              const isBackpackHighlighted = backpackHighlightSlots.includes(index);
+              return (
+                <View
+                  key={`backpack-${index}`}
+                  style={[
+                    styles.backpackSlot,
+                    {
+                      width: backpackSlotSize,
+                      height: backpackSlotSize,
+                      borderColor: isBackpackHighlighted
+                        ? orderHighlightColor
+                        : state.backpackUnlocked
+                        ? "#2A2A4A"
+                        : "#2A2A4A60",
+                      borderWidth: isBackpackHighlighted ? 2 : 1,
+                    },
+                  ]}
                 >
-                  {part ? (
-                    <PartItem
-                      part={part}
-                      size={backpackSlotSize - 8}
-                      disabled={!state.backpackUnlocked}
-                      onDragStart={() => handleDragStart("backpack", index)}
-                      onDragEnd={(tx, ty, ax, ay) =>
-                        handleDragEnd("backpack", index, tx, ty, ax, ay)
-                      }
+                  <LinearGradient
+                    colors={["#1E1E36", "#252542", "#1E1E36"]}
+                    style={styles.backpackGradient}
+                  >
+                    {part ? (
+                      <PartItem
+                        part={part}
+                        size={backpackSlotSize - 8}
+                        disabled={!state.backpackUnlocked}
+                        onDragStart={() => handleDragStart("backpack", index)}
+                        onDragEnd={(tx, ty, ax, ay) =>
+                          handleDragEnd("backpack", index, tx, ty, ax, ay)
+                        }
+                      />
+                    ) : (
+                      <Feather
+                        name="plus"
+                        size={14}
+                        color={state.backpackUnlocked ? GameColors.text.disabled : "#2A2A4A"}
+                      />
+                    )}
+                  </LinearGradient>
+                  {isBackpackHighlighted ? (
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.orderHighlightOverlay,
+                        { borderColor: `${orderHighlightColor}80` },
+                        orderPulseStyle,
+                      ]}
                     />
-                  ) : (
-                    <Feather
-                      name="plus"
-                      size={14}
-                      color={state.backpackUnlocked ? GameColors.text.disabled : "#2A2A4A"}
-                    />
-                  )}
-                </LinearGradient>
-                {!state.backpackUnlocked ? (
-                  <View style={styles.backpackLockOverlay}>
-                    <Feather name="lock" size={12} color={GameColors.text.disabled} />
-                  </View>
-                ) : null}
-              </View>
-            ))}
+                  ) : null}
+                  {!state.backpackUnlocked ? (
+                    <View style={styles.backpackLockOverlay}>
+                      <Feather name="lock" size={12} color={GameColors.text.disabled} />
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         </View>
         <View style={styles.recycleSection}>
@@ -912,7 +948,7 @@ export function MergeBoard({
               style={styles.recycleGradient}
             >
               <Feather name="trash-2" size={18} color={GameColors.ui.danger} />
-              <ThemedText style={styles.recycleHint}>+cash</ThemedText>
+              <ThemedText style={styles.recycleHint}>cash + research</ThemedText>
             </LinearGradient>
           </View>
         </View>

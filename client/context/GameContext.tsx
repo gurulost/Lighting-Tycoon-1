@@ -107,13 +107,16 @@ function createPart(
   return { id: generateId(), family, tier, position, compatible };
 }
 
-function applyDependency(state: GameState, delta: number) {
-  const next = Math.max(0, Math.min(100, state.dependency + delta));
+function applyDependency(state: GameState, delta: number, allowLockout = true) {
+  let next = Math.max(0, Math.min(100, state.dependency + delta));
   const crossed = state.dependency < 100 && next >= 100;
+  if (!allowLockout && crossed) {
+    next = 99;
+  }
   return {
     dependency: next,
-    lockoutActive: state.lockoutActive || crossed,
-    lockoutPhase: crossed ? 1 : state.lockoutPhase,
+    lockoutActive: state.lockoutActive || (allowLockout && crossed),
+    lockoutPhase: allowLockout && crossed ? 1 : state.lockoutPhase,
   };
 }
 
@@ -267,9 +270,9 @@ const FIRST_SESSION_ORDERS: Omit<Order, "id">[] = [
   {
     title: "Certified Check",
     type: "baron_certified",
-    requirements: [{ tier: 3, family: "any", count: 1 }],
-    rewards: { cash: 90, reputation: 14, research: 0 },
-    flavorText: "Certified clients pay full for locked kits.",
+    requirements: [{ tier: 2, family: "any", count: 1 }],
+    rewards: { cash: 65, reputation: 12, research: 0 },
+    flavorText: "Certified clients pay full for locked runs.",
     templateId: "first_session_3",
     modifierIds: ["first_session"],
     familyPreference: "locked",
@@ -522,6 +525,7 @@ function getInitialState(): GameState {
     firstSessionOrderIndex: 0,
     firstSessionOrdersCompleted: 0,
     firstSessionForcedDrops: [],
+    firstSessionSecondOfferTriggered: false,
     cash: 50,
     reputation: 0,
     research: 0,
@@ -698,7 +702,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
-      const dependencyOutcome = applyDependency(state, dependencyChange);
+      const allowLockout = state.firstSessionComplete;
+      const dependencyOutcome = applyDependency(state, dependencyChange, allowLockout);
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
 
       const now = Date.now();
@@ -713,9 +718,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       const isTutorial = !state.tutorialComplete;
+      const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
       const nextTutorialMergeCount = isTutorial
         ? state.tutorialMergeCount + 1
         : state.tutorialMergeCount;
+      const shouldTriggerSecondOfferOnMerge =
+        firstSessionActive &&
+        mergedFamily === "locked" &&
+        state.baronOfferSeen &&
+        !state.baronOfferAvailable &&
+        !state.firstSessionSecondOfferTriggered;
 
       let tutorialOrder: Order | null = null;
       let tutorialOrders: Order[] | null = null;
@@ -795,6 +807,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
         nextState = beginLockout(nextState);
+      }
+      if (shouldTriggerSecondOfferOnMerge) {
+        nextState = {
+          ...nextState,
+          baronOfferAvailable: true,
+          firstSessionSecondOfferTriggered: true,
+        };
+        nextState = queueStoryBeat(nextState, "baron_offer_return");
       }
       return nextState;
     }
@@ -1025,10 +1045,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         researchReward += order.ecoAuditBonusResearch;
       }
 
-      const dependencyOutcome = applyDependency(state, dependencyChange);
+      const allowLockout = state.firstSessionComplete;
+      const dependencyOutcome = applyDependency(state, dependencyChange, allowLockout);
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
+      const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
       const canTriggerBaron =
         state.tutorialComplete &&
+        !firstSessionActive &&
         !state.baronOfferAvailable &&
         Date.now() >= state.baronOfferCooldownUntil &&
         dependencyOutcome.dependency >= 20;
@@ -1050,7 +1073,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       let updatedOrders = state.orders.filter((o) => o.id !== orderId);
       let nextOrderMetrics = state.orderMetrics;
-      const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
       let nextFirstSessionOrderIndex = state.firstSessionOrderIndex;
       let nextFirstSessionOrdersCompleted = state.firstSessionOrdersCompleted;
       let nextFirstSessionComplete = state.firstSessionComplete;
@@ -1141,6 +1163,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       const shouldQueueSecondOffer =
         firstSessionActive &&
+        !state.firstSessionSecondOfferTriggered &&
         nextFirstSessionOrdersCompleted === 2 &&
         state.baronOfferSeen &&
         !state.baronOfferAvailable;
@@ -1157,6 +1180,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         firstSessionOrderIndex: nextFirstSessionOrderIndex,
         firstSessionOrdersCompleted: nextFirstSessionOrdersCompleted,
         firstSessionComplete: nextFirstSessionComplete,
+        firstSessionForcedDrops: nextFirstSessionComplete
+          ? []
+          : state.firstSessionForcedDrops,
+        firstSessionSecondOfferTriggered:
+          state.firstSessionSecondOfferTriggered || shouldQueueSecondOffer,
         cash: state.cash + cashReward,
         reputation: state.reputation + repReward,
         research: state.research + researchReward,
@@ -1207,6 +1235,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (queuedFirstSessionBeat) {
         nextState = queueStoryBeat(nextState, queuedFirstSessionBeat);
+      }
+      if (shouldQueueSecondOffer) {
+        nextState = queueStoryBeat(nextState, "baron_offer_return");
       }
       if (tutorialAdvanceAfterOrder) {
         nextState = queueStoryBeat(nextState, "tutorial_order");
@@ -1410,7 +1441,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const newBoard = [...state.board];
       newBoard[emptySlot] = part;
 
-      const dependencyOutcome = applyDependency(state, 5);
+      const allowLockout = state.firstSessionComplete;
+      const dependencyOutcome = applyDependency(state, 5, allowLockout);
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
       
       const tutorialAdvance =
@@ -1519,22 +1551,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.orders.length >= state.maxOrders) return state;
 
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
-      if (
-        firstSessionActive &&
-        state.firstSessionOrderIndex < FIRST_SESSION_ORDERS.length
-      ) {
-        const scriptedOrder = createFirstSessionOrder(state.firstSessionOrderIndex);
-        if (!scriptedOrder) return state;
-        let nextState: GameState = {
-          ...state,
-          orders: [...state.orders, scriptedOrder],
-          firstSessionOrderIndex: state.firstSessionOrderIndex + 1,
-          orderMetrics: updateOrderMetrics(state, scriptedOrder),
-        };
-        if (scriptedOrder.templateId === "first_session_3") {
-          nextState = queueStoryBeat(nextState, "first_session_certified");
+      if (firstSessionActive) {
+        if (state.firstSessionOrderIndex < FIRST_SESSION_ORDERS.length) {
+          const scriptedOrder = createFirstSessionOrder(state.firstSessionOrderIndex);
+          if (!scriptedOrder) return state;
+          let nextState: GameState = {
+            ...state,
+            orders: [...state.orders, scriptedOrder],
+            firstSessionOrderIndex: state.firstSessionOrderIndex + 1,
+            orderMetrics: updateOrderMetrics(state, scriptedOrder),
+          };
+          if (scriptedOrder.templateId === "first_session_3") {
+            nextState = queueStoryBeat(nextState, "first_session_certified");
+          }
+          return nextState;
         }
-        return nextState;
+        return state;
       }
 
       const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
@@ -1645,6 +1677,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         firstSessionOrderIndex: 0,
         firstSessionOrdersCompleted: 0,
         firstSessionForcedDrops: [],
+        firstSessionSecondOfferTriggered: false,
         baronOfferAvailable: false,
         baronOfferSeen: false,
         baronOfferCooldownUntil: 0,
@@ -1889,11 +1922,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           : action.state.tutorialComplete
           ? true
           : base.firstSessionComplete;
+      const restoredFirstSessionForcedDrops = Array.isArray(action.state.firstSessionForcedDrops)
+        ? action.state.firstSessionForcedDrops
+        : base.firstSessionForcedDrops;
+      const firstSessionForcedDrops = firstSessionComplete ? [] : restoredFirstSessionForcedDrops;
       const highlightedOrderId =
         typeof action.state.highlightedOrderId === "string" &&
         action.state.orders?.some((o) => o.id === action.state.highlightedOrderId)
           ? action.state.highlightedOrderId
           : undefined;
+      const firstSessionSecondOfferTriggered =
+        typeof action.state.firstSessionSecondOfferTriggered === "boolean"
+          ? action.state.firstSessionSecondOfferTriggered
+          : base.firstSessionSecondOfferTriggered;
       return {
         ...base,
         ...action.state,
@@ -1916,9 +1957,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           typeof action.state.firstSessionOrdersCompleted === "number"
             ? action.state.firstSessionOrdersCompleted
             : base.firstSessionOrdersCompleted,
-        firstSessionForcedDrops: Array.isArray(action.state.firstSessionForcedDrops)
-          ? action.state.firstSessionForcedDrops
-          : base.firstSessionForcedDrops,
+        firstSessionForcedDrops,
+        firstSessionSecondOfferTriggered,
         tutorialMergeCount:
           typeof action.state.tutorialMergeCount === "number"
             ? action.state.tutorialMergeCount
@@ -2034,6 +2074,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.firstSessionOrderIndex,
       state.firstSessionOrdersCompleted,
       state.firstSessionForcedDrops,
+      state.firstSessionSecondOfferTriggered,
       state.cash,
       state.reputation,
       state.research,

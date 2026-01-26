@@ -92,24 +92,25 @@ export interface GameState {
   firstSessionOrderIndex: number;
   firstSessionOrdersCompleted: number;
   firstSessionForcedDrops: PartTier[];
-  
+  firstSessionSecondOfferTriggered: boolean;
+
   cash: number;
   reputation: number;
   research: number;
   dependency: number;
-  
+
   orders: Order[];
   maxOrders: number;
-  
+
   workbenchCooldown: number;
   workbenchMaxCooldown: number;
   workbenchReady: boolean;
-  
+
   upgrades: Record<string, number>;
   rdNodes: Record<string, boolean>;
-  
+
   freedomControllerCount: number;
-  
+
   tutorialStep: number;
   tutorialComplete: boolean;
   tutorialSpawnCount: number;
