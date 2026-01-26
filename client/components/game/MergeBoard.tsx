@@ -30,9 +30,9 @@ import {
   Part,
 } from "@/types/game";
 
-const stationWorkbench = require("../../../assets/images/station-workbench.png");
-const stationInbox = require("../../../assets/images/station-inbox.png");
-const stationRd = require("../../../assets/images/station-rd.png");
+const stationWorkbench = require("../../../assets/images/station-workbench.webp");
+const stationInbox = require("../../../assets/images/station-inbox.webp");
+const stationRd = require("../../../assets/images/station-rd.webp");
 
 const GRID_COLS = 6;
 const GRID_ROWS = 5;

@@ -6,7 +6,7 @@ import { Feather } from "@expo/vector-icons";
 import { useGame } from "@/context/GameContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
-import { TinaChip } from "./TinaChip";
+import { AvatarImage } from "./AvatarImage";
 import { STORY_BEATS } from "@/constants/story";
 import { DialogueBubble } from "./DialogueBubble";
 import { GameColors, Spacing } from "@/constants/theme";
@@ -19,6 +19,9 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
   const { state } = useGame();
   const insets = useSafeAreaInsets();
   const entries = state.storyLog.slice().reverse();
+  const tinaPortrait = require("../../../assets/images/tina/tina-portrait-128.webp");
+  const mentorPortrait = require("../../../assets/images/mentor/mentor-portrait-128.webp");
+  const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
 
   return (
     <ModalShell
@@ -26,7 +29,13 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
       subtitle="Revisit recent story beats"
       icon="book-open"
       iconColor={GameColors.text.primary}
-      headerRight={<TinaChip expression="portrait" />}
+      headerRight={
+        <View style={styles.castStrip}>
+          <AvatarImage source={tinaPortrait} size={20} borderColor="#2A2A4A" icon="smile" />
+          <AvatarImage source={mentorPortrait} size={20} borderColor="#2A2A4A" icon="user" />
+          <AvatarImage source={baronPortrait} size={20} borderColor="#2A2A4A" icon="briefcase" />
+        </View>
+      }
       onClose={onClose}
     >
       <ScrollView
@@ -81,5 +90,10 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "#2A2A4A",
     opacity: 0.35,
+  },
+  castStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
   },
 });

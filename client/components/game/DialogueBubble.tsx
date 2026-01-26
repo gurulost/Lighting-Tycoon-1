@@ -2,7 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
+import { AvatarImage } from "./AvatarImage";
 import Svg, { Defs, Pattern, Rect, Circle } from "react-native-svg";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -21,14 +21,14 @@ interface DialogueBubbleProps {
 type BubbleVariant = "speech" | "caption" | "legal";
 
 const TINA_PORTRAITS = {
-  portrait: require("../../../assets/images/tina/tina-portrait-128.png"),
-  confident: require("../../../assets/images/tina/tina-confident-128.png"),
-  focused: require("../../../assets/images/tina/tina-focused-128.png"),
-  delighted: require("../../../assets/images/tina/tina-delighted-128.png"),
-  concerned: require("../../../assets/images/tina/tina-concerned-128.png"),
+  portrait: require("../../../assets/images/tina/tina-portrait-128.webp"),
+  confident: require("../../../assets/images/tina/tina-confident-128.webp"),
+  focused: require("../../../assets/images/tina/tina-focused-128.webp"),
+  delighted: require("../../../assets/images/tina/tina-delighted-128.webp"),
+  concerned: require("../../../assets/images/tina/tina-concerned-128.webp"),
 } as const;
-const MENTOR_PORTRAIT = require("../../../assets/images/mentor/mentor-portrait-128.png");
-const BARON_PORTRAIT = require("../../../assets/images/baron/baron-portrait-128.png");
+const MENTOR_PORTRAIT = require("../../../assets/images/mentor/mentor-portrait-128.webp");
+const BARON_PORTRAIT = require("../../../assets/images/baron/baron-portrait-128.webp");
 
 const SPEAKER_LABEL: Record<StorySpeaker, string> = {
   mentor: "MENTOR",
@@ -204,11 +204,19 @@ export function DialogueBubble({
               ]}
             >
               {showPortrait ? (
-                <Image
+                <AvatarImage
                   source={portraitSource}
-                  style={styles.portrait}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
+                  size={16}
+                  borderColor={palette.border}
+                  backgroundColor="rgba(255,255,255,0.12)"
+                  icon={
+                    beat.speaker === "tina"
+                      ? "smile"
+                      : beat.speaker === "baron"
+                      ? "briefcase"
+                      : "user"
+                  }
+                  iconColor={labelColor}
                 />
               ) : (
                 <Feather name={SPEAKER_ICON[beat.speaker]} size={12} color={labelColor} />
@@ -406,11 +414,6 @@ const styles = StyleSheet.create({
   },
   tagTextLegal: {
     color: DialogueTokens.legalTagText,
-  },
-  portrait: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
   },
   line1: {
     fontSize: 13,

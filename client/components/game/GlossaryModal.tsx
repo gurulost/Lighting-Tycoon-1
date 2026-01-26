@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { AvatarImage } from "./AvatarImage";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
@@ -19,13 +20,13 @@ import { Part, PartFamily, PartTier } from "@/types/game";
 import { PartItem } from "./PartItem";
 import { useGame } from "@/context/GameContext";
 
-const stationWorkbench = require("../../../assets/images/station-workbench.png");
-const stationInbox = require("../../../assets/images/station-inbox.png");
-const stationRd = require("../../../assets/images/station-rd.png");
-const freedomControllerImage = require("../../../assets/images/freedom-controller.png");
-const tinaPortrait = require("../../../assets/images/tina/tina-portrait-256.png");
-const mentorPortrait = require("../../../assets/images/mentor/mentor-portrait-256.png");
-const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.png");
+const stationWorkbench = require("../../../assets/images/station-workbench.webp");
+const stationInbox = require("../../../assets/images/station-inbox.webp");
+const stationRd = require("../../../assets/images/station-rd.webp");
+const freedomControllerImage = require("../../../assets/images/freedom-controller.webp");
+const tinaPortrait = require("../../../assets/images/tina/tina-portrait-256.webp");
+const mentorPortrait = require("../../../assets/images/mentor/mentor-portrait-256.webp");
+const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.webp");
 
 interface GlossaryModalProps {
   onClose: () => void;
@@ -38,6 +39,7 @@ interface GlossaryItem {
   icon?: keyof typeof Feather.glyphMap;
   color?: string;
   image?: ImageSourcePropType;
+  isPortrait?: boolean;
   part?: { tier: PartTier; family: PartFamily };
 }
 
@@ -161,18 +163,21 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         description:
           "You. Owner of the Glow Workshop—confident, clever, and always in control of the glow.",
         image: tinaPortrait,
+        isPortrait: true,
       },
       {
         id: "character-mentor",
         title: "Mentor",
         description: "Retired installer who teaches the craft and keeps you grounded.",
         image: mentorPortrait,
+        isPortrait: true,
       },
       {
         id: "character-baron",
         title: "Bulb Baron",
         description: "Corporate supplier with tempting locked offers and strict terms.",
         image: baronPortrait,
+        isPortrait: true,
       },
     ],
   },
@@ -407,6 +412,15 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
                           size={42}
                           disabled
                           reducedMotion={reducedMotion}
+                        />
+                      ) : item.image && item.isPortrait ? (
+                        <AvatarImage
+                          source={item.image}
+                          size={40}
+                          borderColor="#2A2A4A"
+                          backgroundColor="rgba(255,255,255,0.08)"
+                          icon="user"
+                          iconColor={GameColors.text.secondary}
                         />
                       ) : item.image ? (
                         <Image

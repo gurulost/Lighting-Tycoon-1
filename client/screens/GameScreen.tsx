@@ -32,17 +32,30 @@ import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 
-const freedomControllerImage = require("../../assets/images/freedom-controller.png");
-const tinaPortrait128 = require("../../assets/images/tina/tina-portrait-128.png");
-const tinaPortrait256 = require("../../assets/images/tina/tina-portrait-256.png");
-const tinaConfident128 = require("../../assets/images/tina/tina-confident-128.png");
-const tinaFocused128 = require("../../assets/images/tina/tina-focused-128.png");
-const tinaDelighted128 = require("../../assets/images/tina/tina-delighted-128.png");
-const tinaConcerned128 = require("../../assets/images/tina/tina-concerned-128.png");
-const mentorPortrait128 = require("../../assets/images/mentor/mentor-portrait-128.png");
-const mentorPortrait256 = require("../../assets/images/mentor/mentor-portrait-256.png");
-const baronPortrait128 = require("../../assets/images/baron/baron-portrait-128.png");
-const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.png");
+const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
+const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
+const stationInboxImage = require("../../assets/images/station-inbox.webp");
+const stationRdImage = require("../../assets/images/station-rd.webp");
+const partClipOpen = require("../../assets/images/part-clip-open.webp");
+const partClipLocked = require("../../assets/images/part-clip-locked.webp");
+const partTrackOpen = require("../../assets/images/part-track-open.webp");
+const partTrackLocked = require("../../assets/images/part-track-locked.webp");
+const partSegmentOpen = require("../../assets/images/part-segment-open.webp");
+const partSegmentLocked = require("../../assets/images/part-segment-locked.webp");
+const partSmartkitOpen = require("../../assets/images/part-smartkit-open.webp");
+const partSmartkitLocked = require("../../assets/images/part-smartkit-locked.webp");
+const partPremiumOpen = require("../../assets/images/part-premium-open.webp");
+const partPremiumLocked = require("../../assets/images/part-premium-locked.webp");
+const tinaPortrait128 = require("../../assets/images/tina/tina-portrait-128.webp");
+const tinaPortrait256 = require("../../assets/images/tina/tina-portrait-256.webp");
+const tinaConfident128 = require("../../assets/images/tina/tina-confident-128.webp");
+const tinaFocused128 = require("../../assets/images/tina/tina-focused-128.webp");
+const tinaDelighted128 = require("../../assets/images/tina/tina-delighted-128.webp");
+const tinaConcerned128 = require("../../assets/images/tina/tina-concerned-128.webp");
+const mentorPortrait128 = require("../../assets/images/mentor/mentor-portrait-128.webp");
+const mentorPortrait256 = require("../../assets/images/mentor/mentor-portrait-256.webp");
+const baronPortrait128 = require("../../assets/images/baron/baron-portrait-128.webp");
+const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.webp");
 
 type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | "glossary" | null;
 
@@ -289,6 +302,20 @@ export default function GameScreen() {
       mentorPortrait256,
       baronPortrait128,
       baronPortrait256,
+      stationWorkbenchImage,
+      stationInboxImage,
+      stationRdImage,
+      freedomControllerImage,
+      partClipOpen,
+      partClipLocked,
+      partTrackOpen,
+      partTrackLocked,
+      partSegmentOpen,
+      partSegmentLocked,
+      partSmartkitOpen,
+      partSmartkitLocked,
+      partPremiumOpen,
+      partPremiumLocked,
     ];
     Promise.all(sources.map((source) => Image.loadAsync(source).catch(() => null)));
   }, []);
@@ -628,7 +655,12 @@ export default function GameScreen() {
 
         {state.freedomControllerCount > 0 ? (
           <View style={styles.freedomIndicator}>
-            <Image source={freedomControllerImage} style={styles.freedomIcon} contentFit="contain" />
+            <Image
+              source={freedomControllerImage}
+              style={styles.freedomIcon}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
             <ThemedText style={styles.freedomCount}>{state.freedomControllerCount}</ThemedText>
           </View>
         ) : null}

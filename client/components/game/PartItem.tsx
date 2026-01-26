@@ -18,16 +18,16 @@ import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
-const partClipOpen = require("../../../assets/images/part-clip-open.png");
-const partClipLocked = require("../../../assets/images/part-clip-locked.png");
-const partTrackOpen = require("../../../assets/images/part-track-open.png");
-const partTrackLocked = require("../../../assets/images/part-track-locked.png");
-const partSegmentOpen = require("../../../assets/images/part-segment-open.png");
-const partSegmentLocked = require("../../../assets/images/part-segment-locked.png");
-const partSmartkitOpen = require("../../../assets/images/part-smartkit-open.png");
-const partSmartkitLocked = require("../../../assets/images/part-smartkit-locked.png");
-const partPremiumOpen = require("../../../assets/images/part-premium-open.png");
-const partPremiumLocked = require("../../../assets/images/part-premium-locked.png");
+const partClipOpen = require("../../../assets/images/part-clip-open.webp");
+const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
+const partTrackOpen = require("../../../assets/images/part-track-open.webp");
+const partTrackLocked = require("../../../assets/images/part-track-locked.webp");
+const partSegmentOpen = require("../../../assets/images/part-segment-open.webp");
+const partSegmentLocked = require("../../../assets/images/part-segment-locked.webp");
+const partSmartkitOpen = require("../../../assets/images/part-smartkit-open.webp");
+const partSmartkitLocked = require("../../../assets/images/part-smartkit-locked.webp");
+const partPremiumOpen = require("../../../assets/images/part-premium-open.webp");
+const partPremiumLocked = require("../../../assets/images/part-premium-locked.webp");
 
 const PART_SPRITES: Record<PartTier, Record<PartFamily, ImageSourcePropType>> = {
   1: { open: partClipOpen, locked: partClipLocked },
@@ -194,6 +194,7 @@ export function PartItem({
             source={sprite}
             style={[styles.sprite, { width: size * 0.75, height: size * 0.75 }]}
             contentFit="contain"
+            cachePolicy="memory-disk"
           />
         </LinearGradient>
 
@@ -285,7 +286,7 @@ export function MergeAnimation({
         animatedStyle,
       ]}
     >
-      <Image source={sprite} style={styles.mergeSprite} contentFit="contain" />
+      <Image source={sprite} style={styles.mergeSprite} contentFit="contain" cachePolicy="memory-disk" />
     </Animated.View>
   );
 }

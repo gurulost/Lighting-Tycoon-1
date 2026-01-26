@@ -13,12 +13,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
+import { AvatarImage } from "./AvatarImage";
 
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
-const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.png");
+const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
 
 interface DependencyMeterProps {
   value: number;
@@ -211,11 +211,13 @@ export function DependencyMeter({ value, compact = false }: DependencyMeterProps
 
         {showExtras ? (
           <Animated.View style={[styles.baronContainer, baronStyle]}>
-            <Image
+            <AvatarImage
               source={baronPortrait}
-              style={styles.baronIcon}
-              contentFit="cover"
-              cachePolicy="memory-disk"
+              size={32}
+              borderColor={`${GameColors.locked.primary}55`}
+              backgroundColor="rgba(255,255,255,0.08)"
+              icon="briefcase"
+              iconColor={GameColors.locked.primary}
             />
           </Animated.View>
         ) : null}
@@ -359,13 +361,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     opacity: 0,
-  },
-  baronIcon: {
-    width: 32,
-    height: 32,
-    opacity: 0.75,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: GameColors.locked.primary + "55",
   },
 });

@@ -1,18 +1,17 @@
 import React from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
-import { Image } from "expo-image";
-
 import { ThemedText } from "@/components/ThemedText";
+import { AvatarImage } from "./AvatarImage";
 import { GameColors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 
 type TinaExpression = "portrait" | "confident" | "focused" | "delighted" | "concerned";
 
 const TINA_PORTRAITS: Record<TinaExpression, number> = {
-  portrait: require("../../../assets/images/tina/tina-portrait-128.png"),
-  confident: require("../../../assets/images/tina/tina-confident-128.png"),
-  focused: require("../../../assets/images/tina/tina-focused-128.png"),
-  delighted: require("../../../assets/images/tina/tina-delighted-128.png"),
-  concerned: require("../../../assets/images/tina/tina-concerned-128.png"),
+  portrait: require("../../../assets/images/tina/tina-portrait-128.webp"),
+  confident: require("../../../assets/images/tina/tina-confident-128.webp"),
+  focused: require("../../../assets/images/tina/tina-focused-128.webp"),
+  delighted: require("../../../assets/images/tina/tina-delighted-128.webp"),
+  concerned: require("../../../assets/images/tina/tina-concerned-128.webp"),
 };
 
 interface TinaChipProps {
@@ -34,11 +33,13 @@ export function TinaChip({
 
   return (
     <View style={[styles.container, style]}>
-      <Image
+      <AvatarImage
         source={source}
-        style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
-        contentFit="cover"
-        cachePolicy="memory-disk"
+        size={size}
+        borderColor={`${GameColors.characters.tina}AA`}
+        backgroundColor="rgba(255,255,255,0.12)"
+        icon="smile"
+        iconColor={GameColors.characters.tina}
       />
       {showLabel ? (
         <ThemedText style={styles.label}>{label}</ThemedText>
@@ -58,10 +59,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${GameColors.characters.tina}80`,
     backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  avatar: {
-    borderWidth: 1.5,
-    borderColor: `${GameColors.characters.tina}AA`,
   },
   label: {
     fontSize: 10,

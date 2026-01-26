@@ -2,16 +2,15 @@ import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
-
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
+import { AvatarImage } from "./AvatarImage";
 import { TinaChip } from "./TinaChip";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 import SoundManager from "@/audio/SoundManager";
 
-const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.png");
+const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.webp");
 
 interface BaronOfferModalProps {
   onAccept: () => void;
@@ -50,11 +49,13 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           title="Bulb Baron Offer"
           subtitle='"Certified parts. Faster merges. Just a tiny signature."'
           leading={
-            <Image
+            <AvatarImage
               source={baronPortrait}
-              style={styles.baronIcon}
-              contentFit="cover"
-              cachePolicy="memory-disk"
+              size={56}
+              borderColor={`${GameColors.locked.primary}55`}
+              backgroundColor="rgba(255,255,255,0.08)"
+              icon="briefcase"
+              iconColor={GameColors.locked.primary}
             />
           }
           headerRight={<TinaChip expression="confident" />}
@@ -94,13 +95,6 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     maxWidth: 420,
-  },
-  baronIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: GameColors.locked.primary + "55",
   },
   offerBox: {
     flexDirection: "row",
