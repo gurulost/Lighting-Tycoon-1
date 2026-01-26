@@ -12,9 +12,10 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
 interface OrdersModalProps {
   onClose: () => void;
+  closeDisabled?: boolean;
 }
 
-export function OrdersModal({ onClose }: OrdersModalProps) {
+export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
 
@@ -49,8 +50,15 @@ export function OrdersModal({ onClose }: OrdersModalProps) {
             </ThemedText>
           </View>
         </View>
-        <Pressable onPress={onClose} style={styles.closeButton}>
-          <Feather name="x" size={24} color={GameColors.text.primary} />
+        <Pressable
+          onPress={closeDisabled ? undefined : onClose}
+          style={[styles.closeButton, closeDisabled && styles.closeButtonDisabled]}
+        >
+          <Feather
+            name="x"
+            size={24}
+            color={closeDisabled ? GameColors.text.disabled : GameColors.text.primary}
+          />
         </Pressable>
       </View>
 
@@ -90,7 +98,14 @@ export function OrdersModal({ onClose }: OrdersModalProps) {
               order={order}
               onFulfill={() => handleFulfillOrder(order.id)}
               onDismiss={() => handleDismissOrder(order.id)}
-              dismissible={!order.isLockout}
+              onSelect={() => dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })}
+              selected={state.highlightedOrderId === order.id}
+              dismissible={
+                !order.isTutorial &&
+                !order.isLockout &&
+                !(state.lockoutActive && order.type === "lab_request") &&
+                !order.modifierIds?.includes("first_session")
+              }
             />
           ))
         ) : (
@@ -164,6 +179,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#2A2A4A",
+  },
+  closeButtonDisabled: {
+    opacity: 0.5,
   },
   statsRow: {
     flexDirection: "row",

@@ -24,6 +24,8 @@ interface OrderCardProps {
   onFulfill: () => void;
   onDismiss: () => void;
   dismissible?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
 const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
@@ -34,7 +36,14 @@ const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
   5: "star",
 };
 
-export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: OrderCardProps) {
+export function OrderCard({
+  order,
+  onFulfill,
+  onDismiss,
+  dismissible = true,
+  selected = false,
+  onSelect,
+}: OrderCardProps) {
   const { state, getFulfillmentIndices } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -49,7 +58,13 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
     if (part.tier !== req.tier) return false;
     if (req.family === "any") return true;
     if (part.family === req.family) return true;
-    if (req.family === "locked" && order.type === "locked_required" && part.compatible) return true;
+    if (
+      req.family === "locked" &&
+      order.type === "locked_required" &&
+      part.compatible &&
+      !order.noSubstitutions
+    )
+      return true;
     return false;
   };
 
@@ -74,7 +89,7 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
   }, [canFulfill]);
 
   useEffect(() => {
-    if (order.type === "rush") {
+    if (order.rushDeadline) {
       urgentPulse.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 500 }),
@@ -84,10 +99,10 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
         true
       );
     }
-  }, [order.type]);
+  }, [order.rushDeadline]);
 
   useEffect(() => {
-    if (order.type === "rush" && order.rushStartTime && order.rushDeadline) {
+    if (order.rushStartTime && order.rushDeadline) {
       const interval = setInterval(() => {
         const elapsed = Date.now() - order.rushStartTime!;
         const remaining = order.rushDeadline! - elapsed;
@@ -98,9 +113,9 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
   }, [order]);
 
   const getOrderTypeColor = () => {
+    if (order.type === "locked_required") return GameColors.locked.primary;
+    if (order.rushDeadline) return GameColors.ui.danger;
     switch (order.type) {
-      case "rush":
-        return GameColors.ui.danger;
       case "premium":
         return GameColors.currency.cash;
       case "style_match":
@@ -108,7 +123,6 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
       case "lab_request":
         return GameColors.currency.research;
       case "baron_certified":
-      case "locked_required":
         return GameColors.locked.primary;
       default:
         return GameColors.text.secondary;
@@ -116,9 +130,9 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
   };
 
   const getOrderTypeIcon = (): keyof typeof Feather.glyphMap => {
+    if (order.type === "locked_required") return "lock";
+    if (order.rushDeadline) return "clock";
     switch (order.type) {
-      case "rush":
-        return "clock";
       case "premium":
         return "award";
       case "style_match":
@@ -126,7 +140,6 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
       case "lab_request":
         return "zap";
       case "baron_certified":
-      case "locked_required":
         return "lock";
       default:
         return "package";
@@ -137,16 +150,21 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
     if (canFulfill) {
       return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
     }
+    if (order.type === "locked_required") {
+      return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
+    }
+    if (order.rushDeadline) {
+      return [`${GameColors.ui.danger}15`, "#1A1A2E", `${GameColors.ui.danger}15`];
+    }
     switch (order.type) {
-      case "rush":
-        return [`${GameColors.ui.danger}15`, "#1A1A2E", `${GameColors.ui.danger}15`];
       case "baron_certified":
-      case "locked_required":
         return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
       case "premium":
         return [`${GameColors.currency.cash}15`, "#1A1A2E", `${GameColors.currency.cash}15`];
       case "lab_request":
         return [`${GameColors.currency.research}15`, "#1A1A2E", `${GameColors.currency.research}15`];
+      case "style_match":
+        return [`${GameColors.ui.primary}15`, "#1A1A2E", `${GameColors.ui.primary}15`];
       default:
         return ["#1A1A2E", "#252542", "#1A1A2E"];
     }
@@ -183,25 +201,55 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
       ? Math.floor((1 + (timeRemaining / order.rushDeadline) * 0.5) * 100 - 100)
       : 0;
 
+  const modifierBadges = (() => {
+    const badges: { label: string; color: string; icon: keyof typeof Feather.glyphMap }[] = [];
+    if (order.type === "locked_required" || order.type === "baron_certified") {
+      badges.push({ label: "Certified", color: GameColors.locked.primary, icon: "lock" });
+    }
+    if (order.rushDeadline) {
+      badges.push({ label: "Rush", color: GameColors.ui.danger, icon: "clock" });
+    }
+    if (order.type === "style_match") {
+      const family = order.requirements[0]?.family === "locked" ? "Locked Only" : "Open Only";
+      badges.push({ label: family, color: GameColors.ui.primary, icon: "layers" });
+    }
+    if (order.familyPreference) {
+      const prefLabel = order.familyPreference === "open" ? "Prefers Open" : "Prefers Locked";
+      const color =
+        order.familyPreference === "open" ? GameColors.openStandard.primary : GameColors.locked.primary;
+      badges.push({ label: prefLabel, color, icon: "heart" });
+    }
+    if (order.noSubstitutions) {
+      badges.push({ label: "Exact Tiers", color: GameColors.text.secondary, icon: "check-circle" });
+    }
+    if (order.ecoAuditBonusResearch) {
+      badges.push({ label: `Eco +${order.ecoAuditBonusResearch}`, color: GameColors.currency.research, icon: "zap" });
+    }
+    return badges.slice(0, 3);
+  })();
+
   const typeColor = getOrderTypeColor();
   const borderColor = canFulfill ? GameColors.ui.success : typeColor;
+  const selectionColor = selected ? GameColors.ui.primary : borderColor;
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(300)}
-      exiting={FadeOutUp.duration(200)}
-      style={[
-        styles.container,
-        animatedStyle,
-        glowStyle,
-        { 
-          shadowColor: canFulfill ? GameColors.ui.success : typeColor,
-          borderColor: `${borderColor}40`,
-        },
-      ]}
-    >
-      <LinearGradient colors={getGradientColors()} style={styles.gradient}>
-        <View style={styles.header}>
+    <Pressable onPress={onSelect} disabled={!onSelect}>
+      <Animated.View
+        entering={FadeInDown.duration(300)}
+        exiting={FadeOutUp.duration(200)}
+        style={[
+          styles.container,
+          animatedStyle,
+          glowStyle,
+          selected && styles.containerSelected,
+          { 
+            shadowColor: canFulfill ? GameColors.ui.success : typeColor,
+            borderColor: `${selectionColor}60`,
+          },
+        ]}
+      >
+        <LinearGradient colors={getGradientColors()} style={styles.gradient}>
+          <View style={styles.header}>
           <View style={styles.titleRow}>
             <LinearGradient
               colors={[`${typeColor}40`, `${typeColor}20`, `${typeColor}40`]}
@@ -213,6 +261,17 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
             {order.isLockout ? (
               <View style={styles.lockoutBadge}>
                 <ThemedText style={styles.lockoutBadgeText}>LOCKOUT</ThemedText>
+              </View>
+            ) : null}
+            {order.isTutorial ? (
+              <View style={styles.tutorialBadge}>
+                <ThemedText style={styles.tutorialBadgeText}>REQUIRED</ThemedText>
+              </View>
+            ) : null}
+            {selected ? (
+              <View style={styles.trackBadge}>
+                <Feather name="eye" size={12} color={GameColors.ui.primary} />
+                <ThemedText style={styles.trackBadgeText}>TRACKING</ThemedText>
               </View>
             ) : null}
           </View>
@@ -227,7 +286,7 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
           <ThemedText style={styles.flavorText}>{order.flavorText}</ThemedText>
         ) : null}
 
-        {order.type === "rush" && timeRemaining !== null ? (
+        {order.rushDeadline && timeRemaining !== null ? (
           <Animated.View style={[styles.rushTimer, urgentStyle]}>
             <LinearGradient
               colors={[`${GameColors.ui.danger}30`, `${GameColors.ui.danger}10`]}
@@ -239,6 +298,19 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
               </ThemedText>
             </LinearGradient>
           </Animated.View>
+        ) : null}
+
+        {modifierBadges.length > 0 ? (
+          <View style={styles.badgeRow}>
+            {modifierBadges.map((badge) => (
+              <View key={badge.label} style={[styles.modifierBadge, { borderColor: `${badge.color}40` }]}>
+                <Feather name={badge.icon} size={12} color={badge.color} />
+                <ThemedText style={[styles.modifierBadgeText, { color: badge.color }]}>
+                  {badge.label}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
         ) : null}
 
         <View style={styles.requirements}>
@@ -391,6 +463,7 @@ export function OrderCard({ order, onFulfill, onDismiss, dismissible = true }: O
         </Pressable>
       </LinearGradient>
     </Animated.View>
+    </Pressable>
   );
 }
 
@@ -402,6 +475,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     shadowOffset: { width: 0, height: 0 },
     shadowRadius: 12,
+  },
+  containerSelected: {
+    borderWidth: 1.5,
   },
   gradient: {
     padding: Spacing.lg,
@@ -447,6 +523,39 @@ const styles = StyleSheet.create({
     color: GameColors.ui.danger,
     letterSpacing: 0.5,
   },
+  tutorialBadge: {
+    backgroundColor: GameColors.ui.primary + "30",
+    borderRadius: BorderRadius.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: GameColors.ui.primary + "60",
+    marginLeft: 4,
+  },
+  tutorialBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: GameColors.ui.primary,
+    letterSpacing: 0.5,
+  },
+  trackBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: `${GameColors.ui.primary}20`,
+    borderRadius: BorderRadius.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}60`,
+    marginLeft: 4,
+  },
+  trackBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: GameColors.ui.primary,
+    letterSpacing: 0.4,
+  },
   flavorText: {
     fontSize: 12,
     color: GameColors.text.secondary,
@@ -478,6 +587,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GameColors.ui.danger,
     fontWeight: "700",
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  modifierBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    backgroundColor: "#1A1A2E",
+  },
+  modifierBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   requirements: {
     gap: Spacing.sm,

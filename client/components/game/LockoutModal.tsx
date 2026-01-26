@@ -13,6 +13,7 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
+import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
 interface LockoutModalProps {
@@ -78,7 +79,10 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
   const isPhase1 = state.lockoutPhase === 1;
   const isPhase2 = state.lockoutPhase === 2;
   const isPhase3 = state.lockoutPhase === 3;
-  const labRemaining = state.lockoutLabOrdersRemaining;
+  const labRemaining = Math.max(0, state.lockoutLabOrdersRemaining);
+  const labTarget = Number(LOCKOUT_LAB_REQUESTS);
+  const labRemainingLabel = `${labRemaining} Request${labRemaining === 1 ? "" : "s"}`;
+  const labTargetLabel = `${labTarget} Request${labTarget === 1 ? "" : "s"}`;
 
   return (
     <View style={styles.overlay}>
@@ -139,7 +143,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
                 <View style={[styles.choiceTag, { backgroundColor: GameColors.currency.research + "20" }]}>
                   <Feather name="zap" size={12} color={GameColors.currency.research} />
                   <ThemedText style={[styles.choiceTagText, { color: GameColors.currency.research }]}>
-                    3 Requests
+                    {state.lockoutChoice ? labRemainingLabel : labTargetLabel}
                   </ThemedText>
                 </View>
               </Pressable>
@@ -158,7 +162,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
         {isPhase2 && state.lockoutChoice === "lab" ? (
           <View style={styles.phaseHint}>
             <ThemedText style={styles.choiceDescription}>
-              Complete {labRemaining + 1} lab requests, then craft a Freedom Controller.
+              Complete {labRemaining} lab requests, then craft a Freedom Controller.
             </ThemedText>
           </View>
         ) : null}

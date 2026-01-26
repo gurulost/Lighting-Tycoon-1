@@ -11,6 +11,8 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
 interface UpgradesModalProps {
   onClose: () => void;
+  closeDisabled?: boolean;
+  tutorialOnlyUpgradeId?: string;
 }
 
 const CATEGORIES = [
@@ -21,16 +23,30 @@ const CATEGORIES = [
   { id: "rd", name: "R&D Access", icon: "zap" as const },
 ];
 
-export function UpgradesModal({ onClose }: UpgradesModalProps) {
+export function UpgradesModal({
+  onClose,
+  closeDisabled = false,
+  tutorialOnlyUpgradeId,
+}: UpgradesModalProps) {
   const insets = useSafeAreaInsets();
   const { state, purchaseUpgrade } = useGame();
+  const visibleUpgrades = tutorialOnlyUpgradeId
+    ? UPGRADE_DEFINITIONS.filter((u) => u.id === tutorialOnlyUpgradeId)
+    : UPGRADE_DEFINITIONS;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <ThemedText style={styles.title}>Upgrades</ThemedText>
-        <Pressable onPress={onClose} style={styles.closeButton}>
-          <Feather name="x" size={24} color={GameColors.text.primary} />
+        <Pressable
+          onPress={closeDisabled ? undefined : onClose}
+          style={[styles.closeButton, closeDisabled && styles.closeButtonDisabled]}
+        >
+          <Feather
+            name="x"
+            size={24}
+            color={closeDisabled ? GameColors.text.disabled : GameColors.text.primary}
+          />
         </Pressable>
       </View>
 
@@ -45,8 +61,17 @@ export function UpgradesModal({ onClose }: UpgradesModalProps) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {tutorialOnlyUpgradeId ? (
+          <View style={styles.tutorialBanner}>
+            <Feather name="compass" size={16} color={GameColors.ui.primary} />
+            <ThemedText style={styles.tutorialBannerText}>
+              Tutorial: Unlock Slot 1 to expand your board.
+            </ThemedText>
+          </View>
+        ) : null}
+
         {CATEGORIES.map((category) => {
-          const upgrades = UPGRADE_DEFINITIONS.filter((u) => u.category === category.id);
+          const upgrades = visibleUpgrades.filter((u) => u.category === category.id);
           if (upgrades.length === 0) return null;
 
           return (
@@ -92,6 +117,9 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: Spacing.sm,
   },
+  closeButtonDisabled: {
+    opacity: 0.5,
+  },
   cashDisplay: {
     flexDirection: "row",
     alignItems: "center",
@@ -119,6 +147,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.lg,
     paddingBottom: Spacing["4xl"],
+  },
+  tutorialBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}40`,
+    backgroundColor: `${GameColors.ui.primary}10`,
+    marginBottom: Spacing.lg,
+  },
+  tutorialBannerText: {
+    fontSize: 13,
+    color: GameColors.text.primary,
+    flex: 1,
   },
   categorySection: {
     marginBottom: Spacing.xl,

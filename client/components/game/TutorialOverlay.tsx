@@ -7,6 +7,11 @@ import Animated, {
   FadeOut,
   SlideInDown,
   SlideOutDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,14 +19,23 @@ import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+type HighlightTarget = "board" | "orders" | "upgrades" | "dependency" | "currency";
+
+interface LayoutRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface TutorialStep {
   id: number;
   title: string;
   description: string;
   icon: keyof typeof Feather.glyphMap;
-  highlight?: "board" | "orders" | "currency" | "dependency" | null;
+  highlight?: HighlightTarget | null;
   color: string;
 }
 
@@ -36,7 +50,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 1,
-    title: "Merge to Upgrade",
+    title: "First Merge",
     description: "Drag one Clip onto another to make a Track.",
     icon: "layers",
     highlight: "board",
@@ -44,22 +58,30 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 2,
+    title: "Second Merge",
+    description: "Merge two Tracks into a Segment.",
+    icon: "shuffle",
+    highlight: "board",
+    color: GameColors.openStandard.primary,
+  },
+  {
+    id: 3,
     title: "Complete an Order",
-    description: "Open the Order Inbox and fulfill the Starter Install to earn rewards.",
+    description: "Open Orders and fulfill the Starter Install to earn rewards.",
     icon: "inbox",
     highlight: "orders",
     color: GameColors.currency.reputation,
   },
   {
-    id: 3,
+    id: 4,
     title: "Upgrade Your Space",
     description: "Use your coins to unlock a new board slot. Space is oxygen.",
     icon: "grid",
-    highlight: "currency",
+    highlight: "upgrades",
     color: GameColors.currency.cash,
   },
   {
-    id: 4,
+    id: 5,
     title: "The Baron’s Offer",
     description: "Decide whether to take the locked crate or stay open-standard.",
     icon: "lock",
@@ -67,7 +89,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     color: GameColors.locked.primary,
   },
   {
-    id: 5,
+    id: 6,
     title: "You're Ready!",
     description: "Merge, fulfill orders, and choose your strategy. Good luck, Tycoon!",
     icon: "star",
@@ -76,9 +98,15 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
-export function TutorialOverlay() {
+interface TutorialOverlayProps {
+  targets?: Partial<Record<HighlightTarget, LayoutRect>>;
+}
+
+export function TutorialOverlay({ targets }: TutorialOverlayProps) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
+  const [confirmSkip, setConfirmSkip] = React.useState(false);
+  const pulse = useSharedValue(0);
 
   if (state.tutorialComplete) {
     return null;
@@ -93,8 +121,32 @@ export function TutorialOverlay() {
   const isLastStep = state.tutorialStep === TUTORIAL_STEPS.length - 1;
 
   const handleSkip = () => {
-    dispatch({ type: "COMPLETE_TUTORIAL" });
+    if (!confirmSkip) {
+      setConfirmSkip(true);
+      return;
+    }
+    dispatch({ type: "COMPLETE_TUTORIAL", skipped: true });
   };
+
+  React.useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(withTiming(1, { duration: 1000 }), withTiming(0, { duration: 1000 })),
+      -1,
+      true
+    );
+  }, []);
+
+  React.useEffect(() => {
+    setConfirmSkip(false);
+  }, [state.tutorialStep]);
+
+  const highlightRect =
+    currentStep?.highlight && targets ? targets[currentStep.highlight] : undefined;
+
+  const highlightStyle = useAnimatedStyle(() => ({
+    opacity: 0.6 + pulse.value * 0.4,
+    transform: [{ scale: 1 + pulse.value * 0.02 }],
+  }));
 
   return (
     <Animated.View
@@ -106,8 +158,28 @@ export function TutorialOverlay() {
       <View pointerEvents="none" style={styles.backdrop} />
 
       <Pressable style={styles.skipButton} onPress={handleSkip}>
-        <ThemedText style={styles.skipText}>Skip Tutorial</ThemedText>
+        <ThemedText style={styles.skipText}>
+          {confirmSkip ? "Tap again to skip" : "Skip Tutorial"}
+        </ThemedText>
       </Pressable>
+
+      {highlightRect ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.highlight,
+            highlightStyle,
+            {
+              borderColor: `${currentStep.color}CC`,
+              shadowColor: currentStep.color,
+              left: Math.max(8, highlightRect.x - 6),
+              top: Math.max(8, highlightRect.y - 6),
+              width: Math.min(SCREEN_WIDTH - 16, highlightRect.width + 12),
+              height: Math.min(SCREEN_HEIGHT - 16, highlightRect.height + 12),
+            },
+          ]}
+        />
+      ) : null}
 
       <View style={styles.content}>
         <Animated.View
@@ -128,6 +200,9 @@ export function TutorialOverlay() {
 
             <ThemedText style={styles.title}>{currentStep.title}</ThemedText>
             <ThemedText style={styles.description}>{currentStep.description}</ThemedText>
+            {state.tutorialHint ? (
+              <ThemedText style={styles.hintText}>{state.tutorialHint}</ThemedText>
+            ) : null}
 
             <View style={styles.progressContainer}>
               {TUTORIAL_STEPS.map((step, index) => (
@@ -261,6 +336,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     paddingHorizontal: Spacing.md,
   },
+  hintText: {
+    fontSize: 13,
+    color: GameColors.text.primary,
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+  },
   progressContainer: {
     flexDirection: "row",
     gap: Spacing.sm,
@@ -311,5 +392,14 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 13,
     color: GameColors.text.secondary,
+  },
+  highlight: {
+    position: "absolute",
+    borderRadius: BorderRadius.lg,
+    borderWidth: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
   },
 });

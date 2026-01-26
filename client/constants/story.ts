@@ -6,6 +6,7 @@ export interface StoryBeat {
   line1: string;
   line2?: string;
   onceOnly?: boolean;
+  category?: "baron_fax" | "glowmail" | "mentor_tip" | "rd_memo" | "system" | "tutorial";
 }
 
 export const STORY_BEATS: Record<string, StoryBeat> = {
@@ -14,6 +15,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     speaker: "system",
     line1: "Neighborhood unlocked: Starter Street.",
     onceOnly: true,
+    category: "system",
   },
   neighborhood_hoa: {
     id: "neighborhood_hoa",
@@ -33,10 +35,17 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "Certified Install Week begins now.",
     onceOnly: true,
   },
+  neighborhood_lockout: {
+    id: "neighborhood_lockout",
+    speaker: "system",
+    line1: "Lockout Lane unlocked. Firmware Fridays ahead.",
+    onceOnly: true,
+    category: "system",
+  },
   neighborhood_liberation: {
     id: "neighborhood_liberation",
     speaker: "mentor",
-    line1: "Open Spark Workshop is watching your moves.",
+    line1: "Open Spark Workshop is ready when you are.",
     onceOnly: true,
   },
   dependency_20: {
@@ -96,7 +105,320 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "A signature is just a hug… in legal form.",
     onceOnly: true,
   },
+  baron_offer_prompt: {
+    id: "baron_offer_prompt",
+    speaker: "mentor",
+    line1: "He’s offering speed. Read the fine print.",
+    onceOnly: true,
+    category: "tutorial",
+  },
+  tutorial_merge_1: {
+    id: "tutorial_merge_1",
+    speaker: "mentor",
+    line1: "That’s it. Two become one.",
+    line2: "Keep climbing the chain.",
+    onceOnly: true,
+    category: "tutorial",
+  },
+  tutorial_merge_2: {
+    id: "tutorial_merge_2",
+    speaker: "mentor",
+    line1: "Nice. Now let’s deliver.",
+    onceOnly: true,
+    category: "tutorial",
+  },
+  tutorial_order: {
+    id: "tutorial_order",
+    speaker: "customer",
+    line1: "Please—no flicker. My neighbors judge.",
+    onceOnly: true,
+    category: "tutorial",
+  },
+  tutorial_upgrade: {
+    id: "tutorial_upgrade",
+    speaker: "mentor",
+    line1: "Space is oxygen.",
+    onceOnly: true,
+    category: "tutorial",
+  },
+  backpack_unlocked: {
+    id: "backpack_unlocked",
+    speaker: "mentor",
+    line1: "Backpack unlocked. Store extras to keep the board clear.",
+    onceOnly: true,
+    category: "mentor_tip",
+  },
+  first_session_certified: {
+    id: "first_session_certified",
+    speaker: "baron",
+    line1: "Certified clients pay full for locked kits.",
+    line2: "Open installs take a deduction.",
+    onceOnly: true,
+    category: "baron_fax",
+  },
+  tutorial_baron_choice: {
+    id: "tutorial_baron_choice",
+    speaker: "baron",
+    line1: "Choice is a luxury. Enjoy it.",
+    onceOnly: true,
+    category: "tutorial",
+  },
+  baron_offer_accept: {
+    id: "baron_offer_accept",
+    speaker: "baron",
+    line1: "Welcome to Crownlight Certified.",
+    line2: "Exclusive glow, protected zip codes.",
+    onceOnly: true,
+    category: "baron_fax",
+  },
+  baron_offer_decline: {
+    id: "baron_offer_decline",
+    speaker: "mentor",
+    line1: "Slow and steady. Open keeps you flexible.",
+    onceOnly: true,
+    category: "mentor_tip",
+  },
+  lockout_begin: {
+    id: "lockout_begin",
+    speaker: "system",
+    line1: "Firmware Friday: certified installs only.",
+    line2: "Your workshop is dependent.",
+    onceOnly: true,
+    category: "system",
+  },
+  lockout_choice_baron: {
+    id: "lockout_choice_baron",
+    speaker: "baron",
+    line1: "Emergency crate authorized.",
+    line2: "Compliance keeps your territory safe.",
+    onceOnly: true,
+    category: "baron_fax",
+  },
+  lockout_choice_lab: {
+    id: "lockout_choice_lab",
+    speaker: "rd",
+    line1: "Lab requests incoming. Build the controller.",
+    onceOnly: true,
+    category: "rd_memo",
+  },
+  lockout_resolve_baron: {
+    id: "lockout_resolve_baron",
+    speaker: "baron",
+    line1: "Crownlight thanks you for your loyalty.",
+    line2: "Certified supply will continue.",
+    onceOnly: true,
+    category: "baron_fax",
+  },
+  lockout_resolve_freedom: {
+    id: "lockout_resolve_freedom",
+    speaker: "mentor",
+    line1: "You broke the lock. Breathe.",
+    line2: "Now build on your terms.",
+    onceOnly: true,
+    category: "mentor_tip",
+  },
+  rd_memo_1: {
+    id: "rd_memo_1",
+    speaker: "rd",
+    line1: "Prototype bench calibration complete.",
+    category: "rd_memo",
+  },
+  rd_memo_2: {
+    id: "rd_memo_2",
+    speaker: "rd",
+    line1: "Open-standard diagnostics are clean.",
+    category: "rd_memo",
+  },
+  rd_memo_3: {
+    id: "rd_memo_3",
+    speaker: "rd",
+    line1: "Controller blueprint fragments acquired.",
+    category: "rd_memo",
+  },
+  rd_memo_4: {
+    id: "rd_memo_4",
+    speaker: "rd",
+    line1: "Freedom Controller wants a clean signal.",
+    category: "rd_memo",
+  },
+  mentor_tip_1: {
+    id: "mentor_tip_1",
+    speaker: "mentor",
+    line1: "Merge first. Think later.",
+    category: "mentor_tip",
+  },
+  mentor_tip_2: {
+    id: "mentor_tip_2",
+    speaker: "mentor",
+    line1: "If it feels too good early, check the fine print.",
+    category: "mentor_tip",
+  },
+  mentor_tip_3: {
+    id: "mentor_tip_3",
+    speaker: "mentor",
+    line1: "Space is power. Keep a slot open.",
+    category: "mentor_tip",
+  },
+  mentor_tip_4: {
+    id: "mentor_tip_4",
+    speaker: "mentor",
+    line1: "Open kits earn research. Research earns freedom.",
+    category: "mentor_tip",
+  },
+  mentor_tip_5: {
+    id: "mentor_tip_5",
+    speaker: "mentor",
+    line1: "Locked sells fast. Open lasts long.",
+    category: "mentor_tip",
+  },
+  mentor_tip_6: {
+    id: "mentor_tip_6",
+    speaker: "mentor",
+    line1: "Never chase a quota at the cost of control.",
+    category: "mentor_tip",
+  },
+  glowmail_1: {
+    id: "glowmail_1",
+    speaker: "customer",
+    line1: "GlowMail: The patio looks wedding-ready.",
+    category: "glowmail",
+  },
+  glowmail_2: {
+    id: "glowmail_2",
+    speaker: "customer",
+    line1: "GlowMail: HOA approved your uniformity.",
+    category: "glowmail",
+  },
+  glowmail_3: {
+    id: "glowmail_3",
+    speaker: "customer",
+    line1: "GlowMail: Game day glow was a hit.",
+    category: "glowmail",
+  },
+  glowmail_4: {
+    id: "glowmail_4",
+    speaker: "customer",
+    line1: "GlowMail: Minimalist client loved the calm light.",
+    category: "glowmail",
+  },
+  glowmail_5: {
+    id: "glowmail_5",
+    speaker: "customer",
+    line1: "GlowMail: Tech dad wants exportable presets.",
+    category: "glowmail",
+  },
+  glowmail_6: {
+    id: "glowmail_6",
+    speaker: "customer",
+    line1: "GlowMail: Neighbor rivalry escalated. You won.",
+    category: "glowmail",
+  },
+  glowmail_7: {
+    id: "glowmail_7",
+    speaker: "customer",
+    line1: "GlowMail: Boutique traffic is up after your install.",
+    category: "glowmail",
+  },
+  glowmail_8: {
+    id: "glowmail_8",
+    speaker: "customer",
+    line1: "GlowMail: Thanks for keeping it local.",
+    category: "glowmail",
+  },
+  baron_fax_1: {
+    id: "baron_fax_1",
+    speaker: "baron",
+    line1: "BaronFax: Crownlight Certified shipments prioritized.",
+    line2: "Compliance keeps your zip code protected.",
+    category: "baron_fax",
+  },
+  baron_fax_2: {
+    id: "baron_fax_2",
+    speaker: "baron",
+    line1: "BaronFax: Exclusive is a feeling. Compliance is a requirement.",
+    category: "baron_fax",
+  },
+  baron_fax_3: {
+    id: "baron_fax_3",
+    speaker: "baron",
+    line1: "BaronFax: Quota season begins Monday. Glow targets are non-negotiable.",
+    category: "baron_fax",
+  },
+  baron_fax_4: {
+    id: "baron_fax_4",
+    speaker: "baron",
+    line1: "BaronFax: Firmware Friday rolls out tonight.",
+    line2: "Reboots ensure quality.",
+    category: "baron_fax",
+  },
+  baron_fax_5: {
+    id: "baron_fax_5",
+    speaker: "baron",
+    line1: "BaronFax: Your territory is protected (terms apply).",
+    category: "baron_fax",
+  },
+  baron_fax_6: {
+    id: "baron_fax_6",
+    speaker: "baron",
+    line1: "BaronFax: New patterns available in the Crownlight app.",
+    line2: "Permissions updated for your convenience.",
+    category: "baron_fax",
+  },
+  baron_fax_7: {
+    id: "baron_fax_7",
+    speaker: "baron",
+    line1: "BaronFax: We noticed open kits in certified installs.",
+    line2: "Please align with standards.",
+    category: "baron_fax",
+  },
+  baron_fax_8: {
+    id: "baron_fax_8",
+    speaker: "baron",
+    line1: "BaronFax: Supply chain optimized for loyal partners.",
+    category: "baron_fax",
+  },
+  lockout_lab_complete: {
+    id: "lockout_lab_complete",
+    speaker: "rd",
+    line1: "Prototype Freedom Controller ready.",
+    line2: "Break the lock‑in when you're ready.",
+    onceOnly: true,
+    category: "rd_memo",
+  },
 };
+
+export const BARON_FAX_BEATS = [
+  "baron_fax_1",
+  "baron_fax_2",
+  "baron_fax_3",
+  "baron_fax_4",
+  "baron_fax_5",
+  "baron_fax_6",
+  "baron_fax_7",
+  "baron_fax_8",
+];
+
+export const GLOWMAIL_BEATS = [
+  "glowmail_1",
+  "glowmail_2",
+  "glowmail_3",
+  "glowmail_4",
+  "glowmail_5",
+  "glowmail_6",
+  "glowmail_7",
+  "glowmail_8",
+];
+
+export const MENTOR_TIP_BEATS = [
+  "mentor_tip_1",
+  "mentor_tip_2",
+  "mentor_tip_3",
+  "mentor_tip_4",
+  "mentor_tip_5",
+  "mentor_tip_6",
+];
+
+export const RD_MEMO_BEATS = ["rd_memo_1", "rd_memo_2", "rd_memo_3", "rd_memo_4"];
 
 export const ORDER_FLAVOR_TEXTS = [
   "HOA says: “Warm white only.” HOA says a lot of things.",
@@ -106,4 +428,9 @@ export const ORDER_FLAVOR_TEXTS = [
   "Cozy minimalist: “No wires visible.” Good luck.",
   "Sports superfan wants team colors in 30 seconds.",
   "Neighbor rivalry: “Brighter than the Joneses.”",
+  "A shop owner wants a glow that says premium, not loud.",
+  "A skeptic says: no subscriptions, no surprises.",
+  "HOA president: no blinking. Ever.",
+  "Customer asks for a calm glow, no visible wiring.",
+  "Next-door rivalry request: brighter than last year.",
 ];

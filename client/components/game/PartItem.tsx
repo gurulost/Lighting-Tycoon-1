@@ -48,7 +48,12 @@ const TIER_NAMES: Record<PartTier, string> = {
 interface PartItemProps {
   part: Part;
   onDragStart?: () => void;
-  onDragEnd?: (translationX: number, translationY: number) => void;
+  onDragEnd?: (
+    translationX: number,
+    translationY: number,
+    absoluteX: number,
+    absoluteY: number
+  ) => void;
   onLongPress?: () => void;
   size?: number;
   disabled?: boolean;
@@ -91,8 +96,8 @@ export function PartItem({
     onDragStart?.();
   };
 
-  const handleDragEnd = (tx: number, ty: number) => {
-    onDragEnd?.(tx, ty);
+  const handleDragEnd = (tx: number, ty: number, ax: number, ay: number) => {
+    onDragEnd?.(tx, ty, ax, ay);
   };
 
   const handleLongPress = () => {
@@ -114,7 +119,12 @@ export function PartItem({
     })
     .onEnd((event) => {
       "worklet";
-      runOnJS(handleDragEnd)(event.translationX, event.translationY);
+      runOnJS(handleDragEnd)(
+        event.translationX,
+        event.translationY,
+        event.absoluteX,
+        event.absoluteY
+      );
       translateX.value = withSpring(0, { damping: 15 });
       translateY.value = withSpring(0, { damping: 15 });
       scale.value = withSpring(1, { damping: 15 });

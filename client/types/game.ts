@@ -44,11 +44,18 @@ export interface Order {
     research: number;
   };
   flavorText?: string;
+  templateId?: string;
+  modifierIds?: string[];
+  archetypeId?: string;
+  ecoAuditBonusResearch?: number;
+  noSubstitutions?: boolean;
+  minNeighborhoodId?: string;
   isLockout?: boolean;
   rushDeadline?: number;
   rushStartTime?: number;
   familyPreference?: PartFamily;
   penaltyIfWrongFamily?: boolean;
+  isTutorial?: boolean;
 }
 
 export interface Upgrade {
@@ -77,6 +84,14 @@ export interface GameState {
   unlockedSlots: number[];
   blockedSlots: number[];
   stationSlots: number[];
+  backpackSlots: number;
+  backpack: (Part | null)[];
+  backpackUnlocked: boolean;
+
+  firstSessionComplete: boolean;
+  firstSessionOrderIndex: number;
+  firstSessionOrdersCompleted: number;
+  firstSessionForcedDrops: PartTier[];
   
   cash: number;
   reputation: number;
@@ -98,7 +113,20 @@ export interface GameState {
   tutorialStep: number;
   tutorialComplete: boolean;
   tutorialSpawnCount: number;
+  tutorialMergeCount: number;
   tutorialOrderId?: string;
+  tutorialStepStartedAt: number;
+  tutorialNudgeCount: number;
+  tutorialHint?: string;
+  tutorialMetrics: {
+    stepStartedAt: Record<number, number>;
+    stepCompletedAt: Record<number, number>;
+    stepDurationMs: Record<number, number>;
+    skipped: boolean;
+  };
+  highlightedOrderId?: string;
+  lastRecycleRewardId: number;
+  lastRecycleReward: { cash: number; research: number } | null;
   
   lockoutActive: boolean;
   lockoutPhase: number;
@@ -118,6 +146,7 @@ export interface GameState {
 
   undoSnapshot?: {
     board: (Part | null)[];
+    backpack: (Part | null)[];
     cash: number;
     reputation: number;
     research: number;
@@ -144,9 +173,17 @@ export interface GameState {
 
   reputationTier: number;
   currentNeighborhoodId: string;
+
+  orderMetrics: {
+    generatedByNeighborhood: Record<string, number>;
+    generatedByModifier: Record<string, number>;
+    generatedByNeighborhoodModifier: Record<string, number>;
+    generatedByType: Partial<Record<OrderType, number>>;
+  };
 }
 
 export const INITIAL_BOARD_SIZE = 30;
+export const INITIAL_BACKPACK_SLOTS = 4;
 export const INITIAL_BLOCKED_SLOTS = [27, 28, 29];
 export const STATION_SLOTS = [0, 5, 24];
 

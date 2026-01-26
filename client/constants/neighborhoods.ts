@@ -46,9 +46,24 @@ export const NEIGHBORHOODS: Neighborhood[] = [
     storyBeatId: "neighborhood_certified",
   },
   {
+    id: "lockout",
+    name: "Lockout Lane",
+    repRequired: 1000,
+    allowedOrderTypes: [
+      "basic",
+      "style_match",
+      "rush",
+      "premium",
+      "baron_certified",
+      "locked_required",
+      "lab_request",
+    ],
+    storyBeatId: "neighborhood_lockout",
+  },
+  {
     id: "liberation",
     name: "Open Spark Workshop",
-    repRequired: 1200,
+    repRequired: 1300,
     allowedOrderTypes: [
       "basic",
       "style_match",

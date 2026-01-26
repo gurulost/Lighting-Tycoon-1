@@ -15,6 +15,7 @@ import Animated, {
 import { MergeBoard } from "@/components/game/MergeBoard";
 import { CurrencyDisplay } from "@/components/game/CurrencyDisplay";
 import { DependencyMeter } from "@/components/game/DependencyMeter";
+import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
 import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
@@ -33,6 +34,15 @@ const freedomControllerImage = require("../../assets/images/freedom-controller.p
 
 type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | null;
 
+type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency";
+
+interface LayoutRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface BottomButtonProps {
   icon: keyof typeof Feather.glyphMap;
   label: string;
@@ -40,9 +50,18 @@ interface BottomButtonProps {
   onPress: () => void;
   badge?: number;
   disabled?: boolean;
+  onLayout?: (event: any) => void;
 }
 
-function BottomButton({ icon, label, color, onPress, badge, disabled }: BottomButtonProps) {
+function BottomButton({
+  icon,
+  label,
+  color,
+  onPress,
+  badge,
+  disabled,
+  onLayout,
+}: BottomButtonProps) {
   const pulseAnim = useSharedValue(0);
 
   React.useEffect(() => {
@@ -68,6 +87,7 @@ function BottomButton({ icon, label, color, onPress, badge, disabled }: BottomBu
     <Pressable
       style={[styles.bottomButton, disabled && styles.bottomButtonDisabled]}
       onPress={disabled ? undefined : onPress}
+      onLayout={onLayout}
     >
       <Animated.View
         style={[
@@ -104,13 +124,60 @@ export default function GameScreen() {
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoTick, setUndoTick] = useState(0);
+  const [tutorialTargets, setTutorialTargets] = useState<
+    Partial<Record<TutorialTarget, LayoutRect>>
+  >({});
+  const [relativeTargets, setRelativeTargets] = useState<
+    Partial<Record<TutorialTarget, LayoutRect>>
+  >({});
+  const [topBarLayout, setTopBarLayout] = useState<LayoutRect | null>(null);
+  const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(null);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
+  const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tutorialStepRef = useRef(state.tutorialStep);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
 
   const closeModal = () => setActiveModal(null);
+  const setTarget =
+    (key: TutorialTarget) =>
+    (event: { nativeEvent: { layout: LayoutRect } }) => {
+      const { x, y, width, height } = event.nativeEvent.layout;
+      setRelativeTargets((prev) => ({
+        ...prev,
+        [key]: { x, y, width, height },
+      }));
+    };
+
+  useEffect(() => {
+    const nextTargets: Partial<Record<TutorialTarget, LayoutRect>> = {};
+    const applyOffset = (rect: LayoutRect, offset?: LayoutRect | null) => ({
+      x: rect.x + (offset?.x ?? 0),
+      y: rect.y + (offset?.y ?? 0),
+      width: rect.width,
+      height: rect.height,
+    });
+
+    if (relativeTargets.board) {
+      nextTargets.board = applyOffset(relativeTargets.board);
+    }
+    if (relativeTargets.dependency) {
+      nextTargets.dependency = applyOffset(relativeTargets.dependency);
+    }
+    if (relativeTargets.currency) {
+      nextTargets.currency = applyOffset(relativeTargets.currency, topBarLayout);
+    }
+    if (relativeTargets.orders) {
+      nextTargets.orders = applyOffset(relativeTargets.orders, bottomBarLayout);
+    }
+    if (relativeTargets.upgrades) {
+      nextTargets.upgrades = applyOffset(relativeTargets.upgrades, bottomBarLayout);
+    }
+
+    setTutorialTargets(nextTargets);
+  }, [relativeTargets, topBarLayout, bottomBarLayout]);
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     if (toastTimeout.current) {
@@ -160,6 +227,44 @@ export default function GameScreen() {
   }, [state.lastMergeBonusId, state.lastMergeBonusCash, state.mergeChainCount, showToast, dispatch]);
 
   useEffect(() => {
+    if (
+      state.lastRecycleRewardId !== recycleRewardRef.current &&
+      state.lastRecycleReward
+    ) {
+      const { cash, research } = state.lastRecycleReward;
+      const parts: string[] = [];
+      if (cash > 0) parts.push(`+${cash} coins`);
+      if (research > 0) parts.push(`+${research} research`);
+      showToast(`Recycled ${parts.join(" · ")}`);
+      dispatch({ type: "CLEAR_RECYCLE_REWARD" });
+    }
+    recycleRewardRef.current = state.lastRecycleRewardId;
+  }, [state.lastRecycleRewardId, state.lastRecycleReward, showToast, dispatch]);
+
+  useEffect(() => {
+    if (state.tutorialComplete) {
+      tutorialStepRef.current = state.tutorialStep;
+      return;
+    }
+    if (state.tutorialStep !== tutorialStepRef.current) {
+      const nextStep = state.tutorialStep;
+      const toastMap: Record<number, string> = {
+        1: "Nice! Parts on the board.",
+        2: "Great merge!",
+        3: "Segment built.",
+        4: "Order complete.",
+        5: "Space upgraded.",
+        6: "Choice made.",
+      };
+      const message = toastMap[nextStep];
+      if (message) {
+        showToast(message);
+      }
+      tutorialStepRef.current = nextStep;
+    }
+  }, [state.tutorialStep, state.tutorialComplete, showToast]);
+
+  useEffect(() => {
     if (!state.activeStoryBeatId && state.storyQueue.length > 0) {
       const now = Date.now();
       if (now - state.lastStoryShownAt >= 30000) {
@@ -178,15 +283,32 @@ export default function GameScreen() {
     }, 4000);
   }, [state.activeStoryBeatId, dispatch]);
 
+  useEffect(() => {
+    if (state.tutorialComplete) return;
+    if (state.tutorialStep === 3) {
+      setActiveModal("orders");
+    } else if (state.tutorialStep === 4) {
+      setActiveModal("upgrades");
+    } else if (state.tutorialStep === 5) {
+      setActiveModal(null);
+    }
+  }, [state.tutorialStep, state.tutorialComplete]);
+
   return (
     <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.topBar}>
-        <CurrencyDisplay
-          cash={state.cash}
-          reputation={state.reputation}
-          research={state.research}
-          onCashPress={() => setActiveModal("upgrades")}
-        />
+      <View style={styles.topBar} onLayout={(event) => setTopBarLayout(event.nativeEvent.layout)}>
+        <View onLayout={setTarget("currency")}>
+          <CurrencyDisplay
+            cash={state.cash}
+            reputation={state.reputation}
+            research={state.research}
+            onCashPress={
+              !state.tutorialComplete && state.tutorialStep < 4
+                ? undefined
+                : () => setActiveModal("upgrades")
+            }
+          />
+        </View>
         <View style={styles.topActions}>
           <Pressable
             style={styles.settingsButton}
@@ -214,7 +336,14 @@ export default function GameScreen() {
         </View>
       </View>
 
-      <DependencyMeter value={state.dependency} />
+      <View onLayout={setTarget("dependency")}>
+        <DependencyMeter value={state.dependency} />
+      </View>
+
+      <NeighborhoodBadge
+        reputation={state.reputation}
+        currentNeighborhoodId={state.currentNeighborhoodId}
+      />
 
       {state.activeStoryBeatId ? (
         <Pressable
@@ -225,7 +354,7 @@ export default function GameScreen() {
         </Pressable>
       ) : null}
 
-      <View style={styles.boardContainer}>
+      <View style={styles.boardContainer} onLayout={setTarget("board")}>
         <MergeBoard
           onWorkbenchPress={(result) => {
             if (result === "blocked") {
@@ -237,12 +366,20 @@ export default function GameScreen() {
           onOrderInboxPress={() => setActiveModal("orders")}
           onRDBenchPress={() => setActiveModal("rd")}
           onPartLongPress={(index) => setSelectedPartIndex(index)}
+          tutorialFocus={
+            !state.tutorialComplete && state.tutorialStep === 0
+              ? "workbench"
+              : !state.tutorialComplete && state.tutorialStep === 3
+              ? "orders"
+              : null
+          }
         />
       </View>
 
       <LinearGradient
         colors={["#1A1A2E", "#252542", "#1A1A2E"]}
         style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md }]}
+        onLayout={(event) => setBottomBarLayout(event.nativeEvent.layout)}
       >
         <BottomButton
           icon="inbox"
@@ -250,6 +387,8 @@ export default function GameScreen() {
           color={GameColors.currency.reputation}
           onPress={() => setActiveModal("orders")}
           badge={state.orders.length}
+          disabled={!state.tutorialComplete && state.tutorialStep < 3}
+          onLayout={setTarget("orders")}
         />
 
         <BottomButton
@@ -257,6 +396,8 @@ export default function GameScreen() {
           label="Shop"
           color={GameColors.currency.cash}
           onPress={() => setActiveModal("upgrades")}
+          disabled={!state.tutorialComplete && state.tutorialStep < 4}
+          onLayout={setTarget("upgrades")}
         />
 
         <BottomButton
@@ -264,7 +405,7 @@ export default function GameScreen() {
           label="R&D"
           color={GameColors.currency.research}
           onPress={() => setActiveModal("rd")}
-          disabled={state.upgrades["rd_unlock"] < 1}
+          disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
         />
 
         {state.freedomControllerCount > 0 ? (
@@ -311,18 +452,31 @@ export default function GameScreen() {
         visible={activeModal === "orders"}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={closeModal}
+        onRequestClose={() => {
+          if (state.tutorialComplete || state.tutorialStep !== 3) closeModal();
+        }}
       >
-        <OrdersModal onClose={closeModal} />
+        <OrdersModal
+          onClose={closeModal}
+          closeDisabled={!state.tutorialComplete && state.tutorialStep === 3}
+        />
       </Modal>
 
       <Modal
         visible={activeModal === "upgrades"}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={closeModal}
+        onRequestClose={() => {
+          if (state.tutorialComplete || state.tutorialStep !== 4) closeModal();
+        }}
       >
-        <UpgradesModal onClose={closeModal} />
+        <UpgradesModal
+          onClose={closeModal}
+          closeDisabled={!state.tutorialComplete && state.tutorialStep === 4}
+          tutorialOnlyUpgradeId={
+            !state.tutorialComplete && state.tutorialStep === 4 ? "space_1" : undefined
+          }
+        />
       </Modal>
 
       <Modal
@@ -374,7 +528,7 @@ export default function GameScreen() {
 
       {showLockoutModal ? <LockoutModal onClose={() => {}} /> : null}
 
-      {!state.tutorialComplete ? <TutorialOverlay /> : null}
+      {!state.tutorialComplete ? <TutorialOverlay targets={tutorialTargets} /> : null}
     </LinearGradient>
   );
 }

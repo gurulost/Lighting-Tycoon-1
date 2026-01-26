@@ -24,12 +24,6 @@ export default function MainTabNavigator26() {
         component={HomeStackNavigator}
         options={{
           title: "Home",
-          icon: {
-            sfSymbolName: "house",
-          },
-          selectedIcon: {
-            sfSymbolName: "house.fill",
-          },
         }}
       />
       <Tab.Screen
@@ -37,12 +31,6 @@ export default function MainTabNavigator26() {
         component={ProfileStackNavigator}
         options={{
           title: "Profile",
-          icon: {
-            sfSymbolName: "person",
-          },
-          selectedIcon: {
-            sfSymbolName: "person.fill",
-          },
         }}
       />
     </Tab.Navigator>

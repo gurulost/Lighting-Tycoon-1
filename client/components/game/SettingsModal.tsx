@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable, Switch } from "react-native";
+import { View, StyleSheet, Pressable, Switch, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
@@ -95,6 +95,40 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               }
               color={GameColors.currency.cash}
             />
+
+            <Pressable
+              style={styles.actionRow}
+              onPress={() =>
+                Alert.alert(
+                  "Replay Tutorial",
+                  "This will restart the tutorial and pause new orders until you finish it.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Replay",
+                      style: "destructive",
+                      onPress: () => {
+                        dispatch({ type: "RESET_TUTORIAL" });
+                        onClose();
+                      },
+                    },
+                  ]
+                )
+              }
+            >
+              <LinearGradient
+                colors={[`${GameColors.ui.primary}30`, `${GameColors.ui.primary}10`]}
+                style={styles.settingIcon}
+              >
+                <Feather name="refresh-cw" size={20} color={GameColors.ui.primary} />
+              </LinearGradient>
+              <View style={styles.settingContent}>
+                <ThemedText style={styles.settingLabel}>Replay Tutorial</ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  Restart the guided onboarding steps
+                </ThemedText>
+              </View>
+            </Pressable>
           </View>
 
           <View style={styles.footer}>
@@ -154,6 +188,12 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  actionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.md,

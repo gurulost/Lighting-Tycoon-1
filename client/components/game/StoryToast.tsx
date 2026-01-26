@@ -34,6 +34,7 @@ export function StoryToast({ beatId }: StoryToastProps) {
 
   const color = SPEAKER_COLOR[beat.speaker] || GameColors.text.secondary;
   const icon = SPEAKER_ICON[beat.speaker] || "message-circle";
+  const isSystem = beat.speaker === "system";
 
   return (
     <Animated.View entering={FadeInDown.duration(200)} exiting={FadeOutUp.duration(200)}>
@@ -48,6 +49,11 @@ export function StoryToast({ beatId }: StoryToastProps) {
           <ThemedText style={[styles.speaker, { color }]}>
             {beat.speaker.toUpperCase()}
           </ThemedText>
+          {isSystem ? (
+            <View style={styles.systemTag}>
+              <ThemedText style={styles.systemTagText}>WORKSHOP RADIO</ThemedText>
+            </View>
+          ) : null}
         </View>
         <ThemedText style={styles.line1}>{beat.line1}</ThemedText>
         {beat.line2 ? <ThemedText style={styles.line2}>{beat.line2}</ThemedText> : null}
@@ -91,5 +97,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
     marginTop: 2,
+  },
+  systemTag: {
+    marginLeft: "auto",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#3A3A52",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  systemTagText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+    letterSpacing: 0.6,
   },
 });

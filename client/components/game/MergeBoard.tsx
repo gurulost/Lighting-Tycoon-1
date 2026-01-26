@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { View, StyleSheet, Dimensions, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -20,7 +20,13 @@ import { ThemedText } from "@/components/ThemedText";
 import { PartItem, MergeAnimation } from "./PartItem";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
-import { WORKBENCH_SLOT, ORDER_INBOX_SLOT, RD_BENCH_SLOT } from "@/types/game";
+import {
+  WORKBENCH_SLOT,
+  ORDER_INBOX_SLOT,
+  RD_BENCH_SLOT,
+  PartTier,
+  Part,
+} from "@/types/game";
 
 const stationWorkbench = require("../../../assets/images/station-workbench.png");
 const stationInbox = require("../../../assets/images/station-inbox.png");
@@ -29,22 +35,40 @@ const stationRd = require("../../../assets/images/station-rd.png");
 const GRID_COLS = 6;
 const GRID_ROWS = 5;
 
+interface LayoutRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const GHOST_LABELS: Record<PartTier, string> = {
+  1: "C",
+  2: "T",
+  3: "S",
+  4: "K",
+  5: "P",
+};
+
 interface MergeBoardProps {
   onWorkbenchPress: (result: "spawned" | "blocked" | "cooldown") => void;
   onOrderInboxPress: () => void;
   onRDBenchPress: () => void;
   onPartLongPress?: (index: number) => void;
+  tutorialFocus?: "workbench" | "orders" | "rd" | null;
 }
 
 function AnimatedStation({
   children,
   isActive,
+  forcePulse = false,
   onPress,
   tileSize,
   accentColor,
 }: {
   children: React.ReactNode;
   isActive: boolean;
+  forcePulse?: boolean;
   onPress: () => void;
   tileSize: number;
   accentColor: string;
@@ -52,7 +76,7 @@ function AnimatedStation({
   const pulseAnim = useSharedValue(0);
 
   React.useEffect(() => {
-    if (isActive) {
+    if (isActive || forcePulse) {
       pulseAnim.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 800 }),
@@ -96,22 +120,38 @@ export function MergeBoard({
   onOrderInboxPress,
   onRDBenchPress,
   onPartLongPress,
+  tutorialFocus,
 }: MergeBoardProps) {
-  const { state, mergeParts, movePart, canMerge, spawnPart } = useGame();
+  const { state, mergeParts, movePart, canMerge, spawnPart, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const reducedMotion = state.settings.reducedMotion;
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
+  const [dragSource, setDragSource] = useState<{
+    source: "board" | "backpack";
+    index: number;
+  } | null>(null);
   const [highlightedSlots, setHighlightedSlots] = useState<number[]>([]);
   const [mergeEffect, setMergeEffect] = useState<{
     index: number;
     tier: number;
     family: "open" | "locked";
   } | null>(null);
+  const [gridLayout, setGridLayout] = useState<LayoutRect | null>(null);
+  const [backpackLayout, setBackpackLayout] = useState<LayoutRect | null>(null);
+  const [recycleLayout, setRecycleLayout] = useState<LayoutRect | null>(null);
+  const gridRef = useRef<View>(null);
+  const backpackRef = useRef<View>(null);
+  const recycleRef = useRef<View>(null);
+  const orderPulse = useSharedValue(0);
+  const isDragging = dragSource !== null;
 
   const screenWidth = Dimensions.get("window").width;
   const boardPadding = Spacing.lg * 2;
   const totalGapWidth = (GRID_COLS - 1) * Spacing.tileGap;
   const tileSize = Math.floor((screenWidth - boardPadding - totalGapWidth) / GRID_COLS);
+  const gridWidth = GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
+  const backpackSlotSize = Math.max(38, Math.round(tileSize * 0.7));
+  const backpackGap = Spacing.sm;
 
   const isSlotBlocked = useCallback(
     (index: number) => {
@@ -127,20 +167,156 @@ export function MergeBoard({
     [state.stationSlots]
   );
 
+  const highlightedOrder = useMemo(
+    () => state.orders.find((order) => order.id === state.highlightedOrderId),
+    [state.orders, state.highlightedOrderId]
+  );
+
+  useEffect(() => {
+    if (highlightedOrder) {
+      orderPulse.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 900 }),
+          withTiming(0.2, { duration: 900 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      orderPulse.value = 0;
+    }
+  }, [highlightedOrder]);
+
+  const orderPulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.3 + orderPulse.value * 0.4,
+  }));
+
+  const { orderHighlightSlots, ghostSlotMap, orderHighlightColor } = useMemo(() => {
+    if (!highlightedOrder) {
+      return {
+        orderHighlightSlots: [] as number[],
+        ghostSlotMap: {} as Record<number, PartTier>,
+        orderHighlightColor: GameColors.ui.primary,
+      };
+    }
+
+    const isPartValidForRequirement = (
+      part: Part,
+      req: { tier: PartTier; family: "open" | "locked" | "any" }
+    ) => {
+      if (part.tier !== req.tier) return false;
+      if (req.family === "any") return true;
+      if (part.family === req.family) return true;
+      if (
+        req.family === "locked" &&
+        highlightedOrder.type === "locked_required" &&
+        part.compatible &&
+        !highlightedOrder.noSubstitutions
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    const slots: number[] = [];
+    const missingTiers: PartTier[] = [];
+    highlightedOrder.requirements.forEach((req) => {
+      let matchCount = 0;
+      state.board.forEach((part, index) => {
+        if (!part) return;
+        if (isPartValidForRequirement(part, req)) {
+          if (matchCount < req.count) {
+            slots.push(index);
+          }
+          matchCount += 1;
+        }
+      });
+      const missing = Math.max(0, req.count - matchCount);
+      for (let i = 0; i < missing; i += 1) {
+        missingTiers.push(req.tier);
+      }
+    });
+
+    const emptySlots = state.board
+      .map((part, index) => {
+        if (part !== null) return null;
+        if (isStationSlot(index)) return null;
+        if (isSlotBlocked(index)) return null;
+        return index;
+      })
+      .filter((index): index is number => index !== null);
+
+    const ghostMap: Record<number, PartTier> = {};
+    missingTiers.forEach((tier, idx) => {
+      const slotIndex = emptySlots[idx];
+      if (slotIndex !== undefined) {
+        ghostMap[slotIndex] = tier;
+      }
+    });
+
+    const hasLocked =
+      highlightedOrder.type === "locked_required" ||
+      highlightedOrder.familyPreference === "locked" ||
+      highlightedOrder.requirements.some((r) => r.family === "locked");
+    const hasOpen =
+      highlightedOrder.familyPreference === "open" ||
+      highlightedOrder.requirements.some((r) => r.family === "open");
+
+    const highlightColor = hasLocked
+      ? GameColors.locked.primary
+      : hasOpen
+      ? GameColors.openStandard.primary
+      : GameColors.ui.primary;
+
+    return {
+      orderHighlightSlots: slots,
+      ghostSlotMap: ghostMap,
+      orderHighlightColor: highlightColor,
+    };
+  }, [highlightedOrder, state.board, isStationSlot, isSlotBlocked]);
+
+  const measureGrid = useCallback(() => {
+    gridRef.current?.measureInWindow((x, y, width, height) => {
+      setGridLayout({ x, y, width, height });
+    });
+  }, []);
+
+  const measureBackpack = useCallback(() => {
+    backpackRef.current?.measureInWindow((x, y, width, height) => {
+      setBackpackLayout({ x, y, width, height });
+    });
+  }, []);
+
+  const measureRecycle = useCallback(() => {
+    recycleRef.current?.measureInWindow((x, y, width, height) => {
+      setRecycleLayout({ x, y, width, height });
+    });
+  }, []);
+
+  const backpackSlotRects = useMemo(() => {
+    if (!backpackLayout) return [] as LayoutRect[];
+    return state.backpack.map((_, index) => ({
+      x: backpackLayout.x + index * (backpackSlotSize + backpackGap),
+      y: backpackLayout.y,
+      width: backpackSlotSize,
+      height: backpackSlotSize,
+    }));
+  }, [backpackLayout, backpackSlotSize, backpackGap, state.backpack]);
+
   const handleDragStart = useCallback(
-    (index: number) => {
+    (source: "board" | "backpack", index: number) => {
       setDragFromIndex(index);
+      setDragSource({ source, index });
       if (hapticsEnabled) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       const validTargets: number[] = [];
       for (let i = 0; i < state.boardSize; i++) {
-        if (i === index) continue;
         if (isStationSlot(i)) continue;
         if (isSlotBlocked(i)) continue;
         if (state.board[i] === null) {
           validTargets.push(i);
-        } else if (canMerge(index, i)) {
+        } else if (source === "board" && canMerge(index, i)) {
           validTargets.push(i);
         }
       }
@@ -150,50 +326,167 @@ export function MergeBoard({
   );
 
   const handleDragEnd = useCallback(
-    (fromIndex: number, translationX: number, translationY: number) => {
-      const fromRow = Math.floor(fromIndex / GRID_COLS);
-      const fromCol = fromIndex % GRID_COLS;
+    (
+      source: "board" | "backpack",
+      fromIndex: number,
+      translationX: number,
+      translationY: number,
+      absoluteX?: number,
+      absoluteY?: number
+    ) => {
+      const pointInRect = (x: number, y: number, rect: LayoutRect) =>
+        x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
 
-      const cellWidth = tileSize + Spacing.tileGap;
-      const cellHeight = tileSize + Spacing.tileGap;
+      let handled = false;
 
-      const deltaCol = Math.round(translationX / cellWidth);
-      const deltaRow = Math.round(translationY / cellHeight);
-
-      const toCol = Math.max(0, Math.min(GRID_COLS - 1, fromCol + deltaCol));
-      const toRow = Math.max(0, Math.min(GRID_ROWS - 1, fromRow + deltaRow));
-      const toIndex = toRow * GRID_COLS + toCol;
-
-      if (toIndex !== fromIndex && !isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
-        if (state.board[toIndex] !== null) {
-          const fromPart = state.board[fromIndex];
-          const toPart = state.board[toIndex];
-          const merged = mergeParts(fromIndex, toIndex);
+      if (absoluteX !== undefined && absoluteY !== undefined) {
+        if (recycleLayout && pointInRect(absoluteX, absoluteY, recycleLayout)) {
+          dispatch({ type: "RECYCLE_PART", source, index: fromIndex });
           if (hapticsEnabled) {
-            if (merged) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+          handled = true;
+        } else {
+          const backpackIndex = backpackSlotRects.findIndex((rect) =>
+            pointInRect(absoluteX, absoluteY, rect)
+          );
+          if (backpackIndex !== -1) {
+            const slotOccupied = Boolean(state.backpack[backpackIndex]);
+            if (!state.backpackUnlocked || slotOccupied) {
+              if (hapticsEnabled) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              }
             } else {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              if (source === "board") {
+                dispatch({
+                  type: "STORE_IN_BACKPACK",
+                  fromIndex,
+                  backpackIndex,
+                });
+              } else {
+                dispatch({
+                  type: "MOVE_BACKPACK_ITEM",
+                  fromIndex,
+                  toIndex: backpackIndex,
+                });
+              }
+              if (hapticsEnabled) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+            }
+            handled = true;
+          } else if (gridLayout) {
+            const localX = absoluteX - gridLayout.x;
+            const localY = absoluteY - gridLayout.y;
+            const cellWidth = tileSize + Spacing.tileGap;
+            const cellHeight = tileSize + Spacing.tileGap;
+            const col = Math.floor(localX / cellWidth);
+            const row = Math.floor(localY / cellHeight);
+            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+              const toIndex = row * GRID_COLS + col;
+              if (!isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
+                if (source === "board") {
+                  if (toIndex !== fromIndex) {
+                    if (state.board[toIndex] !== null) {
+                      const fromPart = state.board[fromIndex];
+                      const toPart = state.board[toIndex];
+                      const merged = mergeParts(fromIndex, toIndex);
+                      if (hapticsEnabled) {
+                        if (merged) {
+                          Haptics.notificationAsync(
+                            Haptics.NotificationFeedbackType.Success
+                          );
+                        } else {
+                          Haptics.notificationAsync(
+                            Haptics.NotificationFeedbackType.Error
+                          );
+                        }
+                      }
+                      if (merged && fromPart && toPart && !reducedMotion) {
+                        const mergedFamily =
+                          fromPart.family === "locked" || toPart.family === "locked"
+                            ? "locked"
+                            : "open";
+                        setMergeEffect({
+                          index: toIndex,
+                          tier: fromPart.tier + 1,
+                          family: mergedFamily,
+                        });
+                      }
+                    } else {
+                      movePart(fromIndex, toIndex);
+                      if (hapticsEnabled) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }
+                  }
+                } else if (source === "backpack") {
+                  if (state.board[toIndex] === null) {
+                    dispatch({
+                      type: "MOVE_FROM_BACKPACK",
+                      backpackIndex: fromIndex,
+                      toIndex,
+                    });
+                    if (hapticsEnabled) {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  } else if (hapticsEnabled) {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                  }
+                }
+                handled = true;
+              }
             }
           }
-          if (merged && fromPart && toPart && !reducedMotion) {
-            const mergedFamily =
-              fromPart.family === "locked" || toPart.family === "locked" ? "locked" : "open";
-            setMergeEffect({
-              index: toIndex,
-              tier: fromPart.tier + 1,
-              family: mergedFamily,
-            });
-          }
-        } else {
-          movePart(fromIndex, toIndex);
-          if (hapticsEnabled) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      }
+
+      if (!handled && source === "board") {
+        const fromRow = Math.floor(fromIndex / GRID_COLS);
+        const fromCol = fromIndex % GRID_COLS;
+
+        const cellWidth = tileSize + Spacing.tileGap;
+        const cellHeight = tileSize + Spacing.tileGap;
+
+        const deltaCol = Math.round(translationX / cellWidth);
+        const deltaRow = Math.round(translationY / cellHeight);
+
+        const toCol = Math.max(0, Math.min(GRID_COLS - 1, fromCol + deltaCol));
+        const toRow = Math.max(0, Math.min(GRID_ROWS - 1, fromRow + deltaRow));
+        const toIndex = toRow * GRID_COLS + toCol;
+
+        if (toIndex !== fromIndex && !isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
+          if (state.board[toIndex] !== null) {
+            const fromPart = state.board[fromIndex];
+            const toPart = state.board[toIndex];
+            const merged = mergeParts(fromIndex, toIndex);
+            if (hapticsEnabled) {
+              if (merged) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              }
+            }
+            if (merged && fromPart && toPart && !reducedMotion) {
+              const mergedFamily =
+                fromPart.family === "locked" || toPart.family === "locked" ? "locked" : "open";
+              setMergeEffect({
+                index: toIndex,
+                tier: fromPart.tier + 1,
+                family: mergedFamily,
+              });
+            }
+          } else {
+            movePart(fromIndex, toIndex);
+            if (hapticsEnabled) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
           }
         }
       }
 
       setDragFromIndex(null);
+      setDragSource(null);
       setHighlightedSlots([]);
     },
     [
@@ -201,10 +494,16 @@ export function MergeBoard({
       isSlotBlocked,
       isStationSlot,
       state.board,
+      state.backpack,
+      state.backpackUnlocked,
       mergeParts,
       movePart,
       hapticsEnabled,
       reducedMotion,
+      recycleLayout,
+      backpackSlotRects,
+      gridLayout,
+      dispatch,
     ]
   );
 
@@ -213,6 +512,8 @@ export function MergeBoard({
     const isBlocked = isSlotBlocked(index);
     const isStation = isStationSlot(index);
     const isHighlighted = highlightedSlots.includes(index);
+    const isOrderHighlighted = orderHighlightSlots.includes(index);
+    const ghostTier = ghostSlotMap[index];
     const isMergeTarget =
       isHighlighted && part !== null && dragFromIndex !== null && canMerge(dragFromIndex, index);
 
@@ -244,6 +545,8 @@ export function MergeBoard({
       ? isMergeTarget
         ? ["#00D9FF20", "#00D9FF40", "#00D9FF20"]
         : ["#4DFF8820", "#4DFF8840", "#4DFF8820"]
+      : isOrderHighlighted
+      ? [`${orderHighlightColor}20`, `${orderHighlightColor}35`, `${orderHighlightColor}20`]
       : ["#1E1E36", "#252542", "#1E1E36"];
 
     return (
@@ -259,8 +562,10 @@ export function MergeBoard({
               ? isMergeTarget
                 ? GameColors.ui.primary
                 : GameColors.ui.success
+              : isOrderHighlighted
+              ? orderHighlightColor
               : "#2A2A4A",
-            borderWidth: isHighlighted ? 2 : 1,
+            borderWidth: isHighlighted || isOrderHighlighted ? 2 : 1,
           },
         ]}
       >
@@ -274,13 +579,43 @@ export function MergeBoard({
             <PartItem
               part={part}
               size={tileSize - 10}
-              onDragStart={() => handleDragStart(index)}
-              onDragEnd={(tx, ty) => handleDragEnd(index, tx, ty)}
+              onDragStart={() => handleDragStart("board", index)}
+              onDragEnd={(tx, ty, ax, ay) => handleDragEnd("board", index, tx, ty, ax, ay)}
               onLongPress={() => onPartLongPress?.(index)}
             />
           ) : (
-            <View style={styles.emptySlotIndicator} />
+            <View style={styles.emptySlotIndicator}>
+              {ghostTier ? (
+                <View
+                  style={[
+                    styles.ghostBadge,
+                    { borderColor: `${orderHighlightColor}60` },
+                  ]}
+                >
+                  <ThemedText
+                    style={[
+                      styles.ghostText,
+                      { color: orderHighlightColor },
+                    ]}
+                  >
+                    {GHOST_LABELS[ghostTier]}
+                  </ThemedText>
+                </View>
+              ) : (
+                <View style={styles.emptySlotDot} />
+              )}
+            </View>
           )}
+          {isOrderHighlighted ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.orderHighlightOverlay,
+                { borderColor: `${orderHighlightColor}80` },
+                orderPulseStyle,
+              ]}
+            />
+          ) : null}
         </LinearGradient>
       </Animated.View>
     );
@@ -296,6 +631,7 @@ export function MergeBoard({
         <AnimatedStation
           key={index}
           isActive={state.workbenchReady}
+          forcePulse={tutorialFocus === "workbench"}
           onPress={() => {
             if (state.workbenchReady) {
               const didSpawn = spawnPart();
@@ -349,6 +685,7 @@ export function MergeBoard({
         <AnimatedStation
           key={index}
           isActive={state.orders.length > 0}
+          forcePulse={tutorialFocus === "orders"}
           onPress={onOrderInboxPress}
           tileSize={tileSize}
           accentColor={GameColors.currency.reputation}
@@ -374,6 +711,7 @@ export function MergeBoard({
         <AnimatedStation
           key={index}
           isActive={rdUnlocked && state.research > 0}
+          forcePulse={tutorialFocus === "rd"}
           onPress={rdUnlocked ? onRDBenchPress : () => {}}
           tileSize={tileSize}
           accentColor={GameColors.currency.research}
@@ -441,9 +779,11 @@ export function MergeBoard({
           style={[
             styles.grid,
             {
-              width: GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap,
+              width: gridWidth,
             },
           ]}
+          ref={gridRef}
+          onLayout={measureGrid}
         >
           {tiles}
         </View>
@@ -473,6 +813,110 @@ export function MergeBoard({
           </View>
         ) : null}
       </LinearGradient>
+      <View style={[styles.utilityRow, { width: gridWidth }]}>
+        <View style={styles.backpackSection}>
+          <View style={styles.backpackHeader}>
+            <Feather
+              name="archive"
+              size={14}
+              color={state.backpackUnlocked ? GameColors.ui.primary : GameColors.text.disabled}
+            />
+            <ThemedText
+              style={[
+                styles.backpackTitle,
+                { color: state.backpackUnlocked ? GameColors.text.primary : GameColors.text.disabled },
+              ]}
+            >
+              Backpack
+            </ThemedText>
+            {!state.backpackUnlocked ? (
+              <View style={styles.backpackLockedTag}>
+                <Feather name="lock" size={10} color={GameColors.text.secondary} />
+                <ThemedText style={styles.backpackLockedText}>Unlock after upgrade</ThemedText>
+              </View>
+            ) : null}
+          </View>
+          <View
+            ref={backpackRef}
+            onLayout={measureBackpack}
+            style={[
+              styles.backpackSlots,
+              {
+                height: backpackSlotSize,
+                width:
+                  state.backpackSlots * backpackSlotSize +
+                  (state.backpackSlots - 1) * backpackGap,
+                gap: backpackGap,
+              },
+            ]}
+          >
+            {state.backpack.map((part, index) => (
+              <View
+                key={`backpack-${index}`}
+                style={[
+                  styles.backpackSlot,
+                  {
+                    width: backpackSlotSize,
+                    height: backpackSlotSize,
+                    borderColor: state.backpackUnlocked ? "#2A2A4A" : "#2A2A4A60",
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={["#1E1E36", "#252542", "#1E1E36"]}
+                  style={styles.backpackGradient}
+                >
+                  {part ? (
+                    <PartItem
+                      part={part}
+                      size={backpackSlotSize - 8}
+                      disabled={!state.backpackUnlocked}
+                      onDragStart={() => handleDragStart("backpack", index)}
+                      onDragEnd={(tx, ty, ax, ay) =>
+                        handleDragEnd("backpack", index, tx, ty, ax, ay)
+                      }
+                    />
+                  ) : (
+                    <Feather
+                      name="plus"
+                      size={14}
+                      color={state.backpackUnlocked ? GameColors.text.disabled : "#2A2A4A"}
+                    />
+                  )}
+                </LinearGradient>
+                {!state.backpackUnlocked ? (
+                  <View style={styles.backpackLockOverlay}>
+                    <Feather name="lock" size={12} color={GameColors.text.disabled} />
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </View>
+        <View style={styles.recycleSection}>
+          <ThemedText style={styles.recycleLabel}>Recycle</ThemedText>
+          <View
+            ref={recycleRef}
+            onLayout={measureRecycle}
+            style={[
+              styles.recycleBin,
+              isDragging && styles.recycleBinActive,
+              {
+                width: backpackSlotSize,
+                height: backpackSlotSize,
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["#2A1212", "#321818", "#2A1212"]}
+              style={styles.recycleGradient}
+            >
+              <Feather name="trash-2" size={18} color={GameColors.ui.danger} />
+              <ThemedText style={styles.recycleHint}>+cash</ThemedText>
+            </LinearGradient>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -528,10 +972,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptySlotIndicator: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptySlotDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#2A2A4A60",
+  },
+  ghostBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    backgroundColor: "#0F0F1F",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  ghostText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  orderHighlightOverlay: {
+    position: "absolute",
+    top: 2,
+    left: 2,
+    right: 2,
+    bottom: 2,
+    borderRadius: BorderRadius.xs - 2,
+    borderWidth: 1.5,
   },
   blockedTile: {
     borderWidth: 1,
@@ -602,5 +1074,92 @@ const styles = StyleSheet.create({
     backgroundColor: "#00000080",
     borderRadius: 8,
     padding: 2,
+  },
+  utilityRow: {
+    marginTop: Spacing.md,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: Spacing.md,
+  },
+  backpackSection: {
+    flex: 1,
+  },
+  backpackHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  backpackTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  backpackLockedTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginLeft: Spacing.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: "#1E1E36",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+  },
+  backpackLockedText: {
+    fontSize: 9,
+    color: GameColors.text.secondary,
+  },
+  backpackSlots: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backpackSlot: {
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  backpackGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backpackLockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0F0F1F90",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  recycleSection: {
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  recycleLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+  },
+  recycleBin: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#432020",
+    overflow: "hidden",
+  },
+  recycleBinActive: {
+    borderColor: GameColors.ui.danger,
+    shadowColor: GameColors.ui.danger,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  recycleGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 2,
+  },
+  recycleHint: {
+    fontSize: 9,
+    color: GameColors.text.secondary,
   },
 });
