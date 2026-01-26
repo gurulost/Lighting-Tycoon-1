@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import Svg, { Defs, Pattern, Rect, Circle } from "react-native-svg";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -19,12 +20,21 @@ interface DialogueBubbleProps {
 
 type BubbleVariant = "speech" | "caption" | "legal";
 
+const TINA_PORTRAITS = {
+  portrait: require("../../../assets/images/tina/tina-portrait-128.png"),
+  confident: require("../../../assets/images/tina/tina-confident-128.png"),
+  focused: require("../../../assets/images/tina/tina-focused-128.png"),
+  delighted: require("../../../assets/images/tina/tina-delighted-128.png"),
+  concerned: require("../../../assets/images/tina/tina-concerned-128.png"),
+} as const;
+
 const SPEAKER_LABEL: Record<StorySpeaker, string> = {
   mentor: "MENTOR",
   baron: "BULB BARON",
   customer: "CUSTOMER",
   system: "SYSTEM",
   rd: "R&D",
+  tina: "TINA",
 };
 
 const SPEAKER_ICON: Record<StorySpeaker, keyof typeof Feather.glyphMap> = {
@@ -33,6 +43,7 @@ const SPEAKER_ICON: Record<StorySpeaker, keyof typeof Feather.glyphMap> = {
   customer: "home",
   system: "info",
   rd: "zap",
+  tina: "smile",
 };
 
 const SPEAKER_COLOR: Record<StorySpeaker, string> = {
@@ -41,6 +52,7 @@ const SPEAKER_COLOR: Record<StorySpeaker, string> = {
   customer: GameColors.currency.reputation,
   system: DialogueTokens.inkMuted,
   rd: GameColors.currency.research,
+  tina: GameColors.characters.tina,
 };
 
 const VARIANT_BY_SPEAKER: Record<StorySpeaker, BubbleVariant> = {
@@ -49,6 +61,7 @@ const VARIANT_BY_SPEAKER: Record<StorySpeaker, BubbleVariant> = {
   rd: "speech",
   baron: "legal",
   system: "caption",
+  tina: "speech",
 };
 
 const TAG_BY_CATEGORY: Record<NonNullable<StoryBeat["category"]>, string> = {
@@ -58,6 +71,7 @@ const TAG_BY_CATEGORY: Record<NonNullable<StoryBeat["category"]>, string> = {
   rd_memo: "LAB NOTE",
   system: "WORKSHOP RADIO",
   tutorial: "TUTORIAL",
+  inner_monologue: "THOUGHTS",
 };
 
 const getTagText = (beat: StoryBeat) => {
@@ -78,11 +92,12 @@ export function DialogueBubble({
   showTag = false,
   showHalftone = true,
 }: DialogueBubbleProps) {
-  const variant = VARIANT_BY_SPEAKER[beat.speaker];
+  const variant =
+    beat.category === "inner_monologue" ? "caption" : VARIANT_BY_SPEAKER[beat.speaker];
   const palette = DialogueTokens[variant];
   const labelColor = SPEAKER_COLOR[beat.speaker];
   const tagText = showTag ? getTagText(beat) : null;
-  const showTail = withTail && variant === "speech";
+  const showTail = withTail && variant === "speech" && beat.category !== "inner_monologue";
   const labelFont = beat.speaker === "baron" ? Fonts.mono : Fonts.rounded;
   const bodyFont = variant === "legal" ? Fonts.sans : Fonts.rounded;
   const outerRadius = variant === "legal" ? BorderRadius.md : BorderRadius.lg;
@@ -92,7 +107,13 @@ export function DialogueBubble({
     variant === "legal" ? DialogueTokens.legalChipBackground : DialogueTokens.chipBackground;
   const accentColor = `${labelColor}33`;
   const tailColor = palette.gradient?.[1] ?? palette.background;
+  const tabColor = palette.gradient?.[0] ?? palette.background;
   const patternId = React.useId().replace(/:/g, "");
+  const showStamp = beat.speaker === "baron" && expanded;
+  const showCaptionTab = beat.speaker === "system";
+  const showPortrait = beat.speaker === "tina";
+  const portraitKey = beat.portrait ?? "portrait";
+  const portraitSource = TINA_PORTRAITS[portraitKey] ?? TINA_PORTRAITS.portrait;
 
   return (
     <View style={styles.wrapper}>
@@ -111,6 +132,19 @@ export function DialogueBubble({
           compact ? styles.compact : null,
         ]}
       >
+        {showCaptionTab ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.captionTab,
+              {
+                backgroundColor: tabColor,
+                borderColor: palette.border,
+                borderWidth: palette.borderWidth,
+              },
+            ]}
+          />
+        ) : null}
         <LinearGradient
           colors={palette.gradient}
           style={[
@@ -140,22 +174,36 @@ export function DialogueBubble({
               <Rect width="100%" height="100%" fill={`url(#${patternId})`} />
             </Svg>
           ) : null}
+          {showStamp ? (
+            <ThemedText
+              style={[
+                styles.watermark,
+                { color: DialogueTokens.legalTagText, fontFamily: Fonts.mono },
+              ]}
+            >
+              CERTIFIED
+            </ThemedText>
+          ) : null}
           <View style={styles.contentBody}>
             <View style={styles.header}>
-              <View
-                style={[
-                  styles.labelChip,
-                  {
-                    borderColor: palette.border,
-                    borderWidth: palette.borderWidth,
-                    backgroundColor: chipBackground,
-                  },
-                ]}
-              >
+            <View
+              style={[
+                styles.labelChip,
+                {
+                  borderColor: palette.border,
+                  borderWidth: palette.borderWidth,
+                  backgroundColor: chipBackground,
+                },
+              ]}
+            >
+              {showPortrait ? (
+                <Image source={portraitSource} style={styles.portrait} contentFit="cover" />
+              ) : (
                 <Feather name={SPEAKER_ICON[beat.speaker]} size={12} color={labelColor} />
-                <ThemedText
-                  style={[
-                    styles.labelText,
+              )}
+              <ThemedText
+                style={[
+                  styles.labelText,
                     { color: labelColor, fontFamily: labelFont },
                   ]}
                 >
@@ -265,6 +313,17 @@ const styles = StyleSheet.create({
     opacity: 0.06,
     zIndex: 1,
   },
+  watermark: {
+    position: "absolute",
+    right: 12,
+    bottom: 10,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 2,
+    opacity: 0.15,
+    transform: [{ rotate: "-14deg" }],
+    zIndex: 1,
+  },
   accent: {
     position: "absolute",
     left: 6,
@@ -273,6 +332,19 @@ const styles = StyleSheet.create({
     width: 3,
     borderRadius: 2,
     zIndex: 1,
+  },
+  captionTab: {
+    position: "absolute",
+    top: -9,
+    left: 18,
+    width: 44,
+    height: 12,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -322,6 +394,11 @@ const styles = StyleSheet.create({
   },
   tagTextLegal: {
     color: DialogueTokens.legalTagText,
+  },
+  portrait: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
   line1: {
     fontSize: 13,

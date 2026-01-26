@@ -24,6 +24,7 @@ const stationInbox = require("../../../assets/images/station-inbox.png");
 const stationRd = require("../../../assets/images/station-rd.png");
 const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
 const freedomControllerImage = require("../../../assets/images/freedom-controller.png");
+const tinaPortrait = require("../../../assets/images/tina/tina-portrait-256.png");
 
 interface GlossaryModalProps {
   onClose: () => void;
@@ -150,6 +151,32 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
     ],
   },
   {
+    id: "characters",
+    title: "Characters",
+    items: [
+      {
+        id: "character-tina",
+        title: "Tina",
+        description:
+          "You. Owner of the Glow Workshop—confident, clever, and always in control of the glow.",
+        image: tinaPortrait,
+      },
+      {
+        id: "character-mentor",
+        title: "Mentor",
+        description: "Retired installer who teaches the craft and keeps you grounded.",
+        icon: "user",
+        color: GameColors.openStandard.primary,
+      },
+      {
+        id: "character-baron",
+        title: "Bulb Baron",
+        description: "Corporate supplier with tempting locked offers and strict terms.",
+        image: bulbBaronImage,
+      },
+    ],
+  },
+  {
     id: "utilities",
     title: "Utilities",
     items: [
@@ -206,12 +233,6 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         description: "Rises with locked parts. High levels add certified/locked orders.",
         icon: "activity",
         color: GameColors.ui.warning,
-      },
-      {
-        id: "baron",
-        title: "Bulb Baron",
-        description: "Locked supplier. Tempting offers increase Dependency.",
-        image: bulbBaronImage,
       },
       {
         id: "freedom-controller",

@@ -29,6 +29,7 @@ import {
   GLOWMAIL_BEATS,
   MENTOR_TIP_BEATS,
   RD_MEMO_BEATS,
+  TINA_BEATS,
 } from "@/constants/story";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
 import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
@@ -316,7 +317,9 @@ function beginLockout(state: GameState): GameState {
     lockoutChoice: undefined,
     orders: [lockoutOrder, ...nextOrders].slice(0, state.maxOrders),
   };
-  return queueStoryBeat(nextState, "lockout_begin");
+  let queued = queueStoryBeat(nextState, "lockout_begin");
+  queued = queueStoryBeat(queued, "tina_lockout_react");
+  return queued;
 }
 
 function generateOrder(
@@ -641,8 +644,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             tutorialHint: state.tutorialHint,
             tutorialNudgeCount: state.tutorialNudgeCount,
           };
-      
-      return {
+
+      let nextState: GameState = {
         ...state,
         board: newBoard,
         workbenchReady: false,
@@ -658,6 +661,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
         undoSnapshot: undefined,
       };
+      if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
+        nextState = queueStoryBeat(nextState, "tina_intro");
+      }
+      return nextState;
     }
 
     case "MERGE_PARTS": {
@@ -1241,6 +1248,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (tutorialAdvanceAfterOrder) {
         nextState = queueStoryBeat(nextState, "tutorial_order");
+        nextState = queueStoryBeat(nextState, "tina_customer_reply");
       }
 
       const canQueueAmbient =
@@ -1254,8 +1262,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           pool = BARON_FAX_BEATS;
         } else if (order.ecoAuditBonusResearch) {
           pool = RD_MEMO_BEATS;
-        } else if (hasOpenPart && !hasLockedPart && Math.random() < 0.4) {
+        } else if (hasOpenPart && !hasLockedPart && Math.random() < 0.35) {
           pool = MENTOR_TIP_BEATS;
+        } else if (Math.random() < 0.35) {
+          pool = TINA_BEATS;
         }
         nextState = maybeQueueAmbientBeat(nextState, pool, 0.2);
       }
@@ -1473,6 +1483,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       nextState = queueStoryBeat(nextState, "baron_offer");
       if (state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "baron_offer_accept");
+        nextState = queueStoryBeat(nextState, "tina_baron_accept");
       }
       if (tutorialAdvance) {
         nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
@@ -1521,6 +1532,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       nextState = queueStoryBeat(nextState, "baron_offer");
       if (state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "baron_offer_decline");
+        nextState = queueStoryBeat(nextState, "tina_baron_decline");
       }
       if (tutorialAdvance) {
         nextState = queueStoryBeat(nextState, "tutorial_baron_choice");

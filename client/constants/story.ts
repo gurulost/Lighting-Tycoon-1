@@ -1,4 +1,4 @@
-export type StorySpeaker = "mentor" | "baron" | "customer" | "system" | "rd";
+export type StorySpeaker = "mentor" | "baron" | "customer" | "system" | "rd" | "tina";
 
 export interface StoryBeat {
   id: string;
@@ -6,10 +6,27 @@ export interface StoryBeat {
   line1: string;
   line2?: string;
   onceOnly?: boolean;
-  category?: "baron_fax" | "glowmail" | "mentor_tip" | "rd_memo" | "system" | "tutorial";
+  portrait?: "portrait" | "confident" | "focused" | "delighted" | "concerned";
+  category?:
+    | "baron_fax"
+    | "glowmail"
+    | "mentor_tip"
+    | "rd_memo"
+    | "system"
+    | "tutorial"
+    | "inner_monologue";
 }
 
 export const STORY_BEATS: Record<string, StoryBeat> = {
+  tina_intro: {
+    id: "tina_intro",
+    speaker: "tina",
+    line1: "Alright, Tina. New shop, new rules.",
+    line2: "Let’s glow.",
+    onceOnly: true,
+    portrait: "delighted",
+    category: "inner_monologue",
+  },
   neighborhood_starter: {
     id: "neighborhood_starter",
     speaker: "system",
@@ -95,9 +112,11 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   },
   freedom_first_use: {
     id: "freedom_first_use",
-    speaker: "mentor",
-    line1: "That’s what independence sounds like.",
+    speaker: "tina",
+    line1: "That sound? Freedom.",
+    line2: "Okay, that’s gorgeous.",
     onceOnly: true,
+    portrait: "delighted",
   },
   baron_offer: {
     id: "baron_offer",
@@ -130,9 +149,11 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   },
   tutorial_merge_2: {
     id: "tutorial_merge_2",
-    speaker: "mentor",
+    speaker: "tina",
     line1: "Nice. Now let’s deliver.",
+    line2: "Get paid, get better.",
     onceOnly: true,
+    portrait: "confident",
     category: "tutorial",
   },
   tutorial_order: {
@@ -142,11 +163,19 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     category: "tutorial",
   },
+  tina_customer_reply: {
+    id: "tina_customer_reply",
+    speaker: "tina",
+    line1: "You got it. No flicker, just glow.",
+    onceOnly: true,
+    portrait: "delighted",
+  },
   tutorial_upgrade: {
     id: "tutorial_upgrade",
-    speaker: "mentor",
-    line1: "Space is oxygen.",
+    speaker: "tina",
+    line1: "Space is oxygen. I’m buying oxygen.",
     onceOnly: true,
+    portrait: "confident",
     category: "tutorial",
   },
   backpack_unlocked: {
@@ -186,6 +215,24 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     category: "mentor_tip",
   },
+  tina_baron_accept: {
+    id: "tina_baron_accept",
+    speaker: "tina",
+    line1: "Alright, Baron. I’ll take the boost.",
+    line2: "But I’m reading the fine print.",
+    onceOnly: true,
+    portrait: "confident",
+    category: "inner_monologue",
+  },
+  tina_baron_decline: {
+    id: "tina_baron_decline",
+    speaker: "tina",
+    line1: "Not today, Baron.",
+    line2: "I’m building this my way.",
+    onceOnly: true,
+    portrait: "confident",
+    category: "inner_monologue",
+  },
   lockout_begin: {
     id: "lockout_begin",
     speaker: "system",
@@ -193,6 +240,15 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line2: "Your workshop is dependent.",
     onceOnly: true,
     category: "system",
+  },
+  tina_lockout_react: {
+    id: "tina_lockout_react",
+    speaker: "tina",
+    line1: "Okay… deep breath. We fix this.",
+    line2: "No panic — just moves.",
+    onceOnly: true,
+    portrait: "concerned",
+    category: "inner_monologue",
   },
   lockout_choice_baron: {
     id: "lockout_choice_baron",
@@ -385,6 +441,48 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "BaronFax: Supply chain optimized for loyal partners.",
     category: "baron_fax",
   },
+  tina_thought_1: {
+    id: "tina_thought_1",
+    speaker: "tina",
+    line1: "If it glows, it goes.",
+    portrait: "portrait",
+    category: "inner_monologue",
+  },
+  tina_thought_2: {
+    id: "tina_thought_2",
+    speaker: "tina",
+    line1: "Slow and steady, Tina. No shortcuts you can’t undo.",
+    portrait: "focused",
+    category: "inner_monologue",
+  },
+  tina_thought_3: {
+    id: "tina_thought_3",
+    speaker: "tina",
+    line1: "Customers want magic. I deliver science.",
+    portrait: "portrait",
+    category: "inner_monologue",
+  },
+  tina_thought_4: {
+    id: "tina_thought_4",
+    speaker: "tina",
+    line1: "Locked kits sparkle. So do contracts.",
+    portrait: "focused",
+    category: "inner_monologue",
+  },
+  tina_thought_5: {
+    id: "tina_thought_5",
+    speaker: "tina",
+    line1: "One more merge and this board breathes again.",
+    portrait: "focused",
+    category: "inner_monologue",
+  },
+  tina_thought_6: {
+    id: "tina_thought_6",
+    speaker: "tina",
+    line1: "Open path’s slower, but it feels like mine.",
+    portrait: "portrait",
+    category: "inner_monologue",
+  },
   lockout_lab_complete: {
     id: "lockout_lab_complete",
     speaker: "rd",
@@ -427,6 +525,15 @@ export const MENTOR_TIP_BEATS = [
 ];
 
 export const RD_MEMO_BEATS = ["rd_memo_1", "rd_memo_2", "rd_memo_3", "rd_memo_4"];
+
+export const TINA_BEATS = [
+  "tina_thought_1",
+  "tina_thought_2",
+  "tina_thought_3",
+  "tina_thought_4",
+  "tina_thought_5",
+  "tina_thought_6",
+];
 
 export const ORDER_FLAVOR_TEXTS = [
   "HOA says: “Warm white only.” HOA says a lot of things.",

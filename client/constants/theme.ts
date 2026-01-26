@@ -28,6 +28,9 @@ export const GameColors = {
     reputation: "#00D9FF",
     research: "#9D4EDD",
   },
+  characters: {
+    tina: "#FF6FB3",
+  },
   text: {
     primary: "#FFFFFF",
     secondary: "#A0A0B8",
