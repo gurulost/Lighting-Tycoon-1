@@ -17,6 +17,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Order, Part, TIER_NAMES, PartTier } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import SoundManager from "@/audio/SoundManager";
 
 interface OrderCardProps {
   order: Order;
@@ -460,11 +461,13 @@ export function OrderCard({
         <Pressable
           onPress={() => {
             if (canFulfill) {
+              SoundManager.play("order_complete");
               if (hapticsEnabled) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               }
               onFulfill();
             } else {
+              SoundManager.play("error");
               if (hapticsEnabled) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               }

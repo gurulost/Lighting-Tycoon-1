@@ -20,6 +20,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { PartItem, MergeAnimation } from "./PartItem";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import SoundManager from "@/audio/SoundManager";
+import type { SfxId } from "@/audio/sounds";
 import {
   WORKBENCH_SLOT,
   ORDER_INBOX_SLOT,
@@ -160,6 +162,12 @@ export function MergeBoard({
   const backpackGlow = useSharedValue(0);
   const recyclePulse = useSharedValue(0);
   const isDragging = dragSource !== null;
+
+  const playMergeSound = useCallback((tier: number) => {
+    const clamped = Math.max(1, Math.min(5, tier));
+    const id = `merge_${clamped}` as SfxId;
+    SoundManager.play(id);
+  }, []);
 
   useEffect(() => {
     onDragStateChange?.(isDragging);
@@ -437,6 +445,7 @@ export function MergeBoard({
       if (absoluteX !== undefined && absoluteY !== undefined) {
         if (recycleLayout && pointInRect(absoluteX, absoluteY, recycleLayout)) {
           dispatch({ type: "RECYCLE_PART", source, index: fromIndex });
+          SoundManager.play("recycle");
           if (hapticsEnabled) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
@@ -448,6 +457,7 @@ export function MergeBoard({
           if (backpackIndex !== -1) {
             const slotOccupied = Boolean(state.backpack[backpackIndex]);
             if (!state.backpackUnlocked || slotOccupied) {
+              SoundManager.play("error");
               if (hapticsEnabled) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               }
@@ -465,6 +475,7 @@ export function MergeBoard({
                   toIndex: backpackIndex,
                 });
               }
+              SoundManager.play("backpack");
               if (hapticsEnabled) {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }
@@ -486,6 +497,11 @@ export function MergeBoard({
                       const fromPart = state.board[fromIndex];
                       const toPart = state.board[toIndex];
                       const merged = mergeParts(fromIndex, toIndex);
+                      if (merged && fromPart) {
+                        playMergeSound(fromPart.tier + 1);
+                      } else if (!merged) {
+                        SoundManager.play("error");
+                      }
                       if (hapticsEnabled) {
                         if (merged) {
                           Haptics.notificationAsync(
@@ -522,10 +538,12 @@ export function MergeBoard({
                       backpackIndex: fromIndex,
                       toIndex,
                     });
+                    SoundManager.play("backpack");
                     if (hapticsEnabled) {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }
                   } else if (hapticsEnabled) {
+                    SoundManager.play("error");
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                   }
                 }
@@ -555,6 +573,11 @@ export function MergeBoard({
             const fromPart = state.board[fromIndex];
             const toPart = state.board[toIndex];
             const merged = mergeParts(fromIndex, toIndex);
+            if (merged && fromPart) {
+              playMergeSound(fromPart.tier + 1);
+            } else if (!merged) {
+              SoundManager.play("error");
+            }
             if (hapticsEnabled) {
               if (merged) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -732,17 +755,20 @@ export function MergeBoard({
             if (state.workbenchReady) {
               const didSpawn = spawnPart();
               if (didSpawn) {
+                SoundManager.play("spawn");
                 if (hapticsEnabled) {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 }
                 onWorkbenchPress("spawned");
               } else {
+                SoundManager.play("error");
                 if (hapticsEnabled) {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                 }
                 onWorkbenchPress("blocked");
               }
             } else {
+              SoundManager.play("error");
               if (hapticsEnabled) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               }

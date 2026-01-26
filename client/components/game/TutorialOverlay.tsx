@@ -186,11 +186,12 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
         />
       ) : null}
 
-      <View style={styles.content}>
+      <View style={styles.content} pointerEvents="none">
         <Animated.View
           key={currentStep.id}
           entering={SlideInDown.duration(400).springify()}
           style={styles.card}
+          pointerEvents="none"
         >
           <LinearGradient
             colors={["#1A1A2E", "#252542", "#1A1A2E"]}

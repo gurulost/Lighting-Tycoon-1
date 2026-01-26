@@ -12,6 +12,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Upgrade } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import SoundManager from "@/audio/SoundManager";
 
 interface UpgradeCardProps {
   upgrade: Upgrade;
@@ -53,12 +54,14 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
       scale.value = withSpring(0.95, { damping: 15 });
       setTimeout(() => {
         scale.value = withSpring(1, { damping: 15 });
+        SoundManager.play("upgrade");
         if (hapticsEnabled) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
         onPurchase();
       }, 100);
     } else {
+      SoundManager.play("error");
       if (hapticsEnabled) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }

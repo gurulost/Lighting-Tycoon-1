@@ -8,6 +8,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
+import SoundManager from "@/audio/SoundManager";
 
 const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
 
@@ -20,10 +21,15 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
 
+  React.useEffect(() => {
+    SoundManager.play("baron_offer");
+  }, []);
+
   const handleAccept = () => {
     if (hapticsEnabled) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
+    SoundManager.play("baron_accept");
     onAccept();
   };
 
@@ -31,6 +37,7 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
     if (hapticsEnabled) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    SoundManager.play("baron_decline");
     onDecline();
   };
 

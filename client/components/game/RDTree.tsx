@@ -16,6 +16,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { RD_DEFINITIONS, RDNode } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import SoundManager from "@/audio/SoundManager";
 
 interface RDTreeProps {
   onCraftFreedomController: () => void;
@@ -201,7 +202,10 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
               node={node}
               isUnlocked={state.rdNodes[node.id] || false}
               canUnlock={canUnlockNode(node)}
-              onUnlock={() => unlockRDNode(node.id)}
+              onUnlock={() => {
+                SoundManager.play("rd_unlock");
+                unlockRDNode(node.id);
+              }}
             />
           </React.Fragment>
         ))}
@@ -220,6 +224,7 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
                 if (hapticsEnabled) {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
+                SoundManager.play("rd_craft");
                 craftFreedomController();
                 onCraftFreedomController();
               }

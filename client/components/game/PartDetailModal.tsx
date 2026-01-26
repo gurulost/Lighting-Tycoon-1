@@ -8,6 +8,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
+import SoundManager from "@/audio/SoundManager";
 
 interface PartDetailModalProps {
   part: Part;
@@ -48,6 +49,7 @@ export function PartDetailModal({
     if (hapticsEnabled) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    SoundManager.play("rd_craft");
     onUseFreedomController();
     onClose();
   };

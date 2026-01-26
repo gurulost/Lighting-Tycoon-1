@@ -16,6 +16,7 @@ import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import SoundManager from "@/audio/SoundManager";
 
 interface LockoutModalProps {
   onClose: () => void;
@@ -35,6 +36,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
       -1,
       true
     );
+    SoundManager.play("lockout");
     if (hapticsEnabled) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }

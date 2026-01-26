@@ -30,6 +30,7 @@ import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import SoundManager from "@/audio/SoundManager";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.png");
 
@@ -51,6 +52,7 @@ interface BottomButtonProps {
   onPress: () => void;
   badge?: number;
   disabled?: boolean;
+  onDisabledPress?: () => void;
   onLayout?: (event: any) => void;
 }
 
@@ -61,6 +63,7 @@ function BottomButton({
   onPress,
   badge,
   disabled,
+  onDisabledPress,
   onLayout,
 }: BottomButtonProps) {
   const pulseAnim = useSharedValue(0);
@@ -84,10 +87,19 @@ function BottomButton({
     shadowOpacity: pulseAnim.value * 0.6,
   }));
 
+  const handlePress = () => {
+    if (disabled) {
+      onDisabledPress?.();
+      return;
+    }
+    onPress();
+  };
+
   return (
     <Pressable
       style={[styles.bottomButton, disabled && styles.bottomButtonDisabled]}
-      onPress={disabled ? undefined : onPress}
+      onPress={handlePress}
+      accessibilityState={{ disabled: !!disabled }}
       onLayout={onLayout}
     >
       <Animated.View
@@ -247,6 +259,17 @@ export default function GameScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    SoundManager.init();
+    return () => {
+      SoundManager.unload();
+    };
+  }, []);
+
+  useEffect(() => {
+    SoundManager.setEnabled(state.settings.soundEnabled);
+  }, [state.settings.soundEnabled]);
 
   useEffect(() => {
     if (state.lastMergeBonusId !== mergeBonusRef.current && state.lastMergeBonusCash > 0) {
@@ -541,32 +564,41 @@ export default function GameScreen() {
         style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md }]}
         onLayout={(event) => setBottomBarLayout(event.nativeEvent.layout)}
       >
-        <BottomButton
-          icon="inbox"
-          label="Orders"
-          color={GameColors.currency.reputation}
-          onPress={() => setActiveModal("orders")}
-          badge={state.orders.length}
-          disabled={!state.tutorialComplete && state.tutorialStep < 3}
-          onLayout={setTarget("orders")}
-        />
+      <BottomButton
+        icon="inbox"
+        label="Orders"
+        color={GameColors.currency.reputation}
+        onPress={() => setActiveModal("orders")}
+        onDisabledPress={() =>
+          showToast("Finish the tutorial to unlock Orders.", 2200)
+        }
+        badge={state.orders.length}
+        disabled={!state.tutorialComplete && state.tutorialStep < 3}
+        onLayout={setTarget("orders")}
+      />
 
-        <BottomButton
-          icon="shopping-cart"
-          label="Shop"
-          color={GameColors.currency.cash}
-          onPress={() => setActiveModal("upgrades")}
-          disabled={!state.tutorialComplete && state.tutorialStep < 4}
-          onLayout={setTarget("upgrades")}
-        />
+      <BottomButton
+        icon="shopping-cart"
+        label="Shop"
+        color={GameColors.currency.cash}
+        onPress={() => setActiveModal("upgrades")}
+        onDisabledPress={() =>
+          showToast("Finish the tutorial to unlock the Shop.", 2200)
+        }
+        disabled={!state.tutorialComplete && state.tutorialStep < 4}
+        onLayout={setTarget("upgrades")}
+      />
 
-        <BottomButton
-          icon="cpu"
-          label="R&D"
-          color={GameColors.currency.research}
-          onPress={() => setActiveModal("rd")}
-          disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
-        />
+      <BottomButton
+        icon="cpu"
+        label="R&D"
+        color={GameColors.currency.research}
+        onPress={() => setActiveModal("rd")}
+        onDisabledPress={() =>
+          showToast("Unlock R&D via upgrades to access the lab.", 2200)
+        }
+        disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
+      />
 
         {state.freedomControllerCount > 0 ? (
           <View style={styles.freedomIndicator}>
