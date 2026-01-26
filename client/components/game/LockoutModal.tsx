@@ -13,6 +13,7 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
+import { TinaChip } from "./TinaChip";
 import { useGame } from "@/context/GameContext";
 import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
@@ -99,6 +100,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           subtitle="The Bulb Baron has pushed a firmware update."
           icon="alert-triangle"
           iconColor={GameColors.ui.danger}
+          headerRight={<TinaChip expression="concerned" />}
         >
           <View style={styles.messageBox}>
             <Feather name="lock" size={20} color={GameColors.locked.primary} />

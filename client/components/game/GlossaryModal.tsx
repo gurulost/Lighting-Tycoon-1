@@ -22,9 +22,10 @@ import { useGame } from "@/context/GameContext";
 const stationWorkbench = require("../../../assets/images/station-workbench.png");
 const stationInbox = require("../../../assets/images/station-inbox.png");
 const stationRd = require("../../../assets/images/station-rd.png");
-const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
 const freedomControllerImage = require("../../../assets/images/freedom-controller.png");
 const tinaPortrait = require("../../../assets/images/tina/tina-portrait-256.png");
+const mentorPortrait = require("../../../assets/images/mentor/mentor-portrait-256.png");
+const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.png");
 
 interface GlossaryModalProps {
   onClose: () => void;
@@ -165,14 +166,13 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "character-mentor",
         title: "Mentor",
         description: "Retired installer who teaches the craft and keeps you grounded.",
-        icon: "user",
-        color: GameColors.openStandard.primary,
+        image: mentorPortrait,
       },
       {
         id: "character-baron",
         title: "Bulb Baron",
         description: "Corporate supplier with tempting locked offers and strict terms.",
-        image: bulbBaronImage,
+        image: baronPortrait,
       },
     ],
   },

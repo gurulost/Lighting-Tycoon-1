@@ -6,11 +6,12 @@ import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
+import { TinaChip } from "./TinaChip";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 import SoundManager from "@/audio/SoundManager";
 
-const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
+const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.png");
 
 interface BaronOfferModalProps {
   onAccept: () => void;
@@ -48,7 +49,8 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           variant="card"
           title="Bulb Baron Offer"
           subtitle='"Certified parts. Faster merges. Just a tiny signature."'
-          leading={<Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />}
+          leading={<Image source={baronPortrait} style={styles.baronIcon} contentFit="cover" />}
+          headerRight={<TinaChip expression="confident" />}
         >
           <View style={styles.offerBox}>
             <Feather name="package" size={20} color={GameColors.locked.primary} />
@@ -89,6 +91,9 @@ const styles = StyleSheet.create({
   baronIcon: {
     width: 56,
     height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: GameColors.locked.primary + "55",
   },
   offerBox: {
     flexDirection: "row",

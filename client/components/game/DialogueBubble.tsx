@@ -27,6 +27,8 @@ const TINA_PORTRAITS = {
   delighted: require("../../../assets/images/tina/tina-delighted-128.png"),
   concerned: require("../../../assets/images/tina/tina-concerned-128.png"),
 } as const;
+const MENTOR_PORTRAIT = require("../../../assets/images/mentor/mentor-portrait-128.png");
+const BARON_PORTRAIT = require("../../../assets/images/baron/baron-portrait-128.png");
 
 const SPEAKER_LABEL: Record<StorySpeaker, string> = {
   mentor: "MENTOR",
@@ -111,9 +113,14 @@ export function DialogueBubble({
   const patternId = React.useId().replace(/:/g, "");
   const showStamp = beat.speaker === "baron" && expanded;
   const showCaptionTab = beat.speaker === "system";
-  const showPortrait = beat.speaker === "tina";
+  const showPortrait = beat.speaker === "tina" || beat.speaker === "mentor" || beat.speaker === "baron";
   const portraitKey = beat.portrait ?? "portrait";
-  const portraitSource = TINA_PORTRAITS[portraitKey] ?? TINA_PORTRAITS.portrait;
+  const portraitSource =
+    beat.speaker === "tina"
+      ? TINA_PORTRAITS[portraitKey] ?? TINA_PORTRAITS.portrait
+      : beat.speaker === "mentor"
+      ? MENTOR_PORTRAIT
+      : BARON_PORTRAIT;
 
   return (
     <View style={styles.wrapper}>

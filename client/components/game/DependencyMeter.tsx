@@ -18,7 +18,7 @@ import { Image } from "expo-image";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
-const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
+const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.png");
 
 interface DependencyMeterProps {
   value: number;
@@ -211,7 +211,7 @@ export function DependencyMeter({ value, compact = false }: DependencyMeterProps
 
         {showExtras ? (
           <Animated.View style={[styles.baronContainer, baronStyle]}>
-            <Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />
+            <Image source={baronPortrait} style={styles.baronIcon} contentFit="cover" />
           </Animated.View>
         ) : null}
       </LinearGradient>
@@ -358,6 +358,9 @@ const styles = StyleSheet.create({
   baronIcon: {
     width: 32,
     height: 32,
-    opacity: 0.6,
+    opacity: 0.75,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GameColors.locked.primary + "55",
   },
 });
