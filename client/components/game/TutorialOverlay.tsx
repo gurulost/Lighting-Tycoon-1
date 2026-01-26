@@ -105,6 +105,7 @@ interface TutorialOverlayProps {
 export function TutorialOverlay({ targets }: TutorialOverlayProps) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
+  const reducedMotion = state.settings.reducedMotion;
   const [confirmSkip, setConfirmSkip] = React.useState(false);
   const pulse = useSharedValue(0);
 
@@ -129,12 +130,16 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
   };
 
   React.useEffect(() => {
+    if (reducedMotion) {
+      pulse.value = 0;
+      return;
+    }
     pulse.value = withRepeat(
       withSequence(withTiming(1, { duration: 1000 }), withTiming(0, { duration: 1000 })),
       -1,
       true
     );
-  }, []);
+  }, [reducedMotion]);
 
   React.useEffect(() => {
     setConfirmSkip(false);

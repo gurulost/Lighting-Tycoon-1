@@ -125,6 +125,8 @@ export default function GameScreen() {
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoTick, setUndoTick] = useState(0);
+  const [storyExpanded, setStoryExpanded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [tutorialTargets, setTutorialTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
@@ -137,6 +139,8 @@ export default function GameScreen() {
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const storyCollapseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draggingRef = useRef(false);
   const tutorialStepRef = useRef(state.tutorialStep);
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
   const canUndoNow =
@@ -189,6 +193,27 @@ export default function GameScreen() {
       setToastMessage(null);
     }, durationMs);
   }, []);
+
+  const handleStoryPress = useCallback(() => {
+    if (!state.activeStoryBeatId) return;
+    if (!storyExpanded) {
+      setStoryExpanded(true);
+      if (storyCollapseTimeout.current) {
+        clearTimeout(storyCollapseTimeout.current);
+      }
+      storyCollapseTimeout.current = setTimeout(() => {
+        setStoryExpanded(false);
+      }, 2500);
+      if (storyTimeout.current) {
+        clearTimeout(storyTimeout.current);
+      }
+      storyTimeout.current = setTimeout(() => {
+        dispatch({ type: "DISMISS_STORY_BEAT" });
+      }, 4200);
+    } else {
+      dispatch({ type: "DISMISS_STORY_BEAT" });
+    }
+  }, [state.activeStoryBeatId, storyExpanded, dispatch]);
   const selectedPart =
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
   const showLockoutModal =
@@ -216,6 +241,9 @@ export default function GameScreen() {
       }
       if (storyTimeout.current) {
         clearTimeout(storyTimeout.current);
+      }
+      if (storyCollapseTimeout.current) {
+        clearTimeout(storyCollapseTimeout.current);
       }
     };
   }, []);
@@ -280,21 +308,89 @@ export default function GameScreen() {
   useEffect(() => {
     if (!state.activeStoryBeatId && state.storyQueue.length > 0) {
       const now = Date.now();
-      if (now - state.lastStoryShownAt >= 30000) {
+      if (
+        now - state.lastStoryShownAt >= 30000 &&
+        !activeModal &&
+        !state.baronOfferAvailable &&
+        !showLockoutModal &&
+        selectedPartIndex === null &&
+        !isDragging
+      ) {
         dispatch({ type: "SHOW_STORY_BEAT", beatId: state.storyQueue[0] });
       }
     }
-  }, [state.activeStoryBeatId, state.storyQueue, state.lastStoryShownAt, dispatch]);
+  }, [
+    state.activeStoryBeatId,
+    state.storyQueue,
+    state.lastStoryShownAt,
+    activeModal,
+    state.baronOfferAvailable,
+    showLockoutModal,
+    selectedPartIndex,
+    isDragging,
+    dispatch,
+  ]);
+
+  useEffect(() => {
+    if (
+      state.activeStoryBeatId &&
+      (activeModal || state.baronOfferAvailable || showLockoutModal || selectedPartIndex !== null)
+    ) {
+      dispatch({ type: "DISMISS_STORY_BEAT" });
+    }
+  }, [
+    state.activeStoryBeatId,
+    activeModal,
+    state.baronOfferAvailable,
+    showLockoutModal,
+    selectedPartIndex,
+    dispatch,
+  ]);
 
   useEffect(() => {
     if (!state.activeStoryBeatId) return;
+    setStoryExpanded(false);
     if (storyTimeout.current) {
       clearTimeout(storyTimeout.current);
     }
+    if (storyCollapseTimeout.current) {
+      clearTimeout(storyCollapseTimeout.current);
+    }
     storyTimeout.current = setTimeout(() => {
       dispatch({ type: "DISMISS_STORY_BEAT" });
-    }, 4000);
+    }, 3200);
   }, [state.activeStoryBeatId, dispatch]);
+
+  useEffect(() => {
+    if (!state.activeStoryBeatId) {
+      setStoryExpanded(false);
+    }
+  }, [state.activeStoryBeatId]);
+
+  useEffect(() => {
+    if (!state.activeStoryBeatId) {
+      draggingRef.current = isDragging;
+      return;
+    }
+    if (draggingRef.current === isDragging) return;
+    draggingRef.current = isDragging;
+    if (isDragging) {
+      if (storyTimeout.current) {
+        clearTimeout(storyTimeout.current);
+      }
+      if (storyCollapseTimeout.current) {
+        clearTimeout(storyCollapseTimeout.current);
+      }
+      setStoryExpanded(false);
+    } else {
+      if (storyTimeout.current) {
+        clearTimeout(storyTimeout.current);
+      }
+      storyTimeout.current = setTimeout(() => {
+        dispatch({ type: "DISMISS_STORY_BEAT" });
+      }, 2400);
+    }
+  }, [isDragging, state.activeStoryBeatId, dispatch]);
 
   useEffect(() => {
     if (state.tutorialComplete) return;
@@ -329,6 +425,7 @@ export default function GameScreen() {
             onResearchLongPress={() =>
               showToast("Research unlocks R&D and the Freedom Controller.", 2600)
             }
+            reducedMotion={state.settings.reducedMotion}
           />
         </View>
         <View style={styles.topActions}>
@@ -369,28 +466,34 @@ export default function GameScreen() {
         </View>
       </View>
 
-      <Pressable
-        onLongPress={() =>
-          showToast("Dependency rises with locked parts. Higher levels add certified orders.", 2800)
-        }
-        delayLongPress={350}
-      >
-        <View onLayout={setTarget("dependency")}>
-          <DependencyMeter value={state.dependency} />
-        </View>
-      </Pressable>
-
-      <NeighborhoodBadge
-        reputation={state.reputation}
-        currentNeighborhoodId={state.currentNeighborhoodId}
-      />
-
-      {state.activeStoryBeatId ? (
+      <View style={styles.statusRow}>
         <Pressable
-          style={styles.storyToastContainer}
-          onPress={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
+          style={styles.statusItem}
+          onLongPress={() =>
+            showToast("Dependency rises with locked parts. Higher levels add certified orders.", 2800)
+          }
+          delayLongPress={350}
         >
-          <StoryToast beatId={state.activeStoryBeatId} />
+          <View onLayout={setTarget("dependency")}>
+            <DependencyMeter value={state.dependency} compact />
+          </View>
+        </Pressable>
+        <View style={styles.statusItem}>
+          <NeighborhoodBadge
+            reputation={state.reputation}
+            currentNeighborhoodId={state.currentNeighborhoodId}
+            compact
+          />
+        </View>
+      </View>
+
+      {state.activeStoryBeatId && !isDragging && !activeModal ? (
+        <Pressable style={styles.storyToastContainer} onPress={handleStoryPress}>
+          <StoryToast
+            beatId={state.activeStoryBeatId}
+            reducedMotion={state.settings.reducedMotion}
+            expanded={storyExpanded}
+          />
         </Pressable>
       ) : null}
 
@@ -421,6 +524,7 @@ export default function GameScreen() {
               showToast("Recycle: delete a part for a small refund.", 2400);
             }
           }}
+          onDragStateChange={setIsDragging}
           onPartLongPress={(index) => setSelectedPartIndex(index)}
           tutorialFocus={
             !state.tutorialComplete && state.tutorialStep === 0
@@ -634,9 +738,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
   },
-  storyToastContainer: {
+  statusRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.sm,
+  },
+  statusItem: {
+    flex: 1,
+  },
+  storyToastContainer: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xs,
+    alignSelf: "flex-start",
+    maxWidth: "82%",
   },
   bottomBar: {
     flexDirection: "row",

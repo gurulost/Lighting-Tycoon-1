@@ -1,11 +1,11 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
+import { ModalShell } from "./ModalShell";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 
@@ -37,20 +37,12 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
   return (
     <Pressable style={styles.overlay} onPress={handleDecline}>
       <Pressable style={styles.container} onPress={(event) => event.stopPropagation()}>
-        <LinearGradient
-          colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-          style={styles.card}
+        <ModalShell
+          variant="card"
+          title="Bulb Baron Offer"
+          subtitle='"Certified parts. Faster merges. Just a tiny signature."'
+          leading={<Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />}
         >
-          <View style={styles.header}>
-            <Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />
-            <View style={styles.headerText}>
-              <ThemedText style={styles.title}>Bulb Baron Offer</ThemedText>
-              <ThemedText style={styles.subtitle}>
-                "Certified parts. Faster merges. Just a tiny signature."
-              </ThemedText>
-            </View>
-          </View>
-
           <View style={styles.offerBox}>
             <Feather name="package" size={20} color={GameColors.locked.primary} />
             <ThemedText style={styles.offerText}>
@@ -69,7 +61,7 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
               <ThemedText style={styles.declineText}>Decline (Open-Standard stash)</ThemedText>
             </Pressable>
           </View>
-        </LinearGradient>
+        </ModalShell>
       </Pressable>
     </Pressable>
   );
@@ -87,34 +79,9 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
   },
-  card: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-    padding: Spacing.xl,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
   baronIcon: {
     width: 56,
     height: 56,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: GameColors.text.secondary,
   },
   offerBox: {
     flexDirection: "row",

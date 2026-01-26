@@ -1,11 +1,11 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { Part, TIER_NAMES } from "@/types/game";
 import { ThemedText } from "@/components/ThemedText";
+import { ModalShell } from "./ModalShell";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 
@@ -32,6 +32,17 @@ export function PartDetailModal({
     ? GameColors.ui.success
     : GameColors.openStandard.primary;
 
+  const leading = (
+    <View
+      style={[
+        styles.iconBadge,
+        { backgroundColor: familyColor + "25", borderColor: familyColor + "40" },
+      ]}
+    >
+      <Feather name={isLocked ? "lock" : "shield"} size={22} color={familyColor} />
+    </View>
+  );
+
   const handleUseFreedom = () => {
     if (!canUseFreedomController) return;
     if (hapticsEnabled) {
@@ -44,75 +55,66 @@ export function PartDetailModal({
   return (
     <Pressable style={styles.overlay} onPress={onClose}>
       <Pressable style={styles.container} onPress={(event) => event.stopPropagation()}>
-        <LinearGradient
-          colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-          style={styles.card}
+        <ModalShell
+          variant="card"
+          title={TIER_NAMES[part.tier]}
+          subtitle={
+            isLocked
+              ? "Locked Component"
+              : isCompatible
+              ? "Open-Compatible Component"
+              : "Open-Standard Component"
+          }
+          leading={leading}
+          onClose={onClose}
         >
-          <View style={styles.header}>
-            <View style={[styles.iconBadge, { backgroundColor: familyColor + "25" }]}>
-              <Feather name={isLocked ? "lock" : "shield"} size={22} color={familyColor} />
+          <View style={styles.content}>
+            <View style={styles.detailRow}>
+              <Feather name="layers" size={16} color={GameColors.text.secondary} />
+              <ThemedText style={styles.detailText}>Tier {part.tier}</ThemedText>
             </View>
-            <View style={styles.headerText}>
-              <ThemedText style={styles.title}>{TIER_NAMES[part.tier]}</ThemedText>
-              <ThemedText style={[styles.subtitle, { color: familyColor }]}>
+
+            <View style={styles.detailRow}>
+              <Feather name="alert-triangle" size={16} color={GameColors.text.secondary} />
+              <ThemedText style={styles.detailText}>
                 {isLocked
-                  ? "Locked Component"
+                  ? "+Dependency on merge"
                   : isCompatible
-                  ? "Open-Compatible Component"
-                  : "Open-Standard Component"}
+                  ? "Counts for locked-required installs"
+                  : "Generates Research on merge"}
               </ThemedText>
             </View>
-          </View>
 
-          <View style={styles.detailRow}>
-            <Feather name="layers" size={16} color={GameColors.text.secondary} />
-            <ThemedText style={styles.detailText}>Tier {part.tier}</ThemedText>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Feather name="alert-triangle" size={16} color={GameColors.text.secondary} />
-            <ThemedText style={styles.detailText}>
-              {isLocked
-                ? "+Dependency on merge"
-                : isCompatible
-                ? "Counts for locked-required installs"
-                : "Generates Research on merge"}
-            </ThemedText>
-          </View>
-
-          {isLocked ? (
-            <Pressable
-              onPress={handleUseFreedom}
-              style={[
-                styles.freedomButton,
-                {
-                  backgroundColor: canUseFreedomController
-                    ? GameColors.ui.success
-                    : GameColors.ui.surface,
-                  opacity: canUseFreedomController ? 1 : 0.5,
-                },
-              ]}
-            >
-              <Feather
-                name="unlock"
-                size={18}
-                color={canUseFreedomController ? "#0F0F1F" : GameColors.text.disabled}
-              />
-              <ThemedText
+            {isLocked ? (
+              <Pressable
+                onPress={handleUseFreedom}
                 style={[
-                  styles.freedomText,
-                  { color: canUseFreedomController ? "#0F0F1F" : GameColors.text.disabled },
+                  styles.freedomButton,
+                  {
+                    backgroundColor: canUseFreedomController
+                      ? GameColors.ui.success
+                      : GameColors.ui.surface,
+                    opacity: canUseFreedomController ? 1 : 0.5,
+                  },
                 ]}
               >
-                Use Freedom Controller
-              </ThemedText>
-            </Pressable>
-          ) : null}
-
-          <Pressable onPress={onClose} style={styles.closeButton}>
-            <ThemedText style={styles.closeText}>Close</ThemedText>
-          </Pressable>
-        </LinearGradient>
+                <Feather
+                  name="unlock"
+                  size={18}
+                  color={canUseFreedomController ? "#0F0F1F" : GameColors.text.disabled}
+                />
+                <ThemedText
+                  style={[
+                    styles.freedomText,
+                    { color: canUseFreedomController ? "#0F0F1F" : GameColors.text.disabled },
+                  ]}
+                >
+                  Use Freedom Controller
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        </ModalShell>
       </Pressable>
     </Pressable>
   );
@@ -130,43 +132,21 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
   },
-  card: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-    padding: Spacing.xl,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
   iconBadge: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
   },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 4,
+  content: {
+    gap: Spacing.sm,
   },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
   detailText: {
     fontSize: 14,
@@ -184,14 +164,5 @@ const styles = StyleSheet.create({
   freedomText: {
     fontSize: 14,
     fontWeight: "700",
-  },
-  closeButton: {
-    marginTop: Spacing.md,
-    alignSelf: "center",
-  },
-  closeText: {
-    fontSize: 13,
-    color: GameColors.text.secondary,
-    fontWeight: "600",
   },
 });

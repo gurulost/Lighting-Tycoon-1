@@ -1,13 +1,23 @@
-import React from "react";
-import { View, StyleSheet, ScrollView, Pressable, ImageSourcePropType } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  ImageSourcePropType,
+  TextInput,
+  Pressable,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
+import { ModalShell } from "./ModalShell";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Part, PartFamily, PartTier } from "@/types/game";
 import { PartItem } from "./PartItem";
+import { useGame } from "@/context/GameContext";
 
 const stationWorkbench = require("../../../assets/images/station-workbench.png");
 const stationInbox = require("../../../assets/images/station-inbox.png");
@@ -269,110 +279,194 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
 ];
 
 export function GlossaryModal({ onClose }: GlossaryModalProps) {
-  return (
-    <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <LinearGradient
-            colors={[`${GameColors.ui.primary}30`, `${GameColors.ui.primary}10`]}
-            style={styles.headerIcon}
-          >
-            <Feather name="help-circle" size={22} color={GameColors.ui.primary} />
-          </LinearGradient>
-          <View>
-            <ThemedText style={styles.title}>Glossary</ThemedText>
-            <ThemedText style={styles.subtitle}>Every icon, badge, and system</ThemedText>
-          </View>
-        </View>
-        <Pressable style={styles.closeButton} onPress={onClose}>
-          <Feather name="x" size={22} color={GameColors.text.secondary} />
-        </Pressable>
-      </View>
+  const { state } = useGame();
+  const reducedMotion = state.settings.reducedMotion;
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState("");
+  const scrollRef = useRef<ScrollView>(null);
+  const [sectionOffsets, setSectionOffsets] = useState<Record<string, number>>({});
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {GLOSSARY_SECTIONS.map((section) => (
-          <View key={section.id} style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{section.title}</ThemedText>
-            <View style={styles.sectionCard}>
-              {section.items.map((item) => (
-                <View key={item.id} style={styles.itemRow}>
-                  <View style={styles.itemIcon}>
-                    {item.part ? (
-                      <PartItem part={makePart(item.part.tier, item.part.family)} size={42} disabled />
-                    ) : item.image ? (
-                      <Image source={item.image} style={styles.imageIcon} contentFit="contain" />
-                    ) : item.icon ? (
-                      <LinearGradient
-                        colors={[`${item.color ?? GameColors.ui.primary}30`, `${item.color ?? GameColors.ui.primary}10`]}
-                        style={styles.iconContainer}
-                      >
-                        <Feather name={item.icon} size={18} color={item.color ?? GameColors.ui.primary} />
-                      </LinearGradient>
-                    ) : null}
-                  </View>
-                  <View style={styles.itemText}>
-                    <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
-                    <ThemedText style={styles.itemDescription}>{item.description}</ThemedText>
-                  </View>
-                </View>
-              ))}
-            </View>
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredSections = useMemo(() => {
+    if (!normalizedQuery) return GLOSSARY_SECTIONS;
+    return GLOSSARY_SECTIONS.map((section) => {
+      const items = section.items.filter((item) => {
+        const haystack = `${item.title} ${item.description}`.toLowerCase();
+        return haystack.includes(normalizedQuery);
+      });
+      return { ...section, items };
+    }).filter((section) => section.items.length > 0);
+  }, [normalizedQuery]);
+
+  const handleJumpTo = (sectionId: string) => {
+    const offset = sectionOffsets[sectionId];
+    if (offset === undefined) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, offset - Spacing.md), animated: true });
+  };
+  return (
+    <ModalShell
+      title="Glossary"
+      subtitle="Every icon, badge, and system"
+      icon="help-circle"
+      iconColor={GameColors.ui.primary}
+      onClose={onClose}
+    >
+      <View style={styles.searchSection}>
+        <View style={styles.searchBar}>
+          <Feather name="search" size={16} color={GameColors.text.secondary} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search glossary"
+            placeholderTextColor={GameColors.text.disabled}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {query.length > 0 ? (
+            <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
+              <Feather name="x" size={14} color={GameColors.text.secondary} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.indexRow}
+        >
+          {filteredSections.map((section) => (
+            <Pressable
+              key={section.id}
+              onPress={() => handleJumpTo(section.id)}
+              style={styles.indexChip}
+            >
+              <ThemedText style={styles.indexChipText}>{section.title}</ThemedText>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Spacing["4xl"] + insets.bottom },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {filteredSections.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="search" size={28} color={GameColors.text.disabled} />
+            <ThemedText style={styles.emptyTitle}>No matches</ThemedText>
+            <ThemedText style={styles.emptyDescription}>
+              Try a different keyword or clear the search.
+            </ThemedText>
           </View>
-        ))}
+        ) : (
+          filteredSections.map((section) => (
+            <View
+              key={section.id}
+              style={styles.section}
+              onLayout={(event) =>
+                setSectionOffsets((prev) => ({
+                  ...prev,
+                  [section.id]: event.nativeEvent.layout.y,
+                }))
+              }
+            >
+              <ThemedText style={styles.sectionTitle}>{section.title}</ThemedText>
+              <View style={styles.sectionCard}>
+                {section.items.map((item) => (
+                  <View key={item.id} style={styles.itemRow}>
+                    <View style={styles.itemIcon}>
+                      {item.part ? (
+                        <PartItem
+                          part={makePart(item.part.tier, item.part.family)}
+                          size={42}
+                          disabled
+                          reducedMotion={reducedMotion}
+                        />
+                      ) : item.image ? (
+                        <Image source={item.image} style={styles.imageIcon} contentFit="contain" />
+                      ) : item.icon ? (
+                        <LinearGradient
+                          colors={[`${item.color ?? GameColors.ui.primary}30`, `${item.color ?? GameColors.ui.primary}10`]}
+                          style={styles.iconContainer}
+                        >
+                          <Feather name={item.icon} size={18} color={item.color ?? GameColors.ui.primary} />
+                        </LinearGradient>
+                      ) : null}
+                    </View>
+                    <View style={styles.itemText}>
+                      <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
+                      <ThemedText style={styles.itemDescription}>{item.description}</ThemedText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
-    </LinearGradient>
+    </ModalShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: "#2A2A4A",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  headerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: GameColors.text.secondary,
-    marginTop: 2,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#1A1A2E",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   content: {
     padding: Spacing.lg,
     paddingBottom: Spacing["4xl"],
     gap: Spacing.lg,
+  },
+  searchSection: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#141426",
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: GameColors.text.primary,
+  },
+  clearButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1A1A2E",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+  },
+  indexRow: {
+    gap: Spacing.sm,
+    paddingRight: Spacing.lg,
+  },
+  indexChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  indexChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
   },
   section: {
     gap: Spacing.md,
@@ -423,8 +517,23 @@ const styles = StyleSheet.create({
     color: GameColors.text.primary,
   },
   itemDescription: {
-    fontSize: 12,
+    fontSize: 13,
     color: GameColors.text.secondary,
     marginTop: 2,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: Spacing["3xl"],
+    gap: Spacing.sm,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  emptyDescription: {
+    fontSize: 12,
+    color: GameColors.text.disabled,
+    textAlign: "center",
   },
 });

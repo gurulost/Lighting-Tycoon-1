@@ -23,6 +23,7 @@ interface CurrencyDisplayProps {
   onCashLongPress?: () => void;
   onReputationLongPress?: () => void;
   onResearchLongPress?: () => void;
+  reducedMotion?: boolean;
 }
 
 function formatNumber(num: number): string {
@@ -41,14 +42,28 @@ interface CurrencyItemProps {
   color: string;
   onPress?: () => void;
   onLongPress?: () => void;
+  reducedMotion?: boolean;
 }
 
-function CurrencyItem({ icon, value, color, onPress, onLongPress }: CurrencyItemProps) {
+function CurrencyItem({
+  icon,
+  value,
+  color,
+  onPress,
+  onLongPress,
+  reducedMotion = false,
+}: CurrencyItemProps) {
   const scale = useSharedValue(1);
   const prevValue = useSharedValue(value);
   const glowOpacity = useSharedValue(0);
 
   useEffect(() => {
+    if (reducedMotion) {
+      prevValue.value = value;
+      glowOpacity.value = 0;
+      scale.value = 1;
+      return;
+    }
     if (value > prevValue.value) {
       scale.value = withSequence(
         withSpring(1.15, { damping: 10 }),
@@ -100,6 +115,7 @@ export function CurrencyDisplay({
   onCashLongPress,
   onReputationLongPress,
   onResearchLongPress,
+  reducedMotion = false,
 }: CurrencyDisplayProps) {
   return (
     <LinearGradient
@@ -114,6 +130,7 @@ export function CurrencyDisplay({
         color={GameColors.currency.cash}
         onPress={onCashPress}
         onLongPress={onCashLongPress}
+        reducedMotion={reducedMotion}
       />
 
       <View style={styles.divider} />
@@ -123,6 +140,7 @@ export function CurrencyDisplay({
         value={reputation}
         color={GameColors.currency.reputation}
         onLongPress={onReputationLongPress}
+        reducedMotion={reducedMotion}
       />
 
       <View style={styles.divider} />
@@ -132,6 +150,7 @@ export function CurrencyDisplay({
         value={research}
         color={GameColors.currency.research}
         onLongPress={onResearchLongPress}
+        reducedMotion={reducedMotion}
       />
     </LinearGradient>
   );

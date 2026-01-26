@@ -12,6 +12,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
+import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
@@ -90,105 +91,104 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
         entering={FadeIn.duration(300)}
         style={[styles.container, containerStyle]}
       >
-        <View style={styles.warningIcon}>
-          <Feather name="alert-triangle" size={48} color={GameColors.ui.danger} />
-        </View>
+        <ModalShell
+          variant="card"
+          title="Firmware Update"
+          subtitle="The Bulb Baron has pushed a firmware update."
+          icon="alert-triangle"
+          iconColor={GameColors.ui.danger}
+        >
+          <View style={styles.messageBox}>
+            <Feather name="lock" size={20} color={GameColors.locked.primary} />
+            <ThemedText style={styles.message}>
+              Your workshop is now dependent on locked technology. Certain installs will reject
+              open-standard parts unless they're certified.
+            </ThemedText>
+          </View>
 
-        <ThemedText style={styles.title}>FIRMWARE UPDATE</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          The Bulb Baron has pushed a firmware update!
-        </ThemedText>
+          {isPhase1 ? (
+            <Pressable style={styles.primaryButton} onPress={handleAdvance}>
+              <Feather name="chevron-right" size={18} color="#0F0F1F" />
+              <ThemedText style={styles.primaryButtonText}>Continue</ThemedText>
+            </Pressable>
+          ) : null}
 
-        <View style={styles.messageBox}>
-          <Feather name="lock" size={20} color={GameColors.locked.primary} />
-          <ThemedText style={styles.message}>
-            Your workshop is now dependent on locked technology. Certain installs will reject
-            open-standard parts unless they're certified.
-          </ThemedText>
-        </View>
-
-        {isPhase1 ? (
-          <Pressable style={styles.primaryButton} onPress={handleAdvance}>
-            <Feather name="chevron-right" size={18} color="#0F0F1F" />
-            <ThemedText style={styles.primaryButtonText}>Continue</ThemedText>
-          </Pressable>
-        ) : null}
-
-        {isPhase2 && !state.lockoutChoice ? (
-          <>
-            <ThemedText style={styles.choiceTitle}>Choose Your Response:</ThemedText>
-            <View style={styles.choices}>
-              <Pressable style={styles.baronChoice} onPress={handleBaronChoice}>
-                <View style={[styles.choiceIcon, { backgroundColor: GameColors.locked.primary + "30" }]}>
-                  <Feather name="package" size={24} color={GameColors.locked.primary} />
-                </View>
-                <ThemedText style={styles.choiceName}>Emergency Crate</ThemedText>
-                <ThemedText style={styles.choiceDescription}>
-                  Accept Baron's help. Get locked parts fast, but deepen your dependency.
-                </ThemedText>
-                <View style={styles.choiceTag}>
-                  <Feather name="alert-circle" size={12} color={GameColors.ui.danger} />
-                  <ThemedText style={styles.choiceTagText}>+5 Dependency</ThemedText>
-                </View>
-              </Pressable>
-
-              <Pressable style={styles.labChoice} onPress={handleLabChoice}>
-                <View style={[styles.choiceIcon, { backgroundColor: GameColors.currency.research + "30" }]}>
-                  <Feather name="zap" size={24} color={GameColors.currency.research} />
-                </View>
-                <ThemedText style={styles.choiceName}>Lab Requests</ThemedText>
-                <ThemedText style={styles.choiceDescription}>
-                  Complete lab requests to earn Research and craft a Freedom Controller.
-                </ThemedText>
-                <View style={[styles.choiceTag, { backgroundColor: GameColors.currency.research + "20" }]}>
-                  <Feather name="zap" size={12} color={GameColors.currency.research} />
-                  <ThemedText style={[styles.choiceTagText, { color: GameColors.currency.research }]}>
-                    {state.lockoutChoice ? labRemainingLabel : labTargetLabel}
+          {isPhase2 && !state.lockoutChoice ? (
+            <>
+              <ThemedText style={styles.choiceTitle}>Choose Your Response:</ThemedText>
+              <View style={styles.choices}>
+                <Pressable style={styles.baronChoice} onPress={handleBaronChoice}>
+                  <View style={[styles.choiceIcon, { backgroundColor: GameColors.locked.primary + "30" }]}>
+                    <Feather name="package" size={24} color={GameColors.locked.primary} />
+                  </View>
+                  <ThemedText style={styles.choiceName}>Emergency Crate</ThemedText>
+                  <ThemedText style={styles.choiceDescription}>
+                    Accept Baron's help. Get locked parts fast, but deepen your dependency.
                   </ThemedText>
-                </View>
-              </Pressable>
-            </View>
-          </>
-        ) : null}
+                  <View style={styles.choiceTag}>
+                    <Feather name="alert-circle" size={12} color={GameColors.ui.danger} />
+                    <ThemedText style={styles.choiceTagText}>+5 Dependency</ThemedText>
+                  </View>
+                </Pressable>
 
-        {isPhase2 && state.lockoutChoice === "baron" ? (
-          <View style={styles.phaseHint}>
-            <ThemedText style={styles.choiceDescription}>
-              Complete the Locked Required order using Baron parts to end the lockout.
-            </ThemedText>
-          </View>
-        ) : null}
+                <Pressable style={styles.labChoice} onPress={handleLabChoice}>
+                  <View style={[styles.choiceIcon, { backgroundColor: GameColors.currency.research + "30" }]}>
+                    <Feather name="zap" size={24} color={GameColors.currency.research} />
+                  </View>
+                  <ThemedText style={styles.choiceName}>Lab Requests</ThemedText>
+                  <ThemedText style={styles.choiceDescription}>
+                    Complete lab requests to earn Research and craft a Freedom Controller.
+                  </ThemedText>
+                  <View style={[styles.choiceTag, { backgroundColor: GameColors.currency.research + "20" }]}>
+                    <Feather name="zap" size={12} color={GameColors.currency.research} />
+                    <ThemedText style={[styles.choiceTagText, { color: GameColors.currency.research }]}>
+                      {state.lockoutChoice ? labRemainingLabel : labTargetLabel}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              </View>
+            </>
+          ) : null}
 
-        {isPhase2 && state.lockoutChoice === "lab" ? (
-          <View style={styles.phaseHint}>
-            <ThemedText style={styles.choiceDescription}>
-              Complete {labRemaining} lab requests, then craft a Freedom Controller.
-            </ThemedText>
-          </View>
-        ) : null}
-
-        {isPhase3 ? (
-          <Pressable
-            style={[styles.freedomChoice, !canUseFreedom && styles.choiceDisabled]}
-            onPress={canUseFreedom ? handleFreedomChoice : undefined}
-          >
-            <View style={[styles.choiceIcon, { backgroundColor: GameColors.ui.success + "30" }]}>
-              <Feather name="unlock" size={24} color={GameColors.ui.success} />
-            </View>
-            <ThemedText style={styles.choiceName}>Break Free</ThemedText>
-            <ThemedText style={styles.choiceDescription}>
-              {canUseFreedom
-                ? "Use a Freedom Controller to break the lock-in and reduce dependency."
-                : "Craft a Freedom Controller in R&D to use this option."}
-            </ThemedText>
-            <View style={[styles.choiceTag, { backgroundColor: GameColors.ui.success + "20" }]}>
-              <Feather name="trending-down" size={12} color={GameColors.ui.success} />
-              <ThemedText style={[styles.choiceTagText, { color: GameColors.ui.success }]}>
-                -40 Dependency
+          {isPhase2 && state.lockoutChoice === "baron" ? (
+            <View style={styles.phaseHint}>
+              <ThemedText style={styles.choiceDescription}>
+                Complete the Locked Required order using Baron parts to end the lockout.
               </ThemedText>
             </View>
-          </Pressable>
-        ) : null}
+          ) : null}
+
+          {isPhase2 && state.lockoutChoice === "lab" ? (
+            <View style={styles.phaseHint}>
+              <ThemedText style={styles.choiceDescription}>
+                Complete {labRemaining} lab requests, then craft a Freedom Controller.
+              </ThemedText>
+            </View>
+          ) : null}
+
+          {isPhase3 ? (
+            <Pressable
+              style={[styles.freedomChoice, !canUseFreedom && styles.choiceDisabled]}
+              onPress={canUseFreedom ? handleFreedomChoice : undefined}
+            >
+              <View style={[styles.choiceIcon, { backgroundColor: GameColors.ui.success + "30" }]}>
+                <Feather name="unlock" size={24} color={GameColors.ui.success} />
+              </View>
+              <ThemedText style={styles.choiceName}>Break Free</ThemedText>
+              <ThemedText style={styles.choiceDescription}>
+                {canUseFreedom
+                  ? "Use a Freedom Controller to break the lock-in and reduce dependency."
+                  : "Craft a Freedom Controller in R&D to use this option."}
+              </ThemedText>
+              <View style={[styles.choiceTag, { backgroundColor: GameColors.ui.success + "20" }]}>
+                <Feather name="trending-down" size={12} color={GameColors.ui.success} />
+                <ThemedText style={[styles.choiceTagText, { color: GameColors.ui.success }]}>
+                  -40 Dependency
+                </ThemedText>
+              </View>
+            </Pressable>
+          ) : null}
+        </ModalShell>
       </Animated.View>
     </View>
   );
@@ -207,34 +207,8 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   container: {
-    backgroundColor: GameColors.ui.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
     width: "100%",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: GameColors.ui.danger,
-  },
-  warningIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: GameColors.ui.danger + "20",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: Spacing.lg,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: GameColors.ui.danger,
-    marginBottom: Spacing.sm,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: GameColors.text.secondary,
-    textAlign: "center",
-    marginBottom: Spacing.lg,
+    maxWidth: 520,
   },
   messageBox: {
     flexDirection: "row",

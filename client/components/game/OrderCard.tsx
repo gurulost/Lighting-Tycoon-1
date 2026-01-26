@@ -3,7 +3,6 @@ import { View, StyleSheet, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withRepeat,
   withSequence,
   withTiming,
@@ -46,8 +45,8 @@ export function OrderCard({
 }: OrderCardProps) {
   const { state, getFulfillmentIndices } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
+  const reducedMotion = state.settings.reducedMotion;
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const scale = useSharedValue(1);
   const glowPulse = useSharedValue(0);
   const urgentPulse = useSharedValue(0);
 
@@ -74,6 +73,10 @@ export function OrderCard({
   });
 
   useEffect(() => {
+    if (reducedMotion) {
+      glowPulse.value = 0;
+      return;
+    }
     if (canFulfill) {
       glowPulse.value = withRepeat(
         withSequence(
@@ -86,9 +89,13 @@ export function OrderCard({
     } else {
       glowPulse.value = 0;
     }
-  }, [canFulfill]);
+  }, [canFulfill, reducedMotion]);
 
   useEffect(() => {
+    if (reducedMotion) {
+      urgentPulse.value = 0;
+      return;
+    }
     if (order.rushDeadline) {
       urgentPulse.value = withRepeat(
         withSequence(
@@ -98,8 +105,10 @@ export function OrderCard({
         -1,
         true
       );
+    } else {
+      urgentPulse.value = 0;
     }
-  }, [order.rushDeadline]);
+  }, [order.rushDeadline, reducedMotion]);
 
   useEffect(() => {
     if (order.rushStartTime && order.rushDeadline) {
@@ -110,6 +119,7 @@ export function OrderCard({
       }, 100);
       return () => clearInterval(interval);
     }
+    setTimeRemaining(null);
   }, [order]);
 
   const getOrderTypeColor = () => {
@@ -170,19 +180,6 @@ export function OrderCard({
     }
   };
 
-  const handlePress = () => {
-    if (canFulfill) {
-      scale.value = withSpring(0.95, { damping: 15 });
-      setTimeout(() => {
-        scale.value = withSpring(1, { damping: 15 });
-      }, 100);
-    }
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   const glowStyle = useAnimatedStyle(() => ({
     shadowOpacity: canFulfill ? glowPulse.value * 0.5 : 0,
   }));
@@ -200,6 +197,24 @@ export function OrderCard({
     timeRemaining !== null && order.rushDeadline
       ? Math.floor((1 + (timeRemaining / order.rushDeadline) * 0.5) * 100 - 100)
       : 0;
+
+  const priorityBadge = (() => {
+    if (order.isLockout) {
+      return { label: "LOCKOUT", color: GameColors.ui.danger, icon: "alert-triangle" as const };
+    }
+    if (order.rushDeadline) {
+      const label =
+        timeRemaining !== null ? `${formatTime(timeRemaining)} +${rushBonus}%` : "RUSH";
+      return { label, color: GameColors.ui.danger, icon: "clock" as const };
+    }
+    if (order.type === "locked_required" || order.type === "baron_certified") {
+      return { label: "CERTIFIED", color: GameColors.locked.primary, icon: "lock" as const };
+    }
+    if (order.isTutorial) {
+      return { label: "REQUIRED", color: GameColors.ui.primary, icon: "compass" as const };
+    }
+    return null;
+  })();
 
   const modifierBadges = (() => {
     const badges: { label: string; color: string; icon: keyof typeof Feather.glyphMap }[] = [];
@@ -225,12 +240,42 @@ export function OrderCard({
     if (order.ecoAuditBonusResearch) {
       badges.push({ label: `Eco +${order.ecoAuditBonusResearch}`, color: GameColors.currency.research, icon: "zap" });
     }
-    return badges.slice(0, 3);
+    return badges;
   })();
+
+  const visibleBadges = selected ? modifierBadges : modifierBadges.slice(0, 2);
+  const hiddenBadgeCount = Math.max(0, modifierBadges.length - visibleBadges.length);
+
+  const rewardEntries = [
+    {
+      key: "cash",
+      value: order.rewards.cash,
+      color: GameColors.currency.cash,
+      icon: "dollar-sign" as const,
+    },
+    {
+      key: "rep",
+      value: order.rewards.reputation,
+      color: GameColors.currency.reputation,
+      icon: "star" as const,
+    },
+    {
+      key: "research",
+      value: order.rewards.research,
+      color: GameColors.currency.research,
+      icon: "zap" as const,
+    },
+  ].filter((entry) => entry.value > 0);
+
+  const visibleRewards = selected ? rewardEntries : rewardEntries.slice(0, 2);
+  const hiddenRewardCount = Math.max(0, rewardEntries.length - visibleRewards.length);
 
   const typeColor = getOrderTypeColor();
   const borderColor = canFulfill ? GameColors.ui.success : typeColor;
   const selectionColor = selected ? GameColors.ui.primary : borderColor;
+  const showFlavor = selected || order.isLockout || order.isTutorial;
+  const showRewardsLabel = selected;
+  const showBadges = selected || (!priorityBadge && modifierBadges.length > 0);
 
   return (
     <Pressable onPress={onSelect} disabled={!onSelect}>
@@ -239,7 +284,6 @@ export function OrderCard({
         exiting={FadeOutUp.duration(200)}
         style={[
           styles.container,
-          animatedStyle,
           glowStyle,
           selected && styles.containerSelected,
           { 
@@ -249,7 +293,7 @@ export function OrderCard({
         ]}
       >
         <LinearGradient colors={getGradientColors()} style={styles.gradient}>
-          <View style={styles.header}>
+        <View style={styles.header}>
           <View style={styles.titleRow}>
             <LinearGradient
               colors={[`${typeColor}40`, `${typeColor}20`, `${typeColor}40`]}
@@ -257,60 +301,38 @@ export function OrderCard({
             >
               <Feather name={getOrderTypeIcon()} size={14} color={typeColor} />
             </LinearGradient>
-            <ThemedText style={styles.title}>{order.title}</ThemedText>
-            {order.isLockout ? (
-              <View style={styles.lockoutBadge}>
-                <ThemedText style={styles.lockoutBadgeText}>LOCKOUT</ThemedText>
-              </View>
+            <ThemedText style={styles.title} numberOfLines={1}>
+              {order.title}
+            </ThemedText>
+          </View>
+          <View style={styles.headerRight}>
+            {priorityBadge ? (
+              <Animated.View
+                style={[
+                  styles.statusChip,
+                  { borderColor: `${priorityBadge.color}60`, backgroundColor: `${priorityBadge.color}20` },
+                  order.rushDeadline ? urgentStyle : null,
+                ]}
+              >
+                <Feather name={priorityBadge.icon} size={11} color={priorityBadge.color} />
+                <ThemedText
+                  style={[styles.statusChipText, { color: priorityBadge.color }]}
+                  numberOfLines={1}
+                >
+                  {priorityBadge.label}
+                </ThemedText>
+              </Animated.View>
             ) : null}
-            {order.isTutorial ? (
-              <View style={styles.tutorialBadge}>
-                <ThemedText style={styles.tutorialBadgeText}>REQUIRED</ThemedText>
-              </View>
-            ) : null}
-            {selected ? (
-              <View style={styles.trackBadge}>
-                <Feather name="eye" size={12} color={GameColors.ui.primary} />
-                <ThemedText style={styles.trackBadgeText}>TRACKING</ThemedText>
-              </View>
+            {dismissible ? (
+              <Pressable onPress={onDismiss} style={styles.dismissButton}>
+                <Feather name="x" size={16} color={GameColors.text.disabled} />
+              </Pressable>
             ) : null}
           </View>
-          {dismissible ? (
-            <Pressable onPress={onDismiss} style={styles.dismissButton}>
-              <Feather name="x" size={16} color={GameColors.text.disabled} />
-            </Pressable>
-          ) : null}
         </View>
 
-        {order.flavorText ? (
+        {order.flavorText && showFlavor ? (
           <ThemedText style={styles.flavorText}>{order.flavorText}</ThemedText>
-        ) : null}
-
-        {order.rushDeadline && timeRemaining !== null ? (
-          <Animated.View style={[styles.rushTimer, urgentStyle]}>
-            <LinearGradient
-              colors={[`${GameColors.ui.danger}30`, `${GameColors.ui.danger}10`]}
-              style={styles.rushGradient}
-            >
-              <Feather name="clock" size={12} color={GameColors.ui.danger} />
-              <ThemedText style={styles.rushText}>
-                {formatTime(timeRemaining)} (+{rushBonus}% bonus)
-              </ThemedText>
-            </LinearGradient>
-          </Animated.View>
-        ) : null}
-
-        {modifierBadges.length > 0 ? (
-          <View style={styles.badgeRow}>
-            {modifierBadges.map((badge) => (
-              <View key={badge.label} style={[styles.modifierBadge, { borderColor: `${badge.color}40` }]}>
-                <Feather name={badge.icon} size={12} color={badge.color} />
-                <ThemedText style={[styles.modifierBadgeText, { color: badge.color }]}>
-                  {badge.label}
-                </ThemedText>
-              </View>
-            ))}
-          </View>
         ) : null}
 
         <View style={styles.requirements}>
@@ -324,54 +346,46 @@ export function OrderCard({
                 ? GameColors.locked.primary
                 : GameColors.text.secondary;
 
+            const showFamily = selected && req.family !== "any";
+
             return (
-              <View key={index} style={styles.requirement}>
-                <LinearGradient
-                  colors={
-                    hasEnough
-                      ? [`${familyColor}40`, `${familyColor}20`, `${familyColor}40`]
-                      : ["#1F1F2E", "#252542", "#1F1F2E"]
-                  }
+              <View
+                key={index}
+                style={[
+                  styles.reqTile,
+                  {
+                    borderColor: hasEnough ? `${familyColor}60` : "#2A2A4A",
+                    backgroundColor: hasEnough ? `${familyColor}12` : "#1A1A2E",
+                  },
+                ]}
+              >
+                <Feather
+                  name={TIER_ICONS[req.tier]}
+                  size={14}
+                  color={hasEnough ? familyColor : GameColors.text.disabled}
+                />
+                <ThemedText
                   style={[
-                    styles.reqIcon,
-                    {
-                      borderColor: hasEnough ? familyColor : GameColors.text.disabled,
-                    },
+                    styles.reqTileText,
+                    { color: hasEnough ? GameColors.text.primary : GameColors.text.disabled },
                   ]}
                 >
-                  <Feather
-                    name={TIER_ICONS[req.tier]}
-                    size={16}
-                    color={hasEnough ? familyColor : GameColors.text.disabled}
-                  />
-                </LinearGradient>
-                <View style={styles.reqTextContainer}>
-                  <ThemedText
-                    style={[
-                      styles.reqText,
-                      { color: hasEnough ? GameColors.text.primary : GameColors.text.disabled },
-                    ]}
-                  >
-                    {req.count}x {TIER_NAMES[req.tier]}
-                  </ThemedText>
-                  {req.family !== "any" ? (
-                    <ThemedText
-                      style={[
-                        styles.reqFamily,
-                        { color: familyColor },
-                      ]}
-                    >
+                  {req.count}x {TIER_NAMES[req.tier]}
+                </ThemedText>
+                {showFamily ? (
+                  <View style={[styles.reqFamilyPill, { borderColor: `${familyColor}50` }]}>
+                    <ThemedText style={[styles.reqFamilyText, { color: familyColor }]}>
                       {req.family === "open"
-                        ? "Open-Standard"
+                        ? "Open"
                         : order.type === "locked_required"
-                        ? "Locked / Compatible"
+                        ? "Locked/Compat"
                         : "Locked"}
                     </ThemedText>
-                  ) : null}
-                </View>
+                  </View>
+                ) : null}
                 {hasEnough ? (
                   <View style={styles.checkContainer}>
-                    <Feather name="check" size={14} color={GameColors.ui.success} />
+                    <Feather name="check" size={12} color={GameColors.ui.success} />
                   </View>
                 ) : null}
               </View>
@@ -379,41 +393,62 @@ export function OrderCard({
           })}
         </View>
 
-        <View style={styles.rewardsContainer}>
-          <ThemedText style={styles.rewardsLabel}>Rewards</ThemedText>
+        {showBadges && (visibleBadges.length > 0 || hiddenBadgeCount > 0) ? (
+          <View style={styles.badgeRow}>
+            {visibleBadges.map((badge) => (
+              <View
+                key={badge.label}
+                style={[styles.modifierBadge, { borderColor: `${badge.color}40` }]}
+              >
+                <Feather name={badge.icon} size={11} color={badge.color} />
+                <ThemedText style={[styles.modifierBadgeText, { color: badge.color }]}>
+                  {badge.label}
+                </ThemedText>
+              </View>
+            ))}
+            {!selected && hiddenBadgeCount > 0 ? (
+              <View style={styles.moreBadge}>
+                <ThemedText style={styles.moreBadgeText}>+{hiddenBadgeCount} more</ThemedText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {selected ? (
+          <View style={styles.trackingRow}>
+            <Feather name="eye" size={12} color={GameColors.ui.primary} />
+            <ThemedText style={styles.trackingText}>
+              Tracking parts on board + backpack
+            </ThemedText>
+          </View>
+        ) : null}
+
+        <View
+          style={[
+            styles.rewardsContainer,
+            !showRewardsLabel && styles.rewardsContainerCompact,
+          ]}
+        >
+          {showRewardsLabel ? (
+            <ThemedText style={styles.rewardsLabel}>Rewards</ThemedText>
+          ) : null}
           <View style={styles.rewards}>
-            {order.rewards.cash > 0 ? (
+            {visibleRewards.map((reward) => (
               <LinearGradient
-                colors={[`${GameColors.currency.cash}20`, `${GameColors.currency.cash}10`]}
+                key={reward.key}
+                colors={[`${reward.color}20`, `${reward.color}10`]}
                 style={styles.rewardChip}
               >
-                <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
-                <ThemedText style={[styles.rewardValue, { color: GameColors.currency.cash }]}>
-                  {order.rewards.cash}
+                <Feather name={reward.icon} size={14} color={reward.color} />
+                <ThemedText style={[styles.rewardValue, { color: reward.color }]}>
+                  {reward.value}
                 </ThemedText>
               </LinearGradient>
-            ) : null}
-            {order.rewards.reputation > 0 ? (
-              <LinearGradient
-                colors={[`${GameColors.currency.reputation}20`, `${GameColors.currency.reputation}10`]}
-                style={styles.rewardChip}
-              >
-                <Feather name="star" size={14} color={GameColors.currency.reputation} />
-                <ThemedText style={[styles.rewardValue, { color: GameColors.currency.reputation }]}>
-                  {order.rewards.reputation}
-                </ThemedText>
-              </LinearGradient>
-            ) : null}
-        {order.rewards.research > 0 ? (
-          <LinearGradient
-                colors={[`${GameColors.currency.research}20`, `${GameColors.currency.research}10`]}
-                style={styles.rewardChip}
-              >
-                <Feather name="zap" size={14} color={GameColors.currency.research} />
-                <ThemedText style={[styles.rewardValue, { color: GameColors.currency.research }]}>
-                  {order.rewards.research}
-                </ThemedText>
-              </LinearGradient>
+            ))}
+            {!selected && hiddenRewardCount > 0 ? (
+              <View style={styles.moreBadge}>
+                <ThemedText style={styles.moreBadgeText}>+{hiddenRewardCount}</ThemedText>
+              </View>
             ) : null}
           </View>
         </View>
@@ -443,9 +478,11 @@ export function OrderCard({
             end={{ x: 1, y: 0 }}
             style={[
               styles.fulfillButton,
-              { opacity: canFulfill ? 1 : 0.5 },
+              { opacity: canFulfill ? 1 : 0.55 },
+              canFulfill && styles.fulfillButtonActive,
             ]}
           >
+            {canFulfill ? <View style={styles.readyDot} /> : null}
             <Feather
               name="check-circle"
               size={18}
@@ -461,6 +498,9 @@ export function OrderCard({
             </ThemedText>
           </LinearGradient>
         </Pressable>
+        {!canFulfill ? (
+          <ThemedText style={styles.ctaHint}>Missing parts</ThemedText>
+        ) : null}
       </LinearGradient>
     </Animated.View>
     </Pressable>
@@ -494,6 +534,12 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     flex: 1,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginLeft: Spacing.sm,
+  },
   typeIcon: {
     width: 32,
     height: 32,
@@ -504,57 +550,26 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
   },
   title: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
     color: GameColors.text.primary,
     flex: 1,
   },
-  lockoutBadge: {
-    backgroundColor: GameColors.ui.danger + "30",
-    borderRadius: BorderRadius.xs,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: GameColors.ui.danger + "60",
-  },
-  lockoutBadgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: GameColors.ui.danger,
-    letterSpacing: 0.5,
-  },
-  tutorialBadge: {
-    backgroundColor: GameColors.ui.primary + "30",
-    borderRadius: BorderRadius.xs,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: GameColors.ui.primary + "60",
-    marginLeft: 4,
-  },
-  tutorialBadgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: GameColors.ui.primary,
-    letterSpacing: 0.5,
-  },
-  trackBadge: {
+  statusChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: `${GameColors.ui.primary}20`,
-    borderRadius: BorderRadius.xs,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: `${GameColors.ui.primary}60`,
-    marginLeft: 4,
+    flexShrink: 1,
+    maxWidth: 140,
   },
-  trackBadgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: GameColors.ui.primary,
-    letterSpacing: 0.4,
+  statusChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   flavorText: {
     fontSize: 12,
@@ -562,31 +577,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   dismissButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#1A1A2E",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
-  },
-  rushTimer: {
-    marginBottom: Spacing.md,
-    alignSelf: "flex-start",
-  },
-  rushGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: `${GameColors.ui.danger}40`,
-  },
-  rushText: {
-    fontSize: 13,
-    color: GameColors.ui.danger,
-    fontWeight: "700",
+    borderColor: "#2A2A4A",
   },
   badgeRow: {
     flexDirection: "row",
@@ -608,34 +605,59 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
-  requirements: {
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+  moreBadge: {
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
   },
-  requirement: {
+  moreBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  trackingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.md,
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
   },
-  reqIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  reqTextContainer: {
-    flex: 1,
-  },
-  reqText: {
-    fontSize: 14,
+  trackingText: {
+    fontSize: 11,
+    color: GameColors.ui.primary,
     fontWeight: "600",
   },
-  reqFamily: {
-    fontSize: 11,
-    fontWeight: "500",
-    marginTop: 2,
+  requirements: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  reqTile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  reqTileText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  reqFamilyPill: {
+    marginLeft: Spacing.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  reqFamilyText: {
+    fontSize: 10,
+    fontWeight: "700",
   },
   checkContainer: {
     width: 24,
@@ -646,7 +668,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   rewardsContainer: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  rewardsContainerCompact: {
+    marginBottom: Spacing.sm,
   },
   rewardsLabel: {
     fontSize: 11,
@@ -654,7 +679,7 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   rewards: {
     flexDirection: "row",
@@ -665,30 +690,51 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: "#2A2A4A",
   },
   rewardValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
   },
   fulfillButtonContainer: {
     borderRadius: BorderRadius.md,
     overflow: "hidden",
+    marginTop: Spacing.sm,
   },
   fulfillButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
+    minHeight: 56,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
   },
+  fulfillButtonActive: {
+    shadowColor: GameColors.ui.success,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  readyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#0F0F1F",
+  },
   fulfillText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
+  },
+  ctaHint: {
+    marginTop: Spacing.xs,
+    fontSize: 12,
+    color: GameColors.text.disabled,
+    textAlign: "center",
   },
 });

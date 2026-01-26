@@ -22,11 +22,12 @@ const bulbBaronImage = require("../../../assets/images/bulb-baron.png");
 
 interface DependencyMeterProps {
   value: number;
+  compact?: boolean;
 }
 
 const THRESHOLDS = [20, 40, 60, 80];
 
-export function DependencyMeter({ value }: DependencyMeterProps) {
+export function DependencyMeter({ value, compact = false }: DependencyMeterProps) {
   const progress = useSharedValue(value / 100);
   const pulseScale = useSharedValue(1);
   const prevValue = useSharedValue(value);
@@ -128,10 +129,13 @@ export function DependencyMeter({ value }: DependencyMeterProps) {
     return "lock";
   };
 
+  const showExtras = !compact;
+
   return (
     <Animated.View
       style={[
         styles.container,
+        compact && styles.containerCompact,
         containerStyle,
         warningGlowStyle,
         { shadowColor: GameColors.ui.danger },
@@ -139,57 +143,77 @@ export function DependencyMeter({ value }: DependencyMeterProps) {
     >
       <LinearGradient
         colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-        style={styles.innerContainer}
+        style={[styles.innerContainer, compact && styles.innerContainerCompact]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, compact && styles.headerCompact]}>
           <View style={styles.labelContainer}>
             <View style={[styles.statusIcon, { backgroundColor: getStatusColor() + "30" }]}>
               <Feather name={getStatusIcon()} size={12} color={getStatusColor()} />
             </View>
-            <ThemedText style={styles.label}>Dependency</ThemedText>
+            <ThemedText style={[styles.label, compact && styles.labelCompact]}>
+              Dependency
+            </ThemedText>
           </View>
           <View style={styles.statusContainer}>
-            <ThemedText style={[styles.status, { color: getStatusColor() }]}>
-              {getStatusText()}
-            </ThemedText>
-            <ThemedText style={[styles.percentage, { color: getStatusColor() }]}>
+            {!compact ? (
+              <ThemedText
+                style={[
+                  styles.status,
+                  compact && styles.statusCompact,
+                  { color: getStatusColor() },
+                ]}
+              >
+                {getStatusText()}
+              </ThemedText>
+            ) : null}
+            <ThemedText
+              style={[
+                styles.percentage,
+                compact && styles.percentageCompact,
+                { color: getStatusColor() },
+              ]}
+            >
               {value}%
             </ThemedText>
           </View>
         </View>
 
-        <View style={styles.trackContainer}>
-          <View style={styles.track}>
+        <View style={[styles.trackContainer, compact && styles.trackContainerCompact]}>
+          <View style={[styles.track, compact && styles.trackCompact]}>
             <Animated.View style={[styles.progressBackground, progressStyle]}>
               <Animated.View style={[styles.progressFill, progressColorStyle]} />
             </Animated.View>
           </View>
 
-          <View style={styles.thresholds}>
-            {THRESHOLDS.map((threshold) => (
-              <View
-                key={threshold}
-                style={[
-                  styles.thresholdMarker,
-                  { left: `${threshold}%` },
-                ]}
-              >
+          {showExtras ? (
+            <View style={styles.thresholds}>
+              {THRESHOLDS.map((threshold) => (
                 <View
+                  key={threshold}
                   style={[
-                    styles.thresholdDot,
-                    value >= threshold && styles.thresholdDotActive,
+                    styles.thresholdMarker,
+                    { left: `${threshold}%` },
                   ]}
-                />
-              </View>
-            ))}
-          </View>
+                >
+                  <View
+                    style={[
+                      styles.thresholdDot,
+                      value >= threshold && styles.thresholdDotActive,
+                    ]}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
 
-        <Animated.View style={[styles.baronContainer, baronStyle]}>
-          <Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />
-        </Animated.View>
+        {showExtras ? (
+          <Animated.View style={[styles.baronContainer, baronStyle]}>
+            <Image source={bulbBaronImage} style={styles.baronIcon} contentFit="contain" />
+          </Animated.View>
+        ) : null}
       </LinearGradient>
     </Animated.View>
   );
@@ -207,16 +231,27 @@ const styles = StyleSheet.create({
     elevation: 5,
     overflow: "hidden",
   },
+  containerCompact: {
+    marginHorizontal: 0,
+    marginVertical: 0,
+    borderRadius: BorderRadius.sm,
+  },
   innerContainer: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     position: "relative",
+  },
+  innerContainerCompact: {
+    paddingVertical: Spacing.xs,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.sm,
+  },
+  headerCompact: {
+    marginBottom: Spacing.xs,
   },
   labelContainer: {
     flexDirection: "row",
@@ -235,6 +270,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: GameColors.text.secondary,
   },
+  labelCompact: {
+    fontSize: 11,
+  },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -244,13 +282,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+  statusCompact: {
+    fontSize: 11,
+  },
   percentage: {
     fontSize: 14,
     fontWeight: "800",
   },
+  percentageCompact: {
+    fontSize: 11,
+  },
   trackContainer: {
     position: "relative",
     height: 12,
+  },
+  trackContainerCompact: {
+    height: 8,
   },
   track: {
     height: 12,
@@ -259,6 +306,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#2A2A4A",
+  },
+  trackCompact: {
+    height: 8,
+    borderRadius: 4,
   },
   progressBackground: {
     height: "100%",

@@ -1,10 +1,12 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/ThemedText";
 import { UpgradeCard } from "./UpgradeCard";
+import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { UPGRADE_DEFINITIONS } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
@@ -35,30 +37,30 @@ export function UpgradesModal({
     : UPGRADE_DEFINITIONS;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <ThemedText style={styles.title}>Upgrades</ThemedText>
-        <Pressable
-          onPress={closeDisabled ? undefined : onClose}
-          style={[styles.closeButton, closeDisabled && styles.closeButtonDisabled]}
-        >
-          <Feather
-            name="x"
-            size={24}
-            color={closeDisabled ? GameColors.text.disabled : GameColors.text.primary}
-          />
-        </Pressable>
-      </View>
+    <ModalShell
+      title="Upgrades"
+      subtitle="Spend cash to expand your workshop"
+      icon="tool"
+      iconColor={GameColors.currency.cash}
+      onClose={closeDisabled ? undefined : onClose}
+      closeDisabled={closeDisabled}
+    >
 
-      <View style={styles.cashDisplay}>
+      <LinearGradient
+        colors={[`${GameColors.currency.cash}20`, `${GameColors.currency.cash}08`]}
+        style={styles.cashDisplay}
+      >
         <Feather name="dollar-sign" size={20} color={GameColors.currency.cash} />
         <ThemedText style={styles.cashValue}>{state.cash}</ThemedText>
         <ThemedText style={styles.cashLabel}>Available</ThemedText>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Spacing["4xl"] + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {tutorialOnlyUpgradeId ? (
@@ -92,45 +94,23 @@ export function UpgradesModal({
           );
         })}
       </ScrollView>
-    </View>
+    </ModalShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: GameColors.ui.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: GameColors.ui.surface,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  closeButton: {
-    padding: Spacing.sm,
-  },
-  closeButtonDisabled: {
-    opacity: 0.5,
-  },
   cashDisplay: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    backgroundColor: GameColors.ui.surface,
     marginHorizontal: Spacing.lg,
     marginVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   cashValue: {
     fontSize: 24,
@@ -146,7 +126,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.lg,
-    paddingBottom: Spacing["4xl"],
   },
   tutorialBanner: {
     flexDirection: "row",

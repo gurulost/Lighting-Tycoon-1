@@ -58,6 +58,7 @@ interface MergeBoardProps {
   onUtilityLongPress?: (utility: "backpack" | "recycle") => void;
   onPartLongPress?: (index: number) => void;
   tutorialFocus?: "workbench" | "orders" | "rd" | null;
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 function AnimatedStation({
@@ -66,6 +67,7 @@ function AnimatedStation({
   forcePulse = false,
   onPress,
   onLongPress,
+  reducedMotion = false,
   tileSize,
   accentColor,
 }: {
@@ -74,12 +76,17 @@ function AnimatedStation({
   forcePulse?: boolean;
   onPress: () => void;
   onLongPress?: () => void;
+  reducedMotion?: boolean;
   tileSize: number;
   accentColor: string;
 }) {
   const pulseAnim = useSharedValue(0);
 
   React.useEffect(() => {
+    if (reducedMotion) {
+      pulseAnim.value = 0;
+      return;
+    }
     if (isActive || forcePulse) {
       pulseAnim.value = withRepeat(
         withSequence(
@@ -92,7 +99,7 @@ function AnimatedStation({
     } else {
       pulseAnim.value = 0;
     }
-  }, [isActive]);
+  }, [isActive, forcePulse, reducedMotion]);
 
   const animatedGlow = useAnimatedStyle(() => {
     const glowOpacity = interpolate(pulseAnim.value, [0, 1], [0.3, 0.8], Extrapolation.CLAMP);
@@ -127,6 +134,7 @@ export function MergeBoard({
   onUtilityLongPress,
   onPartLongPress,
   tutorialFocus,
+  onDragStateChange,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, spawnPart, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -153,13 +161,23 @@ export function MergeBoard({
   const recyclePulse = useSharedValue(0);
   const isDragging = dragSource !== null;
 
+  useEffect(() => {
+    onDragStateChange?.(isDragging);
+  }, [isDragging, onDragStateChange]);
+
   const screenWidth = Dimensions.get("window").width;
   const boardPadding = Spacing.lg * 2;
   const totalGapWidth = (GRID_COLS - 1) * Spacing.tileGap;
   const tileSize = Math.floor((screenWidth - boardPadding - totalGapWidth) / GRID_COLS);
   const gridWidth = GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
-  const backpackSlotSize = Math.max(38, Math.round(tileSize * 0.7));
   const backpackGap = Spacing.sm;
+  const desiredBackpackSlotSize = Math.max(44, Math.round(tileSize * 0.8));
+  const backpackSlotCount = Math.max(1, state.backpackSlots);
+  const maxBackpackSlotSize = Math.floor(
+    (gridWidth - (backpackSlotCount - 1) * backpackGap) / backpackSlotCount
+  );
+  const backpackSlotSize = Math.max(36, Math.min(desiredBackpackSlotSize, maxBackpackSlotSize));
+  const recycleSize = Math.max(52, backpackSlotSize);
 
   const isSlotBlocked = useCallback(
     (index: number) => {
@@ -181,6 +199,10 @@ export function MergeBoard({
   );
 
   useEffect(() => {
+    if (reducedMotion) {
+      orderPulse.value = 0;
+      return;
+    }
     if (highlightedOrder) {
       orderPulse.value = withRepeat(
         withSequence(
@@ -193,13 +215,17 @@ export function MergeBoard({
     } else {
       orderPulse.value = 0;
     }
-  }, [highlightedOrder]);
+  }, [highlightedOrder, reducedMotion]);
 
   const orderPulseStyle = useAnimatedStyle(() => ({
     opacity: 0.3 + orderPulse.value * 0.4,
   }));
 
   useEffect(() => {
+    if (reducedMotion) {
+      backpackGlow.value = 0;
+      return;
+    }
     if (state.backpackUnlocked) {
       backpackGlow.value = withRepeat(
         withSequence(
@@ -212,9 +238,13 @@ export function MergeBoard({
     } else {
       backpackGlow.value = 0;
     }
-  }, [state.backpackUnlocked]);
+  }, [state.backpackUnlocked, reducedMotion]);
 
   useEffect(() => {
+    if (reducedMotion) {
+      recyclePulse.value = 0;
+      return;
+    }
     if (isDragging) {
       recyclePulse.value = withRepeat(
         withSequence(
@@ -227,7 +257,7 @@ export function MergeBoard({
     } else {
       recyclePulse.value = 0;
     }
-  }, [isDragging]);
+  }, [isDragging, reducedMotion]);
 
   const backpackGlowStyle = useAnimatedStyle(() => ({
     shadowOpacity: state.backpackUnlocked ? 0.2 + backpackGlow.value * 0.3 : 0,
@@ -647,6 +677,7 @@ export function MergeBoard({
               onDragStart={() => handleDragStart("board", index)}
               onDragEnd={(tx, ty, ax, ay) => handleDragEnd("board", index, tx, ty, ax, ay)}
               onLongPress={() => onPartLongPress?.(index)}
+              reducedMotion={reducedMotion}
             />
           ) : (
             <View style={styles.emptySlotIndicator}>
@@ -719,6 +750,7 @@ export function MergeBoard({
             }
           }}
           onLongPress={() => onStationLongPress?.("workbench")}
+          reducedMotion={reducedMotion}
           tileSize={tileSize}
           accentColor={GameColors.ui.primary}
         >
@@ -754,6 +786,7 @@ export function MergeBoard({
           forcePulse={tutorialFocus === "orders"}
           onPress={onOrderInboxPress}
           onLongPress={() => onStationLongPress?.("orders")}
+          reducedMotion={reducedMotion}
           tileSize={tileSize}
           accentColor={GameColors.currency.reputation}
         >
@@ -781,6 +814,7 @@ export function MergeBoard({
           forcePulse={tutorialFocus === "rd"}
           onPress={rdUnlocked ? onRDBenchPress : () => {}}
           onLongPress={() => onStationLongPress?.("rd")}
+          reducedMotion={reducedMotion}
           tileSize={tileSize}
           accentColor={GameColors.currency.research}
         >
@@ -931,6 +965,7 @@ export function MergeBoard({
                   key={`backpack-${index}`}
                   style={[
                     styles.backpackSlot,
+                    isDragging && state.backpackUnlocked && styles.backpackSlotActive,
                     {
                       width: backpackSlotSize,
                       height: backpackSlotSize,
@@ -948,15 +983,16 @@ export function MergeBoard({
                     style={styles.backpackGradient}
                   >
                     {part ? (
-                      <PartItem
-                        part={part}
-                        size={backpackSlotSize - 8}
-                        disabled={!state.backpackUnlocked}
-                        onDragStart={() => handleDragStart("backpack", index)}
-                        onDragEnd={(tx, ty, ax, ay) =>
-                          handleDragEnd("backpack", index, tx, ty, ax, ay)
-                        }
-                      />
+                    <PartItem
+                      part={part}
+                      size={backpackSlotSize - 8}
+                      disabled={!state.backpackUnlocked}
+                      onDragStart={() => handleDragStart("backpack", index)}
+                      onDragEnd={(tx, ty, ax, ay) =>
+                        handleDragEnd("backpack", index, tx, ty, ax, ay)
+                      }
+                      reducedMotion={reducedMotion}
+                    />
                     ) : (
                       <Feather
                         name="plus"
@@ -999,8 +1035,8 @@ export function MergeBoard({
               styles.recycleBin,
               isDragging && styles.recycleBinActive,
               {
-                width: backpackSlotSize,
-                height: backpackSlotSize,
+                width: recycleSize,
+                height: recycleSize,
               },
               recyclePulseStyle,
             ]}
@@ -1190,7 +1226,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   backpackTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
   },
   backpackLockedTag: {
@@ -1206,7 +1242,7 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
   },
   backpackLockedText: {
-    fontSize: 9,
+    fontSize: 10,
     color: GameColors.text.secondary,
   },
   backpackSlots: {
@@ -1217,6 +1253,12 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  backpackSlotActive: {
+    borderColor: `${GameColors.ui.primary}80`,
+    shadowColor: GameColors.ui.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   backpackGradient: {
     flex: 1,
@@ -1234,7 +1276,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   recycleLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
     color: GameColors.text.secondary,
   },
@@ -1257,7 +1299,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   recycleHint: {
-    fontSize: 9,
+    fontSize: 10,
     color: GameColors.text.secondary,
   },
 });

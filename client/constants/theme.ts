@@ -98,6 +98,43 @@ export const BorderRadius = {
   full: 9999,
 };
 
+export const ModalTokens = {
+  gradient: ["#0A0A14", "#0F0F1F", "#0A0A14"] as const,
+  border: "#2A2A4A",
+  headerHeight: 56,
+  titleSize: 22,
+  subtitleSize: 13,
+  closeButton: {
+    size: 44,
+    radius: 22,
+    background: "#1A1A2E",
+    border: "#2A2A4A",
+  },
+};
+
+export const ModalTypography = {
+  title: {
+    fontSize: 22,
+    fontWeight: "700" as const,
+    color: GameColors.text.primary,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: "400" as const,
+    color: GameColors.text.secondary,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: GameColors.text.primary,
+  },
+  body: {
+    fontSize: 14,
+    fontWeight: "400" as const,
+    color: GameColors.text.secondary,
+  },
+};
+
 export const Typography = {
   h1: {
     fontSize: 32,

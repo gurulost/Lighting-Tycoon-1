@@ -1,12 +1,12 @@
 import React from "react";
 import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
 import { OrderCard } from "./OrderCard";
+import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
@@ -37,56 +37,30 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
   };
 
   return (
-    <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <LinearGradient
-            colors={[`${GameColors.currency.reputation}30`, `${GameColors.currency.reputation}10`]}
-            style={styles.headerIcon}
-          >
-            <Feather name="inbox" size={24} color={GameColors.currency.reputation} />
-          </LinearGradient>
-          <View>
-            <ThemedText style={styles.title}>Orders</ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Fulfill orders to earn rewards
-            </ThemedText>
-          </View>
-        </View>
-        <Pressable
-          onPress={closeDisabled ? undefined : onClose}
-          style={[styles.closeButton, closeDisabled && styles.closeButtonDisabled]}
-        >
-          <Feather
-            name="x"
-            size={24}
-            color={closeDisabled ? GameColors.text.disabled : GameColors.text.primary}
-          />
-        </Pressable>
-      </View>
-
+    <ModalShell
+      title="Orders"
+      subtitle="Fulfill orders to earn rewards"
+      icon="inbox"
+      iconColor={GameColors.currency.reputation}
+      onClose={closeDisabled ? undefined : onClose}
+      closeDisabled={closeDisabled}
+    >
       <View style={styles.statsRow}>
-        <LinearGradient
-          colors={[`${GameColors.currency.reputation}20`, `${GameColors.currency.reputation}08`]}
-          style={styles.statItem}
-        >
+        <View style={styles.statItem}>
           <Feather name="inbox" size={18} color={GameColors.currency.reputation} />
           <ThemedText style={styles.statValue}>
             {state.orders.length}/{state.maxOrders}
           </ThemedText>
           <ThemedText style={styles.statLabel}>Active</ThemedText>
-        </LinearGradient>
+        </View>
 
-        <LinearGradient
-          colors={[`${GameColors.currency.cash}20`, `${GameColors.currency.cash}08`]}
-          style={styles.statItem}
-        >
+        <View style={styles.statItem}>
           <Feather name="dollar-sign" size={18} color={GameColors.currency.cash} />
           <ThemedText style={[styles.statValue, { color: GameColors.currency.cash }]}>
             {state.cash}
           </ThemedText>
           <ThemedText style={styles.statLabel}>Coins</ThemedText>
-        </LinearGradient>
+        </View>
       </View>
 
       <ScrollView
@@ -113,12 +87,9 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
           ))
         ) : (
           <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
-            <LinearGradient
-              colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-              style={styles.emptyIconContainer}
-            >
+            <View style={styles.emptyIconContainer}>
               <Feather name="inbox" size={48} color={GameColors.text.disabled} />
-            </LinearGradient>
+            </View>
             <ThemedText style={styles.emptyTitle}>No Orders Yet</ThemedText>
             <ThemedText style={styles.emptyDescription}>
               New orders will appear automatically. Keep merging parts to be ready!
@@ -132,59 +103,13 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
           </Animated.View>
         )}
       </ScrollView>
-    </LinearGradient>
+    </ModalShell>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: "#2A2A4A",
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: GameColors.text.secondary,
-    marginTop: 2,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#1A1A2E",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-  },
-  closeButtonDisabled: {
-    opacity: 0.5,
   },
   statsRow: {
     flexDirection: "row",
@@ -202,6 +127,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
   },
   statValue: {
     fontSize: 18,
@@ -231,6 +157,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     borderWidth: 1,
     borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
   },
   emptyTitle: {
     fontSize: 20,

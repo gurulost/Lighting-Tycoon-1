@@ -57,6 +57,7 @@ interface PartItemProps {
   onLongPress?: () => void;
   size?: number;
   disabled?: boolean;
+  reducedMotion?: boolean;
 }
 
 export function PartItem({
@@ -66,6 +67,7 @@ export function PartItem({
   onLongPress,
   size = Spacing.partSize,
   disabled = false,
+  reducedMotion = false,
 }: PartItemProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -81,6 +83,10 @@ export function PartItem({
     : ["#FFB84D20", "#A855F740", "#FFB84D20"];
 
   React.useEffect(() => {
+    if (reducedMotion) {
+      glowPulse.value = 0;
+      return;
+    }
     const pulse = () => {
       glowPulse.value = withSequence(
         withTiming(1, { duration: 1500 }),
@@ -90,7 +96,7 @@ export function PartItem({
     pulse();
     const interval = setInterval(pulse, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   const handleDragStart = () => {
     onDragStart?.();
@@ -175,6 +181,15 @@ export function PartItem({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
+          {isOpen ? (
+            <LinearGradient
+              colors={["transparent", `${primaryColor}30`, "transparent", `${primaryColor}30`, "transparent"]}
+              locations={[0, 0.18, 0.36, 0.54, 0.72]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.openPattern}
+            />
+          ) : null}
           <Image
             source={sprite}
             style={[styles.sprite, { width: size * 0.75, height: size * 0.75 }]}
@@ -186,11 +201,23 @@ export function PartItem({
           <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
         </View>
 
-        {part.family === "locked" ? (
-          <View style={[styles.familyIndicator, { backgroundColor: GameColors.locked.accent + "80" }]}>
-            <ThemedText style={styles.familyText}>L</ThemedText>
-          </View>
-        ) : null}
+        <View
+          style={[
+            styles.familyIndicator,
+            part.family === "locked"
+              ? { backgroundColor: GameColors.locked.accent + "80" }
+              : styles.familyIndicatorOpen,
+          ]}
+        >
+          <ThemedText
+            style={[
+              styles.familyText,
+              part.family === "locked" ? styles.familyTextLocked : styles.familyTextOpen,
+            ]}
+          >
+            {part.family === "locked" ? "L" : "O"}
+          </ThemedText>
+        </View>
 
         {part.compatible ? (
           <View style={[styles.compatibleIndicator, { backgroundColor: GameColors.ui.success }]}>
@@ -282,6 +309,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden",
   },
+  openPattern: {
+    position: "absolute",
+    top: "-20%",
+    left: "-20%",
+    right: "-20%",
+    bottom: "-20%",
+    opacity: 0.55,
+    transform: [{ rotate: "-25deg" }],
+  },
   sprite: {
     zIndex: 1,
   },
@@ -321,11 +357,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#0F0F1F",
+  },
+  familyIndicatorOpen: {
+    backgroundColor: "#0F0F1F",
+    borderColor: GameColors.openStandard.primary,
   },
   familyText: {
     fontSize: 9,
     fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  familyTextLocked: {
     color: "#FFF",
+  },
+  familyTextOpen: {
+    color: GameColors.openStandard.primary,
   },
   compatibleIndicator: {
     position: "absolute",

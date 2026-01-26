@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -153,6 +154,7 @@ function RDNodeCard({
 export function RDTree({ onCraftFreedomController }: RDTreeProps) {
   const { state, unlockRDNode, craftFreedomController } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
+  const insets = useSafeAreaInsets();
 
   const canUnlockNode = (node: RDNode): boolean => {
     if (state.rdNodes[node.id]) return false;
@@ -163,7 +165,14 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
   const canCraft = state.rdNodes["freedom_build"] && state.research >= 100;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: Spacing["4xl"] + insets.bottom },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.header}>
         <View style={styles.researchDisplay}>
           <Feather name="zap" size={20} color={GameColors.currency.research} />
@@ -246,7 +255,7 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: GameColors.ui.background,
+    backgroundColor: "transparent",
   },
   content: {
     padding: Spacing.lg,

@@ -10,9 +10,14 @@ import { NEIGHBORHOODS } from "@/constants/neighborhoods";
 interface NeighborhoodBadgeProps {
   reputation: number;
   currentNeighborhoodId: string;
+  compact?: boolean;
 }
 
-export function NeighborhoodBadge({ reputation, currentNeighborhoodId }: NeighborhoodBadgeProps) {
+export function NeighborhoodBadge({
+  reputation,
+  currentNeighborhoodId,
+  compact = false,
+}: NeighborhoodBadgeProps) {
   const currentIndex = Math.max(
     0,
     NEIGHBORHOODS.findIndex((n) => n.id === currentNeighborhoodId)
@@ -30,24 +35,28 @@ export function NeighborhoodBadge({ reputation, currentNeighborhoodId }: Neighbo
   return (
     <LinearGradient
       colors={["#1A1A2E", "#23233D", "#1A1A2E"]}
-      style={styles.container}
+      style={[styles.container, compact && styles.containerCompact]}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, compact && styles.headerCompact]}>
         <View style={styles.iconWrap}>
           <Feather name="map" size={14} color={GameColors.currency.reputation} />
         </View>
-        <ThemedText style={styles.title}>{current.name}</ThemedText>
-        <ThemedText style={styles.tierLabel}>
-          Tier {currentIndex + 1}/{NEIGHBORHOODS.length}
+        <ThemedText style={[styles.title, compact && styles.titleCompact]}>
+          {current.name}
         </ThemedText>
+        {!compact ? (
+          <ThemedText style={styles.tierLabel}>
+            Tier {currentIndex + 1}/{NEIGHBORHOODS.length}
+          </ThemedText>
+        ) : null}
       </View>
 
-      <View style={styles.progressRow}>
-        <View style={styles.progressTrack}>
+      <View style={[styles.progressRow, compact && styles.progressRowCompact]}>
+        <View style={[styles.progressTrack, compact && styles.progressTrackCompact]}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
         </View>
-        <ThemedText style={styles.progressText}>
-          {next ? `${reputation}/${nextRep} Rep` : "All neighborhoods unlocked"}
+        <ThemedText style={[styles.progressText, compact && styles.progressTextCompact]}>
+          {next ? `${reputation}/${nextRep} Rep` : "All unlocked"}
         </ThemedText>
       </View>
     </LinearGradient>
@@ -63,10 +72,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2A2A4A",
   },
+  containerCompact: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    paddingVertical: Spacing.sm,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
+  },
+  headerCompact: {
+    marginBottom: 2,
   },
   iconWrap: {
     width: 28,
@@ -84,6 +101,9 @@ const styles = StyleSheet.create({
     color: GameColors.text.primary,
     flex: 1,
   },
+  titleCompact: {
+    fontSize: 12,
+  },
   tierLabel: {
     fontSize: 12,
     color: GameColors.text.secondary,
@@ -91,11 +111,17 @@ const styles = StyleSheet.create({
   progressRow: {
     marginTop: Spacing.sm,
   },
+  progressRowCompact: {
+    marginTop: Spacing.xs,
+  },
   progressTrack: {
     height: 6,
     backgroundColor: "#2A2A4A",
     borderRadius: BorderRadius.full,
     overflow: "hidden",
+  },
+  progressTrackCompact: {
+    height: 4,
   },
   progressFill: {
     height: 6,
@@ -105,5 +131,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     fontSize: 11,
     color: GameColors.text.secondary,
+  },
+  progressTextCompact: {
+    fontSize: 10,
   },
 });

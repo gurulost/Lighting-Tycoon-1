@@ -4,7 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
-import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { ModalShell } from "./ModalShell";
+import { GameColors, Spacing } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 
 interface SettingsModalProps {
@@ -52,17 +53,14 @@ export function SettingsModal({ onClose, onOpenGlossary }: SettingsModalProps) {
   return (
     <Pressable style={styles.overlay} onPress={onClose} testID="settings-modal">
       <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
-        <LinearGradient
-          colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-          style={styles.modal}
+        <ModalShell
+          title="Settings"
+          subtitle="Tune your workshop experience"
+          icon="settings"
+          iconColor={GameColors.ui.primary}
+          onClose={onClose}
+          variant="card"
         >
-          <View style={styles.header}>
-            <ThemedText style={styles.title}>Settings</ThemedText>
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <Feather name="x" size={24} color={GameColors.text.secondary} />
-            </Pressable>
-          </View>
-
           <View style={styles.content}>
             <SettingRow
               icon="volume-2"
@@ -159,7 +157,7 @@ export function SettingsModal({ onClose, onOpenGlossary }: SettingsModalProps) {
               <ThemedText style={styles.versionNumber}>v1.0.0</ThemedText>
             </View>
           </View>
-        </LinearGradient>
+        </ModalShell>
       </Pressable>
     </Pressable>
   );
@@ -176,34 +174,6 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "100%",
     maxWidth: 400,
-  },
-  modal: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-    overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: "#2A2A4A",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#1A1A2E",
-    justifyContent: "center",
-    alignItems: "center",
   },
   content: {
     padding: Spacing.lg,
