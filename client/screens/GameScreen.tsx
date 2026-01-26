@@ -137,6 +137,7 @@ export default function GameScreen() {
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tutorialStepRef = useRef(state.tutorialStep);
+  const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
 
@@ -225,6 +226,17 @@ export default function GameScreen() {
     }
     mergeBonusRef.current = state.lastMergeBonusId;
   }, [state.lastMergeBonusId, state.lastMergeBonusCash, state.mergeChainCount, showToast, dispatch]);
+
+  useEffect(() => {
+    if (
+      state.tutorialComplete &&
+      state.highlightedOrderId &&
+      state.highlightedOrderId !== highlightedOrderRef.current
+    ) {
+      showToast("Tracking parts on board + backpack");
+    }
+    highlightedOrderRef.current = state.highlightedOrderId;
+  }, [state.highlightedOrderId, state.tutorialComplete, showToast]);
 
   useEffect(() => {
     if (

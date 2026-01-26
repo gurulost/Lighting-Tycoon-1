@@ -26,6 +26,9 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
     const partsToUse = getFulfillmentIndices(order);
     if (partsToUse) {
       fulfillOrder(orderId, partsToUse);
+      if (state.highlightedOrderId === orderId) {
+        dispatch({ type: "HIGHLIGHT_ORDER" });
+      }
     }
   };
 

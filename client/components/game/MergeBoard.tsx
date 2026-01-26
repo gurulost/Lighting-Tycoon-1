@@ -143,6 +143,8 @@ export function MergeBoard({
   const backpackRef = useRef<View>(null);
   const recycleRef = useRef<View>(null);
   const orderPulse = useSharedValue(0);
+  const backpackGlow = useSharedValue(0);
+  const recyclePulse = useSharedValue(0);
   const isDragging = dragSource !== null;
 
   const screenWidth = Dimensions.get("window").width;
@@ -189,6 +191,45 @@ export function MergeBoard({
 
   const orderPulseStyle = useAnimatedStyle(() => ({
     opacity: 0.3 + orderPulse.value * 0.4,
+  }));
+
+  useEffect(() => {
+    if (state.backpackUnlocked) {
+      backpackGlow.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1400 }),
+          withTiming(0.2, { duration: 1400 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      backpackGlow.value = 0;
+    }
+  }, [state.backpackUnlocked]);
+
+  useEffect(() => {
+    if (isDragging) {
+      recyclePulse.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 600 }),
+          withTiming(0.3, { duration: 600 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      recyclePulse.value = 0;
+    }
+  }, [isDragging]);
+
+  const backpackGlowStyle = useAnimatedStyle(() => ({
+    shadowOpacity: state.backpackUnlocked ? 0.2 + backpackGlow.value * 0.3 : 0,
+  }));
+
+  const recyclePulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + recyclePulse.value * 0.03 }],
+    shadowOpacity: 0.2 + recyclePulse.value * 0.5,
   }));
 
   const {
@@ -854,7 +895,7 @@ export function MergeBoard({
               </View>
             ) : null}
           </View>
-          <View
+          <Animated.View
             ref={backpackRef}
             onLayout={measureBackpack}
             style={[
@@ -866,6 +907,7 @@ export function MergeBoard({
                   (state.backpackSlots - 1) * backpackGap,
                 gap: backpackGap,
               },
+              backpackGlowStyle,
             ]}
           >
             {state.backpack.map((part, index) => {
@@ -927,11 +969,11 @@ export function MergeBoard({
                 </View>
               );
             })}
-          </View>
+          </Animated.View>
         </View>
         <View style={styles.recycleSection}>
           <ThemedText style={styles.recycleLabel}>Recycle</ThemedText>
-          <View
+          <Animated.View
             ref={recycleRef}
             onLayout={measureRecycle}
             style={[
@@ -941,6 +983,7 @@ export function MergeBoard({
                 width: backpackSlotSize,
                 height: backpackSlotSize,
               },
+              recyclePulseStyle,
             ]}
           >
             <LinearGradient
@@ -950,7 +993,7 @@ export function MergeBoard({
               <Feather name="trash-2" size={18} color={GameColors.ui.danger} />
               <ThemedText style={styles.recycleHint}>cash + research</ThemedText>
             </LinearGradient>
-          </View>
+          </Animated.View>
         </View>
       </View>
     </View>
