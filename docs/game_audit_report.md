@@ -4,8 +4,8 @@ Date: 2026-01-26
 
 ## Executive Summary
 - The game is **well-formulated, coherent, and playable end-to-end**.
-- Core loop, strategic layer, onboarding, and lockout event are fully integrated and work together without excess complexity.
-- No critical blockers found. A handful of **non-blocking risks / tech-debt** items are noted for tracking.
+- Core loop, strategic layer, onboarding, lockout flow, and narrative integration are fully implemented.
+- Previously identified risks have been **addressed** (order gating, lockout recovery, story log cap, save debounce, and board pressure gating).
 
 ---
 
@@ -21,13 +21,13 @@ Date: 2026-01-26
 7. Lockout triggers at Dependency 100 (after first-session track).
 
 ### Key Systems Implemented
-- Single merge board (6x5) with fixed station slots and locked slots.
+- Single merge board (6x5) with fixed stations and unlockable tiles.
 - Backpack storage and recycle bin (board friction relief).
-- Order highlight with ghost slots for missing parts.
+- Order highlight + ghost slots for missing requirements.
 - Undo (single-step with cooldown).
-- Order modifiers: style match, rush, client preference, certified, no substitutions, eco audit.
+- Order modifiers (style match, rush, preference, certified, no substitutions, eco audit).
 - Dependency meter with threshold story beats.
-- R&D tree and Freedom Controller crafting/use.
+- R&D tree + Freedom Controller craft/use.
 - Lockout event (Baron vs Lab path).
 - Scripted first-session track (forced drops, staged orders, second Baron offer).
 
@@ -37,12 +37,12 @@ Date: 2026-01-26
 
 ### Architecture
 - React Native (Expo).
-- Centralized state reducer: `client/context/GameContext.tsx`.
+- Centralized reducer: `client/context/GameContext.tsx`.
 - Data-driven content:
   - Orders: `client/constants/orderContentPack.ts`.
   - Story beats: `client/constants/story.ts`.
   - Neighborhoods: `client/constants/neighborhoods.ts`.
-- Save system via AsyncStorage (versioned payload).
+- Save system via AsyncStorage with debounced flush + critical-action saves.
 - Audio system via `SoundManager` with preload + cooldown throttling.
 
 ### UI Composition
@@ -74,61 +74,40 @@ Date: 2026-01-26
 
 ### Technical Craft
 - Reducer centralizes behavior for maintainability.
-- Story queue avoids spam and repeats.
+- Story queue avoids spam and repeats; story log is capped.
 - Asset preloading/caching reduces hitching.
+- Save writes are debounced and flushed on critical actions.
 
 ---
 
-## 4) Concerns / Risks (Non-Blocking)
+## 4) Resolved Risks (Prior Audit Items)
 
-### A) Neighborhood allowedOrderTypes not enforced
-- `allowedOrderTypes` exists in `neighborhoods.ts` but is not used by order generation.
-- Current gating relies on `minNeighborhoodId` in templates.
-- **Risk**: future content may assume the field is enforced when it is not.
-
-### B) Legacy `ORDER_TEMPLATES` block appears unused
-- `ORDER_TEMPLATES` remains in `types/game.ts` but is not referenced.
-- **Risk**: confusion for future contributors.
-
-### C) Story log grows indefinitely
-- `storyLog` is never capped.
-- **Risk**: over very long play sessions, save size grows.
-
-### D) Save frequency is high
-- AsyncStorage save triggers on every state change.
-- **Risk**: potential battery/perf impact on older devices (not a functional bug).
-
-### E) Lockout state integrity depends on saved orders
-- If stored orders lose the lockout order, player could stall.
-- No reconciliation logic on load.
-
-### F) Order spawning ignores board congestion
-- Orders spawn on a timer regardless of board fullness (only maxOrders gates).
-- **Risk**: can feel spammy when the board is full or the player is stuck.
+- **Neighborhood order gating** is now enforced by `allowedOrderTypes` in generation.
+- **Legacy `ORDER_TEMPLATES`** removed to avoid confusion.
+- **Lockout recovery on load** reinserts lockout/lab orders if missing.
+- **Story log** now capped to a rolling window to prevent growth.
+- **Save frequency** now debounced + critical-action flushes.
+- **Order spawn pressure** respects board congestion and pauses spawns when full.
 
 ---
 
-## 5) Complexity Assessment
-- Not overly complex from a player perspective.
-- Complexity is centralized in `GameContext`, which is good for maintainability.
-- Content scale is large but data-driven, which is the right type of complexity.
+## 5) Open Risks / Watch List (Low)
+
+- Order reward tuning may need ongoing telemetry + live balancing.
+- Narrative pacing should be monitored to avoid toast overload.
+- Long-term content expansion should maintain modifier variety without adding tier bloat.
 
 ---
 
 ## 6) Overall Verdict
 
-The game is **well-formulated and functional** with all major systems integrated.
-It already meets production-grade core design goals. Remaining issues are
-non-blocking and primarily about future-proofing or tech-debt management.
+The game is **production-grade** in structure and gameplay flow. The architecture
+supports tuning, iteration, and content scaling. Remaining risks are primarily
+balance- and content-volume related, not structural.
 
 ---
 
 ## 7) Recommended Follow-Up (Optional)
 
-If desired, track these as a small tech-debt list:
-1. Enforce `allowedOrderTypes` or remove the field.
-2. Remove or document legacy `ORDER_TEMPLATES`.
-3. Cap `storyLog` length or archive older entries.
-4. Consider batching save writes (e.g., debounce or save on key events).
-5. Add lockout reconciliation on load if lockoutActive is true.
-6. Optional: pause order spawning when board is near full.
+- Add telemetry schema and dashboards for order generation, dependency, and lockout paths.
+- Add a balance sheet doc for drop odds and reward curves.

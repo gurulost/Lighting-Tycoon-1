@@ -6,8 +6,8 @@
 - Fictional villain company: Crownlight Systems (persona: the Bulb Baron).
 - Rule: story is seasoning; 2–6 seconds per beat, always skippable, always logged.
 
-## Core Cast (MVP)
-- Player: new owner of the Glow Workshop.
+## Core Cast (Production)
+- Player: Tina, owner of the Glow Workshop.
 - Mentor: practical retired installer (voice of stability).
 - Bulb Baron: charming supplier mogul, speaks in "terms and conditions."
 - R&D Buddy: upbeat tinkerer who unlocks Freedom Controller.
