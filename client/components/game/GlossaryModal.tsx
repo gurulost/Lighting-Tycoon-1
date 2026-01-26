@@ -409,7 +409,12 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
                           reducedMotion={reducedMotion}
                         />
                       ) : item.image ? (
-                        <Image source={item.image} style={styles.imageIcon} contentFit="contain" />
+                        <Image
+                          source={item.image}
+                          style={styles.imageIcon}
+                          contentFit="contain"
+                          cachePolicy="memory-disk"
+                        />
                       ) : item.icon ? (
                         <LinearGradient
                           colors={[`${item.color ?? GameColors.ui.primary}30`, `${item.color ?? GameColors.ui.primary}10`]}

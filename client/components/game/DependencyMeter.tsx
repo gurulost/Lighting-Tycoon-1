@@ -211,7 +211,12 @@ export function DependencyMeter({ value, compact = false }: DependencyMeterProps
 
         {showExtras ? (
           <Animated.View style={[styles.baronContainer, baronStyle]}>
-            <Image source={baronPortrait} style={styles.baronIcon} contentFit="cover" />
+            <Image
+              source={baronPortrait}
+              style={styles.baronIcon}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
           </Animated.View>
         ) : null}
       </LinearGradient>

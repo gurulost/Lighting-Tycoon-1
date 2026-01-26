@@ -788,6 +788,7 @@ export function MergeBoard({
               source={stationWorkbench}
               style={[styles.stationIcon, { opacity: state.workbenchReady ? 1 : 0.5 }]}
               contentFit="contain"
+              cachePolicy="memory-disk"
             />
             {!state.workbenchReady ? (
               <View style={styles.cooldownBar}>
@@ -820,7 +821,12 @@ export function MergeBoard({
             colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
             style={styles.stationGradient}
           >
-            <Image source={stationInbox} style={styles.stationIcon} contentFit="contain" />
+            <Image
+              source={stationInbox}
+              style={styles.stationIcon}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
             {state.orders.length > 0 ? (
               <View style={styles.badge}>
                 <ThemedText style={styles.badgeText}>{state.orders.length}</ThemedText>
@@ -852,6 +858,7 @@ export function MergeBoard({
               source={stationRd}
               style={[styles.stationIcon, { opacity: rdUnlocked ? 1 : 0.4 }]}
               contentFit="contain"
+              cachePolicy="memory-disk"
             />
             {!rdUnlocked ? (
               <View style={styles.lockOverlay}>

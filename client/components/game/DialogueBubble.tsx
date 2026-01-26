@@ -204,7 +204,12 @@ export function DialogueBubble({
               ]}
             >
               {showPortrait ? (
-                <Image source={portraitSource} style={styles.portrait} contentFit="cover" />
+                <Image
+                  source={portraitSource}
+                  style={styles.portrait}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
               ) : (
                 <Feather name={SPEAKER_ICON[beat.speaker]} size={12} color={labelColor} />
               )}

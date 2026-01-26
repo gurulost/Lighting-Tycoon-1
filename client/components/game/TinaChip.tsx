@@ -34,7 +34,12 @@ export function TinaChip({
 
   return (
     <View style={[styles.container, style]}>
-      <Image source={source} style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]} contentFit="cover" />
+      <Image
+        source={source}
+        style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
       {showLabel ? (
         <ThemedText style={styles.label}>{label}</ThemedText>
       ) : null}

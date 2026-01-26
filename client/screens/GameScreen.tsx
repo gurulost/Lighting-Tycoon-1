@@ -33,6 +33,16 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.png");
+const tinaPortrait128 = require("../../assets/images/tina/tina-portrait-128.png");
+const tinaPortrait256 = require("../../assets/images/tina/tina-portrait-256.png");
+const tinaConfident128 = require("../../assets/images/tina/tina-confident-128.png");
+const tinaFocused128 = require("../../assets/images/tina/tina-focused-128.png");
+const tinaDelighted128 = require("../../assets/images/tina/tina-delighted-128.png");
+const tinaConcerned128 = require("../../assets/images/tina/tina-concerned-128.png");
+const mentorPortrait128 = require("../../assets/images/mentor/mentor-portrait-128.png");
+const mentorPortrait256 = require("../../assets/images/mentor/mentor-portrait-256.png");
+const baronPortrait128 = require("../../assets/images/baron/baron-portrait-128.png");
+const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.png");
 
 type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | "glossary" | null;
 
@@ -265,6 +275,22 @@ export default function GameScreen() {
     return () => {
       SoundManager.unload();
     };
+  }, []);
+
+  useEffect(() => {
+    const sources = [
+      tinaPortrait128,
+      tinaPortrait256,
+      tinaConfident128,
+      tinaFocused128,
+      tinaDelighted128,
+      tinaConcerned128,
+      mentorPortrait128,
+      mentorPortrait256,
+      baronPortrait128,
+      baronPortrait256,
+    ];
+    Promise.all(sources.map((source) => Image.loadAsync(source).catch(() => null)));
   }, []);
 
   useEffect(() => {

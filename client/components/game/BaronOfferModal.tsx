@@ -49,7 +49,14 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           variant="card"
           title="Bulb Baron Offer"
           subtitle='"Certified parts. Faster merges. Just a tiny signature."'
-          leading={<Image source={baronPortrait} style={styles.baronIcon} contentFit="cover" />}
+          leading={
+            <Image
+              source={baronPortrait}
+              style={styles.baronIcon}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          }
           headerRight={<TinaChip expression="confident" />}
         >
           <View style={styles.offerBox}>

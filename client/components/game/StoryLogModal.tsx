@@ -6,6 +6,7 @@ import { Feather } from "@expo/vector-icons";
 import { useGame } from "@/context/GameContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
+import { TinaChip } from "./TinaChip";
 import { STORY_BEATS } from "@/constants/story";
 import { DialogueBubble } from "./DialogueBubble";
 import { GameColors, Spacing } from "@/constants/theme";
@@ -25,6 +26,7 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
       subtitle="Revisit recent story beats"
       icon="book-open"
       iconColor={GameColors.text.primary}
+      headerRight={<TinaChip expression="portrait" />}
       onClose={onClose}
     >
       <ScrollView
