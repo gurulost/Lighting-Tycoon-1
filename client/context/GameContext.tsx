@@ -7,6 +7,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
+import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   GameState,
@@ -34,6 +35,7 @@ import {
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
 import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
 import { ORDER_LIBRARY, ARCHETYPES } from "@/constants/orderContentPack";
+import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 
 type GameAction =
   | { type: "SPAWN_PART" }
@@ -136,10 +138,16 @@ function queueStoryBeat(state: GameState, beatId: string): GameState {
   if (beat.onceOnly && state.storySeen[beatId]) return state;
   if (state.storyQueue.includes(beatId) || state.activeStoryBeatId === beatId) return state;
 
+  const nextStoryLog = [...state.storyLog, { id: beatId, timestamp: Date.now() }];
+  const trimmedStoryLog =
+    nextStoryLog.length > MAX_STORY_LOG_ENTRIES
+      ? nextStoryLog.slice(-MAX_STORY_LOG_ENTRIES)
+      : nextStoryLog;
+
   return {
     ...state,
     storyQueue: [...state.storyQueue, beatId],
-    storyLog: [...state.storyLog, { id: beatId, timestamp: Date.now() }],
+    storyLog: trimmedStoryLog,
     storySeen: { ...state.storySeen, [beatId]: true },
   };
 }
@@ -181,6 +189,11 @@ function getOrderIntervalMs(reputationTier: number) {
   const step = 900;
   return Math.max(2500, base - reputationTier * step);
 }
+
+const ORDER_SPAWN_YELLOW_MULT = 1.6;
+const MAX_STORY_LOG_ENTRIES = 300;
+const SAVE_DEBOUNCE_MS = 1200;
+const SAVE_MAX_WAIT_MS = 12000;
 
 function getNeighborhoodIndex(id: string) {
   const index = NEIGHBORHOODS.findIndex((n) => n.id === id);
@@ -594,6 +607,8 @@ function getInitialState(): GameState {
       generatedByNeighborhoodModifier: {},
       generatedByType: {},
     },
+    orderSpawnCooldownUntil: 0,
+    lastCriticalEventId: 0,
   };
 }
 
@@ -1227,6 +1242,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         highlightedOrderId: nextHighlightedOrderId,
         orderMetrics: nextOrderMetrics,
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
 
       if (dependencyStory) {
@@ -1358,6 +1374,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? true
             : state.baronOfferAvailable,
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       if (upgrade.effect === "unlock_rd") {
         nextState = queueStoryBeat(nextState, "rd_unlock");
@@ -1388,6 +1405,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         research: state.research - node.cost,
         rdNodes: { ...state.rdNodes, [node.id]: true },
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       if (node.id === "freedom_blueprint") {
         nextState = queueStoryBeat(nextState, "rd_blueprint");
@@ -1404,6 +1422,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         research: state.research - 100,
         freedomControllerCount: state.freedomControllerCount + 1,
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
     }
 
@@ -1422,6 +1441,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         freedomControllerCount: state.freedomControllerCount - 1,
         dependency: Math.max(0, state.dependency - 10),
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       nextState = queueStoryBeat(nextState, "freedom_first_use");
       return nextState;
@@ -1486,6 +1506,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? tutorialAdvance.tutorialNudgeCount
           : state.tutorialNudgeCount,
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       nextState = queueStoryBeat(nextState, "baron_offer");
       if (state.tutorialComplete) {
@@ -1535,6 +1556,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? tutorialAdvance.tutorialNudgeCount
           : state.tutorialNudgeCount,
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       nextState = queueStoryBeat(nextState, "baron_offer");
       if (state.tutorialComplete) {
@@ -1588,6 +1610,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
+      const now = Date.now();
+      if (state.orderSpawnCooldownUntil && now < state.orderSpawnCooldownUntil) {
+        return state;
+      }
+      const freeSlots = countFreeSlots(state);
+      const pressureBand = getBoardPressureBand(freeSlots);
+      if (pressureBand === "red") return state;
+      const cooldownMultiplier = pressureBand === "yellow" ? ORDER_SPAWN_YELLOW_MULT : 1;
+
       const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
       const newOrder = generateOrder(
         state.dependency,
@@ -1601,6 +1632,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         orders: [...state.orders, newOrder],
         orderMetrics: updateOrderMetrics(state, newOrder),
+        orderSpawnCooldownUntil:
+          now + Math.round(getOrderIntervalMs(state.reputationTier) * cooldownMultiplier),
       };
     }
 
@@ -1668,6 +1701,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orders: nextOrders,
         orderMetrics: nextOrderMetrics,
         undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
     }
 
@@ -1700,6 +1734,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferAvailable: false,
         baronOfferSeen: false,
         baronOfferCooldownUntil: 0,
+        orderSpawnCooldownUntil: 0,
       };
     }
 
@@ -1809,6 +1844,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lockoutChoice: "baron",
         lockoutLabOrdersRemaining: 0,
         dependency: Math.min(100, state.dependency + 5),
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       return queueStoryBeat(nextState, "lockout_choice_baron");
     }
@@ -1826,6 +1862,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lockoutChoice: "lab",
         lockoutLabOrdersRemaining: LOCKOUT_LAB_REQUESTS,
         lockoutOrderId: lockoutOrder.id,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       if ((state.upgrades["rd_unlock"] || 0) < 1) {
         nextState = {
@@ -1895,6 +1932,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lockoutChoice: undefined,
           orders: state.orders.filter((o) => !o.isLockout),
           undoSnapshot: undefined,
+          lastCriticalEventId: state.lastCriticalEventId + 1,
         };
       } else {
         const nextState = queueStoryBeat(state, "freedom_first_use");
@@ -1909,6 +1947,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lockoutChoice: undefined,
           orders: state.orders.filter((o) => !o.isLockout),
           undoSnapshot: undefined,
+          lastCriticalEventId: state.lastCriticalEventId + 1,
         };
       }
     }
@@ -1954,6 +1993,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.firstSessionSecondOfferTriggered === "boolean"
           ? action.state.firstSessionSecondOfferTriggered
           : base.firstSessionSecondOfferTriggered;
+      const orderSpawnCooldownUntil =
+        typeof action.state.orderSpawnCooldownUntil === "number"
+          ? action.state.orderSpawnCooldownUntil
+          : 0;
+      const lastCriticalEventId =
+        typeof action.state.lastCriticalEventId === "number"
+          ? action.state.lastCriticalEventId
+          : 0;
       let restoredState: GameState = {
         ...base,
         ...action.state,
@@ -1978,6 +2025,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : base.firstSessionOrdersCompleted,
         firstSessionForcedDrops,
         firstSessionSecondOfferTriggered,
+        orderSpawnCooldownUntil,
         tutorialMergeCount:
           typeof action.state.tutorialMergeCount === "number"
             ? action.state.tutorialMergeCount
@@ -2002,6 +2050,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           typeof action.state.reputationTier === "number"
             ? action.state.reputationTier
             : NEIGHBORHOODS.findIndex((n) => n.id === computedNeighborhood.id),
+        lastCriticalEventId,
       };
 
       if (restoredState.lockoutActive) {
@@ -2085,6 +2134,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const orderRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaveAtRef = useRef(0);
+  const lastCriticalEventRef = useRef(state.lastCriticalEventId);
   const [hydrated, setHydrated] = React.useState(false);
 
   useEffect(() => {
@@ -2129,6 +2181,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       activeStoryBeatId: undefined,
       lastRecycleRewardId: 0,
       lastRecycleReward: null,
+      orderSpawnCooldownUntil: 0,
+      lastCriticalEventId: 0,
     }),
     [
       state.board,
@@ -2184,21 +2238,68 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.currentNeighborhoodId,
       state.orderMetrics,
       state.highlightedOrderId,
+      state.orderSpawnCooldownUntil,
+      state.lastCriticalEventId,
     ]
   );
 
+  const flushSave = useCallback(async () => {
+    if (!hydrated) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    try {
+      const payload = JSON.stringify({ version: 1, state: persistableState });
+      await AsyncStorage.setItem(STORAGE_KEY, payload);
+      lastSaveAtRef.current = Date.now();
+    } catch (error) {
+      console.warn("Failed to save game state", error);
+    }
+  }, [hydrated, persistableState]);
+
   useEffect(() => {
     if (!hydrated) return;
-    const saveState = async () => {
-      try {
-        const payload = JSON.stringify({ version: 1, state: persistableState });
-        await AsyncStorage.setItem(STORAGE_KEY, payload);
-      } catch (error) {
-        console.warn("Failed to save game state", error);
+    const now = Date.now();
+    const elapsed = now - lastSaveAtRef.current;
+    if (elapsed >= SAVE_MAX_WAIT_MS) {
+      flushSave();
+      return;
+    }
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      flushSave();
+    }, SAVE_DEBOUNCE_MS);
+  }, [hydrated, persistableState, flushSave]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (state.lastCriticalEventId !== lastCriticalEventRef.current) {
+      lastCriticalEventRef.current = state.lastCriticalEventId;
+      flushSave();
+    }
+  }, [hydrated, state.lastCriticalEventId, flushSave]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") {
+        flushSave();
+      }
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [flushSave]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
     };
-    saveState();
-  }, [hydrated, persistableState]);
+  }, []);
 
   useEffect(() => {
     const intervalMs = getOrderIntervalMs(state.reputationTier);

@@ -44,3 +44,25 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - A lockout order is re-inserted (locked-required order appears).
   - If lab choice is active with remaining lab orders, a lab request is added.
   - Orders list is capped to maxOrders with lockout/lab orders preserved.
+
+## Order Spawn Pressure Gating
+- Fill the board until only 0–1 free slots remain (Red band).
+- Wait for multiple order spawn intervals.
+- Verify:
+  - Orders do not spawn while board is in Red band.
+  - Orders resume spawning once board frees up.
+  - Orders button shows the pause indicator while Red band is active.
+
+## Story Log Cap
+- Trigger a high volume of story beats (300+).
+- Verify:
+  - Story log length never exceeds cap.
+  - Most recent beats remain visible and older entries roll off.
+
+## Save Debounce / Critical Flush
+- Perform rapid merges for 10–15 seconds.
+- Verify:
+  - Saves do not trigger on every action (check storage write frequency).
+- Complete an order or purchase an upgrade.
+- Verify:
+  - Save occurs immediately after the critical action.

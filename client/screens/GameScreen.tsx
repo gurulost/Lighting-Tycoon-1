@@ -29,6 +29,7 @@ import { StoryToast } from "@/components/game/StoryToast";
 import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
+import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 
@@ -74,6 +75,7 @@ interface BottomButtonProps {
   color: string;
   onPress: () => void;
   badge?: number;
+  paused?: boolean;
   disabled?: boolean;
   onDisabledPress?: () => void;
   onLayout?: (event: any) => void;
@@ -85,6 +87,7 @@ function BottomButton({
   color,
   onPress,
   badge,
+  paused = false,
   disabled,
   onDisabledPress,
   onLayout,
@@ -143,6 +146,11 @@ function BottomButton({
             <ThemedText style={styles.badgeText}>{badge}</ThemedText>
           </View>
         ) : null}
+        {paused ? (
+          <View style={styles.pauseBadge}>
+            <Feather name="pause" size={10} color="#1A1A2E" />
+          </View>
+        ) : null}
       </Animated.View>
       <ThemedText
         style={[styles.buttonLabel, { color: disabled ? GameColors.text.disabled : color }]}
@@ -180,6 +188,13 @@ export default function GameScreen() {
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
+  const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
+  const orderSpawnPaused =
+    state.tutorialComplete &&
+    state.firstSessionComplete &&
+    !state.lockoutActive &&
+    state.orders.length < state.maxOrders &&
+    boardPressureBand === "red";
 
   const closeModal = () => setActiveModal(null);
   const setTarget =
@@ -626,6 +641,7 @@ export default function GameScreen() {
           showToast("Finish the tutorial to unlock Orders.", 2200)
         }
         badge={state.orders.length}
+        paused={orderSpawnPaused}
         disabled={!state.tutorialComplete && state.tutorialStep < 3}
         onLayout={setTarget("orders")}
       />
@@ -900,6 +916,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#FFF",
+  },
+  pauseBadge: {
+    position: "absolute",
+    left: -4,
+    bottom: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: GameColors.ui.warning,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#1A1A2E",
   },
   freedomIndicator: {
     flexDirection: "row",

@@ -181,6 +181,10 @@ export interface GameState {
     generatedByNeighborhoodModifier: Record<string, number>;
     generatedByType: Partial<Record<OrderType, number>>;
   };
+
+  orderSpawnCooldownUntil: number;
+
+  lastCriticalEventId: number;
 }
 
 export const INITIAL_BOARD_SIZE = 30;
