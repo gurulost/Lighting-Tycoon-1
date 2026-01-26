@@ -9,6 +9,7 @@ import { useGame } from "@/context/GameContext";
 
 interface SettingsModalProps {
   onClose: () => void;
+  onOpenGlossary?: () => void;
 }
 
 interface SettingRowProps {
@@ -44,7 +45,7 @@ function SettingRow({ icon, label, description, value, onValueChange, color }: S
   );
 }
 
-export function SettingsModal({ onClose }: SettingsModalProps) {
+export function SettingsModal({ onClose, onOpenGlossary }: SettingsModalProps) {
   const { state, dispatch } = useGame();
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
 
@@ -126,6 +127,27 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 <ThemedText style={styles.settingLabel}>Replay Tutorial</ThemedText>
                 <ThemedText style={styles.settingDescription}>
                   Restart the guided onboarding steps
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionRow}
+              onPress={() => {
+                onOpenGlossary?.();
+                onClose();
+              }}
+            >
+              <LinearGradient
+                colors={[`${GameColors.ui.primary}30`, `${GameColors.ui.primary}10`]}
+                style={styles.settingIcon}
+              >
+                <Feather name="help-circle" size={20} color={GameColors.ui.primary} />
+              </LinearGradient>
+              <View style={styles.settingContent}>
+                <ThemedText style={styles.settingLabel}>Glossary</ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  Icons, badges, and systems explained
                 </ThemedText>
               </View>
             </Pressable>

@@ -24,6 +24,7 @@ import { SettingsModal } from "@/components/game/SettingsModal";
 import { BaronOfferModal } from "@/components/game/BaronOfferModal";
 import { PartDetailModal } from "@/components/game/PartDetailModal";
 import { StoryLogModal } from "@/components/game/StoryLogModal";
+import { GlossaryModal } from "@/components/game/GlossaryModal";
 import { StoryToast } from "@/components/game/StoryToast";
 import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
@@ -32,7 +33,7 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.png");
 
-type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | null;
+type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | "glossary" | null;
 
 type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency";
 
@@ -179,14 +180,14 @@ export default function GameScreen() {
 
     setTutorialTargets(nextTargets);
   }, [relativeTargets, topBarLayout, bottomBarLayout]);
-  const showToast = useCallback((message: string) => {
+  const showToast = useCallback((message: string, durationMs = 1800) => {
     setToastMessage(message);
     if (toastTimeout.current) {
       clearTimeout(toastTimeout.current);
     }
     toastTimeout.current = setTimeout(() => {
       setToastMessage(null);
-    }, 1800);
+    }, durationMs);
   }, []);
   const selectedPart =
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
@@ -319,6 +320,15 @@ export default function GameScreen() {
                 ? undefined
                 : () => setActiveModal("upgrades")
             }
+            onCashLongPress={() =>
+              showToast("Cash buys upgrades and expansions.", 2400)
+            }
+            onReputationLongPress={() =>
+              showToast("Reputation unlocks neighborhoods and better orders.", 2600)
+            }
+            onResearchLongPress={() =>
+              showToast("Research unlocks R&D and the Freedom Controller.", 2600)
+            }
           />
         </View>
         <View style={styles.topActions}>
@@ -331,6 +341,17 @@ export default function GameScreen() {
               style={styles.settingsGradient}
             >
               <Feather name="book-open" size={20} color={GameColors.text.secondary} />
+            </LinearGradient>
+          </Pressable>
+          <Pressable
+            style={styles.settingsButton}
+            onPress={() => setActiveModal("glossary")}
+          >
+            <LinearGradient
+              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+              style={styles.settingsGradient}
+            >
+              <Feather name="help-circle" size={20} color={GameColors.text.secondary} />
             </LinearGradient>
           </Pressable>
           <Pressable
@@ -348,9 +369,16 @@ export default function GameScreen() {
         </View>
       </View>
 
-      <View onLayout={setTarget("dependency")}>
-        <DependencyMeter value={state.dependency} />
-      </View>
+      <Pressable
+        onLongPress={() =>
+          showToast("Dependency rises with locked parts. Higher levels add certified orders.", 2800)
+        }
+        delayLongPress={350}
+      >
+        <View onLayout={setTarget("dependency")}>
+          <DependencyMeter value={state.dependency} />
+        </View>
+      </Pressable>
 
       <NeighborhoodBadge
         reputation={state.reputation}
@@ -377,6 +405,22 @@ export default function GameScreen() {
           }}
           onOrderInboxPress={() => setActiveModal("orders")}
           onRDBenchPress={() => setActiveModal("rd")}
+          onStationLongPress={(station) => {
+            if (station === "workbench") {
+              showToast("Workbench: tap to spawn parts. Cooldown improves with upgrades.", 2600);
+            } else if (station === "orders") {
+              showToast("Orders: fulfill installs for cash, reputation, and research.", 2600);
+            } else {
+              showToast("R&D: spend research to unlock Freedom Controller tech.", 2600);
+            }
+          }}
+          onUtilityLongPress={(utility) => {
+            if (utility === "backpack") {
+              showToast("Backpack: temporary storage. Drag items in and out.", 2400);
+            } else {
+              showToast("Recycle: delete a part for a small refund.", 2400);
+            }
+          }}
           onPartLongPress={(index) => setSelectedPartIndex(index)}
           tutorialFocus={
             !state.tutorialComplete && state.tutorialStep === 0
@@ -506,7 +550,10 @@ export default function GameScreen() {
         transparent
         onRequestClose={closeModal}
       >
-        <SettingsModal onClose={closeModal} />
+        <SettingsModal
+          onClose={closeModal}
+          onOpenGlossary={() => setActiveModal("glossary")}
+        />
       </Modal>
 
       <Modal
@@ -516,6 +563,15 @@ export default function GameScreen() {
         onRequestClose={closeModal}
       >
         <StoryLogModal onClose={closeModal} />
+      </Modal>
+
+      <Modal
+        visible={activeModal === "glossary"}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeModal}
+      >
+        <GlossaryModal onClose={closeModal} />
       </Modal>
 
       <Modal visible={state.baronOfferAvailable} animationType="fade" transparent>

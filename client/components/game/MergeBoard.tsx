@@ -54,6 +54,8 @@ interface MergeBoardProps {
   onWorkbenchPress: (result: "spawned" | "blocked" | "cooldown") => void;
   onOrderInboxPress: () => void;
   onRDBenchPress: () => void;
+  onStationLongPress?: (station: "workbench" | "orders" | "rd") => void;
+  onUtilityLongPress?: (utility: "backpack" | "recycle") => void;
   onPartLongPress?: (index: number) => void;
   tutorialFocus?: "workbench" | "orders" | "rd" | null;
 }
@@ -63,6 +65,7 @@ function AnimatedStation({
   isActive,
   forcePulse = false,
   onPress,
+  onLongPress,
   tileSize,
   accentColor,
 }: {
@@ -70,6 +73,7 @@ function AnimatedStation({
   isActive: boolean;
   forcePulse?: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
   tileSize: number;
   accentColor: string;
 }) {
@@ -96,7 +100,7 @@ function AnimatedStation({
   });
 
   return (
-    <Pressable onPress={onPress}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
       <Animated.View
         style={[
           styles.stationTile,
@@ -119,6 +123,8 @@ export function MergeBoard({
   onWorkbenchPress,
   onOrderInboxPress,
   onRDBenchPress,
+  onStationLongPress,
+  onUtilityLongPress,
   onPartLongPress,
   tutorialFocus,
 }: MergeBoardProps) {
@@ -712,6 +718,7 @@ export function MergeBoard({
               onWorkbenchPress("cooldown");
             }
           }}
+          onLongPress={() => onStationLongPress?.("workbench")}
           tileSize={tileSize}
           accentColor={GameColors.ui.primary}
         >
@@ -746,6 +753,7 @@ export function MergeBoard({
           isActive={state.orders.length > 0}
           forcePulse={tutorialFocus === "orders"}
           onPress={onOrderInboxPress}
+          onLongPress={() => onStationLongPress?.("orders")}
           tileSize={tileSize}
           accentColor={GameColors.currency.reputation}
         >
@@ -772,6 +780,7 @@ export function MergeBoard({
           isActive={rdUnlocked && state.research > 0}
           forcePulse={tutorialFocus === "rd"}
           onPress={rdUnlocked ? onRDBenchPress : () => {}}
+          onLongPress={() => onStationLongPress?.("rd")}
           tileSize={tileSize}
           accentColor={GameColors.currency.research}
         >
@@ -874,27 +883,32 @@ export function MergeBoard({
       </LinearGradient>
       <View style={[styles.utilityRow, { width: gridWidth }]}>
         <View style={styles.backpackSection}>
-          <View style={styles.backpackHeader}>
-            <Feather
-              name="archive"
-              size={14}
-              color={state.backpackUnlocked ? GameColors.ui.primary : GameColors.text.disabled}
-            />
-            <ThemedText
-              style={[
-                styles.backpackTitle,
-                { color: state.backpackUnlocked ? GameColors.text.primary : GameColors.text.disabled },
-              ]}
-            >
-              Backpack
-            </ThemedText>
-            {!state.backpackUnlocked ? (
-              <View style={styles.backpackLockedTag}>
-                <Feather name="lock" size={10} color={GameColors.text.secondary} />
-                <ThemedText style={styles.backpackLockedText}>Unlock after upgrade</ThemedText>
-              </View>
-            ) : null}
-          </View>
+          <Pressable
+            onLongPress={() => onUtilityLongPress?.("backpack")}
+            delayLongPress={350}
+          >
+            <View style={styles.backpackHeader}>
+              <Feather
+                name="archive"
+                size={14}
+                color={state.backpackUnlocked ? GameColors.ui.primary : GameColors.text.disabled}
+              />
+              <ThemedText
+                style={[
+                  styles.backpackTitle,
+                  { color: state.backpackUnlocked ? GameColors.text.primary : GameColors.text.disabled },
+                ]}
+              >
+                Backpack
+              </ThemedText>
+              {!state.backpackUnlocked ? (
+                <View style={styles.backpackLockedTag}>
+                  <Feather name="lock" size={10} color={GameColors.text.secondary} />
+                  <ThemedText style={styles.backpackLockedText}>Unlock after upgrade</ThemedText>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
           <Animated.View
             ref={backpackRef}
             onLayout={measureBackpack}
@@ -972,7 +986,12 @@ export function MergeBoard({
           </Animated.View>
         </View>
         <View style={styles.recycleSection}>
-          <ThemedText style={styles.recycleLabel}>Recycle</ThemedText>
+          <Pressable
+            onLongPress={() => onUtilityLongPress?.("recycle")}
+            delayLongPress={350}
+          >
+            <ThemedText style={styles.recycleLabel}>Recycle</ThemedText>
+          </Pressable>
           <Animated.View
             ref={recycleRef}
             onLayout={measureRecycle}

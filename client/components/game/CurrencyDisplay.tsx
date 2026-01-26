@@ -20,6 +20,9 @@ interface CurrencyDisplayProps {
   reputation: number;
   research: number;
   onCashPress?: () => void;
+  onCashLongPress?: () => void;
+  onReputationLongPress?: () => void;
+  onResearchLongPress?: () => void;
 }
 
 function formatNumber(num: number): string {
@@ -37,9 +40,10 @@ interface CurrencyItemProps {
   value: number;
   color: string;
   onPress?: () => void;
+  onLongPress?: () => void;
 }
 
-function CurrencyItem({ icon, value, color, onPress }: CurrencyItemProps) {
+function CurrencyItem({ icon, value, color, onPress, onLongPress }: CurrencyItemProps) {
   const scale = useSharedValue(1);
   const prevValue = useSharedValue(value);
   const glowOpacity = useSharedValue(0);
@@ -67,7 +71,7 @@ function CurrencyItem({ icon, value, color, onPress }: CurrencyItemProps) {
   }));
 
   return (
-    <Pressable onPress={onPress}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={300}>
       <Animated.View style={[styles.currencyItem, animatedStyle]}>
         <Animated.View
           style={[styles.glowEffect, { backgroundColor: color }, glowStyle]}
@@ -93,6 +97,9 @@ export function CurrencyDisplay({
   reputation,
   research,
   onCashPress,
+  onCashLongPress,
+  onReputationLongPress,
+  onResearchLongPress,
 }: CurrencyDisplayProps) {
   return (
     <LinearGradient
@@ -106,6 +113,7 @@ export function CurrencyDisplay({
         value={cash}
         color={GameColors.currency.cash}
         onPress={onCashPress}
+        onLongPress={onCashLongPress}
       />
 
       <View style={styles.divider} />
@@ -114,6 +122,7 @@ export function CurrencyDisplay({
         icon="star"
         value={reputation}
         color={GameColors.currency.reputation}
+        onLongPress={onReputationLongPress}
       />
 
       <View style={styles.divider} />
@@ -122,6 +131,7 @@ export function CurrencyDisplay({
         icon="zap"
         value={research}
         color={GameColors.currency.research}
+        onLongPress={onResearchLongPress}
       />
     </LinearGradient>
   );
