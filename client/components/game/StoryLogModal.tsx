@@ -7,7 +7,8 @@ import { useGame } from "@/context/GameContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { STORY_BEATS } from "@/constants/story";
-import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { DialogueBubble } from "./DialogueBubble";
+import { GameColors, Spacing } from "@/constants/theme";
 
 interface StoryLogModalProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ interface StoryLogModalProps {
 export function StoryLogModal({ onClose }: StoryLogModalProps) {
   const { state } = useGame();
   const insets = useSafeAreaInsets();
+  const entries = state.storyLog.slice().reverse();
 
   return (
     <ModalShell
@@ -32,30 +34,23 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {state.storyLog.length === 0 ? (
+        {entries.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather name="message-circle" size={32} color={GameColors.text.disabled} />
             <ThemedText style={styles.emptyText}>No story beats yet.</ThemedText>
           </View>
         ) : (
-          state.storyLog
-            .slice()
-            .reverse()
-            .map((entry, index) => {
-              const beat = STORY_BEATS[entry.id];
-              if (!beat) return null;
-              return (
-                <View key={`${entry.id}-${index}`} style={styles.logItem}>
-                  <ThemedText style={styles.logSpeaker}>
-                    {beat.speaker.toUpperCase()}
-                  </ThemedText>
-                  <ThemedText style={styles.logLine}>{beat.line1}</ThemedText>
-                  {beat.line2 ? (
-                    <ThemedText style={styles.logLineSecondary}>{beat.line2}</ThemedText>
-                  ) : null}
-                </View>
-              );
-            })
+          entries.map((entry, index) => {
+            const beat = STORY_BEATS[entry.id];
+            if (!beat) return null;
+            const isLast = index === entries.length - 1;
+            return (
+              <View key={`${entry.id}-${index}`} style={styles.logEntry}>
+                <DialogueBubble beat={beat} expanded showTag />
+                {!isLast ? <View style={styles.panelDivider} /> : null}
+              </View>
+            );
+          })
         )}
       </ScrollView>
     </ModalShell>
@@ -76,28 +71,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: GameColors.text.secondary,
   },
-  logItem: {
-    backgroundColor: GameColors.ui.surface,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
+  logEntry: {
+    gap: Spacing.sm,
   },
-  logSpeaker: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: GameColors.text.secondary,
-    letterSpacing: 0.6,
-    marginBottom: 4,
-  },
-  logLine: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: GameColors.text.primary,
-  },
-  logLineSecondary: {
-    fontSize: 12,
-    color: GameColors.text.secondary,
-    marginTop: 2,
+  panelDivider: {
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: "#2A2A4A",
+    opacity: 0.35,
   },
 });

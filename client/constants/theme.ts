@@ -98,6 +98,62 @@ export const BorderRadius = {
   full: 9999,
 };
 
+export const DialogueTokens = {
+  ink: "#1C1C2B",
+  inkMuted: "#4B4B66",
+  speech: {
+    background: "#FFF4E2",
+    gradient: ["#FFFDF7", "#FFF4E2", "#FFEFD7"] as const,
+    border: "#232339",
+    borderWidth: 2,
+    innerBorder: "#FFFFFF",
+    shadowColor: "rgba(0,0,0,0.28)",
+    shadowOpacity: 0.6,
+    elevation: 4,
+  },
+  caption: {
+    background: "#EAF2FF",
+    gradient: ["#F7FBFF", "#EAF2FF", "#E3EDFF"] as const,
+    border: "#232339",
+    borderWidth: 2,
+    innerBorder: "#FFFFFF",
+    shadowColor: "rgba(0,0,0,0.24)",
+    shadowOpacity: 0.55,
+    elevation: 3,
+  },
+  legal: {
+    background: "#F8F9FC",
+    gradient: ["#FFFFFF", "#F8F9FC", "#FFFFFF"] as const,
+    border: "#C9CAD6",
+    borderWidth: 1.5,
+    innerBorder: "#FFFFFF",
+    shadowColor: "rgba(0,0,0,0.18)",
+    shadowOpacity: 0.45,
+    elevation: 2,
+  },
+  chipBackground: "#FFFFFF",
+  legalChipBackground: "#F1F3F9",
+  tagBackground: "#FFFFFF",
+  tagBorder: "#2B2B40",
+  tagText: "#2B2B40",
+  legalTagBackground: "#EEF0F6",
+  legalTagBorder: "#C9CAD6",
+  legalTagText: "#5B5B72",
+};
+
+export const DialogueTypography = {
+  line1: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700" as const,
+  },
+  line2: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600" as const,
+  },
+};
+
 export const ModalTokens = {
   gradient: ["#0A0A14", "#0F0F1F", "#0A0A14"] as const,
   border: "#2A2A4A",
@@ -191,9 +247,9 @@ export const Fonts = Platform.select({
     mono: "ui-monospace",
   },
   default: {
-    sans: "normal",
+    sans: "sans-serif",
     serif: "serif",
-    rounded: "normal",
+    rounded: "sans-serif-medium",
     mono: "monospace",
   },
   web: {
