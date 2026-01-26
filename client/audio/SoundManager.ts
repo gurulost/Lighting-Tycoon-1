@@ -11,8 +11,12 @@ type SoundInstance = {
 class SoundManager {
   private static initialized = false;
   private static enabled = true;
+  private static masterVolume = 1;
   private static sounds = new Map<SfxId, SoundInstance>();
   private static lastPlayedAt = new Map<SfxId, number>();
+  private static recentPlays: number[] = [];
+  private static maxPlaysInWindow = 6;
+  private static windowMs = 220;
 
   static async init() {
     if (this.initialized) return;
@@ -33,6 +37,19 @@ class SoundManager {
 
   static setEnabled(enabled: boolean) {
     this.enabled = enabled;
+    if (!enabled) {
+      this.sounds.forEach(async ({ sound }) => {
+        try {
+          await sound.stopAsync();
+        } catch {
+          return;
+        }
+      });
+    }
+  }
+
+  static setMasterVolume(volume: number) {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
   }
 
   static async preload() {
@@ -63,6 +80,9 @@ class SoundManager {
     }
     if (!this.enabled) return;
     const now = Date.now();
+    this.recentPlays = this.recentPlays.filter((t) => now - t < this.windowMs);
+    if (this.recentPlays.length >= this.maxPlaysInWindow) return;
+    this.recentPlays.push(now);
     const lastPlayed = this.lastPlayedAt.get(id) ?? 0;
     const cooldownMs = SFX[id]?.cooldownMs ?? 80;
     if (now - lastPlayed < cooldownMs) return;
@@ -87,8 +107,16 @@ class SoundManager {
 
     const instance = this.sounds.get(id);
     if (!instance) return;
+    const config = SFX[id];
     try {
-      await instance.sound.setVolumeAsync(instance.volume);
+      const rateRange = config.rateRange;
+      const rate =
+        rateRange && rateRange.length === 2
+          ? Math.random() * (rateRange[1] - rateRange[0]) + rateRange[0]
+          : 1;
+      const volume = instance.volume * this.masterVolume;
+      await instance.sound.setRateAsync(rate, true);
+      await instance.sound.setVolumeAsync(volume);
       await instance.sound.replayAsync();
     } catch (error) {
       console.warn(`Failed to play sound ${id}`, error);
