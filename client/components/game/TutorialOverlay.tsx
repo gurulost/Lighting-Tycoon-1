@@ -384,7 +384,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
                 <Feather name="chevron-down" size={18} color={GameColors.text.secondary} />
                 <ThemedText style={styles.waitingText}>Complete the step to continue</ThemedText>
               </View>
-            )}
+            ) : null}
           </LinearGradient>
         </Animated.View>
       </View>
