@@ -188,6 +188,7 @@ export default function GameScreen() {
   const storyCollapseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draggingRef = useRef(false);
   const tutorialStepRef = useRef(state.tutorialStep);
+  const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
@@ -401,27 +402,35 @@ export default function GameScreen() {
   }, [state.lastRecycleRewardId, state.lastRecycleReward, showToast, dispatch]);
 
   useEffect(() => {
+    const hadSpaceUpgrade = spaceUpgradeRef.current;
+    const hasSpaceUpgrade = (state.upgrades["space_1"] || 0) > 0;
     if (state.tutorialComplete) {
       tutorialStepRef.current = state.tutorialStep;
+      spaceUpgradeRef.current = hasSpaceUpgrade;
       return;
     }
     if (state.tutorialStep !== tutorialStepRef.current) {
       const nextStep = state.tutorialStep;
-      const toastMap: Record<number, string> = {
-        1: "Nice! Parts on the board.",
-        2: "Great merge!",
-        3: "Segment built.",
-        4: "Order complete.",
-        5: "Space upgraded.",
-        6: "Choice made.",
-      };
-      const message = toastMap[nextStep];
-      if (message) {
-        showToast(message);
+      if (nextStep === 5 && hadSpaceUpgrade) {
+        showToast("Space already unlocked — moving on.");
+      } else {
+        const toastMap: Record<number, string> = {
+          1: "Nice! Parts on the board.",
+          2: "Great merge!",
+          3: "Segment built.",
+          4: "Order complete.",
+          5: "Space upgraded.",
+          6: "Choice made.",
+        };
+        const message = toastMap[nextStep];
+        if (message) {
+          showToast(message);
+        }
       }
       tutorialStepRef.current = nextStep;
     }
-  }, [state.tutorialStep, state.tutorialComplete, showToast]);
+    spaceUpgradeRef.current = hasSpaceUpgrade;
+  }, [state.tutorialStep, state.tutorialComplete, state.upgrades, showToast]);
 
   useEffect(() => {
     if (!state.activeStoryBeatId && state.storyQueue.length > 0) {
