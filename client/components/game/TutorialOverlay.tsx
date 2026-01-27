@@ -14,13 +14,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Rect, Defs, Mask } from "react-native-svg";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const DIM_COLOR = "rgba(10, 10, 20, 0.45)";
 
 type HighlightTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
 
@@ -154,7 +154,6 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
 
   const highlightRect =
     currentStep?.highlight && targets ? targets[currentStep.highlight] : undefined;
-  const maskId = `tutorialMask-${currentStep.id}`;
   const holePadding = 10;
   const holeRect = highlightRect
     ? (() => {
@@ -171,6 +170,24 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         return { x, y, width, height, rx: BorderRadius.lg };
       })()
     : null;
+  const dimPanels = holeRect
+    ? (() => {
+        const holeRight = holeRect.x + holeRect.width;
+        const holeBottom = holeRect.y + holeRect.height;
+        const topHeight = Math.max(0, holeRect.y);
+        const bottomTop = Math.min(SCREEN_HEIGHT, holeBottom);
+        const bottomHeight = Math.max(0, SCREEN_HEIGHT - bottomTop);
+        const leftWidth = Math.max(0, holeRect.x);
+        const rightLeft = Math.min(SCREEN_WIDTH, holeRight);
+        const rightWidth = Math.max(0, SCREEN_WIDTH - rightLeft);
+        return [
+          { top: 0, left: 0, right: 0, height: topHeight },
+          { top: bottomTop, left: 0, right: 0, height: bottomHeight },
+          { top: holeRect.y, left: 0, width: leftWidth, height: holeRect.height },
+          { top: holeRect.y, left: rightLeft, width: rightWidth, height: holeRect.height },
+        ];
+      })()
+    : [{ top: 0, left: 0, right: 0, bottom: 0 }];
 
   const topSafe = insets.top + Spacing.md;
   const bottomSafe = insets.bottom + safeBottom + Spacing.md;
@@ -204,37 +221,9 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
       style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
     >
       <View pointerEvents="none" style={styles.backdropLayer}>
-        <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={styles.backdropSvg}>
-          <Defs>
-            <Mask id={maskId}>
-              <Rect
-                width={SCREEN_WIDTH}
-                height={SCREEN_HEIGHT}
-                fill="white"
-                pointerEvents="none"
-              />
-              {holeRect ? (
-                <Rect
-                  x={holeRect.x}
-                  y={holeRect.y}
-                  width={holeRect.width}
-                  height={holeRect.height}
-                  rx={holeRect.rx}
-                  ry={holeRect.rx}
-                  fill="black"
-                  pointerEvents="none"
-                />
-              ) : null}
-            </Mask>
-          </Defs>
-          <Rect
-            width={SCREEN_WIDTH}
-            height={SCREEN_HEIGHT}
-            fill="rgba(10, 10, 20, 0.45)"
-            mask={`url(#${maskId})`}
-            pointerEvents="none"
-          />
-        </Svg>
+        {dimPanels.map((panel, index) => (
+          <View key={`dim-${index}`} style={[styles.dimPanel, panel]} />
+        ))}
       </View>
 
       <Pressable
@@ -417,10 +406,9 @@ const styles = StyleSheet.create({
   backdropLayer: {
     ...StyleSheet.absoluteFillObject,
   },
-  backdropSvg: {
+  dimPanel: {
     position: "absolute",
-    top: 0,
-    left: 0,
+    backgroundColor: DIM_COLOR,
   },
   skipButton: {
     position: "absolute",
