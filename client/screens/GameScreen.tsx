@@ -60,7 +60,7 @@ const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.w
 
 type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | "glossary" | null;
 
-type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency";
+type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
 
 interface LayoutRect {
   x: number;
@@ -173,6 +173,9 @@ export default function GameScreen() {
   const [tutorialTargets, setTutorialTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
+  const [absoluteTargets, setAbsoluteTargets] = useState<
+    Partial<Record<TutorialTarget, LayoutRect>>
+  >({});
   const [relativeTargets, setRelativeTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
@@ -206,6 +209,30 @@ export default function GameScreen() {
         [key]: { x, y, width, height },
       }));
     };
+  const handleStationLayout = useCallback(
+    (stations: Partial<Record<"workbench", LayoutRect>>) => {
+      setAbsoluteTargets((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(stations).forEach(([key, rect]) => {
+          if (!rect) return;
+          const prevRect = prev[key as TutorialTarget];
+          if (
+            !prevRect ||
+            prevRect.x !== rect.x ||
+            prevRect.y !== rect.y ||
+            prevRect.width !== rect.width ||
+            prevRect.height !== rect.height
+          ) {
+            next[key as TutorialTarget] = rect;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     const nextTargets: Partial<Record<TutorialTarget, LayoutRect>> = {};
@@ -232,8 +259,8 @@ export default function GameScreen() {
       nextTargets.upgrades = applyOffset(relativeTargets.upgrades, bottomBarLayout);
     }
 
-    setTutorialTargets(nextTargets);
-  }, [relativeTargets, topBarLayout, bottomBarLayout]);
+    setTutorialTargets({ ...nextTargets, ...absoluteTargets });
+  }, [relativeTargets, topBarLayout, bottomBarLayout, absoluteTargets]);
   const showToast = useCallback((message: string, durationMs = 1800) => {
     setToastMessage(message);
     if (toastTimeout.current) {
@@ -617,6 +644,7 @@ export default function GameScreen() {
           }}
           onDragStateChange={setIsDragging}
           onPartLongPress={(index) => setSelectedPartIndex(index)}
+          onStationLayout={handleStationLayout}
           tutorialFocus={
             !state.tutorialComplete && state.tutorialStep === 0
               ? "workbench"
@@ -806,7 +834,9 @@ export default function GameScreen() {
 
       {showLockoutModal ? <LockoutModal onClose={() => {}} /> : null}
 
-      {!state.tutorialComplete ? <TutorialOverlay targets={tutorialTargets} /> : null}
+      {!state.tutorialComplete ? (
+        <TutorialOverlay targets={tutorialTargets} safeBottom={bottomBarLayout?.height} />
+      ) : null}
     </LinearGradient>
   );
 }

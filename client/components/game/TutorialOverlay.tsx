@@ -22,7 +22,7 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-type HighlightTarget = "board" | "orders" | "upgrades" | "dependency" | "currency";
+type HighlightTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
 
 interface LayoutRect {
   x: number;
@@ -46,7 +46,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     title: "Tap the Workbench",
     description: "Spawn two Clips to get started. Tap the glowing Workbench tile on the board.",
     icon: "tool",
-    highlight: "board",
+    highlight: "workbench",
     color: GameColors.ui.primary,
   },
   {
@@ -101,9 +101,10 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 
 interface TutorialOverlayProps {
   targets?: Partial<Record<HighlightTarget, LayoutRect>>;
+  safeBottom?: number;
 }
 
-export function TutorialOverlay({ targets }: TutorialOverlayProps) {
+export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayProps) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
   const reducedMotion = state.settings.reducedMotion;
@@ -155,20 +156,34 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
   const maskId = `tutorialMask-${currentStep.id}`;
   const holePadding = 10;
   const holeRect = highlightRect
-    ? {
-        x: Math.max(0, highlightRect.x - holePadding),
-        y: Math.max(0, highlightRect.y - holePadding),
-        width: Math.min(SCREEN_WIDTH, highlightRect.width + holePadding * 2),
-        height: Math.min(SCREEN_HEIGHT, highlightRect.height + holePadding * 2),
-        rx: BorderRadius.lg,
-      }
+    ? (() => {
+        const x = Math.max(0, highlightRect.x - holePadding);
+        const y = Math.max(0, highlightRect.y - holePadding);
+        const width = Math.min(
+          Math.max(0, SCREEN_WIDTH - x),
+          highlightRect.width + holePadding * 2
+        );
+        const height = Math.min(
+          Math.max(0, SCREEN_HEIGHT - y),
+          highlightRect.height + holePadding * 2
+        );
+        return { x, y, width, height, rx: BorderRadius.lg };
+      })()
     : null;
 
-  const placeCardAtTop =
-    !highlightRect || highlightRect.y > SCREEN_HEIGHT * 0.55;
+  const topSafe = insets.top + Spacing.md;
+  const bottomSafe = insets.bottom + safeBottom + Spacing.md;
+  const availableAbove = holeRect ? Math.max(0, holeRect.y - topSafe - Spacing.md) : SCREEN_HEIGHT;
+  const availableBelow = holeRect
+    ? Math.max(0, SCREEN_HEIGHT - bottomSafe - (holeRect.y + holeRect.height) - Spacing.md)
+    : SCREEN_HEIGHT;
+  const placeCardAtTop = !holeRect || availableAbove >= availableBelow;
+  const availableSpace = placeCardAtTop ? availableAbove : availableBelow;
+  const compactMode = availableSpace > 0 ? availableSpace < 280 : SCREEN_HEIGHT < 700;
+  const clampHeight = availableSpace >= 180 ? availableSpace : undefined;
   const cardPositionStyle = placeCardAtTop
-    ? { top: insets.top + Spacing.md }
-    : { bottom: insets.bottom + 120 };
+    ? { top: topSafe }
+    : { bottom: bottomSafe };
 
   const highlightStyle = useAnimatedStyle(() => ({
     opacity: 0.6 + pulse.value * 0.4,
@@ -269,44 +284,66 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
         <Animated.View
           key={currentStep.id}
           entering={SlideInDown.duration(400).springify()}
-          style={styles.card}
+          style={[
+            styles.card,
+            clampHeight ? { maxHeight: clampHeight } : null,
+            compactMode ? styles.cardCompact : null,
+          ]}
           pointerEvents="none"
         >
           <LinearGradient
             colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-            style={styles.cardGradient}
+            style={[styles.cardGradient, compactMode ? styles.cardGradientCompact : null]}
           >
             <LinearGradient
               colors={[`${currentStep.color}40`, `${currentStep.color}15`]}
-              style={styles.iconContainer}
+              style={[styles.iconContainer, compactMode ? styles.iconContainerCompact : null]}
             >
-              <Feather name={currentStep.icon} size={40} color={currentStep.color} />
+              <Feather
+                name={currentStep.icon}
+                size={compactMode ? 32 : 40}
+                color={currentStep.color}
+              />
             </LinearGradient>
 
-            <ThemedText style={styles.title}>{currentStep.title}</ThemedText>
-            <ThemedText style={styles.description}>{currentStep.description}</ThemedText>
+            <ThemedText style={[styles.title, compactMode ? styles.titleCompact : null]}>
+              {currentStep.title}
+            </ThemedText>
+            <ThemedText
+              style={[styles.description, compactMode ? styles.descriptionCompact : null]}
+              numberOfLines={compactMode ? 2 : undefined}
+            >
+              {currentStep.description}
+            </ThemedText>
             {state.tutorialHint ? (
-              <ThemedText style={styles.hintText}>{state.tutorialHint}</ThemedText>
+              <ThemedText
+                style={[styles.hintText, compactMode ? styles.hintTextCompact : null]}
+                numberOfLines={compactMode ? 1 : undefined}
+              >
+                {state.tutorialHint}
+              </ThemedText>
             ) : null}
 
-            <View style={styles.progressContainer}>
-              {TUTORIAL_STEPS.map((step, index) => (
-                <View
-                  key={step.id}
-                  style={[
-                    styles.progressDot,
-                    {
-                      backgroundColor:
-                        index === state.tutorialStep
-                          ? currentStep.color
-                          : index < state.tutorialStep
-                          ? `${currentStep.color}60`
-                          : "#2A2A4A",
-                    },
-                  ]}
-                />
-              ))}
-            </View>
+            {!compactMode ? (
+              <View style={styles.progressContainer}>
+                {TUTORIAL_STEPS.map((step, index) => (
+                  <View
+                    key={step.id}
+                    style={[
+                      styles.progressDot,
+                      {
+                        backgroundColor:
+                          index === state.tutorialStep
+                            ? currentStep.color
+                            : index < state.tutorialStep
+                            ? `${currentStep.color}60`
+                            : "#2A2A4A",
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            ) : null}
 
             {isLastStep ? (
               <Pressable
@@ -323,7 +360,7 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
                   <Feather name="play" size={20} color="#0F0F1F" />
                 </LinearGradient>
               </Pressable>
-            ) : (
+            ) : !compactMode ? (
               <View style={styles.waitingContainer}>
                 <Feather name="chevron-down" size={18} color={GameColors.text.secondary} />
                 <ThemedText style={styles.waitingText}>Complete the step to continue</ThemedText>
@@ -333,7 +370,7 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
         </Animated.View>
       </View>
 
-      <View style={styles.stepIndicator}>
+      <View style={styles.stepIndicator} pointerEvents="none">
         <ThemedText style={styles.stepText}>
           Step {state.tutorialStep + 1} of {TUTORIAL_STEPS.length}
         </ThemedText>
@@ -398,10 +435,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
   },
+  cardCompact: {
+    maxWidth: 320,
+  },
   cardGradient: {
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.xl,
     alignItems: "center",
+  },
+  cardGradientCompact: {
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   iconContainer: {
     width: 56,
@@ -413,12 +457,22 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#2A2A4A",
   },
+  iconContainerCompact: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginBottom: Spacing.md,
+  },
   title: {
     fontSize: 20,
     fontWeight: "700",
     color: GameColors.text.primary,
     textAlign: "center",
     marginBottom: Spacing.md,
+  },
+  titleCompact: {
+    fontSize: 18,
+    marginBottom: Spacing.sm,
   },
   description: {
     fontSize: 14,
@@ -428,11 +482,20 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     paddingHorizontal: Spacing.sm,
   },
+  descriptionCompact: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: Spacing.md,
+  },
   hintText: {
     fontSize: 12,
     color: GameColors.text.primary,
     textAlign: "center",
     marginBottom: Spacing.lg,
+  },
+  hintTextCompact: {
+    fontSize: 11,
+    marginBottom: Spacing.md,
   },
   progressContainer: {
     flexDirection: "row",

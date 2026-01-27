@@ -61,6 +61,7 @@ interface MergeBoardProps {
   onPartLongPress?: (index: number) => void;
   tutorialFocus?: "workbench" | "orders" | "rd" | null;
   onDragStateChange?: (isDragging: boolean) => void;
+  onStationLayout?: (stationLayouts: Partial<Record<"workbench", LayoutRect>>) => void;
 }
 
 function AnimatedStation({
@@ -137,6 +138,7 @@ export function MergeBoard({
   onPartLongPress,
   tutorialFocus,
   onDragStateChange,
+  onStationLayout,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, spawnPart, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -383,6 +385,15 @@ export function MergeBoard({
       setGridLayout({ x, y, width, height });
     });
   }, []);
+
+  useEffect(() => {
+    if (!onStationLayout || !gridLayout) return;
+    const row = Math.floor(WORKBENCH_SLOT / GRID_COLS);
+    const col = WORKBENCH_SLOT % GRID_COLS;
+    const x = gridLayout.x + col * (tileSize + Spacing.tileGap);
+    const y = gridLayout.y + row * (tileSize + Spacing.tileGap);
+    onStationLayout({ workbench: { x, y, width: tileSize, height: tileSize } });
+  }, [gridLayout, onStationLayout, tileSize]);
 
   const measureBackpack = useCallback(() => {
     backpackRef.current?.measureInWindow((x, y, width, height) => {
