@@ -122,6 +122,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
   }
 
   const isLastStep = state.tutorialStep === TUTORIAL_STEPS.length - 1;
+  const cardPointerEvents = isLastStep ? "box-none" : "none";
 
   const handleSkip = () => {
     if (!confirmSkip) {
@@ -202,35 +203,39 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
       pointerEvents="box-none"
       style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
     >
-      <Svg
-        width={SCREEN_WIDTH}
-        height={SCREEN_HEIGHT}
-        style={styles.backdropSvg}
-        pointerEvents="none"
-      >
-        <Defs>
-          <Mask id={maskId}>
-            <Rect width={SCREEN_WIDTH} height={SCREEN_HEIGHT} fill="white" />
-            {holeRect ? (
+      <View pointerEvents="none" style={styles.backdropLayer}>
+        <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={styles.backdropSvg}>
+          <Defs>
+            <Mask id={maskId}>
               <Rect
-                x={holeRect.x}
-                y={holeRect.y}
-                width={holeRect.width}
-                height={holeRect.height}
-                rx={holeRect.rx}
-                ry={holeRect.rx}
-                fill="black"
+                width={SCREEN_WIDTH}
+                height={SCREEN_HEIGHT}
+                fill="white"
+                pointerEvents="none"
               />
-            ) : null}
-          </Mask>
-        </Defs>
-        <Rect
-          width={SCREEN_WIDTH}
-          height={SCREEN_HEIGHT}
-          fill="rgba(10, 10, 20, 0.45)"
-          mask={`url(#${maskId})`}
-        />
-      </Svg>
+              {holeRect ? (
+                <Rect
+                  x={holeRect.x}
+                  y={holeRect.y}
+                  width={holeRect.width}
+                  height={holeRect.height}
+                  rx={holeRect.rx}
+                  ry={holeRect.rx}
+                  fill="black"
+                  pointerEvents="none"
+                />
+              ) : null}
+            </Mask>
+          </Defs>
+          <Rect
+            width={SCREEN_WIDTH}
+            height={SCREEN_HEIGHT}
+            fill="rgba(10, 10, 20, 0.45)"
+            mask={`url(#${maskId})`}
+            pointerEvents="none"
+          />
+        </Svg>
+      </View>
 
       <Pressable
         style={styles.skipButton}
@@ -282,7 +287,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         />
       ) : null}
 
-      <View style={[styles.content, cardPositionStyle]} pointerEvents="none">
+      <View style={[styles.content, cardPositionStyle]} pointerEvents={cardPointerEvents}>
         <Animated.View
           key={currentStep.id}
           entering={SlideInDown.duration(400).springify()}
@@ -292,7 +297,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
             compactMode ? styles.cardCompact : null,
             nanoMode ? styles.cardNano : null,
           ]}
-          pointerEvents="none"
+          pointerEvents={cardPointerEvents}
         >
           <LinearGradient
             colors={["#1A1A2E", "#252542", "#1A1A2E"]}
@@ -408,6 +413,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
+  },
+  backdropLayer: {
+    ...StyleSheet.absoluteFillObject,
   },
   backdropSvg: {
     position: "absolute",
