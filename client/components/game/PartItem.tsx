@@ -162,74 +162,78 @@ export function PartItem({
 
   const sprite = PART_SPRITES[part.tier][part.family];
 
-  return (
-    <GestureDetector gesture={composedGesture}>
-      <Animated.View
+  const content = (
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          width: size,
+          height: size,
+          shadowColor: glowColor,
+        },
+        animatedStyle,
+      ]}
+    >
+      <LinearGradient
+        colors={gradientColors as [string, string, string]}
+        style={[styles.glowBackground, { borderColor: primaryColor }]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        {isOpen ? (
+          <LinearGradient
+            colors={["transparent", `${primaryColor}30`, "transparent", `${primaryColor}30`, "transparent"]}
+            locations={[0, 0.18, 0.36, 0.54, 0.72]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.openPattern}
+          />
+        ) : null}
+        <Image
+          source={sprite}
+          style={[styles.sprite, { width: size * 0.75, height: size * 0.75 }]}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+      </LinearGradient>
+
+      <View style={[styles.tierBadge, { backgroundColor: GameColors.tiers[part.tier] }]}>
+        <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
+      </View>
+
+      <View
         style={[
-          styles.container,
-          {
-            width: size,
-            height: size,
-            shadowColor: glowColor,
-          },
-          animatedStyle,
+          styles.familyIndicator,
+          part.family === "locked"
+            ? { backgroundColor: GameColors.locked.accent + "80" }
+            : styles.familyIndicatorOpen,
         ]}
       >
-        <LinearGradient
-          colors={gradientColors as [string, string, string]}
-          style={[styles.glowBackground, { borderColor: primaryColor }]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {isOpen ? (
-            <LinearGradient
-              colors={["transparent", `${primaryColor}30`, "transparent", `${primaryColor}30`, "transparent"]}
-              locations={[0, 0.18, 0.36, 0.54, 0.72]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.openPattern}
-            />
-          ) : null}
-          <Image
-            source={sprite}
-            style={[styles.sprite, { width: size * 0.75, height: size * 0.75 }]}
-            contentFit="contain"
-            cachePolicy="memory-disk"
-          />
-        </LinearGradient>
-
-        <View style={[styles.tierBadge, { backgroundColor: GameColors.tiers[part.tier] }]}>
-          <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
-        </View>
-
-        <View
+        <ThemedText
           style={[
-            styles.familyIndicator,
-            part.family === "locked"
-              ? { backgroundColor: GameColors.locked.accent + "80" }
-              : styles.familyIndicatorOpen,
+            styles.familyText,
+            part.family === "locked" ? styles.familyTextLocked : styles.familyTextOpen,
           ]}
         >
-          <ThemedText
-            style={[
-              styles.familyText,
-              part.family === "locked" ? styles.familyTextLocked : styles.familyTextOpen,
-            ]}
-          >
-            {part.family === "locked" ? "L" : "O"}
-          </ThemedText>
+          {part.family === "locked" ? "L" : "O"}
+        </ThemedText>
+      </View>
+
+      {part.compatible ? (
+        <View style={[styles.compatibleIndicator, { backgroundColor: GameColors.ui.success }]}>
+          <ThemedText style={styles.compatibleText}>C</ThemedText>
         </View>
+      ) : null}
 
-        {part.compatible ? (
-          <View style={[styles.compatibleIndicator, { backgroundColor: GameColors.ui.success }]}>
-            <ThemedText style={styles.compatibleText}>C</ThemedText>
-          </View>
-        ) : null}
-
-        <View style={[styles.glowRing, { borderColor: primaryColor }]} />
-      </Animated.View>
-    </GestureDetector>
+      <View style={[styles.glowRing, { borderColor: primaryColor }]} />
+    </Animated.View>
   );
+
+  if (disabled) {
+    return content;
+  }
+
+  return <GestureDetector gesture={composedGesture}>{content}</GestureDetector>;
 }
 
 export function MergeAnimation({
