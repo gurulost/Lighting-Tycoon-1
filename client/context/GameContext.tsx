@@ -57,6 +57,9 @@ type GameAction =
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
   | { type: "AUTO_COMPLETE_TUTORIAL_UPGRADE" }
+  | { type: "ENSURE_TUTORIAL_ORDER" }
+  | { type: "AUTO_COMPLETE_TUTORIAL_BARON" }
+  | { type: "ENSURE_TUTORIAL_BARON_OFFER" }
   | { type: "COMPLETE_TUTORIAL"; skipped?: boolean }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
@@ -1679,6 +1682,63 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return nextState;
     }
 
+    case "ENSURE_TUTORIAL_ORDER": {
+      if (state.tutorialComplete) return state;
+      if (state.tutorialStep !== 3) return state;
+      if (state.tutorialOrderId) return state;
+
+      const tutorialOrder = createTutorialOrder();
+      const trimmedOrders =
+        state.orders.length >= state.maxOrders
+          ? state.orders.slice(0, Math.max(0, state.maxOrders - 1))
+          : state.orders;
+
+      return {
+        ...state,
+        orders: [...trimmedOrders, tutorialOrder],
+        tutorialOrderId: tutorialOrder.id,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
+    case "AUTO_COMPLETE_TUTORIAL_BARON": {
+      if (state.tutorialComplete) return state;
+      if (state.tutorialStep !== 5) return state;
+      if (!state.baronOfferSeen) return state;
+
+      const tutorialAdvance = advanceTutorialStep(state, 6);
+      let nextState: GameState = {
+        ...state,
+        tutorialStep: tutorialAdvance.tutorialStep,
+        tutorialStepStartedAt: tutorialAdvance.tutorialStepStartedAt,
+        tutorialMetrics: tutorialAdvance.tutorialMetrics,
+        tutorialHint: tutorialAdvance.tutorialHint,
+        tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
+        baronOfferAvailable: false,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+      nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
+      return nextState;
+    }
+
+    case "ENSURE_TUTORIAL_BARON_OFFER": {
+      if (state.tutorialComplete) return state;
+      if (state.tutorialStep !== 5) return state;
+      if (state.baronOfferSeen) return state;
+      if (state.baronOfferAvailable) return state;
+
+      let nextState: GameState = {
+        ...state,
+        baronOfferAvailable: true,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+      nextState = queueStoryBeat(nextState, "baron_offer_prompt");
+      return nextState;
+    }
+
     case "COMPLETE_TUTORIAL": {
       const now = Date.now();
       const metrics = {
@@ -2368,6 +2428,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if ((state.upgrades["space_1"] || 0) < 1) return;
     dispatch({ type: "AUTO_COMPLETE_TUTORIAL_UPGRADE" });
   }, [state.tutorialComplete, state.tutorialStep, state.upgrades]);
+
+  useEffect(() => {
+    if (state.tutorialComplete) return;
+    if (state.tutorialStep === 3 && !state.tutorialOrderId) {
+      dispatch({ type: "ENSURE_TUTORIAL_ORDER" });
+      return;
+    }
+    if (state.tutorialStep !== 5) return;
+    if (state.baronOfferSeen) {
+      dispatch({ type: "AUTO_COMPLETE_TUTORIAL_BARON" });
+      return;
+    }
+    if (!state.baronOfferAvailable) {
+      dispatch({ type: "ENSURE_TUTORIAL_BARON_OFFER" });
+    }
+  }, [
+    state.tutorialComplete,
+    state.tutorialStep,
+    state.tutorialOrderId,
+    state.baronOfferSeen,
+    state.baronOfferAvailable,
+  ]);
 
   const spawnPart = useCallback((): boolean => {
     if (!state.workbenchReady) return false;
