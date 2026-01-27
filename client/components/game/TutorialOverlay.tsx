@@ -179,8 +179,10 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
     : SCREEN_HEIGHT;
   const placeCardAtTop = !holeRect || availableAbove >= availableBelow;
   const availableSpace = placeCardAtTop ? availableAbove : availableBelow;
-  const compactMode = availableSpace > 0 ? availableSpace < 280 : SCREEN_HEIGHT < 700;
-  const clampHeight = availableSpace >= 180 ? availableSpace : undefined;
+  const compactMode = availableSpace > 0 ? availableSpace < 300 : SCREEN_HEIGHT < 700;
+  const microMode = availableSpace > 0 ? availableSpace < 220 : SCREEN_HEIGHT < 640;
+  const nanoMode = availableSpace > 0 ? availableSpace < 150 : SCREEN_HEIGHT < 600;
+  const clampHeight = availableSpace > 0 ? availableSpace : undefined;
   const cardPositionStyle = placeCardAtTop
     ? { top: topSafe }
     : { bottom: bottomSafe };
@@ -288,34 +290,51 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
             styles.card,
             clampHeight ? { maxHeight: clampHeight } : null,
             compactMode ? styles.cardCompact : null,
+            nanoMode ? styles.cardNano : null,
           ]}
           pointerEvents="none"
         >
           <LinearGradient
             colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-            style={[styles.cardGradient, compactMode ? styles.cardGradientCompact : null]}
+            style={[
+              styles.cardGradient,
+              compactMode ? styles.cardGradientCompact : null,
+              nanoMode ? styles.cardGradientNano : null,
+            ]}
           >
             <LinearGradient
               colors={[`${currentStep.color}40`, `${currentStep.color}15`]}
-              style={[styles.iconContainer, compactMode ? styles.iconContainerCompact : null]}
+              style={[
+                styles.iconContainer,
+                compactMode ? styles.iconContainerCompact : null,
+                nanoMode ? styles.iconContainerNano : null,
+              ]}
             >
               <Feather
                 name={currentStep.icon}
-                size={compactMode ? 32 : 40}
+                size={nanoMode ? 22 : compactMode ? 30 : 40}
                 color={currentStep.color}
               />
             </LinearGradient>
 
-            <ThemedText style={[styles.title, compactMode ? styles.titleCompact : null]}>
+            <ThemedText
+              style={[
+                styles.title,
+                compactMode ? styles.titleCompact : null,
+                nanoMode ? styles.titleNano : null,
+              ]}
+            >
               {currentStep.title}
             </ThemedText>
-            <ThemedText
-              style={[styles.description, compactMode ? styles.descriptionCompact : null]}
-              numberOfLines={compactMode ? 2 : undefined}
-            >
-              {currentStep.description}
-            </ThemedText>
-            {state.tutorialHint ? (
+            {!nanoMode ? (
+              <ThemedText
+                style={[styles.description, compactMode ? styles.descriptionCompact : null]}
+                numberOfLines={compactMode ? 2 : undefined}
+              >
+                {currentStep.description}
+              </ThemedText>
+            ) : null}
+            {state.tutorialHint && !microMode ? (
               <ThemedText
                 style={[styles.hintText, compactMode ? styles.hintTextCompact : null]}
                 numberOfLines={compactMode ? 1 : undefined}
@@ -324,7 +343,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
               </ThemedText>
             ) : null}
 
-            {!compactMode ? (
+            {!compactMode && !microMode ? (
               <View style={styles.progressContainer}>
                 {TUTORIAL_STEPS.map((step, index) => (
                   <View
@@ -360,7 +379,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
                   <Feather name="play" size={20} color="#0F0F1F" />
                 </LinearGradient>
               </Pressable>
-            ) : !compactMode ? (
+            ) : !compactMode && !microMode ? (
               <View style={styles.waitingContainer}>
                 <Feather name="chevron-down" size={18} color={GameColors.text.secondary} />
                 <ThemedText style={styles.waitingText}>Complete the step to continue</ThemedText>
@@ -370,11 +389,13 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         </Animated.View>
       </View>
 
-      <View style={styles.stepIndicator} pointerEvents="none">
-        <ThemedText style={styles.stepText}>
-          Step {state.tutorialStep + 1} of {TUTORIAL_STEPS.length}
-        </ThemedText>
-      </View>
+      {!microMode ? (
+        <View style={styles.stepIndicator} pointerEvents="none">
+          <ThemedText style={styles.stepText}>
+            Step {state.tutorialStep + 1} of {TUTORIAL_STEPS.length}
+          </ThemedText>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -438,6 +459,9 @@ const styles = StyleSheet.create({
   cardCompact: {
     maxWidth: 320,
   },
+  cardNano: {
+    maxWidth: 280,
+  },
   cardGradient: {
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.xl,
@@ -446,6 +470,10 @@ const styles = StyleSheet.create({
   cardGradientCompact: {
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
+  },
+  cardGradientNano: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   iconContainer: {
     width: 56,
@@ -463,6 +491,12 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     marginBottom: Spacing.md,
   },
+  iconContainerNano: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginBottom: Spacing.sm,
+  },
   title: {
     fontSize: 20,
     fontWeight: "700",
@@ -473,6 +507,10 @@ const styles = StyleSheet.create({
   titleCompact: {
     fontSize: 18,
     marginBottom: Spacing.sm,
+  },
+  titleNano: {
+    fontSize: 16,
+    marginBottom: Spacing.xs,
   },
   description: {
     fontSize: 14,
