@@ -567,6 +567,7 @@ function getInitialState(): GameState {
     freedomControllerCount: 0,
     tutorialStep: 0,
     tutorialComplete: false,
+    tutorialReplay: false,
     tutorialSpawnCount: 0,
     tutorialMergeCount: 0,
     tutorialOrderId: undefined,
@@ -1779,6 +1780,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         tutorialComplete: true,
+        tutorialReplay: true,
         tutorialMetrics: metrics,
         tutorialHint: undefined,
         firstSessionForcedDrops:
@@ -1799,6 +1801,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         tutorialStep: 0,
         tutorialComplete: false,
+        tutorialReplay: state.tutorialReplay || state.tutorialComplete,
         tutorialSpawnCount: 0,
         tutorialMergeCount: 0,
         tutorialOrderId: undefined,
@@ -2118,6 +2121,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           typeof action.state.tutorialMergeCount === "number"
             ? action.state.tutorialMergeCount
             : base.tutorialMergeCount,
+        tutorialReplay:
+          typeof action.state.tutorialReplay === "boolean"
+            ? action.state.tutorialReplay
+            : base.tutorialReplay,
         tutorialStepStartedAt:
           typeof action.state.tutorialStepStartedAt === "number"
             ? action.state.tutorialStepStartedAt
@@ -2298,6 +2305,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.freedomControllerCount,
       state.tutorialStep,
       state.tutorialComplete,
+      state.tutorialReplay,
       state.tutorialSpawnCount,
       state.tutorialMergeCount,
       state.tutorialOrderId,

@@ -520,7 +520,7 @@ export default function GameScreen() {
   }, [isDragging, state.activeStoryBeatId, dispatch]);
 
   useEffect(() => {
-    if (state.tutorialComplete) return;
+    if (state.tutorialComplete || state.tutorialReplay) return;
     if (state.tutorialStep === 3) {
       setActiveModal("orders");
     } else if (state.tutorialStep === 4) {
@@ -539,7 +539,7 @@ export default function GameScreen() {
             reputation={state.reputation}
             research={state.research}
             onCashPress={
-              !state.tutorialComplete && state.tutorialStep < 4
+              !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep < 4
                 ? undefined
                 : () => setActiveModal("upgrades")
             }
@@ -669,31 +669,31 @@ export default function GameScreen() {
         style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md }]}
         onLayout={(event) => setBottomBarLayout(event.nativeEvent.layout)}
       >
-      <BottomButton
-        icon="inbox"
-        label="Orders"
-        color={GameColors.currency.reputation}
-        onPress={() => setActiveModal("orders")}
-        onDisabledPress={() =>
-          showToast("Finish the tutorial to unlock Orders.", 2200)
-        }
-        badge={state.orders.length}
-        paused={orderSpawnPaused}
-        disabled={!state.tutorialComplete && state.tutorialStep < 3}
-        onLayout={setTarget("orders")}
-      />
+        <BottomButton
+          icon="inbox"
+          label="Orders"
+          color={GameColors.currency.reputation}
+          onPress={() => setActiveModal("orders")}
+          onDisabledPress={() =>
+            showToast("Finish the tutorial to unlock Orders.", 2200)
+          }
+          badge={state.orders.length}
+          paused={orderSpawnPaused}
+          disabled={!state.tutorialComplete && !state.tutorialReplay && state.tutorialStep < 3}
+          onLayout={setTarget("orders")}
+        />
 
-      <BottomButton
-        icon="shopping-cart"
-        label="Shop"
-        color={GameColors.currency.cash}
-        onPress={() => setActiveModal("upgrades")}
-        onDisabledPress={() =>
-          showToast("Finish the tutorial to unlock the Shop.", 2200)
-        }
-        disabled={!state.tutorialComplete && state.tutorialStep < 4}
-        onLayout={setTarget("upgrades")}
-      />
+        <BottomButton
+          icon="shopping-cart"
+          label="Shop"
+          color={GameColors.currency.cash}
+          onPress={() => setActiveModal("upgrades")}
+          onDisabledPress={() =>
+            showToast("Finish the tutorial to unlock the Shop.", 2200)
+          }
+          disabled={!state.tutorialComplete && !state.tutorialReplay && state.tutorialStep < 4}
+          onLayout={setTarget("upgrades")}
+        />
 
       <BottomButton
         icon="cpu"
@@ -756,12 +756,16 @@ export default function GameScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
-          if (state.tutorialComplete || state.tutorialStep !== 3) closeModal();
+          if (state.tutorialComplete || state.tutorialReplay || state.tutorialStep !== 3) {
+            closeModal();
+          }
         }}
       >
         <OrdersModal
           onClose={closeModal}
-          closeDisabled={!state.tutorialComplete && state.tutorialStep === 3}
+          closeDisabled={
+            !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep === 3
+          }
         />
       </Modal>
 
@@ -770,14 +774,20 @@ export default function GameScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
-          if (state.tutorialComplete || state.tutorialStep !== 4) closeModal();
+          if (state.tutorialComplete || state.tutorialReplay || state.tutorialStep !== 4) {
+            closeModal();
+          }
         }}
       >
         <UpgradesModal
           onClose={closeModal}
-          closeDisabled={!state.tutorialComplete && state.tutorialStep === 4}
+          closeDisabled={
+            !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep === 4
+          }
           tutorialOnlyUpgradeId={
-            !state.tutorialComplete && state.tutorialStep === 4 ? "space_1" : undefined
+            !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep === 4
+              ? "space_1"
+              : undefined
           }
         />
       </Modal>

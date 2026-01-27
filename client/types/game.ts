@@ -113,6 +113,7 @@ export interface GameState {
 
   tutorialStep: number;
   tutorialComplete: boolean;
+  tutorialReplay: boolean;
   tutorialSpawnCount: number;
   tutorialMergeCount: number;
   tutorialOrderId?: string;
