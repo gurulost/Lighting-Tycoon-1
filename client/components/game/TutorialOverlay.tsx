@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Rect, Defs, Mask } from "react-native-svg";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
@@ -147,6 +148,23 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
 
   const highlightRect =
     currentStep?.highlight && targets ? targets[currentStep.highlight] : undefined;
+  const maskId = `tutorialMask-${currentStep.id}`;
+  const holePadding = 10;
+  const holeRect = highlightRect
+    ? {
+        x: Math.max(0, highlightRect.x - holePadding),
+        y: Math.max(0, highlightRect.y - holePadding),
+        width: Math.min(SCREEN_WIDTH, highlightRect.width + holePadding * 2),
+        height: Math.min(SCREEN_HEIGHT, highlightRect.height + holePadding * 2),
+        rx: BorderRadius.lg,
+      }
+    : null;
+
+  const placeCardAtTop =
+    !highlightRect || highlightRect.y > SCREEN_HEIGHT * 0.55;
+  const cardPositionStyle = placeCardAtTop
+    ? { top: insets.top + Spacing.md }
+    : { bottom: insets.bottom + 120 };
 
   const highlightStyle = useAnimatedStyle(() => ({
     opacity: 0.6 + pulse.value * 0.4,
@@ -160,7 +178,35 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
       pointerEvents="box-none"
       style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
     >
-      <View pointerEvents="none" style={styles.backdrop} />
+      <Svg
+        width={SCREEN_WIDTH}
+        height={SCREEN_HEIGHT}
+        style={styles.backdropSvg}
+        pointerEvents="none"
+      >
+        <Defs>
+          <Mask id={maskId}>
+            <Rect width={SCREEN_WIDTH} height={SCREEN_HEIGHT} fill="white" />
+            {holeRect ? (
+              <Rect
+                x={holeRect.x}
+                y={holeRect.y}
+                width={holeRect.width}
+                height={holeRect.height}
+                rx={holeRect.rx}
+                ry={holeRect.rx}
+                fill="black"
+              />
+            ) : null}
+          </Mask>
+        </Defs>
+        <Rect
+          width={SCREEN_WIDTH}
+          height={SCREEN_HEIGHT}
+          fill="rgba(10, 10, 20, 0.45)"
+          mask={`url(#${maskId})`}
+        />
+      </Svg>
 
       <Pressable style={styles.skipButton} onPress={handleSkip}>
         <ThemedText style={styles.skipText}>
@@ -186,7 +232,7 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
         />
       ) : null}
 
-      <View style={styles.content} pointerEvents="none">
+      <View style={[styles.content, cardPositionStyle]} pointerEvents="none">
         <Animated.View
           key={currentStep.id}
           entering={SlideInDown.duration(400).springify()}
@@ -270,13 +316,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
     zIndex: 1000,
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 10, 20, 0.75)",
+  backdropSvg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
   },
   skipButton: {
     position: "absolute",
@@ -295,15 +340,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   content: {
-    flex: 1,
-    justifyContent: "center",
+    position: "absolute",
+    left: 0,
+    right: 0,
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
-    width: "100%",
-    maxWidth: 400,
   },
   card: {
     width: "100%",
+    maxWidth: 360,
     borderRadius: BorderRadius.xl,
     overflow: "hidden",
     borderWidth: 1,
@@ -314,36 +359,37 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
   },
   cardGradient: {
-    padding: Spacing["2xl"],
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
     alignItems: "center",
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     borderWidth: 2,
     borderColor: "#2A2A4A",
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
     color: GameColors.text.primary,
     textAlign: "center",
     marginBottom: Spacing.md,
   },
   description: {
-    fontSize: 16,
+    fontSize: 14,
     color: GameColors.text.secondary,
     textAlign: "center",
-    lineHeight: 24,
-    marginBottom: Spacing.xl,
-    paddingHorizontal: Spacing.md,
+    lineHeight: 20,
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
   },
   hintText: {
-    fontSize: 13,
+    fontSize: 12,
     color: GameColors.text.primary,
     textAlign: "center",
     marginBottom: Spacing.lg,
@@ -351,7 +397,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     flexDirection: "row",
     gap: Spacing.sm,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   progressDot: {
     width: 10,
@@ -380,7 +426,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    marginTop: Spacing.lg,
+    marginTop: Spacing.sm,
   },
   waitingText: {
     fontSize: 13,
