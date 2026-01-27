@@ -130,6 +130,10 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
     dispatch({ type: "COMPLETE_TUTORIAL", skipped: true });
   };
 
+  const handleSkipImmediate = () => {
+    dispatch({ type: "COMPLETE_TUTORIAL", skipped: true });
+  };
+
   React.useEffect(() => {
     if (reducedMotion) {
       pulse.value = 0;
@@ -171,6 +175,9 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
     transform: [{ scale: 1 + pulse.value * 0.02 }],
   }));
 
+  const cutoutGlowStyle = useAnimatedStyle(() => ({
+    opacity: 0.35 + pulse.value * 0.45,
+  }));
   return (
     <Animated.View
       entering={FadeIn.duration(300)}
@@ -208,10 +215,18 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
         />
       </Svg>
 
-      <Pressable style={styles.skipButton} onPress={handleSkip}>
+      <Pressable
+        style={styles.skipButton}
+        onPress={handleSkip}
+        onLongPress={handleSkipImmediate}
+        delayLongPress={450}
+      >
         <ThemedText style={styles.skipText}>
           {confirmSkip ? "Tap again to skip" : "Skip Tutorial"}
         </ThemedText>
+        {!confirmSkip ? (
+          <ThemedText style={styles.skipHint}>Tap twice or hold</ThemedText>
+        ) : null}
       </Pressable>
 
       {highlightRect ? (
@@ -227,6 +242,24 @@ export function TutorialOverlay({ targets }: TutorialOverlayProps) {
               top: Math.max(8, highlightRect.y - 6),
               width: Math.min(SCREEN_WIDTH - 16, highlightRect.width + 12),
               height: Math.min(SCREEN_HEIGHT - 16, highlightRect.height + 12),
+            },
+          ]}
+        />
+      ) : null}
+      {holeRect ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.cutoutGlow,
+            cutoutGlowStyle,
+            {
+              borderColor: `${currentStep.color}AA`,
+              shadowColor: currentStep.color,
+              left: holeRect.x,
+              top: holeRect.y,
+              width: holeRect.width,
+              height: holeRect.height,
+              borderRadius: holeRect.rx,
             },
           ]}
         />
@@ -338,6 +371,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GameColors.text.secondary,
     fontWeight: "600",
+  },
+  skipHint: {
+    fontSize: 10,
+    color: GameColors.text.secondary,
+    opacity: 0.75,
+    marginTop: 2,
+    textAlign: "center",
   },
   content: {
     position: "absolute",
@@ -453,5 +493,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 12,
+  },
+  cutoutGlow: {
+    position: "absolute",
+    borderWidth: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
   },
 });
