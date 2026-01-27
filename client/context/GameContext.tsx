@@ -56,6 +56,7 @@ type GameAction =
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
+  | { type: "AUTO_COMPLETE_TUTORIAL_UPGRADE" }
   | { type: "COMPLETE_TUTORIAL"; skipped?: boolean }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
@@ -1651,6 +1652,33 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "AUTO_COMPLETE_TUTORIAL_UPGRADE": {
+      if (state.tutorialComplete) return state;
+      if (state.tutorialStep !== 4) return state;
+      if ((state.upgrades["space_1"] || 0) < 1) return state;
+
+      const tutorialAdvance = advanceTutorialStep(state, 5);
+      let nextState: GameState = {
+        ...state,
+        tutorialStep: tutorialAdvance.tutorialStep,
+        tutorialStepStartedAt: tutorialAdvance.tutorialStepStartedAt,
+        tutorialMetrics: tutorialAdvance.tutorialMetrics,
+        tutorialHint: tutorialAdvance.tutorialHint,
+        tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
+        baronOfferAvailable:
+          tutorialAdvance.tutorialStep === 5 && !state.baronOfferSeen
+            ? true
+            : state.baronOfferAvailable,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+      nextState = queueStoryBeat(nextState, "tutorial_upgrade");
+      if (!state.baronOfferSeen) {
+        nextState = queueStoryBeat(nextState, "baron_offer_prompt");
+      }
+      return nextState;
+    }
+
     case "COMPLETE_TUTORIAL": {
       const now = Date.now();
       const metrics = {
@@ -2333,6 +2361,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     state.tutorialStepStartedAt,
     state.tutorialNudgeCount,
   ]);
+
+  useEffect(() => {
+    if (state.tutorialComplete) return;
+    if (state.tutorialStep !== 4) return;
+    if ((state.upgrades["space_1"] || 0) < 1) return;
+    dispatch({ type: "AUTO_COMPLETE_TUTORIAL_UPGRADE" });
+  }, [state.tutorialComplete, state.tutorialStep, state.upgrades]);
 
   const spawnPart = useCallback((): boolean => {
     if (!state.workbenchReady) return false;
