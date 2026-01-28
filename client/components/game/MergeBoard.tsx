@@ -157,9 +157,11 @@ export function MergeBoard({
   const [gridLayout, setGridLayout] = useState<LayoutRect | null>(null);
   const [backpackLayout, setBackpackLayout] = useState<LayoutRect | null>(null);
   const [recycleLayout, setRecycleLayout] = useState<LayoutRect | null>(null);
+  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const gridRef = useRef<View>(null);
   const backpackRef = useRef<View>(null);
   const recycleRef = useRef<View>(null);
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const orderPulse = useSharedValue(0);
   const backpackGlow = useSharedValue(0);
   const recyclePulse = useSharedValue(0);
@@ -174,6 +176,34 @@ export function MergeBoard({
   useEffect(() => {
     onDragStateChange?.(isDragging);
   }, [isDragging, onDragStateChange]);
+
+  useEffect(() => {
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+      cooldownIntervalRef.current = null;
+    }
+    const cooldownUntil = state.workbenchCooldownUntil || 0;
+    const now = Date.now();
+    setCooldownNow(now);
+    if (!cooldownUntil || cooldownUntil <= now) {
+      return undefined;
+    }
+    cooldownIntervalRef.current = setInterval(() => {
+      const tickNow = Date.now();
+      setCooldownNow(tickNow);
+      if (cooldownIntervalRef.current && tickNow >= cooldownUntil) {
+        clearInterval(cooldownIntervalRef.current);
+        cooldownIntervalRef.current = null;
+      }
+    }, 250);
+
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+        cooldownIntervalRef.current = null;
+      }
+    };
+  }, [state.workbenchCooldownUntil]);
 
   const screenWidth = Dimensions.get("window").width;
   const boardPadding = Spacing.lg * 2;
@@ -753,17 +783,20 @@ export function MergeBoard({
 
   const renderStation = (index: number) => {
     if (index === WORKBENCH_SLOT) {
-      const cooldownProgress = state.workbenchReady
+      const cooldownUntil = state.workbenchCooldownUntil || 0;
+      const workbenchReady = !cooldownUntil || cooldownNow >= cooldownUntil;
+      const cooldownRemaining = Math.max(0, cooldownUntil - cooldownNow);
+      const cooldownProgress = workbenchReady
         ? 1
-        : 1 - state.workbenchCooldown / state.workbenchMaxCooldown;
+        : 1 - cooldownRemaining / Math.max(1, state.workbenchMaxCooldown);
 
       return (
         <AnimatedStation
           key={index}
-          isActive={state.workbenchReady}
+          isActive={workbenchReady}
           forcePulse={tutorialFocus === "workbench"}
           onPress={() => {
-            if (state.workbenchReady) {
+            if (workbenchReady) {
               const didSpawn = spawnPart();
               if (didSpawn) {
                 SoundManager.play("spawn");
@@ -797,11 +830,11 @@ export function MergeBoard({
           >
             <Image
               source={stationWorkbench}
-              style={[styles.stationIcon, { opacity: state.workbenchReady ? 1 : 0.5 }]}
+              style={[styles.stationIcon, { opacity: workbenchReady ? 1 : 0.5 }]}
               contentFit="contain"
               cachePolicy="memory-disk"
             />
-            {!state.workbenchReady ? (
+            {!workbenchReady ? (
               <View style={styles.cooldownBar}>
                 <View
                   style={[

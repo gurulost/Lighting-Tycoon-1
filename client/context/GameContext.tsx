@@ -71,7 +71,6 @@ type GameAction =
   | { type: "LOCKOUT_ADVANCE" }
   | { type: "LOCKOUT_CHOOSE_BARON" }
   | { type: "LOCKOUT_CHOOSE_LAB" }
-  | { type: "TICK_COOLDOWN" }
   | { type: "SPAWN_ORDER" }
   | { type: "RESOLVE_LOCKOUT"; choice: "baron" | "freedom" }
   | { type: "LOAD_STATE"; state: GameState };
@@ -559,9 +558,8 @@ function getInitialState(): GameState {
     dependency: 0,
     orders: [],
     maxOrders: 2,
-    workbenchCooldown: 0,
     workbenchMaxCooldown: 3000,
-    workbenchReady: true,
+    workbenchCooldownUntil: 0,
     upgrades: {},
     rdNodes: {},
     freedomControllerCount: 0,
@@ -630,10 +628,21 @@ function findEmptySlot(state: GameState): number {
   return -1;
 }
 
+function getWorkbenchCooldownRemaining(state: GameState, now = Date.now()): number {
+  const cooldownUntil =
+    typeof state.workbenchCooldownUntil === "number" ? state.workbenchCooldownUntil : 0;
+  return Math.max(0, cooldownUntil - now);
+}
+
+function isWorkbenchReady(state: GameState, now = Date.now()): boolean {
+  return getWorkbenchCooldownRemaining(state, now) === 0;
+}
+
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "SPAWN_PART": {
-      if (!state.workbenchReady) return state;
+      const now = Date.now();
+      if (!isWorkbenchReady(state, now)) return state;
       const emptySlot = findEmptySlot(state);
       if (emptySlot === -1) return state;
       
@@ -675,8 +684,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextState: GameState = {
         ...state,
         board: newBoard,
-        workbenchReady: false,
-        workbenchCooldown: state.workbenchMaxCooldown,
+        workbenchCooldownUntil: now + state.workbenchMaxCooldown,
         firstSessionForcedDrops: forcedTier
           ? state.firstSessionForcedDrops.slice(1)
           : state.firstSessionForcedDrops,
@@ -1574,23 +1582,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return nextState;
     }
 
-    case "TICK_COOLDOWN": {
-      if (state.workbenchReady) return state;
-      
-      const newCooldown = state.workbenchCooldown - 100;
-      if (newCooldown <= 0) {
-        return {
-          ...state,
-          workbenchCooldown: 0,
-          workbenchReady: true,
-        };
-      }
-      return {
-        ...state,
-        workbenchCooldown: newCooldown,
-      };
-    }
-
     case "SPAWN_ORDER": {
       if (!state.tutorialComplete) return state;
       if (state.lockoutActive) return state;
@@ -2092,6 +2083,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.lastCriticalEventId === "number"
           ? action.state.lastCriticalEventId
           : 0;
+      const restoredWorkbenchCooldownUntil =
+        typeof action.state.workbenchCooldownUntil === "number"
+          ? action.state.workbenchCooldownUntil
+          : 0;
       let restoredState: GameState = {
         ...base,
         ...action.state,
@@ -2139,6 +2134,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         highlightedOrderId,
         lastRecycleRewardId: 0,
         lastRecycleReward: null,
+        workbenchCooldownUntil: restoredWorkbenchCooldownUntil,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -2226,23 +2222,12 @@ const STORAGE_KEY = "lighting_tycoon_state_v1";
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, getInitialState());
-  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const orderRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveAtRef = useRef(0);
   const lastCriticalEventRef = useRef(state.lastCriticalEventId);
   const [hydrated, setHydrated] = React.useState(false);
-
-  useEffect(() => {
-    cooldownRef.current = setInterval(() => {
-      dispatch({ type: "TICK_COOLDOWN" });
-    }, 100);
-
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     const loadState = async () => {
@@ -2269,8 +2254,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const persistableState = useMemo(
     () => ({
       ...state,
-      workbenchCooldown: 0,
-      workbenchReady: true,
+      workbenchCooldownUntil: 0,
       undoSnapshot: undefined,
       storyQueue: [],
       activeStoryBeatId: undefined,
@@ -2460,7 +2444,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   const spawnPart = useCallback((): boolean => {
-    if (!state.workbenchReady) return false;
+    if (!isWorkbenchReady(state)) return false;
     if (findEmptySlot(state) === -1) return false;
     dispatch({ type: "SPAWN_PART" });
     return true;

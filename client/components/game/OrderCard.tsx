@@ -113,11 +113,13 @@ export function OrderCard({
 
   useEffect(() => {
     if (order.rushStartTime && order.rushDeadline) {
-      const interval = setInterval(() => {
+      const updateTime = () => {
         const elapsed = Date.now() - order.rushStartTime!;
         const remaining = order.rushDeadline! - elapsed;
         setTimeRemaining(Math.max(0, remaining));
-      }, 100);
+      };
+      updateTime();
+      const interval = setInterval(updateTime, 500);
       return () => clearInterval(interval);
     }
     setTimeRemaining(null);

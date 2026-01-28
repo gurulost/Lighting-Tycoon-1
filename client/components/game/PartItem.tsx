@@ -87,15 +87,17 @@ export function PartItem({
       glowPulse.value = 0;
       return;
     }
-    const pulse = () => {
-      glowPulse.value = withSequence(
+    glowPulse.value = withRepeat(
+      withSequence(
         withTiming(1, { duration: 1500 }),
         withTiming(0, { duration: 1500 })
-      );
+      ),
+      -1,
+      true
+    );
+    return () => {
+      glowPulse.value = 0;
     };
-    pulse();
-    const interval = setInterval(pulse, 3000);
-    return () => clearInterval(interval);
   }, [reducedMotion]);
 
   const handleDragStart = () => {

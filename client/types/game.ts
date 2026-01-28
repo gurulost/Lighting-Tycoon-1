@@ -102,9 +102,8 @@ export interface GameState {
   orders: Order[];
   maxOrders: number;
 
-  workbenchCooldown: number;
   workbenchMaxCooldown: number;
-  workbenchReady: boolean;
+  workbenchCooldownUntil: number;
 
   upgrades: Record<string, number>;
   rdNodes: Record<string, boolean>;
