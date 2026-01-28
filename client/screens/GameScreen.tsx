@@ -195,6 +195,9 @@ export default function GameScreen() {
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
   const tierDiscoveryRef = useRef(state.lastTierDiscoveryId);
   const lockedDiscoveryRef = useRef(state.lastLockedDiscoveryId);
+  const compatibleDiscoveryRef = useRef(state.lastCompatibleDiscoveryId);
+  const marketingBoostRef = useRef(state.marketingBoostOrdersRemaining);
+  const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
@@ -441,6 +444,36 @@ export default function GameScreen() {
     }
     lockedDiscoveryRef.current = state.lastLockedDiscoveryId;
   }, [state.lastLockedDiscoveryId, showToast]);
+
+  useEffect(() => {
+    if (state.lastCompatibleDiscoveryId !== compatibleDiscoveryRef.current) {
+      showToast(
+        "Compatible parts can satisfy locked-required orders.",
+        2800
+      );
+    }
+    compatibleDiscoveryRef.current = state.lastCompatibleDiscoveryId;
+  }, [state.lastCompatibleDiscoveryId, showToast]);
+
+  useEffect(() => {
+    const previous = marketingBoostRef.current;
+    if (state.marketingBoostOrdersRemaining > previous) {
+      showToast("Marketing campaign active — higher-tier orders boosted.", 2400);
+    } else if (previous > 0 && state.marketingBoostOrdersRemaining === 0) {
+      showToast("Marketing campaign ended.", 2000);
+    }
+    marketingBoostRef.current = state.marketingBoostOrdersRemaining;
+  }, [state.marketingBoostOrdersRemaining, showToast]);
+
+  useEffect(() => {
+    const previous = contractRef.current;
+    if (state.baronContractOrdersRemaining > previous) {
+      showToast("Baron contract active — cash rewards boosted.", 2400);
+    } else if (previous > 0 && state.baronContractOrdersRemaining === 0) {
+      showToast("Baron contract fulfilled.", 2000);
+    }
+    contractRef.current = state.baronContractOrdersRemaining;
+  }, [state.baronContractOrdersRemaining, showToast]);
 
   useEffect(() => {
     const previousIds = new Set(orderIdsRef.current);

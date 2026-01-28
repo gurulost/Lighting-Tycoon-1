@@ -133,6 +133,8 @@ export interface GameState {
   lastTierDiscovered?: PartTier;
   lockedDiscoverySeen: boolean;
   lastLockedDiscoveryId: number;
+  compatibleDiscoverySeen: boolean;
+  lastCompatibleDiscoveryId: number;
   
   lockoutActive: boolean;
   lockoutPhase: number;
@@ -144,6 +146,8 @@ export interface GameState {
   baronOfferSeen: boolean;
   baronOfferCooldownUntil: number;
   baronChoice?: "accepted" | "declined";
+  baronOfferType?: "crate" | "contract" | "rush";
+  baronContractOrdersRemaining: number;
 
   tier5ShowcaseSeen: boolean;
   tier5ShowcasePending: boolean;
@@ -196,6 +200,8 @@ export interface GameState {
   lastCriticalEventId: number;
 
   maxTierCrafted: number;
+
+  marketingBoostOrdersRemaining: number;
 }
 
 export const INITIAL_BOARD_SIZE = 30;

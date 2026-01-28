@@ -54,6 +54,7 @@ type GameAction =
   | { type: "USE_FREEDOM_CONTROLLER"; partIndex: number }
   | { type: "DISMISS_ORDER"; orderId: string }
   | { type: "REFRESH_ORDER"; orderId: string }
+  | { type: "START_MARKETING_CAMPAIGN" }
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
@@ -115,6 +116,21 @@ function getRandomTier(
   if (roll < tier2Threshold) return 2;
   if (roll < 95) return 3;
   return 4;
+}
+
+type BaronOfferType = "crate" | "contract" | "rush";
+
+function pickBaronOfferType(state: GameState, forceCrate = false): BaronOfferType {
+  if (forceCrate) return "crate";
+  const options: BaronOfferType[] = ["crate", "contract", "rush"];
+  const filtered = state.baronContractOrdersRemaining > 0
+    ? options.filter((type) => type !== "contract")
+    : options;
+  const roll = Math.random();
+  if (filtered.includes("crate") && roll < 0.5) return "crate";
+  if (filtered.includes("contract") && roll < 0.8) return "contract";
+  if (filtered.includes("rush")) return "rush";
+  return filtered[0] || "crate";
 }
 
 function createPart(
@@ -210,9 +226,21 @@ function getOrderRefreshCost(reputationTier: number) {
   return 40 + reputationTier * 20;
 }
 
+function getMarketingCampaignCost(reputationTier: number) {
+  return 120 + reputationTier * 40;
+}
+
 const ORDER_SPAWN_YELLOW_MULT = 1.6;
 const MAX_STORY_LOG_ENTRIES = 120;
 const PERSISTED_STORY_LOG_LIMIT = 120;
+const MARKETING_BOOST_ORDERS = 3;
+const MARKETING_BOOST_MAX_STACK = 9;
+const MARKETING_BOOST_DIFFICULTY_BONUS = 2;
+const BARON_CONTRACT_ORDERS = 3;
+const BARON_CONTRACT_MAX_STACK = 6;
+const BARON_CONTRACT_CASH_BONUS = 0.35;
+const BARON_CONTRACT_DEPENDENCY_DELTA = 1;
+const BARON_RUSH_DEPENDENCY = 3;
 const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
   generatedByNeighborhood: {},
   generatedByModifier: {},
@@ -234,12 +262,13 @@ function getOrderDifficulty(order: { requirements: { tier: PartTier; count: numb
 function getTargetOrderDifficulty(
   reputationTier: number,
   maxTierCrafted: number,
-  upgrades: Record<string, number>
+  upgrades: Record<string, number>,
+  bonus = 0
 ) {
   const tierScore = Math.max(1, maxTierCrafted);
   const repScore = Math.max(0, reputationTier);
   const qualityBonus = upgrades["workbench_quality_1"] || 0;
-  const target = Math.round(tierScore + repScore * 0.5 + qualityBonus * 0.5);
+  const target = Math.round(tierScore + repScore * 0.5 + qualityBonus * 0.5 + bonus);
   return Math.max(2, Math.min(10, target));
 }
 
@@ -432,7 +461,8 @@ function generateOrder(
   currentNeighborhoodId: string,
   reputationTier: number,
   maxTierCrafted: number,
-  upgrades: Record<string, number>
+  upgrades: Record<string, number>,
+  marketingBoostOrdersRemaining: number
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
   const currentNeighborhood =
@@ -455,10 +485,13 @@ function generateOrder(
     return true;
   });
 
+  const marketingBoost =
+    marketingBoostOrdersRemaining > 0 ? MARKETING_BOOST_DIFFICULTY_BONUS : 0;
   const targetDifficulty = getTargetOrderDifficulty(
     reputationTier,
     maxTierCrafted,
-    upgrades
+    upgrades,
+    marketingBoost
   );
   const weightedTemplates = availableTemplates.map((template) => {
     const diff = Math.max(0, neighborhoodIndex - getNeighborhoodIndex(template.minNeighborhoodId));
@@ -691,6 +724,8 @@ function getInitialState(): GameState {
     lastTierDiscovered: undefined,
     lockedDiscoverySeen: false,
     lastLockedDiscoveryId: 0,
+    compatibleDiscoverySeen: false,
+    lastCompatibleDiscoveryId: 0,
     lockoutActive: false,
     lockoutPhase: 0,
     lockoutOrderId: undefined,
@@ -700,6 +735,8 @@ function getInitialState(): GameState {
     baronOfferSeen: false,
     baronOfferCooldownUntil: 0,
     baronChoice: undefined,
+    baronOfferType: undefined,
+    baronContractOrdersRemaining: 0,
     tier5ShowcaseSeen: false,
     tier5ShowcasePending: false,
     settings: {
@@ -726,6 +763,7 @@ function getInitialState(): GameState {
     orderSpawnCooldownUntil: 0,
     lastCriticalEventId: 0,
     maxTierCrafted: 1,
+    marketingBoostOrdersRemaining: 0,
   };
 }
 
@@ -935,6 +973,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mergedFamily === "open" && (fromPart.compatible || toPart.compatible);
       const mergedPart = createPart(toIndex, mergedFamily, newTier, mergedCompatible);
       const sawLocked = mergedFamily === "locked" && !state.lockedDiscoverySeen;
+      const sawCompatible = mergedCompatible && !state.compatibleDiscoverySeen;
       const nextMaxTierCrafted = Math.max(state.maxTierCrafted, newTier);
       
       const newBoard = [...state.board];
@@ -1042,6 +1081,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextTierDiscovered = state.lastTierDiscovered;
       let nextLockedDiscoverySeen = state.lockedDiscoverySeen;
       let nextLockedDiscoveryId = state.lastLockedDiscoveryId;
+      let nextCompatibleDiscoverySeen = state.compatibleDiscoverySeen;
+      let nextCompatibleDiscoveryId = state.lastCompatibleDiscoveryId;
 
       if (newTier >= 2 && !state.tierDiscovery[newTier]) {
         nextTierDiscovery = { ...state.tierDiscovery, [newTier]: true };
@@ -1051,6 +1092,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (sawLocked) {
         nextLockedDiscoverySeen = true;
         nextLockedDiscoveryId = state.lastLockedDiscoveryId + 1;
+      }
+      if (sawCompatible) {
+        nextCompatibleDiscoverySeen = true;
+        nextCompatibleDiscoveryId = state.lastCompatibleDiscoveryId + 1;
       }
 
       if (
@@ -1094,6 +1139,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastTierDiscovered: nextTierDiscovered,
         lockedDiscoverySeen: nextLockedDiscoverySeen,
         lastLockedDiscoveryId: nextLockedDiscoveryId,
+        compatibleDiscoverySeen: nextCompatibleDiscoverySeen,
+        lastCompatibleDiscoveryId: nextCompatibleDiscoveryId,
         maxTierCrafted: nextMaxTierCrafted,
         undoSnapshot: {
           board: [...state.board],
@@ -1128,6 +1175,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ...nextState,
           baronOfferAvailable: true,
           firstSessionSecondOfferTriggered: true,
+          baronOfferType: pickBaronOfferType(state, !state.baronOfferSeen),
         };
         nextState = queueStoryBeat(nextState, "baron_offer_return");
       }
@@ -1320,6 +1368,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let repReward = order.rewards.reputation;
       let researchReward = order.rewards.research;
       let dependencyChange = 0;
+      const contractActive = state.baronContractOrdersRemaining > 0;
       
       const partsUsed = partIndices.map((idx) => state.board[idx]).filter(Boolean) as Part[];
       const hasLockedPart = partsUsed.some((p) => p.family === "locked");
@@ -1358,6 +1407,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (order.ecoAuditBonusResearch && !hasLockedPart) {
         researchReward += order.ecoAuditBonusResearch;
+      }
+
+      if (contractActive) {
+        cashReward = Math.floor(cashReward * (1 + BARON_CONTRACT_CASH_BONUS));
+        dependencyChange += BARON_CONTRACT_DEPENDENCY_DELTA;
       }
 
       const allowLockout = state.firstSessionComplete;
@@ -1487,6 +1541,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       )
         ? state.highlightedOrderId
         : undefined;
+      const nextBaronContractOrdersRemaining = contractActive
+        ? Math.max(0, state.baronContractOrdersRemaining - 1)
+        : state.baronContractOrdersRemaining;
 
       let nextState: GameState = {
         ...state,
@@ -1515,6 +1572,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           : shouldShowBaronOffer
           ? true
           : state.baronOfferAvailable,
+        baronOfferType:
+          shouldQueueSecondOffer || shouldShowBaronOffer
+            ? pickBaronOfferType(state, !state.baronOfferSeen)
+            : state.baronOfferType,
+        baronContractOrdersRemaining: nextBaronContractOrdersRemaining,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
         tutorialStepStartedAt: tutorialAdvance
           ? tutorialAdvance.tutorialStepStartedAt
@@ -1642,6 +1704,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const tutorialAdvance = isTutorialUpgradeStep
         ? advanceTutorialStep(state, 5)
         : null;
+      const baronOfferUnlocked =
+        (tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep) === 5 &&
+        !state.baronOfferSeen;
 
       let nextState: GameState = {
         ...newState,
@@ -1654,11 +1719,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialNudgeCount: tutorialAdvance
           ? tutorialAdvance.tutorialNudgeCount
           : state.tutorialNudgeCount,
-        baronOfferAvailable:
-          (tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep) === 5 &&
-          !state.baronOfferSeen
-            ? true
-            : state.baronOfferAvailable,
+        baronOfferAvailable: baronOfferUnlocked ? true : state.baronOfferAvailable,
+        baronOfferType: baronOfferUnlocked ? "crate" : state.baronOfferType,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -1720,12 +1782,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       
       const newBoard = [...state.board];
       newBoard[partIndex] = { ...part, family: "open", compatible: true };
+      const sawCompatible = !state.compatibleDiscoverySeen;
       
       let nextState: GameState = {
         ...state,
         board: newBoard,
         freedomControllerCount: state.freedomControllerCount - 1,
         dependency: Math.max(0, state.dependency - 10),
+        compatibleDiscoverySeen: sawCompatible ? true : state.compatibleDiscoverySeen,
+        lastCompatibleDiscoveryId: sawCompatible
+          ? state.lastCompatibleDiscoveryId + 1
+          : state.lastCompatibleDiscoveryId,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -1773,15 +1840,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.currentNeighborhoodId,
         state.reputationTier,
         state.maxTierCrafted,
-        state.upgrades
+        state.upgrades,
+        state.marketingBoostOrdersRemaining
       );
       if (!newOrder) return state;
+      const nextMarketingBoostOrdersRemaining = Math.max(
+        0,
+        state.marketingBoostOrdersRemaining - (state.marketingBoostOrdersRemaining > 0 ? 1 : 0)
+      );
 
       return {
         ...state,
         cash: state.cash - refreshCost,
         orders: [...remainingOrders, newOrder],
         orderMetrics: updateOrderMetrics(state, newOrder),
+        marketingBoostOrdersRemaining: nextMarketingBoostOrdersRemaining,
         highlightedOrderId:
           state.highlightedOrderId === action.orderId ? undefined : state.highlightedOrderId,
         orderSpawnCooldownUntil: Date.now() + getOrderIntervalMs(state.reputationTier),
@@ -1789,7 +1862,148 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "START_MARKETING_CAMPAIGN": {
+      if (!state.tutorialComplete) return state;
+      const cost = getMarketingCampaignCost(state.reputationTier);
+      if (state.cash < cost) return state;
+      const nextRemaining = Math.min(
+        MARKETING_BOOST_MAX_STACK,
+        state.marketingBoostOrdersRemaining + MARKETING_BOOST_ORDERS
+      );
+      if (nextRemaining === state.marketingBoostOrdersRemaining) return state;
+      return {
+        ...state,
+        cash: state.cash - cost,
+        marketingBoostOrdersRemaining: nextRemaining,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
     case "ACCEPT_BARON_OFFER": {
+      const offerType: BaronOfferType = state.baronOfferType ?? "crate";
+      const allowLockout = state.firstSessionComplete;
+      const tutorialAdvance =
+        !state.tutorialComplete && state.tutorialStep === 5
+          ? advanceTutorialStep(state, 6)
+          : null;
+
+      if (offerType === "contract") {
+        const dependencyOutcome = applyDependency(state, 2, allowLockout);
+        const dependencyStory = getDependencyStoryBeat(
+          state.dependency,
+          dependencyOutcome.dependency
+        );
+        const nextContractRemaining = Math.min(
+          BARON_CONTRACT_MAX_STACK,
+          state.baronContractOrdersRemaining + BARON_CONTRACT_ORDERS
+        );
+
+        let nextState: GameState = {
+          ...state,
+          dependency: dependencyOutcome.dependency,
+          lockoutActive: dependencyOutcome.lockoutActive,
+          lockoutPhase: dependencyOutcome.lockoutPhase,
+          baronOfferAvailable: false,
+          baronOfferSeen: true,
+          baronOfferCooldownUntil: Date.now() + 60000,
+          baronChoice: "accepted",
+          baronOfferType: undefined,
+          baronContractOrdersRemaining: nextContractRemaining,
+          cash: state.cash + 80,
+          tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
+          tutorialStepStartedAt: tutorialAdvance
+            ? tutorialAdvance.tutorialStepStartedAt
+            : state.tutorialStepStartedAt,
+          tutorialMetrics: tutorialAdvance ? tutorialAdvance.tutorialMetrics : state.tutorialMetrics,
+          tutorialHint: tutorialAdvance ? tutorialAdvance.tutorialHint : state.tutorialHint,
+          tutorialNudgeCount: tutorialAdvance
+            ? tutorialAdvance.tutorialNudgeCount
+            : state.tutorialNudgeCount,
+          undoSnapshot: undefined,
+          lastCriticalEventId: state.lastCriticalEventId + 1,
+        };
+        nextState = queueStoryBeat(nextState, "baron_offer");
+        if (state.tutorialComplete) {
+          nextState = queueStoryBeat(nextState, "baron_offer_accept");
+          nextState = queueStoryBeat(nextState, "tina_baron_accept");
+        }
+        if (tutorialAdvance) {
+          nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
+        }
+        if (dependencyStory) {
+          nextState = queueStoryBeat(nextState, dependencyStory);
+        }
+        if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
+          nextState = beginLockout(nextState);
+        }
+        return nextState;
+      }
+
+      if (offerType === "rush") {
+        const emptySlot = findEmptySlot(state);
+        const guaranteedTier = Math.min(4, Math.max(2, state.maxTierCrafted));
+        const newBoard = [...state.board];
+        let placedLocked = false;
+        if (emptySlot !== -1) {
+          newBoard[emptySlot] = createPart(emptySlot, "locked", guaranteedTier as PartTier);
+          placedLocked = true;
+        }
+
+        const dependencyOutcome = applyDependency(state, BARON_RUSH_DEPENDENCY, allowLockout);
+        const dependencyStory = getDependencyStoryBeat(
+          state.dependency,
+          dependencyOutcome.dependency
+        );
+        const sawLocked = placedLocked && !state.lockedDiscoverySeen;
+
+        let nextState: GameState = {
+          ...state,
+          board: newBoard,
+          workbenchCooldownUntil: 0,
+          dependency: dependencyOutcome.dependency,
+          lockoutActive: dependencyOutcome.lockoutActive,
+          lockoutPhase: dependencyOutcome.lockoutPhase,
+          baronOfferAvailable: false,
+          baronOfferSeen: true,
+          baronOfferCooldownUntil: Date.now() + 60000,
+          baronChoice: "accepted",
+          baronOfferType: undefined,
+          lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
+          lastLockedDiscoveryId: sawLocked
+            ? state.lastLockedDiscoveryId + 1
+            : state.lastLockedDiscoveryId,
+          cash: state.cash + (emptySlot === -1 ? 40 : 0),
+          research: state.research + (emptySlot === -1 ? 4 : 0),
+          tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
+          tutorialStepStartedAt: tutorialAdvance
+            ? tutorialAdvance.tutorialStepStartedAt
+            : state.tutorialStepStartedAt,
+          tutorialMetrics: tutorialAdvance ? tutorialAdvance.tutorialMetrics : state.tutorialMetrics,
+          tutorialHint: tutorialAdvance ? tutorialAdvance.tutorialHint : state.tutorialHint,
+          tutorialNudgeCount: tutorialAdvance
+            ? tutorialAdvance.tutorialNudgeCount
+            : state.tutorialNudgeCount,
+          undoSnapshot: undefined,
+          lastCriticalEventId: state.lastCriticalEventId + 1,
+        };
+        nextState = queueStoryBeat(nextState, "baron_offer");
+        if (state.tutorialComplete) {
+          nextState = queueStoryBeat(nextState, "baron_offer_accept");
+          nextState = queueStoryBeat(nextState, "tina_baron_accept");
+        }
+        if (tutorialAdvance) {
+          nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
+        }
+        if (dependencyStory) {
+          nextState = queueStoryBeat(nextState, dependencyStory);
+        }
+        if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
+          nextState = beginLockout(nextState);
+        }
+        return nextState;
+      }
+
       const emptySlots = findEmptySlots(state, 2);
       const sawLocked = !state.lockedDiscoverySeen;
       const guaranteedTier = Math.min(4, Math.max(2, state.maxTierCrafted));
@@ -1814,14 +2028,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         );
       }
 
-      const allowLockout = state.firstSessionComplete;
       const dependencyOutcome = applyDependency(state, 5, allowLockout);
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
-      
-      const tutorialAdvance =
-        !state.tutorialComplete && state.tutorialStep === 5
-          ? advanceTutorialStep(state, 6)
-          : null;
 
       let nextState: GameState = {
         ...state,
@@ -1833,6 +2041,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferSeen: true,
         baronOfferCooldownUntil: Date.now() + 60000,
         baronChoice: "accepted",
+        baronOfferType: undefined,
         lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
         lastLockedDiscoveryId: sawLocked
           ? state.lastLockedDiscoveryId + 1
@@ -1888,6 +2097,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferSeen: true,
         baronOfferCooldownUntil: Date.now() + 60000,
         baronChoice: "declined",
+        baronOfferType: undefined,
         cash: emptySlot === -1 ? state.cash + 10 : state.cash,
         research: emptySlot === -1 ? state.research + 2 : state.research,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
@@ -1978,14 +2188,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.currentNeighborhoodId,
         workingState.reputationTier,
         workingState.maxTierCrafted,
-        workingState.upgrades
+        workingState.upgrades,
+        workingState.marketingBoostOrdersRemaining
       );
       if (!newOrder) return workingState;
+      const nextMarketingBoostOrdersRemaining = Math.max(
+        0,
+        workingState.marketingBoostOrdersRemaining -
+          (workingState.marketingBoostOrdersRemaining > 0 ? 1 : 0)
+      );
 
       return {
         ...workingState,
         orders: [...workingState.orders, newOrder],
         orderMetrics: updateOrderMetrics(workingState, newOrder),
+        marketingBoostOrdersRemaining: nextMarketingBoostOrdersRemaining,
         orderSpawnCooldownUntil:
           now + Math.round(getOrderIntervalMs(workingState.reputationTier) * cooldownMultiplier),
       };
@@ -2066,6 +2283,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialHint: tutorialAdvance.tutorialHint,
         tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
         baronOfferAvailable: false,
+        baronOfferType: undefined,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -2082,6 +2300,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextState: GameState = {
         ...state,
         baronOfferAvailable: true,
+        baronOfferType: "crate",
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -2269,9 +2488,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferSeen: false,
         baronOfferCooldownUntil: 0,
         baronChoice: undefined,
+        baronOfferType: undefined,
+        baronContractOrdersRemaining: 0,
         orderSpawnCooldownUntil: 0,
         tier5ShowcaseSeen: false,
         tier5ShowcasePending: false,
+        marketingBoostOrdersRemaining: 0,
       };
     }
 
@@ -2553,6 +2775,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         action.state.baronChoice === "accepted" || action.state.baronChoice === "declined"
           ? action.state.baronChoice
           : base.baronChoice;
+      const baronOfferType =
+        action.state.baronOfferType === "crate" ||
+        action.state.baronOfferType === "contract" ||
+        action.state.baronOfferType === "rush"
+          ? action.state.baronOfferType
+          : base.baronOfferType;
+      const baronContractOrdersRemaining =
+        typeof action.state.baronContractOrdersRemaining === "number"
+          ? action.state.baronContractOrdersRemaining
+          : base.baronContractOrdersRemaining;
       const tier5ShowcaseSeen =
         typeof action.state.tier5ShowcaseSeen === "boolean"
           ? action.state.tier5ShowcaseSeen
@@ -2581,6 +2813,27 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.lastLockedDiscoveryId === "number"
           ? action.state.lastLockedDiscoveryId
           : base.lastLockedDiscoveryId;
+      const compatibleDiscoverySeen =
+        typeof action.state.compatibleDiscoverySeen === "boolean"
+          ? action.state.compatibleDiscoverySeen
+          : base.compatibleDiscoverySeen;
+      const lastCompatibleDiscoveryId =
+        typeof action.state.lastCompatibleDiscoveryId === "number"
+          ? action.state.lastCompatibleDiscoveryId
+          : base.lastCompatibleDiscoveryId;
+      const hasCompatibleParts =
+        (Array.isArray(action.state.board) &&
+          action.state.board.some((part) => part?.compatible)) ||
+        (Array.isArray(action.state.backpack) &&
+          action.state.backpack.some((part) => part?.compatible));
+      const resolvedCompatibleSeen = compatibleDiscoverySeen || !!hasCompatibleParts;
+      const resolvedCompatibleId = resolvedCompatibleSeen
+        ? Math.max(lastCompatibleDiscoveryId, base.lastCompatibleDiscoveryId + 1)
+        : lastCompatibleDiscoveryId;
+      const marketingBoostOrdersRemaining =
+        typeof action.state.marketingBoostOrdersRemaining === "number"
+          ? action.state.marketingBoostOrdersRemaining
+          : base.marketingBoostOrdersRemaining;
       const derivedMaxTier = Math.max(
         1,
         ...(Array.isArray(action.state.board)
@@ -2643,6 +2896,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastRecycleReward: null,
         workbenchCooldownUntil: restoredWorkbenchCooldownUntil,
         baronChoice,
+        baronOfferType:
+          action.state.baronOfferAvailable && !baronOfferType ? "crate" : baronOfferType,
+        baronContractOrdersRemaining,
         tier5ShowcaseSeen,
         tier5ShowcasePending,
         tierDiscovery,
@@ -2650,7 +2906,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastTierDiscovered,
         lockedDiscoverySeen,
         lastLockedDiscoveryId,
+        compatibleDiscoverySeen: resolvedCompatibleSeen,
+        lastCompatibleDiscoveryId: resolvedCompatibleId,
         maxTierCrafted,
+        marketingBoostOrdersRemaining,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -2822,6 +3081,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.baronOfferSeen,
       state.baronOfferCooldownUntil,
       state.baronChoice,
+      state.baronOfferType,
+      state.baronContractOrdersRemaining,
       state.settings,
       state.undoCooldownUntil,
       state.mergeChainCount,
@@ -2844,7 +3105,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.lastTierDiscovered,
       state.lockedDiscoverySeen,
       state.lastLockedDiscoveryId,
+      state.compatibleDiscoverySeen,
+      state.lastCompatibleDiscoveryId,
       state.maxTierCrafted,
+      state.marketingBoostOrdersRemaining,
     ]
   );
 

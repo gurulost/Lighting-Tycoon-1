@@ -20,6 +20,32 @@ interface BaronOfferModalProps {
 export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
+  const offerType = state.baronOfferType ?? "crate";
+
+  const offerDetails = {
+    crate: {
+      title: "Certified Crate",
+      description:
+        "Get two locked parts now (one at your best tier) plus a bonus payout. Dependency rises with every locked merge.",
+      acceptText: "Accept Crate (+5 Dependency, +60 coins, +6 research)",
+      icon: "package" as const,
+    },
+    contract: {
+      title: "Territory Contract",
+      description:
+        "Next 3 orders pay +35% coins. Each completion nudges Dependency upward.",
+      acceptText: "Sign Contract (+35% coins for 3 orders)",
+      icon: "trending-up" as const,
+    },
+    rush: {
+      title: "Emergency Rush Kit",
+      description:
+        "Instant workbench reset and a locked kit delivered now. Dependency spikes slightly.",
+      acceptText: "Take Rush Kit (Reset cooldown + locked kit)",
+      icon: "zap" as const,
+    },
+  };
+  const offer = offerDetails[offerType];
 
   React.useEffect(() => {
     SoundManager.play("baron_offer");
@@ -61,18 +87,18 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           headerRight={<TinaChip expression="confident" />}
         >
           <View style={styles.offerBox}>
-            <Feather name="package" size={20} color={GameColors.locked.primary} />
-            <ThemedText style={styles.offerText}>
-              Get two locked parts now (one at your best tier) plus a bonus payout. Dependency
-              rises with every locked merge.
-            </ThemedText>
+            <Feather name={offer.icon} size={20} color={GameColors.locked.primary} />
+            <View style={styles.offerBody}>
+              <ThemedText style={styles.offerTitle}>{offer.title}</ThemedText>
+              <ThemedText style={styles.offerText}>{offer.description}</ThemedText>
+            </View>
           </View>
 
           <View style={styles.choices}>
             <Pressable style={styles.acceptButton} onPress={handleAccept}>
-              <Feather name="zap" size={18} color="#0F0F1F" />
+              <Feather name={offer.icon} size={18} color="#0F0F1F" />
               <ThemedText style={styles.acceptText}>
-                Accept Crate (+5 Dependency, +60 coins, +6 research)
+                {offer.acceptText}
               </ThemedText>
             </Pressable>
 
@@ -109,6 +135,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: GameColors.locked.primary + "30",
     marginBottom: Spacing.lg,
+  },
+  offerBody: {
+    flex: 1,
+    gap: 6,
+  },
+  offerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: GameColors.text.primary,
   },
   offerText: {
     flex: 1,
