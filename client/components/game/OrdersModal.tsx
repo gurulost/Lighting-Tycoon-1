@@ -26,6 +26,18 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
+  const orderLegend = [
+    { key: "C", label: "Clip" },
+    { key: "T", label: "Track" },
+    { key: "S", label: "Segment" },
+    { key: "K", label: "Kit" },
+    { key: "P", label: "System" },
+  ];
+  const badgeLegend = [
+    { key: "O", label: "Open" },
+    { key: "L", label: "Locked" },
+    { key: "C", label: "Compatible" },
+  ];
 
   const isRefreshable = (order: Order) =>
     !order.isTutorial &&
@@ -145,6 +157,38 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
         </View>
       ) : null}
 
+      <View style={styles.legendCard}>
+        <View style={styles.legendHeader}>
+          <Feather name="type" size={14} color={GameColors.text.secondary} />
+          <ThemedText style={styles.legendTitle}>Legend</ThemedText>
+        </View>
+        <ThemedText style={styles.legendSubtitle}>
+          Order hints + tile badges
+        </ThemedText>
+        <View style={styles.legendGroup}>
+          <ThemedText style={styles.legendGroupLabel}>Order letters</ThemedText>
+          <View style={styles.legendRow}>
+            {orderLegend.map((item) => (
+              <View key={item.key} style={styles.legendChip}>
+                <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
+                <ThemedText style={styles.legendLabel}>{item.label}</ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
+        <View style={styles.legendGroup}>
+          <ThemedText style={styles.legendGroupLabel}>Tile badges</ThemedText>
+          <View style={styles.legendRow}>
+            {badgeLegend.map((item) => (
+              <View key={item.key} style={styles.legendChip}>
+                <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
+                <ThemedText style={styles.legendLabel}>{item.label}</ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing["4xl"] }]}
@@ -245,6 +289,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: GameColors.currency.cash,
+  },
+  legendCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#141426",
+    gap: Spacing.sm,
+  },
+  legendHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  legendTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  legendSubtitle: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+  },
+  legendGroup: {
+    gap: Spacing.xs,
+  },
+  legendGroupLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  legendRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  legendChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  legendKey: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  legendLabel: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
   },
   campaignStatus: {
     flexDirection: "row",

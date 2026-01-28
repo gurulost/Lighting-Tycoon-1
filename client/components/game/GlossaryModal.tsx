@@ -248,6 +248,28 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
     ],
   },
   {
+    id: "letter-legend",
+    title: "Letters + Badges",
+    items: [
+      {
+        id: "legend-order-letters",
+        title: "Order Letters (C/T/S/K/P)",
+        description:
+          "Order hints use letters for part tiers: C=Clip, T=Track, S=Segment, K=Smart Kit, P=Premium System.",
+        icon: "type",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "legend-tile-badges",
+        title: "Tile Badges (O/L/C)",
+        description:
+          "O=open-standard, L=locked certified, C=compatible (counts for locked-required installs).",
+        icon: "tag",
+        color: GameColors.text.secondary,
+      },
+    ],
+  },
+  {
     id: "order-badges",
     title: "Order Badges",
     items: [
