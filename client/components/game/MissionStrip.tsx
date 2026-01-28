@@ -15,6 +15,7 @@ interface MissionStripProps {
   onPress?: () => void;
   onLockedPress?: () => void;
   compact?: boolean;
+  collapsed?: boolean;
 }
 
 export function MissionStrip({
@@ -23,8 +24,9 @@ export function MissionStrip({
   onPress,
   onLockedPress,
   compact = false,
+  collapsed = false,
 }: MissionStripProps) {
-  const maxVisible = compact ? 1 : 2;
+  const maxVisible = compact || collapsed ? 1 : 2;
   const activeMissions = missions.slice(0, maxVisible);
   const visibleCount = Math.min(missions.length, maxVisible);
   const isEmpty = activeMissions.length === 0;
@@ -60,7 +62,11 @@ export function MissionStrip({
             <ThemedText style={styles.headerTitle}>Goals</ThemedText>
           </View>
           <ThemedText style={styles.headerMeta}>
-            {locked ? "Locked" : `${visibleCount}/${maxVisible}`}
+            {locked
+              ? "Locked"
+              : collapsed
+              ? `${missions.length} active`
+              : `${visibleCount}/${maxVisible}`}
           </ThemedText>
         </View>
 
@@ -70,6 +76,15 @@ export function MissionStrip({
           </ThemedText>
         ) : isEmpty ? (
           <ThemedText style={styles.lockedText}>Goals syncing...</ThemedText>
+        ) : collapsed ? (
+          <View style={styles.summaryRow}>
+            <ThemedText style={styles.summaryLabel} numberOfLines={1}>
+              {activeMissions[0].label}
+            </ThemedText>
+            <ThemedText style={styles.summaryProgress}>
+              {activeMissions[0].progress}/{activeMissions[0].target}
+            </ThemedText>
+          </View>
         ) : (
           <View style={styles.missionList}>
             {activeMissions.map((mission) => {
@@ -174,6 +189,22 @@ const styles = StyleSheet.create({
   },
   missionList: {
     gap: Spacing.xs,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.primary,
+    flex: 1,
+  },
+  summaryProgress: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
   },
   missionRow: {
     flexDirection: "row",

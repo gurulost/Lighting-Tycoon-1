@@ -257,6 +257,14 @@ export function OrdersModal({
           </View>
         </Animated.View>
       ) : null}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + Spacing["4xl"] },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Feather name="inbox" size={18} color={GameColors.currency.reputation} />
@@ -558,11 +566,7 @@ export function OrdersModal({
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing["4xl"] }]}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.ordersList}>
         {state.orders.length > 0 ? (
           state.orders.map((order) => (
             <OrderCard
@@ -599,6 +603,7 @@ export function OrdersModal({
             </View>
           </Animated.View>
         )}
+      </View>
       </ScrollView>
     </ModalShell>
   );
@@ -888,7 +893,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.lg,
+    paddingTop: 0,
+    paddingBottom: Spacing.lg,
+  },
+  ordersList: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   emptyState: {
     alignItems: "center",

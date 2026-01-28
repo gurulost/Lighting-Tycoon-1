@@ -201,7 +201,6 @@ export default function GameScreen() {
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoTick, setUndoTick] = useState(0);
-  const [storyExpanded, setStoryExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [debugOverlayVisible, setDebugOverlayVisible] = useState(false);
   const [tutorialTargets, setTutorialTargets] = useState<
@@ -216,13 +215,11 @@ export default function GameScreen() {
   const [topBarLayout, setTopBarLayout] = useState<LayoutRect | null>(null);
   const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
-  const [boardContainerHeight, setBoardContainerHeight] = useState(0);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const storyCollapseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draggingRef = useRef(false);
   const tutorialStepRef = useRef(state.tutorialStep);
@@ -250,8 +247,9 @@ export default function GameScreen() {
     });
     return count;
   }, [state.orders, state.board, getFulfillmentIndices]);
-  const availableBoardHeight = boardContainerHeight > 0 ? boardContainerHeight : undefined;
   const isCompactLayout = screenHeight > 0 && screenHeight < 740;
+  const topCondensed =
+    state.tutorialComplete || (screenHeight > 0 && screenHeight < 800);
 
   const closeModal = () => setActiveModal(null);
   const handleResumeTutorial = () => {
@@ -333,24 +331,9 @@ export default function GameScreen() {
   const handleStoryPress = useCallback(() => {
     if (!state.activeStoryBeatId) return;
     if (momentLockActive) return;
-    if (!storyExpanded) {
-      setStoryExpanded(true);
-      if (storyCollapseTimeout.current) {
-        clearTimeout(storyCollapseTimeout.current);
-      }
-      storyCollapseTimeout.current = setTimeout(() => {
-        setStoryExpanded(false);
-      }, 2500);
-      if (storyTimeout.current) {
-        clearTimeout(storyTimeout.current);
-      }
-      storyTimeout.current = setTimeout(() => {
-        dispatch({ type: "DISMISS_STORY_BEAT" });
-      }, 4200);
-    } else {
-      dispatch({ type: "DISMISS_STORY_BEAT" });
-    }
-  }, [state.activeStoryBeatId, storyExpanded, dispatch, momentLockActive]);
+    setActiveModal("story");
+    dispatch({ type: "DISMISS_STORY_BEAT" });
+  }, [state.activeStoryBeatId, dispatch, momentLockActive]);
   const selectedPart =
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
   const showLockoutModal =
@@ -378,9 +361,6 @@ export default function GameScreen() {
       }
       if (storyTimeout.current) {
         clearTimeout(storyTimeout.current);
-      }
-      if (storyCollapseTimeout.current) {
-        clearTimeout(storyCollapseTimeout.current);
       }
       if (momentLockTimeout.current) {
         clearTimeout(momentLockTimeout.current);
@@ -625,30 +605,13 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (!state.activeStoryBeatId) return;
-    const beat = STORY_BEATS[state.activeStoryBeatId];
-    const autoExpand = beat?.priority === "high";
-    setStoryExpanded(autoExpand);
     if (storyTimeout.current) {
       clearTimeout(storyTimeout.current);
     }
-    if (storyCollapseTimeout.current) {
-      clearTimeout(storyCollapseTimeout.current);
-    }
-    if (autoExpand) {
-      storyCollapseTimeout.current = setTimeout(() => {
-        setStoryExpanded(false);
-      }, 2200);
-    }
     storyTimeout.current = setTimeout(() => {
       dispatch({ type: "DISMISS_STORY_BEAT" });
-    }, 3200);
+    }, 8000);
   }, [state.activeStoryBeatId, dispatch]);
-
-  useEffect(() => {
-    if (!state.activeStoryBeatId) {
-      setStoryExpanded(false);
-    }
-  }, [state.activeStoryBeatId]);
 
   useEffect(() => {
     if (!state.activeStoryBeatId) {
@@ -661,17 +624,13 @@ export default function GameScreen() {
       if (storyTimeout.current) {
         clearTimeout(storyTimeout.current);
       }
-      if (storyCollapseTimeout.current) {
-        clearTimeout(storyCollapseTimeout.current);
-      }
-      setStoryExpanded(false);
     } else {
       if (storyTimeout.current) {
         clearTimeout(storyTimeout.current);
       }
       storyTimeout.current = setTimeout(() => {
         dispatch({ type: "DISMISS_STORY_BEAT" });
-      }, 2400);
+      }, 8000);
     }
   }, [isDragging, state.activeStoryBeatId, dispatch]);
 
@@ -767,7 +726,7 @@ export default function GameScreen() {
           </View>
         </View>
 
-        <View style={[styles.statusRow, isCompactLayout && styles.statusRowCompact]}>
+        <View style={[styles.statusRow, topCondensed && styles.statusRowCompact]}>
           <Pressable
             style={styles.statusItem}
             onLongPress={() =>
@@ -797,7 +756,8 @@ export default function GameScreen() {
           locked={!state.tutorialComplete}
           onPress={() => setActiveModal("missions")}
           onLockedPress={() => showToast("Finish the tutorial to unlock goals.", 2200)}
-          compact={isCompactLayout}
+          compact={topCondensed}
+          collapsed={topCondensed}
         />
 
         {tutorialSkipped ? (
@@ -817,7 +777,7 @@ export default function GameScreen() {
             <StoryToast
               beatId={state.activeStoryBeatId}
               reducedMotion={state.settings.reducedMotion}
-              expanded={storyExpanded}
+              expanded={false}
             />
           </Pressable>
         ) : null}
@@ -831,12 +791,9 @@ export default function GameScreen() {
         style={styles.boardContainer}
         onLayout={(event) => {
           setTarget("board")(event);
-          const { height } = event.nativeEvent.layout;
-          setBoardContainerHeight((prev) => (prev === height ? prev : height));
         }}
       >
         <MergeBoard
-          maxHeight={availableBoardHeight}
           onWorkbenchPress={(result) => {
             if (result === "blocked") {
               showToast("Board is full — merge or fulfill an order.");

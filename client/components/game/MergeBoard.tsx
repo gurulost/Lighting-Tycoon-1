@@ -534,6 +534,9 @@ export function MergeBoard({
 
   const handleDragStart = useCallback(
     (source: "board" | "backpack", index: number) => {
+      measureGrid();
+      measureBackpack();
+      measureRecycle();
       setDragFromIndex(index);
       setDragSource({ source, index });
       if (hapticsEnabled) {
@@ -551,7 +554,17 @@ export function MergeBoard({
       }
       setHighlightedSlots(validTargets);
     },
-    [state.board, state.boardSize, isSlotBlocked, isStationSlot, canMerge, hapticsEnabled]
+    [
+      state.board,
+      state.boardSize,
+      isSlotBlocked,
+      isStationSlot,
+      canMerge,
+      hapticsEnabled,
+      measureGrid,
+      measureBackpack,
+      measureRecycle,
+    ]
   );
 
   const handleDragEnd = useCallback(
