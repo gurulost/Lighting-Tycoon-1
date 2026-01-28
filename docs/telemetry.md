@@ -30,6 +30,8 @@ Status: not yet fully instrumented.
 - `cash_earned` / `cash_spent`
 - `research_earned` / `research_spent`
 - `reputation_earned`
+- `boost_start` (type, mode, cost, remaining)
+- `boost_consume` (type, remaining, trigger)
 
 ## Friction Signals (Why: churn predictors)
 - `board_full` (freeSlots)

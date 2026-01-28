@@ -16,6 +16,10 @@ import {
   OrderType,
   PartFamily,
   PartTier,
+  SupplierScoutRoute,
+  WarrantyStampMode,
+  Mission,
+  MissionReward,
   INITIAL_BOARD_SIZE,
   INITIAL_BACKPACK_SLOTS,
   INITIAL_BLOCKED_SLOTS,
@@ -23,6 +27,7 @@ import {
   UPGRADE_DEFINITIONS,
   RD_DEFINITIONS,
 } from "@/types/game";
+import { MISSION_TEMPLATES, MissionTemplate } from "@/constants/missions";
 import {
   STORY_BEATS,
   ORDER_FLAVOR_TEXTS,
@@ -47,6 +52,7 @@ type GameAction =
   | { type: "RECYCLE_PART"; source: "board" | "backpack"; index: number }
   | { type: "HIGHLIGHT_ORDER"; orderId?: string }
   | { type: "CLEAR_RECYCLE_REWARD" }
+  | { type: "CLEAR_MISSION_REWARD" }
   | { type: "SET_ORDERS_HELP_SEEN" }
   | { type: "FULFILL_ORDER"; orderId: string; partIndices: number[] }
   | { type: "PURCHASE_UPGRADE"; upgradeId: string }
@@ -56,6 +62,9 @@ type GameAction =
   | { type: "DISMISS_ORDER"; orderId: string }
   | { type: "REFRESH_ORDER"; orderId: string }
   | { type: "START_MARKETING_CAMPAIGN" }
+  | { type: "START_SUPPLIER_SCOUT"; route: SupplierScoutRoute }
+  | { type: "START_MENTOR_CLINIC" }
+  | { type: "START_WARRANTY_STAMP"; mode: WarrantyStampMode }
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
@@ -68,6 +77,7 @@ type GameAction =
   | { type: "RESUME_TUTORIAL" }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
+  | { type: "SKIP_MISSION"; missionId: string }
   | { type: "UPDATE_SETTINGS"; settings: Partial<GameState["settings"]> }
   | { type: "UNDO_LAST_MOVE" }
   | { type: "CLEAR_MERGE_BONUS" }
@@ -88,7 +98,8 @@ function getRandomFamily(
   dependency: number,
   rdNodes: Record<string, boolean>,
   baronOfferSeen: boolean,
-  baronChoice?: "accepted" | "declined"
+  baronChoice?: "accepted" | "declined",
+  scoutRoute?: SupplierScoutRoute
 ): PartFamily {
   if (!baronOfferSeen) return "open";
   const choice = baronChoice ?? "declined";
@@ -98,16 +109,22 @@ function getRandomFamily(
   if (rdNodes["open_standard_2"]) {
     lockedChance -= 0.08;
   }
-  lockedChance = Math.max(0, Math.min(0.35, lockedChance));
+  if (scoutRoute === "open") {
+    lockedChance -= SCOUT_FAMILY_SHIFT;
+  } else if (scoutRoute === "locked") {
+    lockedChance += SCOUT_FAMILY_SHIFT;
+  }
+  lockedChance = Math.max(0, Math.min(0.85, lockedChance));
   return Math.random() < lockedChance ? "locked" : "open";
 }
 
 function getRandomTier(
   upgrades: Record<string, number>,
   family: PartFamily,
-  dependency: number
+  dependency: number,
+  extraQualityBonus = 0
 ): PartTier {
-  const qualityBonus = (upgrades["workbench_quality_1"] || 0) * 10;
+  const qualityBonus = (upgrades["workbench_quality_1"] || 0) * 10 + extraQualityBonus;
   const lockedBoost =
     family === "locked" ? Math.min(15, Math.floor(Math.max(0, dependency - 10) / 5)) : 0;
   const roll = Math.random() * 100;
@@ -234,12 +251,37 @@ function getMarketingCampaignCost(reputationTier: number) {
   return 120 + reputationTier * 40;
 }
 
+function getSupplierScoutCost(reputationTier: number) {
+  return 90 + reputationTier * 30;
+}
+
+function getMentorClinicCost(reputationTier: number) {
+  return 120 + reputationTier * 40;
+}
+
+function getWarrantyStampCost(reputationTier: number) {
+  return 150 + reputationTier * 45;
+}
+
 const ORDER_SPAWN_YELLOW_MULT = 1.6;
 const MAX_STORY_LOG_ENTRIES = 120;
 const PERSISTED_STORY_LOG_LIMIT = 120;
 const MARKETING_BOOST_ORDERS = 3;
 const MARKETING_BOOST_MAX_STACK = 9;
 const MARKETING_BOOST_DIFFICULTY_BONUS = 2;
+const SCOUT_SPAWNS = 6;
+const SCOUT_MAX_STACK = 12;
+const SCOUT_FAMILY_SHIFT = 0.2;
+const SCOUT_TIER_QUALITY_BONUS = 15;
+const CLINIC_MERGES = 10;
+const CLINIC_MAX_STACK = 20;
+const CLINIC_OPEN_RESEARCH_BONUS = 1;
+const CLINIC_OPEN_DEPENDENCY_DELTA = -1;
+const WARRANTY_ORDERS = 3;
+const WARRANTY_MAX_STACK = 6;
+const WARRANTY_REFUND_LOCKED_RATE = 0.85;
+const WARRANTY_REFUND_OPEN_RATE = 0.9;
+const WARRANTY_CONTRACT_CASH_BONUS = 0.55;
 const LATE_GAME_DIFFICULTY_FLOOR_TIER3 = 6;
 const LATE_GAME_DIFFICULTY_FLOOR_TIER4 = 7;
 const LATE_GAME_DIFFICULTY_FLOOR_TIER5 = 8;
@@ -248,6 +290,9 @@ const BARON_CONTRACT_MAX_STACK = 6;
 const BARON_CONTRACT_CASH_BONUS = 0.35;
 const BARON_CONTRACT_DEPENDENCY_DELTA = 1;
 const BARON_RUSH_DEPENDENCY = 3;
+const MAX_ACTIVE_MISSIONS = 2;
+const MISSION_HISTORY_LIMIT = 60;
+const MISSION_REPEAT_WINDOW_MS = 1000 * 60 * 12;
 const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
   generatedByNeighborhood: {},
   generatedByModifier: {},
@@ -301,6 +346,351 @@ function getTargetOrderDifficulty(
   const qualityBonus = upgrades["workbench_quality_1"] || 0;
   const target = Math.round(tierScore + repScore * 0.5 + qualityBonus * 0.5 + bonus);
   return Math.max(2, Math.min(10, target));
+}
+
+function getMissionPhase(state: GameState) {
+  if (!state.tutorialComplete) return 0;
+  return state.firstSessionComplete ? 2 : 1;
+}
+
+function wasMissionRecentlyCompleted(
+  history: GameState["missionHistory"],
+  templateId: string,
+  now: number
+) {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const entry = history[i];
+    if (entry.templateId !== templateId) continue;
+    return now - entry.completedAt < MISSION_REPEAT_WINDOW_MS;
+  }
+  return false;
+}
+
+function getChainTemplates(chainId: string) {
+  return MISSION_TEMPLATES.filter((template) => template.chainId === chainId);
+}
+
+function isChainCompleted(
+  history: GameState["missionHistory"],
+  chainId: string
+) {
+  const templates = getChainTemplates(chainId);
+  if (templates.length === 0) return false;
+  return templates.every((template) =>
+    history.some((entry) => entry.templateId === template.id)
+  );
+}
+
+function getChainTemplate(chainId: string, chainIndex: number) {
+  return MISSION_TEMPLATES.find(
+    (template) => template.chainId === chainId && template.chainIndex === chainIndex
+  );
+}
+
+function isMissionTemplateEligible(
+  template: MissionTemplate,
+  state: GameState,
+  options: { ignoreRepeatWindow?: boolean } = {}
+) {
+  const phase = getMissionPhase(state);
+  if (phase === 0) return false;
+  if (phase === 1 && template.chainId) return false;
+  if (typeof template.minRepTier === "number" && state.reputationTier < template.minRepTier) {
+    return false;
+  }
+  if (typeof template.maxRepTier === "number" && state.reputationTier > template.maxRepTier) {
+    return false;
+  }
+  if (
+    typeof template.minTierCrafted === "number" &&
+    state.maxTierCrafted < template.minTierCrafted
+  ) {
+    return false;
+  }
+  if (template.type === "reach_tier" && state.maxTierCrafted >= template.target) {
+    return false;
+  }
+  if (template.requiresBaronSeen && !state.baronOfferSeen) return false;
+  if (template.requiresRdUnlocked && (state.upgrades["rd_unlock"] || 0) < 1) return false;
+  if (template.requiresFreedomBuild && !state.rdNodes["freedom_build"]) return false;
+  if (template.requiresFreedomController && state.freedomControllerCount < 1) return false;
+  if (template.requiresCompatibleUnlocked && !state.compatibleDiscoverySeen) return false;
+  if (state.missions.some((mission) => mission.templateId === template.id)) return false;
+  if (!options.ignoreRepeatWindow) {
+    const now = Date.now();
+    if (wasMissionRecentlyCompleted(state.missionHistory, template.id, now)) return false;
+  }
+
+  if (template.chainId) {
+    if (isChainCompleted(state.missionHistory, template.chainId)) return false;
+    if (state.missions.some((mission) => mission.chainId === template.chainId)) return false;
+    if (template.chainIndex && template.chainIndex > 1) {
+      const prevTemplate = getChainTemplate(template.chainId, template.chainIndex - 1);
+      if (
+        prevTemplate &&
+        !state.missionHistory.some((entry) => entry.templateId === prevTemplate.id)
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function getMissionInitialProgress(template: MissionTemplate, state: GameState) {
+  if (template.type === "reach_tier") {
+    return Math.min(template.target, state.maxTierCrafted);
+  }
+  return 0;
+}
+
+function createMissionFromTemplate(
+  template: MissionTemplate,
+  state: GameState
+): Mission {
+  const progress = getMissionInitialProgress(template, state);
+  return {
+    id: generateId(),
+    templateId: template.id,
+    giver: template.giver,
+    type: template.type,
+    label: template.label,
+    description: template.description,
+    target: template.target,
+    progress,
+    reward: template.reward,
+    completed: progress >= template.target,
+    chainId: template.chainId,
+    chainIndex: template.chainIndex,
+    chainLength: template.chainLength,
+  };
+}
+
+function ensureMissions(state: GameState): GameState {
+  if (!state.tutorialComplete) return state;
+  if (state.missions.length >= MAX_ACTIVE_MISSIONS) return state;
+  const phase = getMissionPhase(state);
+  const slotsNeeded = Math.max(0, MAX_ACTIVE_MISSIONS - state.missions.length);
+  if (slotsNeeded === 0) return state;
+
+  let nextMissions = [...state.missions];
+  let candidates = MISSION_TEMPLATES.filter((template) =>
+    isMissionTemplateEligible(template, state)
+  );
+  if (candidates.length === 0) {
+    candidates = MISSION_TEMPLATES.filter((template) =>
+      isMissionTemplateEligible(template, state, { ignoreRepeatWindow: true })
+    );
+  }
+
+  for (let i = 0; i < slotsNeeded; i += 1) {
+    if (candidates.length === 0) break;
+    const weighted = candidates.map((template) => ({
+      ...template,
+      weight: (template.weight ?? 1) * (phase === 1 && template.minRepTier ? 0.9 : 1),
+    }));
+    const picked = pickWeightedTemplate(weighted);
+    if (!picked) break;
+    nextMissions = [...nextMissions, createMissionFromTemplate(picked, state)];
+    candidates = candidates.filter((template) => template.id !== picked.id);
+  }
+
+  if (nextMissions.length === state.missions.length) return state;
+  return { ...state, missions: nextMissions };
+}
+
+function getMissionCompleteBeatId(giver: Mission["giver"]) {
+  if (giver === "mentor") return "mission_mentor_complete";
+  if (giver === "baron") return "mission_baron_complete";
+  if (giver === "rd") return "mission_rd_complete";
+  if (giver === "customer") return "mission_customer_complete";
+  if (giver === "system") return "mission_system_complete";
+  return null;
+}
+
+function applyMissionReward(state: GameState, mission: Mission): GameState {
+  const reward = mission.reward;
+  if (!reward.cash && !reward.reputation && !reward.research) {
+    return state;
+  }
+  let nextState: GameState = {
+    ...state,
+    cash: state.cash + (reward.cash ?? 0),
+    reputation: state.reputation + (reward.reputation ?? 0),
+    research: state.research + (reward.research ?? 0),
+    lastMissionRewardId: state.lastMissionRewardId + 1,
+    lastMissionReward: { label: mission.label, reward },
+    undoSnapshot: undefined,
+    lastCriticalEventId: state.lastCriticalEventId + 1,
+  };
+
+  const nextNeighborhood = getNeighborhoodByRep(nextState.reputation);
+  if (nextNeighborhood.id !== nextState.currentNeighborhoodId) {
+    nextState = {
+      ...nextState,
+      currentNeighborhoodId: nextNeighborhood.id,
+      reputationTier: NEIGHBORHOODS.findIndex((n) => n.id === nextNeighborhood.id),
+    };
+    nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+  }
+
+  return nextState;
+}
+
+function finalizeMissionCompletion(state: GameState, mission: Mission): GameState {
+  const entry = { templateId: mission.templateId, completedAt: Date.now() };
+  const history = [...state.missionHistory, entry].slice(-MISSION_HISTORY_LIMIT);
+  let nextState: GameState = {
+    ...state,
+    missionHistory: history,
+  };
+  nextState = applyMissionReward(nextState, mission);
+  const beatId = getMissionCompleteBeatId(mission.giver);
+  if (beatId) {
+    nextState = queueStoryBeat(nextState, beatId);
+  }
+  return nextState;
+}
+
+function maybeQueueNextChainMission(state: GameState, mission: Mission): GameState {
+  if (!mission.chainId || !mission.chainIndex || !mission.chainLength) return state;
+  if (mission.chainIndex >= mission.chainLength) return state;
+  if (state.missions.length >= MAX_ACTIVE_MISSIONS) return state;
+  const nextTemplate = getChainTemplate(mission.chainId, mission.chainIndex + 1);
+  if (!nextTemplate) return state;
+  if (!isMissionTemplateEligible(nextTemplate, state, { ignoreRepeatWindow: true })) {
+    return state;
+  }
+  return {
+    ...state,
+    missions: [...state.missions, createMissionFromTemplate(nextTemplate, state)],
+  };
+}
+
+type MissionEvent =
+  | { type: "merge"; count: number; maxTierCrafted: PartTier }
+  | { type: "reach_tier"; maxTierCrafted: PartTier }
+  | { type: "fulfill_order"; order: Order; parts: Part[] }
+  | { type: "accept_baron_offer" }
+  | { type: "decline_baron_offer" }
+  | { type: "craft_freedom_controller" }
+  | { type: "use_freedom_controller" };
+
+function applyMissionProgress(state: GameState, event: MissionEvent): GameState {
+  if (!state.tutorialComplete || state.missions.length === 0) return state;
+  const updated: Mission[] = [];
+  const completed: Mission[] = [];
+  let progressChanged = false;
+
+  state.missions.forEach((mission) => {
+    if (mission.completed) return;
+    let nextProgress = mission.progress;
+    const target = mission.target;
+    switch (mission.type) {
+      case "merge_count": {
+        if (event.type === "merge") {
+          nextProgress = Math.min(target, mission.progress + event.count);
+        }
+        break;
+      }
+      case "complete_order": {
+        if (event.type === "fulfill_order") {
+          nextProgress = Math.min(target, mission.progress + 1);
+        }
+        break;
+      }
+      case "complete_order_no_locked": {
+        if (event.type === "fulfill_order") {
+          const hasLocked = event.parts.some((part) => part.family === "locked");
+          if (!hasLocked) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
+      case "complete_order_with_locked": {
+        if (event.type === "fulfill_order") {
+          const hasLocked = event.parts.some((part) => part.family === "locked");
+          if (hasLocked) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
+      case "complete_order_compatible": {
+        if (event.type === "fulfill_order") {
+          const hasCompat = event.parts.some((part) => part.compatible);
+          const requiresCompat = event.order.requirements.some(
+            (req) => req.requiresCompatible
+          );
+          if (hasCompat || event.order.type === "compatibility_required" || requiresCompat) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
+      case "reach_tier": {
+        if (event.type === "merge" || event.type === "reach_tier") {
+          nextProgress = Math.min(target, event.maxTierCrafted);
+        }
+        break;
+      }
+      case "fulfill_tier5_order": {
+        if (event.type === "fulfill_order") {
+          const requiresTier5 = event.order.requirements.some((req) => req.tier >= 5);
+          if (requiresTier5) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
+      case "accept_baron_offer": {
+        if (event.type === "accept_baron_offer") {
+          nextProgress = Math.min(target, mission.progress + 1);
+        }
+        break;
+      }
+      case "decline_baron_offer": {
+        if (event.type === "decline_baron_offer") {
+          nextProgress = Math.min(target, mission.progress + 1);
+        }
+        break;
+      }
+      case "craft_freedom_controller": {
+        if (event.type === "craft_freedom_controller") {
+          nextProgress = Math.min(target, mission.progress + 1);
+        }
+        break;
+      }
+      case "use_freedom_controller": {
+        if (event.type === "use_freedom_controller") {
+          nextProgress = Math.min(target, mission.progress + 1);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    const isComplete = nextProgress >= target;
+    if (nextProgress !== mission.progress) {
+      progressChanged = true;
+    }
+    if (isComplete) {
+      completed.push({ ...mission, progress: nextProgress, completed: true });
+    } else {
+      updated.push({ ...mission, progress: nextProgress });
+    }
+  });
+
+  if (!progressChanged && completed.length === 0) return state;
+  let nextState: GameState = { ...state, missions: updated };
+  completed.forEach((mission) => {
+    nextState = finalizeMissionCompletion(nextState, mission);
+    nextState = maybeQueueNextChainMission(nextState, mission);
+  });
+  return ensureMissions(nextState);
 }
 
 function hashString(value: string) {
@@ -978,6 +1368,15 @@ function getInitialState(): GameState {
     marketingBoostOrdersRemaining: 0,
     installStreakCurrent: 0,
     installStreakBest: 0,
+    supplierScoutRoute: undefined,
+    supplierScoutSpawnsRemaining: 0,
+    mentorClinicMergesRemaining: 0,
+    warrantyStampMode: undefined,
+    warrantyStampOrdersRemaining: 0,
+    missions: [],
+    missionHistory: [],
+    lastMissionRewardId: 0,
+    lastMissionReward: null,
   };
 }
 
@@ -1113,15 +1512,36 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         firstSessionActive && state.firstSessionForcedDrops.length > 0
           ? state.firstSessionForcedDrops[0]
           : undefined;
+      const scoutActive =
+        state.supplierScoutSpawnsRemaining > 0 && state.supplierScoutRoute !== undefined;
+      const scoutRoute = scoutActive ? state.supplierScoutRoute : undefined;
+      const scoutTierBonus =
+        scoutActive && scoutRoute === "tier" ? SCOUT_TIER_QUALITY_BONUS : 0;
       const family = forceOpenParts
         ? "open"
         : forcedTier
         ? "open"
-        : getRandomFamily(state.dependency, state.rdNodes, state.baronOfferSeen, state.baronChoice);
-      const tier = forceTierOne ? 1 : forcedTier ?? getRandomTier(state.upgrades, family, state.dependency);
+        : getRandomFamily(
+            state.dependency,
+            state.rdNodes,
+            state.baronOfferSeen,
+            state.baronChoice,
+            scoutRoute
+          );
+      const tier =
+        forceTierOne ? 1 : forcedTier ?? getRandomTier(state.upgrades, family, state.dependency, scoutTierBonus);
       const part = createPart(emptySlot, family, tier);
       const sawLocked = part.family === "locked" && !state.lockedDiscoverySeen;
       const nextMaxTierCrafted = Math.max(state.maxTierCrafted, part.tier);
+      const shouldConsumeScout =
+        scoutActive &&
+        !forceTierOne &&
+        typeof forcedTier !== "number" &&
+        !forceOpenParts;
+      const nextScoutRemaining = shouldConsumeScout
+        ? Math.max(0, state.supplierScoutSpawnsRemaining - 1)
+        : state.supplierScoutSpawnsRemaining;
+      const nextScoutRoute = nextScoutRemaining > 0 ? state.supplierScoutRoute : undefined;
       
       const newBoard = [...state.board];
       newBoard[emptySlot] = part;
@@ -1156,6 +1576,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialHint: tutorialAdvance.tutorialHint,
         tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
         maxTierCrafted: nextMaxTierCrafted,
+        supplierScoutRoute: nextScoutRoute,
+        supplierScoutSpawnsRemaining: nextScoutRemaining,
         undoSnapshot: undefined,
       };
       if (sawLocked) {
@@ -1170,6 +1592,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
         nextState = queueStoryBeat(nextState, "tina_intro");
+      }
+      if (nextMaxTierCrafted > state.maxTierCrafted) {
+        nextState = applyMissionProgress(nextState, {
+          type: "reach_tier",
+          maxTierCrafted: nextMaxTierCrafted,
+        });
       }
       return nextState;
     }
@@ -1204,6 +1632,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           dependencyChange = 1;
         }
       }
+
+      const clinicActive = state.mentorClinicMergesRemaining > 0;
+      const clinicResearchBonus =
+        clinicActive && mergedFamily === "open" ? CLINIC_OPEN_RESEARCH_BONUS : 0;
+      const clinicDependencyBonus =
+        clinicActive && mergedFamily === "open" ? CLINIC_OPEN_DEPENDENCY_DELTA : 0;
+      dependencyChange += clinicDependencyBonus;
       
       const cashBonus = (state.upgrades["quality_bonus_1"] || 0) * 5;
       const researchBonus = mergedFamily === "open" ? 1 : 0;
@@ -1382,7 +1817,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lockoutPhase: dependencyOutcome.lockoutPhase,
         cash: state.cash + cashBonus + bonusCash + chainBonusCash + tutorialBonusCash,
         reputation: state.reputation + tutorialBonusRep,
-        research: state.research + researchBonus + bonusResearch,
+        research: state.research + researchBonus + bonusResearch + clinicResearchBonus,
         tutorialStep: tutorialUpdate.tutorialStep,
         tutorialStepStartedAt: tutorialUpdate.tutorialStepStartedAt,
         tutorialMetrics: tutorialUpdate.tutorialMetrics,
@@ -1403,6 +1838,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         compatibleDiscoverySeen: nextCompatibleDiscoverySeen,
         lastCompatibleDiscoveryId: nextCompatibleDiscoveryId,
         maxTierCrafted: nextMaxTierCrafted,
+        mentorClinicMergesRemaining: clinicActive
+          ? Math.max(0, state.mentorClinicMergesRemaining - 1)
+          : state.mentorClinicMergesRemaining,
         undoSnapshot: {
           board: [...state.board],
           backpack: [...state.backpack],
@@ -1445,6 +1883,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         };
         nextState = queueStoryBeat(nextState, "baron_offer_return");
       }
+      nextState = applyMissionProgress(nextState, {
+        type: "merge",
+        count: 1,
+        maxTierCrafted: nextMaxTierCrafted,
+      });
       return nextState;
     }
 
@@ -1620,6 +2063,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "CLEAR_MISSION_REWARD": {
+      return {
+        ...state,
+        lastMissionReward: null,
+      };
+    }
+
     case "SET_ORDERS_HELP_SEEN": {
       if (state.ordersHelpNudgeSeen) return state;
       return {
@@ -1644,6 +2094,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let researchReward = order.rewards.research;
       let dependencyChange = 0;
       const contractActive = state.baronContractOrdersRemaining > 0;
+      const warrantyActive = state.warrantyStampOrdersRemaining > 0;
+      const warrantyMode = warrantyActive ? state.warrantyStampMode : undefined;
       
       const partsUsed = partIndices.map((idx) => state.board[idx]).filter(Boolean) as Part[];
       const hasLockedPart = partsUsed.some((p) => p.family === "locked");
@@ -1667,8 +2119,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const shouldPenalize = prefersLocked ? !hasLockedPart : hasLockedPart;
         if (shouldPenalize) {
           const penaltyRate = prefersLocked ? 0.6 : 0.8;
-          cashReward = Math.floor(cashReward * penaltyRate);
-          repReward = Math.floor(repReward * penaltyRate);
+          const adjustedRate =
+            warrantyMode === "refund"
+              ? prefersLocked
+                ? WARRANTY_REFUND_LOCKED_RATE
+                : WARRANTY_REFUND_OPEN_RATE
+              : penaltyRate;
+          cashReward = Math.floor(cashReward * adjustedRate);
+          repReward = Math.floor(repReward * adjustedRate);
         }
       }
       
@@ -1685,7 +2143,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (contractActive) {
-        cashReward = Math.floor(cashReward * (1 + BARON_CONTRACT_CASH_BONUS));
+        const contractBonus =
+          warrantyMode === "contract" ? WARRANTY_CONTRACT_CASH_BONUS : BARON_CONTRACT_CASH_BONUS;
+        cashReward = Math.floor(cashReward * (1 + contractBonus));
         dependencyChange += BARON_CONTRACT_DEPENDENCY_DELTA;
       }
 
@@ -1694,6 +2154,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         !order.isTutorial &&
         !order.isLockout &&
         order.type !== "lab_request";
+      const shouldConsumeWarranty = warrantyActive && shouldIncrementStreak;
       const nextInstallStreakCurrent = shouldIncrementStreak
         ? state.installStreakCurrent + 1
         : state.installStreakCurrent;
@@ -1701,6 +2162,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.installStreakBest,
         nextInstallStreakCurrent
       );
+      const nextWarrantyOrdersRemaining = shouldConsumeWarranty
+        ? Math.max(0, state.warrantyStampOrdersRemaining - 1)
+        : state.warrantyStampOrdersRemaining;
+      const nextWarrantyMode =
+        nextWarrantyOrdersRemaining > 0 ? state.warrantyStampMode : undefined;
 
       const allowLockout = state.firstSessionComplete;
       const dependencyOutcome = applyDependency(state, dependencyChange, allowLockout);
@@ -1933,6 +2399,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? pickBaronOfferType(state, !state.baronOfferSeen)
             : state.baronOfferType,
         baronContractOrdersRemaining: nextBaronContractOrdersRemaining,
+        warrantyStampOrdersRemaining: nextWarrantyOrdersRemaining,
+        warrantyStampMode: nextWarrantyMode,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
         tutorialStepStartedAt: tutorialAdvance
           ? tutorialAdvance.tutorialStepStartedAt
@@ -2014,7 +2482,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         };
         nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
       }
-
+      if (
+        state.tutorialComplete &&
+        !order.isTutorial &&
+        !order.isLockout &&
+        order.type !== "lab_request"
+      ) {
+        nextState = applyMissionProgress(nextState, {
+          type: "fulfill_order",
+          order,
+          parts: partsUsed,
+        });
+      }
       return nextState;
     }
 
@@ -2129,13 +2608,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.rdNodes["freedom_build"]) return state;
       if (state.research < 100) return state;
       
-      return {
+      let nextState: GameState = {
         ...state,
         research: state.research - 100,
         freedomControllerCount: state.freedomControllerCount + 1,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      nextState = applyMissionProgress(nextState, { type: "craft_freedom_controller" });
+      return nextState;
     }
 
     case "USE_FREEDOM_CONTROLLER": {
@@ -2164,6 +2645,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (sawCompatible && state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "discover_compatible");
       }
+      nextState = applyMissionProgress(nextState, { type: "use_freedom_controller" });
       return nextState;
     }
 
@@ -2259,6 +2741,65 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "START_SUPPLIER_SCOUT": {
+      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
+      const cost = getSupplierScoutCost(state.reputationTier);
+      if (state.cash < cost) return state;
+      const nextRemaining = Math.min(
+        SCOUT_MAX_STACK,
+        state.supplierScoutSpawnsRemaining + SCOUT_SPAWNS
+      );
+      if (nextRemaining === state.supplierScoutSpawnsRemaining) return state;
+      return {
+        ...state,
+        cash: state.cash - cost,
+        supplierScoutRoute: action.route,
+        supplierScoutSpawnsRemaining: nextRemaining,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
+    case "START_MENTOR_CLINIC": {
+      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
+      const cost = getMentorClinicCost(state.reputationTier);
+      if (state.cash < cost) return state;
+      const nextRemaining = Math.min(
+        CLINIC_MAX_STACK,
+        state.mentorClinicMergesRemaining + CLINIC_MERGES
+      );
+      if (nextRemaining === state.mentorClinicMergesRemaining) return state;
+      return {
+        ...state,
+        cash: state.cash - cost,
+        mentorClinicMergesRemaining: nextRemaining,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
+    case "START_WARRANTY_STAMP": {
+      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
+      if (action.mode === "contract" && state.baronContractOrdersRemaining <= 0) {
+        return state;
+      }
+      const cost = getWarrantyStampCost(state.reputationTier);
+      if (state.cash < cost) return state;
+      const nextRemaining = Math.min(
+        WARRANTY_MAX_STACK,
+        state.warrantyStampOrdersRemaining + WARRANTY_ORDERS
+      );
+      if (nextRemaining === state.warrantyStampOrdersRemaining) return state;
+      return {
+        ...state,
+        cash: state.cash - cost,
+        warrantyStampMode: action.mode,
+        warrantyStampOrdersRemaining: nextRemaining,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
     case "ACCEPT_BARON_OFFER": {
       const offerType: BaronOfferType = state.baronOfferType ?? "crate";
       const allowLockout = state.firstSessionComplete;
@@ -2330,6 +2871,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
           nextState = beginLockout(nextState);
         }
+        nextState = applyMissionProgress(nextState, { type: "accept_baron_offer" });
         return nextState;
       }
 
@@ -2411,6 +2953,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (sawLocked && state.tutorialComplete) {
           nextState = queueStoryBeat(nextState, "discover_locked");
         }
+        nextState = applyMissionProgress(nextState, { type: "accept_baron_offer" });
         return nextState;
       }
 
@@ -2501,6 +3044,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (sawLocked && state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "discover_locked");
       }
+      nextState = applyMissionProgress(nextState, { type: "accept_baron_offer" });
       return nextState;
     }
 
@@ -2547,6 +3091,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (tutorialAdvance) {
         nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
       }
+      nextState = applyMissionProgress(nextState, { type: "decline_baron_offer" });
       return nextState;
     }
 
@@ -2881,7 +3426,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextOrderMetrics = seededMetrics;
       }
 
-      return {
+      let nextState: GameState = {
         ...state,
         tutorialComplete: true,
         tutorialReplay: true,
@@ -2897,6 +3442,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      nextState = ensureMissions(nextState);
+      return nextState;
     }
 
     case "RESUME_TUTORIAL": {
@@ -2961,6 +3508,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tier5ShowcaseSeen: false,
         tier5ShowcasePending: false,
         marketingBoostOrdersRemaining: 0,
+        supplierScoutRoute: undefined,
+        supplierScoutSpawnsRemaining: 0,
+        mentorClinicMergesRemaining: 0,
+        warrantyStampMode: undefined,
+        warrantyStampOrdersRemaining: 0,
+        missions: [],
+        missionHistory: [],
+        lastMissionRewardId: 0,
+        lastMissionReward: null,
       };
     }
 
@@ -3039,6 +3595,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialNudgeCount: nextNudgeCount,
         tutorialHint: hint,
       };
+    }
+
+    case "SKIP_MISSION": {
+      if (!state.tutorialComplete) return state;
+      const mission = state.missions.find((m) => m.id === action.missionId);
+      if (!mission) return state;
+      const history = [
+        ...state.missionHistory,
+        { templateId: mission.templateId, completedAt: Date.now(), skipped: true },
+      ].slice(-MISSION_HISTORY_LIMIT);
+      let nextState: GameState = {
+        ...state,
+        missions: state.missions.filter((m) => m.id !== action.missionId),
+        missionHistory: history,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+      nextState = ensureMissions(nextState);
+      return nextState;
     }
 
     case "UPDATE_SETTINGS": {
@@ -3326,6 +3900,37 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.marketingBoostOrdersRemaining === "number"
           ? action.state.marketingBoostOrdersRemaining
           : base.marketingBoostOrdersRemaining;
+      const supplierScoutRoute =
+        action.state.supplierScoutRoute === "open" ||
+        action.state.supplierScoutRoute === "locked" ||
+        action.state.supplierScoutRoute === "tier"
+          ? action.state.supplierScoutRoute
+          : base.supplierScoutRoute;
+      const supplierScoutSpawnsRemaining =
+        typeof action.state.supplierScoutSpawnsRemaining === "number"
+          ? action.state.supplierScoutSpawnsRemaining
+          : base.supplierScoutSpawnsRemaining;
+      const mentorClinicMergesRemaining =
+        typeof action.state.mentorClinicMergesRemaining === "number"
+          ? action.state.mentorClinicMergesRemaining
+          : base.mentorClinicMergesRemaining;
+      const warrantyStampMode =
+        action.state.warrantyStampMode === "refund" ||
+        action.state.warrantyStampMode === "contract"
+          ? action.state.warrantyStampMode
+          : base.warrantyStampMode;
+      const warrantyStampOrdersRemaining =
+        typeof action.state.warrantyStampOrdersRemaining === "number"
+          ? action.state.warrantyStampOrdersRemaining
+          : base.warrantyStampOrdersRemaining;
+      const resolvedScoutRoute =
+        supplierScoutSpawnsRemaining > 0
+          ? supplierScoutRoute ?? "open"
+          : undefined;
+      const resolvedWarrantyMode =
+        warrantyStampOrdersRemaining > 0
+          ? warrantyStampMode ?? "refund"
+          : undefined;
       const ordersHelpNudgeSeen =
         typeof action.state.ordersHelpNudgeSeen === "boolean"
           ? action.state.ordersHelpNudgeSeen
@@ -3421,6 +4026,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ordersHelpNudgeSeen,
         installStreakCurrent,
         installStreakBest,
+        supplierScoutRoute: resolvedScoutRoute,
+        supplierScoutSpawnsRemaining,
+        mentorClinicMergesRemaining,
+        warrantyStampMode: resolvedWarrantyMode,
+        warrantyStampOrdersRemaining,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -3627,6 +4237,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.ordersHelpNudgeSeen,
       state.installStreakCurrent,
       state.installStreakBest,
+      state.supplierScoutRoute,
+      state.supplierScoutSpawnsRemaining,
+      state.mentorClinicMergesRemaining,
+      state.warrantyStampMode,
+      state.warrantyStampOrdersRemaining,
     ]
   );
 

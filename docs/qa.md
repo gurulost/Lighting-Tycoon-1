@@ -53,6 +53,30 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Orders resume spawning once board frees up.
   - Orders button shows the pause indicator while Red band is active.
 
+## Late-Game Order Mix Floors
+- Set `reputationTier >= 3`, `maxTierCrafted >= 4`, and clear the active orders list.
+- Force multiple spawns or refresh orders. Verify:
+  - No new order has difficulty below the rep-tier floor (6/7/8).
+  - At least one active order requires Tier 4+ when `maxTierCrafted >= 4`.
+- Set `maxTierCrafted = 5` and clear active orders.
+- Force multiple spawns or refresh orders. Verify:
+  - At least one active order requires Tier 5.
+  - After completing a Tier 5 order, the next generated order restores a Tier 5 requirement.
+
+## Tactical Boosts
+- Complete tutorial + first session.
+- Supplier Scout:
+  - Choose Open route. Verify next 6 spawns skew Open and counter decrements.
+  - Verify forced/tutorial spawns do not consume the counter.
+- Mentor Workshop Clinic:
+  - Activate clinic. Verify next open merges grant +1 research and reduce dependency by 1.
+  - Counter decrements on every merge, then expires at 0.
+- Baron Warranty Stamp:
+  - Refund Relief: fulfill a wrong-family preference order and confirm a softer penalty.
+  - Contract Edge: with an active Baron contract, confirm higher cash bonus.
+  - Verify Contract Edge is unavailable when no active contract is running.
+  - Counter decrements only on non-tutorial, non-lockout, non-lab orders.
+
 ## Story Log Cap
 - Trigger a high volume of story beats (300+).
 - Verify:

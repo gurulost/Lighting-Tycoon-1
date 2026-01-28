@@ -2,6 +2,10 @@ export type PartFamily = "open" | "locked";
 
 export type PartTier = 1 | 2 | 3 | 4 | 5;
 
+export type SupplierScoutRoute = "open" | "locked" | "tier";
+
+export type WarrantyStampMode = "refund" | "contract";
+
 export const TIER_NAMES: Record<PartTier, string> = {
   1: "Clip",
   2: "Track",
@@ -27,6 +31,43 @@ export type OrderType =
   | "locked_required"
   | "compatibility_required"
   | "lab_request";
+
+export type MissionGiver = "mentor" | "baron" | "rd" | "customer" | "system";
+
+export type MissionType =
+  | "merge_count"
+  | "complete_order"
+  | "complete_order_no_locked"
+  | "complete_order_with_locked"
+  | "complete_order_compatible"
+  | "reach_tier"
+  | "fulfill_tier5_order"
+  | "accept_baron_offer"
+  | "decline_baron_offer"
+  | "craft_freedom_controller"
+  | "use_freedom_controller";
+
+export interface MissionReward {
+  cash?: number;
+  reputation?: number;
+  research?: number;
+}
+
+export interface Mission {
+  id: string;
+  templateId: string;
+  giver: MissionGiver;
+  type: MissionType;
+  label: string;
+  description: string;
+  target: number;
+  progress: number;
+  reward: MissionReward;
+  completed: boolean;
+  chainId?: string;
+  chainIndex?: number;
+  chainLength?: number;
+}
 
 export interface OrderRequirement {
   tier: PartTier;
@@ -212,6 +253,17 @@ export interface GameState {
 
   installStreakCurrent: number;
   installStreakBest: number;
+
+  supplierScoutRoute?: SupplierScoutRoute;
+  supplierScoutSpawnsRemaining: number;
+  mentorClinicMergesRemaining: number;
+  warrantyStampMode?: WarrantyStampMode;
+  warrantyStampOrdersRemaining: number;
+
+  missions: Mission[];
+  missionHistory: { templateId: string; completedAt: number; skipped?: boolean }[];
+  lastMissionRewardId: number;
+  lastMissionReward: { label: string; reward: MissionReward } | null;
 }
 
 export const INITIAL_BOARD_SIZE = 30;

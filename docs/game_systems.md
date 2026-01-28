@@ -50,6 +50,11 @@ This document is the single source of truth for the core gameplay systems.
 - Nodes: Open Standardization I/II, Freedom Blueprint, Freedom Build
 - Freedom Controller converts locked kits to open-compatible
 
+## Tactical Boosts (Post-Session)
+- Supplier Scout: spend cash to skew the next spawns toward Open, Locked, or higher tiers.
+- Mentor Workshop Clinic: spend cash to enhance the next merges with extra research and lower dependency.
+- Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
+
 ## Lockout Event
 - Triggers at Dependency 100
 - Phase 1: forced locked-required order

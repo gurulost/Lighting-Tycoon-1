@@ -202,6 +202,33 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
     ],
   },
   {
+    id: "boosts",
+    title: "Tactical Boosts",
+    items: [
+      {
+        id: "boost-scout",
+        title: "Supplier Scout",
+        description: "Spend cash to skew the next spawns toward Open, Locked, or higher tiers.",
+        icon: "compass",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "boost-clinic",
+        title: "Mentor Workshop Clinic",
+        description: "Spend cash to boost the next merges with extra research and lower dependency.",
+        icon: "activity",
+        color: GameColors.currency.research,
+      },
+      {
+        id: "boost-warranty",
+        title: "Baron Warranty Stamp",
+        description: "Spend cash to soften wrong-family penalties or boost Baron contract payouts.",
+        icon: "shield",
+        color: GameColors.currency.cash,
+      },
+    ],
+  },
+  {
     id: "currencies",
     title: "Currencies",
     items: [

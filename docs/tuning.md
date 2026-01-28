@@ -48,6 +48,33 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 
 ---
 
+## Tactical Boosts (Post-Session Cash Sinks)
+Unlocked after tutorial + first session completion.
+
+**Supplier Scout**
+- Cost: `90 + reputationTier * 30`
+- Duration: 6 spawns (stack to 12)
+- Routes:
+  - Open Route: locked chance `-0.20` (clamped 0–0.85)
+  - Locked Route: locked chance `+0.20` (clamped 0–0.85)
+  - Tier Route: `+15` quality bonus to tier roll
+- Consumption: only on non-forced spawns
+
+**Mentor Workshop Clinic**
+- Cost: `120 + reputationTier * 40`
+- Duration: 10 merges (stack to 20)
+- Effect: open merges gain `+1 research` and `-1 dependency`
+
+**Baron Warranty Stamp**
+- Cost: `150 + reputationTier * 45`
+- Duration: 3 orders (stack to 6)
+- Modes:
+  - Refund Relief: wrong-family penalty rates become `0.85` (locked pref) or `0.90` (open pref)
+  - Contract Edge: Baron contract cash bonus becomes `+0.55` (requires active contract)
+- Consumption: non-tutorial, non-lockout, non-lab orders
+
+---
+
 ## Reward Curves by Neighborhood
 Rewards are computed from tier weights, then modified by archetypes + modifiers,
 then scaled by neighborhood multipliers:
@@ -68,6 +95,23 @@ then scaled by neighborhood multipliers:
   - Green: 5+ free slots (normal)
   - Yellow: 2–4 free slots (slower)
   - Red: 0–1 free slots (paused)
+
+---
+
+## Late-Game Order Mix Floors
+These rules prevent long streaks of low-interest orders in late progression.
+
+**Difficulty floor (by reputation tier)**
+- Rep tier >= 3: minimum difficulty 6
+- Rep tier >= 4: minimum difficulty 7
+- Rep tier >= 5: minimum difficulty 8
+- Difficulty = sum of (tier * count) across requirements.
+
+**Tier quota (by max tier crafted)**
+- If `maxTierCrafted >= 4`, ensure at least one active order requires Tier 4+.
+- If `maxTierCrafted >= 5`, ensure at least one active order requires Tier 5.
+- Applied during order generation (spawn + refresh). If no templates meet the floor,
+  the generator falls back to the full pool to avoid deadlocks.
 
 ---
 

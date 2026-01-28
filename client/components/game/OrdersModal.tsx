@@ -9,23 +9,49 @@ import { OrderCard } from "./OrderCard";
 import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
-import { Order } from "@/types/game";
+import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
 
 interface OrdersModalProps {
   onClose: () => void;
   closeDisabled?: boolean;
+  onOrderFulfilled?: (order: Order) => void;
 }
 
-export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps) {
+export function OrdersModal({
+  onClose,
+  closeDisabled = false,
+  onOrderFulfilled,
+}: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
   const marketingOrders = 3;
   const marketingMax = 9;
+  const scoutSpawns = 6;
+  const scoutMax = 12;
+  const clinicMerges = 10;
+  const clinicMax = 20;
+  const warrantyOrders = 3;
+  const warrantyMax = 6;
   const refreshCost = 40 + state.reputationTier * 20;
   const marketingCost = 120 + state.reputationTier * 40;
+  const scoutCost = 90 + state.reputationTier * 30;
+  const clinicCost = 120 + state.reputationTier * 40;
+  const warrantyCost = 150 + state.reputationTier * 45;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
+  const scoutRemaining = state.supplierScoutSpawnsRemaining;
+  const clinicRemaining = state.mentorClinicMergesRemaining;
+  const warrantyRemaining = state.warrantyStampOrdersRemaining;
+  const scoutActive = scoutRemaining > 0;
+  const clinicActive = clinicRemaining > 0;
+  const warrantyActive = warrantyRemaining > 0;
+  const scoutAtCap = scoutRemaining >= scoutMax;
+  const clinicAtCap = clinicRemaining >= clinicMax;
+  const warrantyAtCap = warrantyRemaining >= warrantyMax;
+  const canUseBoosts = state.tutorialComplete && state.firstSessionComplete;
+  const [showScoutOptions, setShowScoutOptions] = React.useState(false);
+  const [showWarrantyOptions, setShowWarrantyOptions] = React.useState(false);
   const [showOrdersHint, setShowOrdersHint] = React.useState(
     () => !state.ordersHelpNudgeSeen
   );
@@ -60,6 +86,30 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
   const canRefresh = state.tutorialComplete && Boolean(refreshTarget) && state.cash >= refreshCost;
   const canStartCampaign =
     state.tutorialComplete && state.cash >= marketingCost && !marketingAtCap;
+  const canStartScout = canUseBoosts && state.cash >= scoutCost && !scoutAtCap;
+  const canStartClinic = canUseBoosts && state.cash >= clinicCost && !clinicAtCap;
+  const canStartWarranty = canUseBoosts && state.cash >= warrantyCost && !warrantyAtCap;
+  const canSelectWarrantyContract =
+    canStartWarranty && state.baronContractOrdersRemaining > 0;
+
+  const scoutRouteLabel =
+    state.supplierScoutRoute === "open"
+      ? "Open route"
+      : state.supplierScoutRoute === "locked"
+      ? "Locked route"
+      : state.supplierScoutRoute === "tier"
+      ? "Tier route"
+      : "Route";
+  const warrantyModeLabel =
+    state.warrantyStampMode === "refund"
+      ? "Refund relief"
+      : state.warrantyStampMode === "contract"
+      ? "Contract edge"
+      : "Mode";
+  const contractOptionSub =
+    state.baronContractOrdersRemaining > 0
+      ? "Higher Baron contract bonus"
+      : "Requires active contract";
 
   const handleDismissOrdersHint = React.useCallback(() => {
     setShowOrdersHint(false);
@@ -89,6 +139,7 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
     const partsToUse = getFulfillmentIndices(order);
     if (partsToUse) {
       fulfillOrder(orderId, partsToUse);
+      onOrderFulfilled?.(order);
       if (state.highlightedOrderId === orderId) {
         dispatch({ type: "HIGHLIGHT_ORDER" });
       }
@@ -107,6 +158,29 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
   const handleStartCampaign = () => {
     dispatch({ type: "START_MARKETING_CAMPAIGN" });
   };
+
+  const handleStartScout = React.useCallback(
+    (route: SupplierScoutRoute) => {
+      if (!canStartScout) return;
+      dispatch({ type: "START_SUPPLIER_SCOUT", route });
+      setShowScoutOptions(false);
+    },
+    [canStartScout, dispatch]
+  );
+
+  const handleStartClinic = React.useCallback(() => {
+    if (!canStartClinic) return;
+    dispatch({ type: "START_MENTOR_CLINIC" });
+  }, [canStartClinic, dispatch]);
+
+  const handleStartWarranty = React.useCallback(
+    (mode: WarrantyStampMode) => {
+      if (!canStartWarranty) return;
+      dispatch({ type: "START_WARRANTY_STAMP", mode });
+      setShowWarrantyOptions(false);
+    },
+    [canStartWarranty, dispatch]
+  );
 
   return (
     <ModalShell
@@ -201,6 +275,183 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
           ) : (
             <ThemedText style={styles.campaignHint}>
               Boosts higher-tier orders for the next {marketingOrders} orders.
+            </ThemedText>
+          )}
+
+          {canUseBoosts ? (
+            <View style={styles.boostStack}>
+              <View style={styles.boostHeader}>
+                <Feather name="compass" size={14} color={GameColors.ui.primary} />
+                <ThemedText style={styles.boostHeaderText}>Tactical Boosts</ThemedText>
+              </View>
+
+              <View style={styles.boostCard}>
+                <View style={styles.refreshRow}>
+                  <Pressable
+                    style={styles.refreshButton}
+                    onPress={() => setShowScoutOptions((prev) => !prev)}
+                  >
+                    <Feather name="compass" size={16} color={GameColors.ui.primary} />
+                    <ThemedText style={styles.refreshLabel}>Supplier Scout</ThemedText>
+                  </Pressable>
+                  <View
+                    style={[
+                      styles.refreshCost,
+                      !canStartScout && styles.boostCostDisabled,
+                    ]}
+                  >
+                    <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
+                    <ThemedText style={styles.refreshCostText}>{scoutCost}</ThemedText>
+                  </View>
+                </View>
+                {scoutActive ? (
+                  <View style={styles.boostStatus}>
+                    <Feather name="target" size={12} color={GameColors.text.secondary} />
+                    <ThemedText style={styles.boostStatusText}>
+                      Active · {scoutRouteLabel} · {scoutRemaining} spawn{scoutRemaining === 1 ? "" : "s"}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={styles.boostHint}>
+                    Next {scoutSpawns} spawns: choose Open, Locked, or Tier route.
+                  </ThemedText>
+                )}
+                {showScoutOptions ? (
+                  <View style={styles.boostOptionsRow}>
+                    <Pressable
+                      style={[
+                        styles.boostOption,
+                        state.supplierScoutRoute === "open" && styles.boostOptionSelected,
+                        !canStartScout && styles.boostOptionDisabled,
+                      ]}
+                      onPress={canStartScout ? () => handleStartScout("open") : undefined}
+                    >
+                      <ThemedText style={styles.boostOptionLabel}>Open Route</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>More open spawns</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.boostOption,
+                        state.supplierScoutRoute === "locked" && styles.boostOptionSelected,
+                        !canStartScout && styles.boostOptionDisabled,
+                      ]}
+                      onPress={canStartScout ? () => handleStartScout("locked") : undefined}
+                    >
+                      <ThemedText style={styles.boostOptionLabel}>Locked Route</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>More locked spawns</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.boostOption,
+                        state.supplierScoutRoute === "tier" && styles.boostOptionSelected,
+                        !canStartScout && styles.boostOptionDisabled,
+                      ]}
+                      onPress={canStartScout ? () => handleStartScout("tier") : undefined}
+                    >
+                      <ThemedText style={styles.boostOptionLabel}>Tier Route</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Better tier odds</ThemedText>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.boostCard}>
+                <View style={styles.refreshRow}>
+                  <Pressable
+                    style={[styles.refreshButton, !canStartClinic && styles.refreshButtonDisabled]}
+                    onPress={canStartClinic ? handleStartClinic : undefined}
+                  >
+                    <Feather name="activity" size={16} color={GameColors.currency.research} />
+                    <ThemedText style={styles.refreshLabel}>Mentor Workshop Clinic</ThemedText>
+                  </Pressable>
+                  <View
+                    style={[
+                      styles.refreshCost,
+                      !canStartClinic && styles.boostCostDisabled,
+                    ]}
+                  >
+                    <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
+                    <ThemedText style={styles.refreshCostText}>{clinicCost}</ThemedText>
+                  </View>
+                </View>
+                {clinicActive ? (
+                  <View style={styles.boostStatus}>
+                    <Feather name="zap" size={12} color={GameColors.currency.research} />
+                    <ThemedText style={styles.boostStatusText}>
+                      Active · {clinicRemaining} merge{clinicRemaining === 1 ? "" : "s"} left
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={styles.boostHint}>
+                    Next {clinicMerges} merges: open merges grant +1 research and reduce dependency.
+                  </ThemedText>
+                )}
+              </View>
+
+              <View style={styles.boostCard}>
+                <View style={styles.refreshRow}>
+                  <Pressable
+                    style={styles.refreshButton}
+                    onPress={() => setShowWarrantyOptions((prev) => !prev)}
+                  >
+                    <Feather name="shield" size={16} color={GameColors.currency.cash} />
+                    <ThemedText style={styles.refreshLabel}>Baron Warranty Stamp</ThemedText>
+                  </Pressable>
+                  <View
+                    style={[
+                      styles.refreshCost,
+                      !canStartWarranty && styles.boostCostDisabled,
+                    ]}
+                  >
+                    <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
+                    <ThemedText style={styles.refreshCostText}>{warrantyCost}</ThemedText>
+                  </View>
+                </View>
+                {warrantyActive ? (
+                  <View style={styles.boostStatus}>
+                    <Feather name="shield" size={12} color={GameColors.currency.cash} />
+                    <ThemedText style={styles.boostStatusText}>
+                      Active · {warrantyModeLabel} · {warrantyRemaining} order{warrantyRemaining === 1 ? "" : "s"}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={styles.boostHint}>
+                    Next {warrantyOrders} orders: reduce wrong-family penalties or boost contracts.
+                  </ThemedText>
+                )}
+                {showWarrantyOptions ? (
+                  <View style={styles.boostOptionsRow}>
+                    <Pressable
+                      style={[
+                        styles.boostOption,
+                        state.warrantyStampMode === "refund" && styles.boostOptionSelected,
+                        !canStartWarranty && styles.boostOptionDisabled,
+                      ]}
+                      onPress={canStartWarranty ? () => handleStartWarranty("refund") : undefined}
+                    >
+                      <ThemedText style={styles.boostOptionLabel}>Refund Relief</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Smaller wrong-family penalty</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.boostOption,
+                        state.warrantyStampMode === "contract" && styles.boostOptionSelected,
+                        !canSelectWarrantyContract && styles.boostOptionDisabled,
+                      ]}
+                      onPress={
+                        canSelectWarrantyContract ? () => handleStartWarranty("contract") : undefined
+                      }
+                    >
+                      <ThemedText style={styles.boostOptionLabel}>Contract Edge</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>{contractOptionSub}</ThemedText>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ) : (
+            <ThemedText style={styles.boostLockedHint}>
+              Tactical boosts unlock after your first session.
             </ThemedText>
           )}
         </View>
@@ -414,6 +665,81 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
     paddingHorizontal: Spacing.sm,
+  },
+  boostStack: {
+    marginTop: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  boostHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  boostHeaderText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  boostCard: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#141426",
+    gap: Spacing.sm,
+  },
+  boostStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+  },
+  boostStatusText: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
+  },
+  boostHint: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
+    paddingHorizontal: Spacing.xs,
+  },
+  boostOptionsRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  boostOption: {
+    flex: 1,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+    gap: 4,
+  },
+  boostOptionSelected: {
+    borderColor: `${GameColors.ui.primary}60`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  boostOptionDisabled: {
+    opacity: 0.5,
+  },
+  boostOptionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.primary,
+  },
+  boostOptionSub: {
+    fontSize: 10,
+    color: GameColors.text.secondary,
+  },
+  boostCostDisabled: {
+    opacity: 0.5,
+  },
+  boostLockedHint: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+    paddingTop: Spacing.sm,
   },
   statItem: {
     flex: 1,

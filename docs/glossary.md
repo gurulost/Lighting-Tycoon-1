@@ -25,6 +25,11 @@ Use this as a quick reference for every icon, badge, and system.
 - Backpack: temporary storage; drag items in and out.
 - Recycle Bin: delete parts for a small cash/research refund.
 
+## Tactical Boosts
+- Supplier Scout: spend cash to skew the next spawns toward Open, Locked, or higher tiers.
+- Mentor Workshop Clinic: spend cash to boost the next merges with extra research and lower dependency.
+- Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
+
 ## Currencies
 - Cash: buy upgrades and expansions.
 - Reputation: unlocks neighborhoods and higher-value orders.
@@ -43,4 +48,3 @@ Use this as a quick reference for every icon, badge, and system.
 - Exact Tiers: no substitutions allowed.
 - Eco Audit: open kits grant bonus research.
 - Lockout: firmware lock; use locked or compatible kits.
-
