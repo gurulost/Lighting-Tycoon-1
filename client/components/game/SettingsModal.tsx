@@ -11,6 +11,8 @@ import { useGame } from "@/context/GameContext";
 interface SettingsModalProps {
   onClose: () => void;
   onOpenGlossary?: () => void;
+  debugOverlayEnabled?: boolean;
+  onToggleDebugOverlay?: (value: boolean) => void;
 }
 
 interface SettingRowProps {
@@ -46,7 +48,12 @@ function SettingRow({ icon, label, description, value, onValueChange, color }: S
   );
 }
 
-export function SettingsModal({ onClose, onOpenGlossary }: SettingsModalProps) {
+export function SettingsModal({
+  onClose,
+  onOpenGlossary,
+  debugOverlayEnabled,
+  onToggleDebugOverlay,
+}: SettingsModalProps) {
   const { state, dispatch } = useGame();
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
 
@@ -94,6 +101,17 @@ export function SettingsModal({ onClose, onOpenGlossary }: SettingsModalProps) {
               }
               color={GameColors.currency.cash}
             />
+
+            {__DEV__ && onToggleDebugOverlay ? (
+              <SettingRow
+                icon="cpu"
+                label="Debug Overlay"
+                description="Show live perf + state counters"
+                value={!!debugOverlayEnabled}
+                onValueChange={onToggleDebugOverlay}
+                color={GameColors.ui.success}
+              />
+            ) : null}
 
             <Pressable
               style={styles.actionRow}

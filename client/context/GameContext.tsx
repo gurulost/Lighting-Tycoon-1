@@ -194,7 +194,14 @@ function getOrderIntervalMs(reputationTier: number) {
 }
 
 const ORDER_SPAWN_YELLOW_MULT = 1.6;
-const MAX_STORY_LOG_ENTRIES = 300;
+const MAX_STORY_LOG_ENTRIES = 120;
+const PERSISTED_STORY_LOG_LIMIT = 120;
+const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
+  generatedByNeighborhood: {},
+  generatedByModifier: {},
+  generatedByNeighborhoodModifier: {},
+  generatedByType: {},
+};
 const SAVE_DEBOUNCE_MS = 1200;
 const SAVE_MAX_WAIT_MS = 12000;
 
@@ -604,12 +611,7 @@ function getInitialState(): GameState {
     reputationTier: 0,
     currentNeighborhoodId: startingNeighborhood.id,
 
-    orderMetrics: {
-      generatedByNeighborhood: {},
-      generatedByModifier: {},
-      generatedByNeighborhoodModifier: {},
-      generatedByType: {},
-    },
+      orderMetrics: DEFAULT_ORDER_METRICS,
     orderSpawnCooldownUntil: 0,
     lastCriticalEventId: 0,
   };
@@ -2330,7 +2332,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       saveTimeoutRef.current = null;
     }
     try {
-      const payload = JSON.stringify({ version: 1, state: persistableState });
+      const payloadState = {
+        ...persistableState,
+        orderMetrics: DEFAULT_ORDER_METRICS,
+        storyLog: persistableState.storyLog.slice(-PERSISTED_STORY_LOG_LIMIT),
+      };
+      const payload = JSON.stringify({ version: 1, state: payloadState });
       await AsyncStorage.setItem(STORAGE_KEY, payload);
       lastSaveAtRef.current = Date.now();
     } catch (error) {

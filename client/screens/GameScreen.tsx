@@ -25,6 +25,7 @@ import { BaronOfferModal } from "@/components/game/BaronOfferModal";
 import { PartDetailModal } from "@/components/game/PartDetailModal";
 import { StoryLogModal } from "@/components/game/StoryLogModal";
 import { GlossaryModal } from "@/components/game/GlossaryModal";
+import { DebugOverlay } from "@/components/DebugOverlay";
 import { StoryToast } from "@/components/game/StoryToast";
 import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
@@ -170,6 +171,7 @@ export default function GameScreen() {
   const [undoTick, setUndoTick] = useState(0);
   const [storyExpanded, setStoryExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [debugOverlayVisible, setDebugOverlayVisible] = useState(false);
   const [tutorialTargets, setTutorialTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
@@ -532,6 +534,16 @@ export default function GameScreen() {
 
   return (
     <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={[styles.container, { paddingTop: insets.top }]}>
+      {__DEV__ ? (
+        <DebugOverlay
+          visible={debugOverlayVisible}
+          onClose={() => setDebugOverlayVisible(false)}
+          activeModal={activeModal}
+          selectedPartIndex={selectedPartIndex}
+          isDragging={isDragging}
+          showLockoutModal={showLockoutModal}
+        />
+      ) : null}
       <View style={styles.topBar} onLayout={(event) => setTopBarLayout(event.nativeEvent.layout)}>
         <View onLayout={setTarget("currency")}>
           <CurrencyDisplay
@@ -810,6 +822,8 @@ export default function GameScreen() {
         <SettingsModal
           onClose={closeModal}
           onOpenGlossary={() => setActiveModal("glossary")}
+          debugOverlayEnabled={debugOverlayVisible}
+          onToggleDebugOverlay={setDebugOverlayVisible}
         />
       </Modal>
 
