@@ -1,0 +1,45 @@
+# Database
+
+Lighting Tycoon uses PostgreSQL with Drizzle ORM.
+
+## Connection
+
+The database is configured via `DATABASE_URL`.
+
+## Schema Overview
+
+### users
+
+- `id` (uuid, primary key)
+- `username` (text, unique)
+- `password` (text)
+- `created_at` (timestamp)
+
+### game_saves
+
+- `id` (uuid, primary key)
+- `session_id` (text, unique)
+- `cash` (integer)
+- `reputation` (integer)
+- `research` (integer)
+- `dependency` (integer)
+- `board_state` (jsonb)
+- `unlocked_slots` (jsonb)
+- `upgrades` (jsonb)
+- `rd_nodes` (jsonb)
+- `freedom_controller_count` (integer)
+- `max_orders` (integer)
+- `workbench_max_cooldown` (integer)
+- `tutorial_complete` (boolean)
+- `created_at` (timestamp)
+- `updated_at` (timestamp)
+
+## Migrations
+
+This project uses Drizzle. The current setup relies on `drizzle-kit push` to sync schema changes.
+
+```bash
+npm run db:push
+```
+
+If you introduce migrations or use `drizzle-kit generate`, update this doc with the chosen workflow.

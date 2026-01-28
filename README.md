@@ -7,8 +7,11 @@ fast locked components or slower open-standard independence.
 
 ```bash
 npm install
+npm run server:dev
 npm run expo:dev
 ```
+
+If you are not on Replit, set `EXPO_PUBLIC_DOMAIN=localhost:5000` before starting the Expo client.
 
 ## Scripts
 
@@ -29,6 +32,14 @@ npm run expo:dev
 ## Docs Index
 
 - `docs/INDEX.md` - full documentation map
+- `docs/architecture.md` - system architecture overview
+- `docs/development.md` - local development guide
+- `docs/configuration.md` - environment variables
+- `docs/api.md` - API reference
+- `docs/database.md` - database schema and migrations
+- `docs/deployment.md` - build and deployment steps
+- `docs/testing.md` - testing guidance
+- `docs/operations.md` - production runbook notes
 - `docs/game_systems.md` - core loop and mechanics
 - `docs/tutorial.md` - tutorial + first-session flow
 - `docs/content_pipeline.md` - orders, modifiers, archetypes
@@ -36,14 +47,17 @@ npm run expo:dev
 - `docs/narrative.md` - narrative rules and beats
 - `docs/glossary.md` - in-game glossary
 - `docs/audio.md` - SFX map
+- `design_guidelines.md` - visual and UI direction
 - `docs/telemetry.md` - analytics event plan
 - `docs/qa.md` - QA checklist
 - `docs/release_checklist.md` - production release checklist
 - `docs/changelog.md` - change log
 - `docs/game_audit_report.md` - current state audit
 - `docs/art_source/README.md` - art source sizes + usage
+- `SUPPORT.md` - support and help
 
 ## Requirements
 
 - Node.js 18+ recommended
 - Expo CLI via `npx`
+- PostgreSQL (for server persistence)
