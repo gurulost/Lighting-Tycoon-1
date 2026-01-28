@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { View, StyleSheet, Modal, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -33,6 +33,7 @@ import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
+import { TIER_NAMES } from "@/types/game";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
 const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
@@ -164,7 +165,7 @@ function BottomButton({
 
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, undoLastMove } = useGame();
+  const { state, dispatch, undoLastMove, getFulfillmentIndices } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -192,6 +193,8 @@ export default function GameScreen() {
   const tutorialStepRef = useRef(state.tutorialStep);
   const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
+  const tierDiscoveryRef = useRef(state.lastTierDiscoveryId);
+  const lockedDiscoveryRef = useRef(state.lastLockedDiscoveryId);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
@@ -201,8 +204,21 @@ export default function GameScreen() {
     !state.lockoutActive &&
     state.orders.length < state.maxOrders &&
     boardPressureBand === "red";
+  const tutorialSkipped = state.tutorialComplete && state.tutorialMetrics.skipped;
+  const fulfillableOrderCount = useMemo(() => {
+    if (state.orders.length === 0) return 0;
+    let count = 0;
+    state.orders.forEach((order) => {
+      if (getFulfillmentIndices(order)) count += 1;
+    });
+    return count;
+  }, [state.orders, state.board, getFulfillmentIndices]);
 
   const closeModal = () => setActiveModal(null);
+  const handleResumeTutorial = () => {
+    dispatch({ type: "RESUME_TUTORIAL" });
+    showToast("Resuming tutorial.", 1800);
+  };
   const setTarget =
     (key: TutorialTarget) =>
     (event: { nativeEvent: { layout: LayoutRect } }) => {
@@ -404,6 +420,28 @@ export default function GameScreen() {
   }, [state.lastRecycleRewardId, state.lastRecycleReward, showToast, dispatch]);
 
   useEffect(() => {
+    if (
+      state.lastTierDiscoveryId !== tierDiscoveryRef.current &&
+      state.lastTierDiscovered
+    ) {
+      const tier = state.lastTierDiscovered;
+      const tierLabel = TIER_NAMES[tier];
+      showToast(`New part: ${tierLabel} (Tier ${tier}).`, 2400);
+    }
+    tierDiscoveryRef.current = state.lastTierDiscoveryId;
+  }, [state.lastTierDiscoveryId, state.lastTierDiscovered, showToast]);
+
+  useEffect(() => {
+    if (state.lastLockedDiscoveryId !== lockedDiscoveryRef.current) {
+      showToast(
+        "Locked parts stay locked when merged and raise Dependency.",
+        2800
+      );
+    }
+    lockedDiscoveryRef.current = state.lastLockedDiscoveryId;
+  }, [state.lastLockedDiscoveryId, showToast]);
+
+  useEffect(() => {
     const hadSpaceUpgrade = spaceUpgradeRef.current;
     const hasSpaceUpgrade = (state.upgrades["space_1"] || 0) > 0;
     if (state.tutorialComplete) {
@@ -522,7 +560,7 @@ export default function GameScreen() {
   }, [isDragging, state.activeStoryBeatId, dispatch]);
 
   useEffect(() => {
-    if (state.tutorialComplete || state.tutorialReplay) return;
+    if (state.tutorialComplete) return;
     if (state.tutorialStep === 3) {
       setActiveModal("orders");
     } else if (state.tutorialStep === 4) {
@@ -551,7 +589,7 @@ export default function GameScreen() {
             reputation={state.reputation}
             research={state.research}
             onCashPress={
-              !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep < 4
+              !state.tutorialComplete && state.tutorialStep < 4
                 ? undefined
                 : () => setActiveModal("upgrades")
             }
@@ -626,6 +664,18 @@ export default function GameScreen() {
         </View>
       </View>
 
+      {tutorialSkipped ? (
+        <Pressable style={styles.resumeBanner} onPress={handleResumeTutorial}>
+          <View style={styles.resumeBannerContent}>
+            <Feather name="play-circle" size={16} color={GameColors.ui.primary} />
+            <ThemedText style={styles.resumeBannerText}>
+              Tutorial skipped — tap to resume
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
+        </Pressable>
+      ) : null}
+
       {state.activeStoryBeatId && !isDragging && !activeModal ? (
         <Pressable style={styles.storyToastContainer} onPress={handleStoryPress}>
           <StoryToast
@@ -645,8 +695,20 @@ export default function GameScreen() {
               showToast("Workbench cooling down.");
             }
           }}
-          onOrderInboxPress={() => setActiveModal("orders")}
-          onRDBenchPress={() => setActiveModal("rd")}
+          onOrderInboxPress={() => {
+            if (!state.tutorialComplete && state.tutorialStep < 3) {
+              showToast("Finish Step 3 to unlock Orders.", 2200);
+              return;
+            }
+            setActiveModal("orders");
+          }}
+          onRDBenchPress={() => {
+            if (state.upgrades["rd_unlock"] < 1) {
+              showToast("Unlock R&D via upgrades to access the lab.", 2200);
+              return;
+            }
+            setActiveModal("rd");
+          }}
           onStationLongPress={(station) => {
             if (station === "workbench") {
               showToast("Workbench: tap to spawn parts. Cooldown improves with upgrades.", 2600);
@@ -689,9 +751,9 @@ export default function GameScreen() {
           onDisabledPress={() =>
             showToast("Finish the tutorial to unlock Orders.", 2200)
           }
-          badge={state.orders.length}
+          badge={fulfillableOrderCount}
           paused={orderSpawnPaused}
-          disabled={!state.tutorialComplete && !state.tutorialReplay && state.tutorialStep < 3}
+          disabled={!state.tutorialComplete && state.tutorialStep < 3}
           onLayout={setTarget("orders")}
         />
 
@@ -703,7 +765,7 @@ export default function GameScreen() {
           onDisabledPress={() =>
             showToast("Finish the tutorial to unlock the Shop.", 2200)
           }
-          disabled={!state.tutorialComplete && !state.tutorialReplay && state.tutorialStep < 4}
+          disabled={!state.tutorialComplete && state.tutorialStep < 4}
           onLayout={setTarget("upgrades")}
         />
 
@@ -768,7 +830,7 @@ export default function GameScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
-          if (state.tutorialComplete || state.tutorialReplay || state.tutorialStep !== 3) {
+          if (state.tutorialComplete || state.tutorialStep !== 3) {
             closeModal();
           }
         }}
@@ -776,7 +838,7 @@ export default function GameScreen() {
         <OrdersModal
           onClose={closeModal}
           closeDisabled={
-            !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep === 3
+            !state.tutorialComplete && state.tutorialStep === 3
           }
         />
       </Modal>
@@ -786,7 +848,7 @@ export default function GameScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
-          if (state.tutorialComplete || state.tutorialReplay || state.tutorialStep !== 4) {
+          if (state.tutorialComplete || state.tutorialStep !== 4) {
             closeModal();
           }
         }}
@@ -794,10 +856,10 @@ export default function GameScreen() {
         <UpgradesModal
           onClose={closeModal}
           closeDisabled={
-            !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep === 4
+            !state.tutorialComplete && state.tutorialStep === 4
           }
           tutorialOnlyUpgradeId={
-            !state.tutorialComplete && !state.tutorialReplay && state.tutorialStep === 4
+            !state.tutorialComplete && state.tutorialStep === 4
               ? "space_1"
               : undefined
           }
@@ -915,6 +977,30 @@ const styles = StyleSheet.create({
   },
   statusItem: {
     flex: 1,
+  },
+  resumeBanner: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  resumeBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  resumeBannerText: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+    fontWeight: "600",
   },
   storyToastContainer: {
     marginHorizontal: Spacing.lg,

@@ -128,6 +128,11 @@ export interface GameState {
   highlightedOrderId?: string;
   lastRecycleRewardId: number;
   lastRecycleReward: { cash: number; research: number } | null;
+  tierDiscovery: Record<number, boolean>;
+  lastTierDiscoveryId: number;
+  lastTierDiscovered?: PartTier;
+  lockedDiscoverySeen: boolean;
+  lastLockedDiscoveryId: number;
   
   lockoutActive: boolean;
   lockoutPhase: number;
@@ -138,6 +143,10 @@ export interface GameState {
   baronOfferAvailable: boolean;
   baronOfferSeen: boolean;
   baronOfferCooldownUntil: number;
+  baronChoice?: "accepted" | "declined";
+
+  tier5ShowcaseSeen: boolean;
+  tier5ShowcasePending: boolean;
 
   settings: {
     soundEnabled: boolean;

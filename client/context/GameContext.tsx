@@ -61,6 +61,7 @@ type GameAction =
   | { type: "AUTO_COMPLETE_TUTORIAL_BARON" }
   | { type: "ENSURE_TUTORIAL_BARON_OFFER" }
   | { type: "COMPLETE_TUTORIAL"; skipped?: boolean }
+  | { type: "RESUME_TUTORIAL" }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
   | { type: "UPDATE_SETTINGS"; settings: Partial<GameState["settings"]> }
@@ -79,11 +80,21 @@ function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
 
-function getRandomFamily(dependency: number, rdNodes: Record<string, boolean>): PartFamily {
-  let lockedChance = 0.3 + (dependency / 100) * 0.3;
+function getRandomFamily(
+  dependency: number,
+  rdNodes: Record<string, boolean>,
+  baronOfferSeen: boolean,
+  baronChoice?: "accepted" | "declined"
+): PartFamily {
+  if (!baronOfferSeen) return "open";
+  const choice = baronChoice ?? "declined";
+  const baseLockedChance = choice === "accepted" ? 0.15 : 0.03;
+  const maxExtra = choice === "accepted" ? 0.1 : 0.05;
+  let lockedChance = baseLockedChance + (dependency / 100) * maxExtra;
   if (rdNodes["open_standard_2"]) {
-    lockedChance -= 0.1;
+    lockedChance -= 0.08;
   }
+  lockedChance = Math.max(0, Math.min(0.35, lockedChance));
   return Math.random() < lockedChance ? "locked" : "open";
 }
 
@@ -319,10 +330,57 @@ function createFirstSessionOrder(index: number): Order | null {
   return { ...template, id: generateId() };
 }
 
+function isProtectedOrder(state: GameState, order: Order) {
+  if (order.isTutorial || order.id === state.tutorialOrderId) return true;
+  if (order.isLockout || order.type === "lab_request") return true;
+  if (order.modifierIds?.includes("first_session")) return true;
+  if (order.modifierIds?.includes("tier5_showcase")) return true;
+  return false;
+}
+
+function insertTier5ShowcaseOrder(
+  state: GameState,
+  orders: Order[]
+): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
+  const showcaseOrder = createTier5ShowcaseOrder();
+  if (orders.length < state.maxOrders) {
+    return {
+      orders: [...orders, showcaseOrder],
+      highlightedOrderId: state.highlightedOrderId,
+      inserted: true,
+    };
+  }
+
+  let removableIndex = -1;
+  for (let i = orders.length - 1; i >= 0; i -= 1) {
+    if (!isProtectedOrder(state, orders[i])) {
+      removableIndex = i;
+      break;
+    }
+  }
+  if (removableIndex === -1) {
+    return { orders, highlightedOrderId: state.highlightedOrderId, inserted: false };
+  }
+
+  const removedOrder = orders[removableIndex];
+  const nextOrders = orders.filter((_, index) => index !== removableIndex);
+  const nextHighlightedOrderId =
+    state.highlightedOrderId === removedOrder.id ? undefined : state.highlightedOrderId;
+
+  return {
+    orders: [...nextOrders, showcaseOrder],
+    highlightedOrderId: nextHighlightedOrderId,
+    inserted: true,
+  };
+}
+
 function getRecycleReward(part: Part) {
   const baseValue = { 1: 20, 2: 50, 3: 100, 4: 200, 5: 400 }[part.tier];
   const cash = Math.max(1, Math.floor(baseValue * 0.2));
-  const research = part.family === "open" ? Math.max(0, part.tier - 2) : 0;
+  let research = part.family === "open" ? Math.max(0, part.tier - 2) : 0;
+  if (part.tier === 5) {
+    research = Math.max(research, part.family === "open" ? 12 : 8);
+  }
   return { cash, research };
 }
 
@@ -476,6 +534,18 @@ function createTutorialOrder(): Order {
   };
 }
 
+function createTier5ShowcaseOrder(): Order {
+  return {
+    id: generateId(),
+    title: "Showcase System",
+    type: "premium",
+    requirements: [{ tier: 5, family: "any", count: 1 }],
+    rewards: { cash: 320, reputation: 60, research: 10 },
+    flavorText: "A signature install to prove you can deliver the best.",
+    modifierIds: ["tier5_showcase"],
+  };
+}
+
 function createTutorialMetrics() {
   const now = Date.now();
   return {
@@ -583,6 +653,11 @@ function getInitialState(): GameState {
     highlightedOrderId: undefined,
     lastRecycleRewardId: 0,
     lastRecycleReward: null,
+    tierDiscovery: {},
+    lastTierDiscoveryId: 0,
+    lastTierDiscovered: undefined,
+    lockedDiscoverySeen: false,
+    lastLockedDiscoveryId: 0,
     lockoutActive: false,
     lockoutPhase: 0,
     lockoutOrderId: undefined,
@@ -591,6 +666,9 @@ function getInitialState(): GameState {
     baronOfferAvailable: false,
     baronOfferSeen: false,
     baronOfferCooldownUntil: 0,
+    baronChoice: undefined,
+    tier5ShowcaseSeen: false,
+    tier5ShowcasePending: false,
     settings: {
       soundEnabled: true,
       hapticsEnabled: true,
@@ -650,7 +728,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       
       const isTutorial = !state.tutorialComplete;
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
-      const forceOpenParts = isTutorial && !state.baronOfferSeen;
+      const forceOpenParts = !state.baronOfferSeen;
       const forceTierOne = isTutorial && state.tutorialStep <= 2;
       const forcedTier =
         firstSessionActive && state.firstSessionForcedDrops.length > 0
@@ -660,9 +738,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ? "open"
         : forcedTier
         ? "open"
-        : getRandomFamily(state.dependency, state.rdNodes);
+        : getRandomFamily(state.dependency, state.rdNodes, state.baronOfferSeen, state.baronChoice);
       const tier = forceTierOne ? 1 : forcedTier ?? getRandomTier(state.upgrades, family, state.dependency);
       const part = createPart(emptySlot, family, tier);
+      const sawLocked = part.family === "locked" && !state.lockedDiscoverySeen;
       
       const newBoard = [...state.board];
       newBoard[emptySlot] = part;
@@ -698,6 +777,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
         undoSnapshot: undefined,
       };
+      if (sawLocked) {
+        nextState = {
+          ...nextState,
+          lockedDiscoverySeen: true,
+          lastLockedDiscoveryId: state.lastLockedDiscoveryId + 1,
+        };
+      }
       if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
         nextState = queueStoryBeat(nextState, "tina_intro");
       }
@@ -719,6 +805,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const mergedCompatible =
         mergedFamily === "open" && (fromPart.compatible || toPart.compatible);
       const mergedPart = createPart(toIndex, mergedFamily, newTier, mergedCompatible);
+      const sawLocked = mergedFamily === "locked" && !state.lockedDiscoverySeen;
       
       const newBoard = [...state.board];
       newBoard[fromIndex] = null;
@@ -806,6 +893,42 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialBonusRep = 2;
         tutorialStoryBeat = "tutorial_merge_2";
       }
+
+      let nextOrders = tutorialOrders || state.orders;
+      let nextHighlightedOrderId = state.highlightedOrderId;
+      let nextTier5ShowcaseSeen = state.tier5ShowcaseSeen;
+      let nextTier5ShowcasePending = state.tier5ShowcasePending;
+      let nextTierDiscovery = state.tierDiscovery;
+      let nextTierDiscoveryId = state.lastTierDiscoveryId;
+      let nextTierDiscovered = state.lastTierDiscovered;
+      let nextLockedDiscoverySeen = state.lockedDiscoverySeen;
+      let nextLockedDiscoveryId = state.lastLockedDiscoveryId;
+
+      if (newTier >= 2 && !state.tierDiscovery[newTier]) {
+        nextTierDiscovery = { ...state.tierDiscovery, [newTier]: true };
+        nextTierDiscoveryId = state.lastTierDiscoveryId + 1;
+        nextTierDiscovered = newTier;
+      }
+      if (sawLocked) {
+        nextLockedDiscoverySeen = true;
+        nextLockedDiscoveryId = state.lastLockedDiscoveryId + 1;
+      }
+
+      if (
+        newTier === 5 &&
+        !state.tier5ShowcaseSeen &&
+        !state.tier5ShowcasePending
+      ) {
+        const showcaseResult = insertTier5ShowcaseOrder(state, nextOrders);
+        if (showcaseResult.inserted) {
+          nextOrders = showcaseResult.orders;
+          nextHighlightedOrderId = showcaseResult.highlightedOrderId;
+          nextTier5ShowcaseSeen = true;
+          nextTier5ShowcasePending = false;
+        } else {
+          nextTier5ShowcasePending = true;
+        }
+      }
       
       let nextState: GameState = {
         ...state,
@@ -823,7 +946,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialNudgeCount: tutorialUpdate.tutorialNudgeCount ?? state.tutorialNudgeCount,
         tutorialMergeCount: nextTutorialMergeCount,
         tutorialOrderId: tutorialOrder ? tutorialOrder.id : state.tutorialOrderId,
-        orders: tutorialOrders || state.orders,
+        orders: nextOrders,
+        highlightedOrderId: nextHighlightedOrderId,
+        tier5ShowcaseSeen: nextTier5ShowcaseSeen,
+        tier5ShowcasePending: nextTier5ShowcasePending,
+        tierDiscovery: nextTierDiscovery,
+        lastTierDiscoveryId: nextTierDiscoveryId,
+        lastTierDiscovered: nextTierDiscovered,
+        lockedDiscoverySeen: nextLockedDiscoverySeen,
+        lastLockedDiscoveryId: nextLockedDiscoveryId,
         undoSnapshot: {
           board: [...state.board],
           backpack: [...state.backpack],
@@ -1474,6 +1605,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (order.modifierIds?.includes("first_session")) {
         return state;
       }
+      if (order.modifierIds?.includes("tier5_showcase")) {
+        return state;
+      }
       return {
         ...state,
         orders: state.orders.filter((o) => o.id !== action.orderId),
@@ -1489,6 +1623,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       
       const tier = Math.random() < 0.5 ? 2 : 3;
       const part = createPart(emptySlot, "locked", tier as PartTier);
+      const sawLocked = !state.lockedDiscoverySeen;
       
       const newBoard = [...state.board];
       newBoard[emptySlot] = part;
@@ -1511,6 +1646,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferAvailable: false,
         baronOfferSeen: true,
         baronOfferCooldownUntil: Date.now() + 60000,
+        baronChoice: "accepted",
+        lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
+        lastLockedDiscoveryId: sawLocked
+          ? state.lastLockedDiscoveryId + 1
+          : state.lastLockedDiscoveryId,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
         tutorialStepStartedAt: tutorialAdvance
           ? tutorialAdvance.tutorialStepStartedAt
@@ -1559,6 +1699,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferAvailable: false,
         baronOfferSeen: true,
         baronOfferCooldownUntil: Date.now() + 60000,
+        baronChoice: "declined",
         cash: emptySlot === -1 ? state.cash + 10 : state.cash,
         research: emptySlot === -1 ? state.research + 2 : state.research,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
@@ -1588,6 +1729,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.tutorialComplete) return state;
       if (state.lockoutActive) return state;
       if (state.orders.length >= state.maxOrders) return state;
+
+      if (state.tier5ShowcasePending && !state.tier5ShowcaseSeen) {
+        const showcaseResult = insertTier5ShowcaseOrder(state, state.orders);
+        if (showcaseResult.inserted) {
+          return {
+            ...state,
+            orders: showcaseResult.orders,
+            highlightedOrderId: showcaseResult.highlightedOrderId,
+            tier5ShowcaseSeen: true,
+            tier5ShowcasePending: false,
+          };
+        }
+      }
 
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
       let workingState = state;
@@ -1799,6 +1953,27 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "RESUME_TUTORIAL": {
+      if (!state.tutorialComplete) return state;
+      const now = Date.now();
+      return {
+        ...state,
+        tutorialComplete: false,
+        tutorialReplay: true,
+        tutorialStepStartedAt: now,
+        tutorialNudgeCount: 0,
+        tutorialHint: undefined,
+        tutorialMetrics: {
+          ...state.tutorialMetrics,
+          skipped: false,
+          stepStartedAt: {
+            ...state.tutorialMetrics.stepStartedAt,
+            [state.tutorialStep]: now,
+          },
+        },
+      };
+    }
+
     case "RESET_TUTORIAL": {
       const now = Date.now();
       return {
@@ -1829,7 +2004,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferAvailable: false,
         baronOfferSeen: false,
         baronOfferCooldownUntil: 0,
+        baronChoice: undefined,
         orderSpawnCooldownUntil: 0,
+        tier5ShowcaseSeen: false,
+        tier5ShowcasePending: false,
       };
     }
 
@@ -2100,6 +2278,38 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.workbenchCooldownUntil === "number"
           ? action.state.workbenchCooldownUntil
           : 0;
+      const baronChoice =
+        action.state.baronChoice === "accepted" || action.state.baronChoice === "declined"
+          ? action.state.baronChoice
+          : base.baronChoice;
+      const tier5ShowcaseSeen =
+        typeof action.state.tier5ShowcaseSeen === "boolean"
+          ? action.state.tier5ShowcaseSeen
+          : base.tier5ShowcaseSeen;
+      const tier5ShowcasePending =
+        typeof action.state.tier5ShowcasePending === "boolean"
+          ? action.state.tier5ShowcasePending
+          : base.tier5ShowcasePending;
+      const tierDiscovery =
+        action.state.tierDiscovery && typeof action.state.tierDiscovery === "object"
+          ? action.state.tierDiscovery
+          : base.tierDiscovery;
+      const lastTierDiscoveryId =
+        typeof action.state.lastTierDiscoveryId === "number"
+          ? action.state.lastTierDiscoveryId
+          : base.lastTierDiscoveryId;
+      const lastTierDiscovered =
+        typeof action.state.lastTierDiscovered === "number"
+          ? (action.state.lastTierDiscovered as PartTier)
+          : base.lastTierDiscovered;
+      const lockedDiscoverySeen =
+        typeof action.state.lockedDiscoverySeen === "boolean"
+          ? action.state.lockedDiscoverySeen
+          : base.lockedDiscoverySeen;
+      const lastLockedDiscoveryId =
+        typeof action.state.lastLockedDiscoveryId === "number"
+          ? action.state.lastLockedDiscoveryId
+          : base.lastLockedDiscoveryId;
       let restoredState: GameState = {
         ...base,
         ...action.state,
@@ -2148,6 +2358,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastRecycleRewardId: 0,
         lastRecycleReward: null,
         workbenchCooldownUntil: restoredWorkbenchCooldownUntil,
+        baronChoice,
+        tier5ShowcaseSeen,
+        tier5ShowcasePending,
+        tierDiscovery,
+        lastTierDiscoveryId,
+        lastTierDiscovered,
+        lockedDiscoverySeen,
+        lastLockedDiscoveryId,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -2318,6 +2536,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.baronOfferAvailable,
       state.baronOfferSeen,
       state.baronOfferCooldownUntil,
+      state.baronChoice,
       state.settings,
       state.undoCooldownUntil,
       state.mergeChainCount,
@@ -2333,6 +2552,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.highlightedOrderId,
       state.orderSpawnCooldownUntil,
       state.lastCriticalEventId,
+      state.tier5ShowcaseSeen,
+      state.tier5ShowcasePending,
+      state.tierDiscovery,
+      state.lastTierDiscoveryId,
+      state.lastTierDiscovered,
+      state.lockedDiscoverySeen,
+      state.lastLockedDiscoveryId,
     ]
   );
 
