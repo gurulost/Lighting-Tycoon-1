@@ -1590,6 +1590,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.orders.length >= state.maxOrders) return state;
 
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
+      let workingState = state;
       if (firstSessionActive) {
         if (state.firstSessionOrderIndex < FIRST_SESSION_ORDERS.length) {
           const scriptedOrder = createFirstSessionOrder(state.firstSessionOrderIndex);
@@ -1605,33 +1606,43 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
           return nextState;
         }
-        return state;
+        const hasFirstSessionOrders = state.orders.some((order) =>
+          order.modifierIds?.includes("first_session")
+        );
+        if (hasFirstSessionOrders) {
+          return state;
+        }
+        workingState = {
+          ...state,
+          firstSessionComplete: true,
+          firstSessionForcedDrops: [],
+        };
       }
 
       const now = Date.now();
-      if (state.orderSpawnCooldownUntil && now < state.orderSpawnCooldownUntil) {
-        return state;
+      if (workingState.orderSpawnCooldownUntil && now < workingState.orderSpawnCooldownUntil) {
+        return workingState;
       }
-      const freeSlots = countFreeSlots(state);
+      const freeSlots = countFreeSlots(workingState);
       const pressureBand = getBoardPressureBand(freeSlots);
-      if (pressureBand === "red") return state;
+      if (pressureBand === "red") return workingState;
       const cooldownMultiplier = pressureBand === "yellow" ? ORDER_SPAWN_YELLOW_MULT : 1;
 
-      const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
+      const rdUnlocked = workingState.upgrades["rd_unlock"] >= 1;
       const newOrder = generateOrder(
-        state.dependency,
-        state.orders,
+        workingState.dependency,
+        workingState.orders,
         rdUnlocked,
-        state.currentNeighborhoodId
+        workingState.currentNeighborhoodId
       );
-      if (!newOrder) return state;
+      if (!newOrder) return workingState;
 
       return {
-        ...state,
-        orders: [...state.orders, newOrder],
-        orderMetrics: updateOrderMetrics(state, newOrder),
+        ...workingState,
+        orders: [...workingState.orders, newOrder],
+        orderMetrics: updateOrderMetrics(workingState, newOrder),
         orderSpawnCooldownUntil:
-          now + Math.round(getOrderIntervalMs(state.reputationTier) * cooldownMultiplier),
+          now + Math.round(getOrderIntervalMs(workingState.reputationTier) * cooldownMultiplier),
       };
     }
 

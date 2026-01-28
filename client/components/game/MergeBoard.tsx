@@ -673,6 +673,8 @@ export function MergeBoard({
     const isHighlighted = highlightedSlots.includes(index);
     const isOrderHighlighted = orderHighlightSlots.includes(index);
     const ghostTier = ghostSlotMap[index];
+    const isDragged =
+      dragSource?.source === "board" && dragSource.index === index;
     const isMergeTarget =
       isHighlighted && part !== null && dragFromIndex !== null && canMerge(dragFromIndex, index);
 
@@ -717,6 +719,8 @@ export function MergeBoard({
           {
             width: tileSize,
             height: tileSize,
+            zIndex: isDragged ? 50 : 0,
+            elevation: isDragged ? 50 : 0,
             borderColor: isHighlighted
               ? isMergeTarget
                 ? GameColors.ui.primary
@@ -1175,7 +1179,7 @@ const styles = StyleSheet.create({
   },
   tile: {
     borderRadius: BorderRadius.xs,
-    overflow: "hidden",
+    overflow: "visible",
   },
   tileGradient: {
     flex: 1,

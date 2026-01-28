@@ -158,6 +158,7 @@ export function PartItem({
         { scale: scale.value },
       ],
       zIndex: zIndex.value,
+      elevation: zIndex.value,
       shadowOpacity: glowOpacity,
     };
   });
