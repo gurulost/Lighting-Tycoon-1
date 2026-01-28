@@ -772,19 +772,17 @@ function getTutorialLockedMergeStatus(state: GameState): {
 
   let targetTier: PartTier = 1;
   let hasPair = false;
-  for (const tier of lockedTiers) {
-    if (openTiers.has(tier)) {
-      targetTier = tier;
-      hasPair = true;
-      break;
-    }
+  const overlap = Array.from(lockedTiers).filter((tier) => openTiers.has(tier));
+  if (overlap.length > 0) {
+    targetTier = Math.min(...overlap) as PartTier;
+    hasPair = true;
   }
 
   if (!hasPair) {
-    if (lockedTiers.size > 0) {
-      targetTier = Math.min(...Array.from(lockedTiers)) as PartTier;
-    } else if (openTiers.size > 0) {
+    if (openTiers.size > 0) {
       targetTier = Math.min(...Array.from(openTiers)) as PartTier;
+    } else if (lockedTiers.size > 0) {
+      targetTier = Math.min(...Array.from(lockedTiers)) as PartTier;
     }
   }
 
@@ -1026,7 +1024,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialStoryBeat = "tutorial_merge_2";
       }
 
-      if (isTutorial && state.tutorialStep === 6 && mergedFamily === "locked") {
+      if (
+        isTutorial &&
+        state.tutorialStep === 6 &&
+        fromPart.family !== toPart.family
+      ) {
         tutorialUpdate = advanceTutorialStep(state, 7);
         tutorialStoryBeat = "tutorial_locked_merge";
       }
@@ -2100,6 +2102,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextBackpack = state.backpack;
       let hint = state.tutorialHint;
       let placedLocked = false;
+      let placedInBackpack = false;
 
       if (status.needsLocked) {
         const placement = placeTutorialPart(
@@ -2112,6 +2115,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextBoard = placement.board;
         nextBackpack = placement.backpack;
         placedLocked = placement.placed;
+        placedInBackpack = placedInBackpack || placement.placedInBackpack;
         if (!placement.placed) {
           hint = "Clear a slot so we can drop a locked part.";
         }
@@ -2127,6 +2131,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         );
         nextBoard = placement.board;
         nextBackpack = placement.backpack;
+        placedInBackpack = placedInBackpack || placement.placedInBackpack;
         if (!placement.placed) {
           hint = hint ?? "Clear a slot so we can drop an open part.";
         }
@@ -2139,6 +2144,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       });
       if (!postStatus.needsLocked && !postStatus.needsOpen) {
         hint = undefined;
+      }
+      if (!hint && placedInBackpack) {
+        hint = "Demo part placed in backpack — drag it onto the board.";
       }
 
       const sawLocked = placedLocked && !state.lockedDiscoverySeen;
