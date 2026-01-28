@@ -195,6 +195,7 @@ export default function GameScreen() {
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
   const tierDiscoveryRef = useRef(state.lastTierDiscoveryId);
   const lockedDiscoveryRef = useRef(state.lastLockedDiscoveryId);
+  const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
@@ -440,6 +441,17 @@ export default function GameScreen() {
     }
     lockedDiscoveryRef.current = state.lastLockedDiscoveryId;
   }, [state.lastLockedDiscoveryId, showToast]);
+
+  useEffect(() => {
+    const previousIds = new Set(orderIdsRef.current);
+    const newRushOrder = state.orders.find(
+      (order) => order.rushDeadline && !previousIds.has(order.id)
+    );
+    if (newRushOrder) {
+      showToast("Rush order incoming — limited-time bonus!", 2600);
+    }
+    orderIdsRef.current = state.orders.map((order) => order.id);
+  }, [state.orders, showToast]);
 
   useEffect(() => {
     const hadSpaceUpgrade = spaceUpgradeRef.current;

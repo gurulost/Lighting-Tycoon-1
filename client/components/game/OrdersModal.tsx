@@ -9,6 +9,7 @@ import { OrderCard } from "./OrderCard";
 import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { Order } from "@/types/game";
 
 interface OrdersModalProps {
   onClose: () => void;
@@ -18,6 +19,23 @@ interface OrdersModalProps {
 export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
+  const refreshCost = 40 + state.reputationTier * 20;
+
+  const isRefreshable = (order: Order) =>
+    !order.isTutorial &&
+    !order.isLockout &&
+    !(state.lockoutActive && order.type === "lab_request") &&
+    !order.modifierIds?.includes("first_session") &&
+    !order.modifierIds?.includes("tier5_showcase");
+
+  const refreshTarget =
+    state.highlightedOrderId &&
+    state.orders.find(
+      (order) => order.id === state.highlightedOrderId && isRefreshable(order)
+    )
+      ? state.orders.find((order) => order.id === state.highlightedOrderId)!
+      : state.orders.find((order) => isRefreshable(order));
+  const canRefresh = state.tutorialComplete && Boolean(refreshTarget) && state.cash >= refreshCost;
 
   const handleFulfillOrder = (orderId: string) => {
     const order = state.orders.find((o) => o.id === orderId);
@@ -34,6 +52,11 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
 
   const handleDismissOrder = (orderId: string) => {
     dispatch({ type: "DISMISS_ORDER", orderId });
+  };
+
+  const handleRefreshOrder = () => {
+    if (!refreshTarget) return;
+    dispatch({ type: "REFRESH_ORDER", orderId: refreshTarget.id });
   };
 
   return (
@@ -62,6 +85,22 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
           <ThemedText style={styles.statLabel}>Coins</ThemedText>
         </View>
       </View>
+
+      {state.tutorialComplete ? (
+        <View style={styles.refreshRow}>
+          <Pressable
+            style={[styles.refreshButton, !canRefresh && styles.refreshButtonDisabled]}
+            onPress={canRefresh ? handleRefreshOrder : undefined}
+          >
+            <Feather name="refresh-cw" size={16} color={GameColors.ui.primary} />
+            <ThemedText style={styles.refreshLabel}>Refresh 1 order</ThemedText>
+          </Pressable>
+          <View style={styles.refreshCost}>
+            <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
+            <ThemedText style={styles.refreshCostText}>{refreshCost}</ThemedText>
+          </View>
+        </View>
+      ) : null}
 
       <ScrollView
         style={styles.scrollView}
@@ -117,6 +156,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     gap: Spacing.md,
+  },
+  refreshRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  refreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  refreshButtonDisabled: {
+    opacity: 0.5,
+  },
+  refreshLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.primary,
+  },
+  refreshCost: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  refreshCostText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.currency.cash,
   },
   statItem: {
     flex: 1,

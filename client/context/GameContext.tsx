@@ -53,6 +53,7 @@ type GameAction =
   | { type: "CRAFT_FREEDOM_CONTROLLER" }
   | { type: "USE_FREEDOM_CONTROLLER"; partIndex: number }
   | { type: "DISMISS_ORDER"; orderId: string }
+  | { type: "REFRESH_ORDER"; orderId: string }
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
@@ -204,6 +205,10 @@ function getOrderIntervalMs(reputationTier: number) {
   return Math.max(2500, base - reputationTier * step);
 }
 
+function getOrderRefreshCost(reputationTier: number) {
+  return 40 + reputationTier * 20;
+}
+
 const ORDER_SPAWN_YELLOW_MULT = 1.6;
 const MAX_STORY_LOG_ENTRIES = 120;
 const PERSISTED_STORY_LOG_LIMIT = 120;
@@ -219,6 +224,22 @@ const SAVE_MAX_WAIT_MS = 12000;
 function getNeighborhoodIndex(id: string) {
   const index = NEIGHBORHOODS.findIndex((n) => n.id === id);
   return index === -1 ? 0 : index;
+}
+
+function getOrderDifficulty(order: { requirements: { tier: PartTier; count: number }[] }) {
+  return order.requirements.reduce((sum, req) => sum + req.tier * req.count, 0);
+}
+
+function getTargetOrderDifficulty(
+  reputationTier: number,
+  maxTierCrafted: number,
+  upgrades: Record<string, number>
+) {
+  const tierScore = Math.max(1, maxTierCrafted);
+  const repScore = Math.max(0, reputationTier);
+  const qualityBonus = upgrades["workbench_quality_1"] || 0;
+  const target = Math.round(tierScore + repScore * 0.5 + qualityBonus * 0.5);
+  return Math.max(2, Math.min(10, target));
 }
 
 function hashString(value: string) {
@@ -407,7 +428,10 @@ function generateOrder(
   dependency: number,
   orders: Order[],
   rdUnlocked: boolean,
-  currentNeighborhoodId: string
+  currentNeighborhoodId: string,
+  reputationTier: number,
+  maxTierCrafted: number,
+  upgrades: Record<string, number>
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
   const currentNeighborhood =
@@ -430,10 +454,18 @@ function generateOrder(
     return true;
   });
 
+  const targetDifficulty = getTargetOrderDifficulty(
+    reputationTier,
+    maxTierCrafted,
+    upgrades
+  );
   const weightedTemplates = availableTemplates.map((template) => {
     const diff = Math.max(0, neighborhoodIndex - getNeighborhoodIndex(template.minNeighborhoodId));
     const falloff = Math.pow(0.7, diff);
-    return { ...template, weight: (template.weight ?? 1) * falloff };
+    const templateDifficulty = getOrderDifficulty(template);
+    const difficultyDelta = Math.abs(templateDifficulty - targetDifficulty);
+    const difficultyWeight = Math.pow(0.75, difficultyDelta);
+    return { ...template, weight: (template.weight ?? 1) * falloff * difficultyWeight };
   });
 
   const template = pickWeightedTemplate(weightedTemplates);
@@ -689,9 +721,10 @@ function getInitialState(): GameState {
     reputationTier: 0,
     currentNeighborhoodId: startingNeighborhood.id,
 
-      orderMetrics: DEFAULT_ORDER_METRICS,
+    orderMetrics: DEFAULT_ORDER_METRICS,
     orderSpawnCooldownUntil: 0,
     lastCriticalEventId: 0,
+    maxTierCrafted: 1,
   };
 }
 
@@ -706,6 +739,21 @@ function findEmptySlot(state: GameState): number {
     }
   }
   return -1;
+}
+
+function findEmptySlots(state: GameState, count: number): number[] {
+  const slots: number[] = [];
+  for (let i = 0; i < state.boardSize; i++) {
+    if (
+      state.board[i] === null &&
+      !state.stationSlots.includes(i) &&
+      !state.blockedSlots.includes(i)
+    ) {
+      slots.push(i);
+      if (slots.length >= count) break;
+    }
+  }
+  return slots;
 }
 
 function getWorkbenchCooldownRemaining(state: GameState, now = Date.now()): number {
@@ -742,6 +790,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const tier = forceTierOne ? 1 : forcedTier ?? getRandomTier(state.upgrades, family, state.dependency);
       const part = createPart(emptySlot, family, tier);
       const sawLocked = part.family === "locked" && !state.lockedDiscoverySeen;
+      const nextMaxTierCrafted = Math.max(state.maxTierCrafted, part.tier);
       
       const newBoard = [...state.board];
       newBoard[emptySlot] = part;
@@ -775,6 +824,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialMetrics: tutorialAdvance.tutorialMetrics,
         tutorialHint: tutorialAdvance.tutorialHint,
         tutorialNudgeCount: tutorialAdvance.tutorialNudgeCount,
+        maxTierCrafted: nextMaxTierCrafted,
         undoSnapshot: undefined,
       };
       if (sawLocked) {
@@ -806,6 +856,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mergedFamily === "open" && (fromPart.compatible || toPart.compatible);
       const mergedPart = createPart(toIndex, mergedFamily, newTier, mergedCompatible);
       const sawLocked = mergedFamily === "locked" && !state.lockedDiscoverySeen;
+      const nextMaxTierCrafted = Math.max(state.maxTierCrafted, newTier);
       
       const newBoard = [...state.board];
       newBoard[fromIndex] = null;
@@ -955,6 +1006,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastTierDiscovered: nextTierDiscovered,
         lockedDiscoverySeen: nextLockedDiscoverySeen,
         lastLockedDiscoveryId: nextLockedDiscoveryId,
+        maxTierCrafted: nextMaxTierCrafted,
         undoSnapshot: {
           board: [...state.board],
           backpack: [...state.backpack],
@@ -1617,16 +1669,62 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "REFRESH_ORDER": {
+      const order = state.orders.find((o) => o.id === action.orderId);
+      if (!order) return state;
+      if (isProtectedOrder(state, order)) return state;
+      const refreshCost = getOrderRefreshCost(state.reputationTier);
+      if (state.cash < refreshCost) return state;
+
+      const remainingOrders = state.orders.filter((o) => o.id !== action.orderId);
+      const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
+      const newOrder = generateOrder(
+        state.dependency,
+        remainingOrders,
+        rdUnlocked,
+        state.currentNeighborhoodId,
+        state.reputationTier,
+        state.maxTierCrafted,
+        state.upgrades
+      );
+      if (!newOrder) return state;
+
+      return {
+        ...state,
+        cash: state.cash - refreshCost,
+        orders: [...remainingOrders, newOrder],
+        orderMetrics: updateOrderMetrics(state, newOrder),
+        highlightedOrderId:
+          state.highlightedOrderId === action.orderId ? undefined : state.highlightedOrderId,
+        orderSpawnCooldownUntil: Date.now() + getOrderIntervalMs(state.reputationTier),
+        undoSnapshot: undefined,
+      };
+    }
+
     case "ACCEPT_BARON_OFFER": {
-      const emptySlot = findEmptySlot(state);
-      if (emptySlot === -1) return state;
-      
-      const tier = Math.random() < 0.5 ? 2 : 3;
-      const part = createPart(emptySlot, "locked", tier as PartTier);
+      const emptySlots = findEmptySlots(state, 2);
       const sawLocked = !state.lockedDiscoverySeen;
-      
+      const guaranteedTier = Math.min(4, Math.max(2, state.maxTierCrafted));
+      const secondaryTier = Math.max(2, guaranteedTier - 1);
+      const bonusCash = 60;
+      const bonusResearch = 6;
+      const missingSlots = Math.max(0, 2 - emptySlots.length);
+
       const newBoard = [...state.board];
-      newBoard[emptySlot] = part;
+      if (emptySlots[0] !== undefined) {
+        newBoard[emptySlots[0]] = createPart(
+          emptySlots[0],
+          "locked",
+          guaranteedTier as PartTier
+        );
+      }
+      if (emptySlots[1] !== undefined) {
+        newBoard[emptySlots[1]] = createPart(
+          emptySlots[1],
+          "locked",
+          secondaryTier as PartTier
+        );
+      }
 
       const allowLockout = state.firstSessionComplete;
       const dependencyOutcome = applyDependency(state, 5, allowLockout);
@@ -1651,6 +1749,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastLockedDiscoveryId: sawLocked
           ? state.lastLockedDiscoveryId + 1
           : state.lastLockedDiscoveryId,
+        cash: state.cash + bonusCash + missingSlots * 20,
+        research: state.research + bonusResearch + missingSlots * 4,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
         tutorialStepStartedAt: tutorialAdvance
           ? tutorialAdvance.tutorialStepStartedAt
@@ -1787,7 +1887,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.dependency,
         workingState.orders,
         rdUnlocked,
-        workingState.currentNeighborhoodId
+        workingState.currentNeighborhoodId,
+        workingState.reputationTier,
+        workingState.maxTierCrafted,
+        workingState.upgrades
       );
       if (!newOrder) return workingState;
 
@@ -2310,6 +2413,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.lastLockedDiscoveryId === "number"
           ? action.state.lastLockedDiscoveryId
           : base.lastLockedDiscoveryId;
+      const derivedMaxTier = Math.max(
+        1,
+        ...(Array.isArray(action.state.board)
+          ? action.state.board.map((part) => part?.tier ?? 0)
+          : []),
+        ...(Array.isArray(action.state.backpack)
+          ? action.state.backpack.map((part) => part?.tier ?? 0)
+          : [])
+      );
+      const maxTierCrafted =
+        typeof action.state.maxTierCrafted === "number"
+          ? action.state.maxTierCrafted
+          : derivedMaxTier || base.maxTierCrafted;
       let restoredState: GameState = {
         ...base,
         ...action.state,
@@ -2366,6 +2482,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastTierDiscovered,
         lockedDiscoverySeen,
         lastLockedDiscoveryId,
+        maxTierCrafted,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -2559,6 +2676,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.lastTierDiscovered,
       state.lockedDiscoverySeen,
       state.lastLockedDiscoveryId,
+      state.maxTierCrafted,
     ]
   );
 

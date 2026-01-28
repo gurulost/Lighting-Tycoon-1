@@ -194,6 +194,8 @@ export interface GameState {
   orderSpawnCooldownUntil: number;
 
   lastCriticalEventId: number;
+
+  maxTierCrafted: number;
 }
 
 export const INITIAL_BOARD_SIZE = 30;

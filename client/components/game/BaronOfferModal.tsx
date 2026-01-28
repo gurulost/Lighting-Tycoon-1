@@ -63,14 +63,17 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           <View style={styles.offerBox}>
             <Feather name="package" size={20} color={GameColors.locked.primary} />
             <ThemedText style={styles.offerText}>
-              Get a locked part crate now. Dependency rises with every locked merge.
+              Get two locked parts now (one at your best tier) plus a bonus payout. Dependency
+              rises with every locked merge.
             </ThemedText>
           </View>
 
           <View style={styles.choices}>
             <Pressable style={styles.acceptButton} onPress={handleAccept}>
               <Feather name="zap" size={18} color="#0F0F1F" />
-              <ThemedText style={styles.acceptText}>Accept Crate (+5 Dependency)</ThemedText>
+              <ThemedText style={styles.acceptText}>
+                Accept Crate (+5 Dependency, +60 coins, +6 research)
+              </ThemedText>
             </Pressable>
 
             <Pressable style={styles.declineButton} onPress={handleDecline}>
