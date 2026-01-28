@@ -25,12 +25,14 @@ export type OrderType =
   | "premium"
   | "baron_certified"
   | "locked_required"
+  | "compatibility_required"
   | "lab_request";
 
 export interface OrderRequirement {
   tier: PartTier;
   family: PartFamily | "any";
   count: number;
+  requiresCompatible?: boolean;
 }
 
 export interface Order {

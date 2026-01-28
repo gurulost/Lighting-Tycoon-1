@@ -56,8 +56,12 @@ export function OrderCard({
   const fulfillmentIndices = getFulfillmentIndices(order);
   const canFulfill = fulfillmentIndices !== null;
 
-  const isPartValidForRequirement = (part: Part, req: { tier: PartTier; family: "open" | "locked" | "any" }) => {
+  const isPartValidForRequirement = (
+    part: Part,
+    req: { tier: PartTier; family: "open" | "locked" | "any"; requiresCompatible?: boolean }
+  ) => {
     if (part.tier !== req.tier) return false;
+    if (req.requiresCompatible && !part.compatible) return false;
     if (req.family === "any") return true;
     if (part.family === req.family) return true;
     if (
@@ -138,6 +142,7 @@ export function OrderCard({
 
   const getOrderTypeColor = () => {
     if (order.type === "locked_required") return GameColors.locked.primary;
+    if (order.type === "compatibility_required") return GameColors.ui.success;
     if (order.rushDeadline) return GameColors.ui.danger;
     switch (order.type) {
       case "premium":
@@ -155,6 +160,7 @@ export function OrderCard({
 
   const getOrderTypeIcon = (): keyof typeof Feather.glyphMap => {
     if (order.type === "locked_required") return "lock";
+    if (order.type === "compatibility_required") return "shield";
     if (order.rushDeadline) return "clock";
     switch (order.type) {
       case "premium":
@@ -174,6 +180,9 @@ export function OrderCard({
     if (canFulfill) {
       return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
     }
+    if (order.type === "compatibility_required") {
+      return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
+    }
     if (order.type === "locked_required") {
       return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
     }
@@ -183,6 +192,8 @@ export function OrderCard({
     switch (order.type) {
       case "baron_certified":
         return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
+      case "compatibility_required":
+        return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
       case "premium":
         return [`${GameColors.currency.cash}15`, "#1A1A2E", `${GameColors.currency.cash}15`];
       case "lab_request":
@@ -228,6 +239,9 @@ export function OrderCard({
     if (order.type === "locked_required" || order.type === "baron_certified") {
       return { label: "CERTIFIED", color: GameColors.locked.primary, icon: "lock" as const };
     }
+    if (order.type === "compatibility_required") {
+      return { label: "COMPAT", color: GameColors.ui.success, icon: "shield" as const };
+    }
     if (order.isTutorial) {
       return { label: "REQUIRED", color: GameColors.ui.primary, icon: "compass" as const };
     }
@@ -238,6 +252,9 @@ export function OrderCard({
     const badges: { label: string; color: string; icon: keyof typeof Feather.glyphMap }[] = [];
     if (order.type === "locked_required" || order.type === "baron_certified") {
       badges.push({ label: "Certified", color: GameColors.locked.primary, icon: "lock" });
+    }
+    if (order.type === "compatibility_required" || order.requirements.some((r) => r.requiresCompatible)) {
+      badges.push({ label: "Compatible", color: GameColors.ui.success, icon: "shield" });
     }
     if (order.modifierIds?.includes("mentor_job")) {
       badges.push({
@@ -400,6 +417,8 @@ export function OrderCard({
                 : GameColors.text.secondary;
 
             const showFamily = selected && req.family !== "any";
+            const showCompat = selected && req.requiresCompatible;
+            const compatColor = GameColors.ui.success;
 
             return (
               <View
@@ -433,6 +452,15 @@ export function OrderCard({
                         : order.type === "locked_required"
                         ? "Locked/Compat"
                         : "Locked"}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {showCompat ? (
+                  <View
+                    style={[styles.reqFamilyPill, { borderColor: `${compatColor}50` }]}
+                  >
+                    <ThemedText style={[styles.reqFamilyText, { color: compatColor }]}>
+                      Compat
                     </ThemedText>
                   </View>
                 ) : null}

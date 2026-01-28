@@ -82,7 +82,7 @@ export function PartDetailModal({
                 {isLocked
                   ? "+Dependency on merge"
                   : isCompatible
-                  ? "Counts for locked-required installs"
+                  ? "Counts for locked + compatible installs"
                   : "Generates Research on merge"}
               </ThemedText>
             </View>

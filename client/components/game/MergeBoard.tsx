@@ -325,9 +325,10 @@ export function MergeBoard({
 
     const isPartValidForRequirement = (
       part: Part,
-      req: { tier: PartTier; family: "open" | "locked" | "any" }
+      req: { tier: PartTier; family: "open" | "locked" | "any"; requiresCompatible?: boolean }
     ) => {
       if (part.tier !== req.tier) return false;
+      if (req.requiresCompatible && !part.compatible) return false;
       if (req.family === "any") return true;
       if (part.family === req.family) return true;
       if (
@@ -388,6 +389,9 @@ export function MergeBoard({
       }
     });
 
+    const hasCompatible =
+      highlightedOrder.type === "compatibility_required" ||
+      highlightedOrder.requirements.some((r) => r.requiresCompatible);
     const hasLocked =
       highlightedOrder.type === "locked_required" ||
       highlightedOrder.familyPreference === "locked" ||
@@ -396,7 +400,9 @@ export function MergeBoard({
       highlightedOrder.familyPreference === "open" ||
       highlightedOrder.requirements.some((r) => r.family === "open");
 
-    const highlightColor = hasLocked
+    const highlightColor = hasCompatible
+      ? GameColors.ui.success
+      : hasLocked
       ? GameColors.locked.primary
       : hasOpen
       ? GameColors.openStandard.primary

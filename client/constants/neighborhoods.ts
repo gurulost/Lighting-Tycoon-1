@@ -72,6 +72,7 @@ export const NEIGHBORHOODS: Neighborhood[] = [
       "baron_certified",
       "locked_required",
       "lab_request",
+      "compatibility_required",
     ],
     storyBeatId: "neighborhood_liberation",
   },

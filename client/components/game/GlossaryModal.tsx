@@ -242,7 +242,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "freedom-controller",
         title: "Freedom Controller",
-        description: "Converts locked kits into open-compatible builds.",
+        description: "Converts locked kits into open-compatible builds for special orders.",
         image: freedomControllerImage,
       },
     ],
@@ -263,7 +263,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "legend-tile-badges",
         title: "Tile Badges (O/L/C)",
         description:
-          "O=open-standard, L=locked certified, C=compatible (counts for locked-required installs).",
+          "O=open-standard, L=locked certified, C=compatible (counts for locked + compatible orders).",
         icon: "tag",
         color: GameColors.text.secondary,
       },
@@ -279,6 +279,13 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         description: "Locked preferred or required for full rewards.",
         icon: "lock",
         color: GameColors.locked.primary,
+      },
+      {
+        id: "badge-compatible",
+        title: "Compatible",
+        description: "Requires open-compatible parts (liberated tech).",
+        icon: "shield",
+        color: GameColors.ui.success,
       },
       {
         id: "badge-rush",

@@ -336,8 +336,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   discover_compatible: {
     id: "discover_compatible",
     speaker: "rd",
-    line1: "Compatible kits count as locked-required installs.",
-    line2: "Freedom tech keeps you open.",
+    line1: "Compatible kits unlock special compatibility installs.",
+    line2: "Still open. Still flexible.",
     onceOnly: true,
     category: "discovery",
     priority: "high",

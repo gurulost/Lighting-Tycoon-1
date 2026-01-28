@@ -12,7 +12,14 @@ export interface BaseRecipe {
 export interface OrderModifier {
   id: string;
   name: string;
-  type: "style_match" | "rush" | "client_preference" | "no_substitutions" | "eco_audit" | "certified";
+  type:
+    | "style_match"
+    | "rush"
+    | "client_preference"
+    | "no_substitutions"
+    | "eco_audit"
+    | "certified"
+    | "compatibility";
   minNeighborhoodId: string;
   maxNeighborhoodId?: string;
   styleMatchFamily?: PartFamily;
@@ -291,6 +298,13 @@ export const ORDER_MODIFIERS: OrderModifier[] = [
     ecoAuditBonusResearch: 0,
     lockedRequired: true,
     rewardMult: { cash: 1.2, rep: 1.2, research: 1.0 },
+  },
+  {
+    id: "mod_compatible",
+    name: "Compatibility Required",
+    type: "compatibility",
+    minNeighborhoodId: "liberation",
+    rewardMult: { cash: 1.3, rep: 1.2, research: 1.15 },
   },
   {
     id: "mod_no_sub",
@@ -1421,6 +1435,66 @@ export const ORDER_OVERRIDES: OrderOverride[] = [
     titleOverride: "Quiet Freedom",
     flavorOverride: "Open kits. Calm glow.",
   },
+  {
+    id: "ord_101",
+    baseId: "base_smart_1",
+    archetypeId: "subscription_skeptic",
+    modifierIds: ["mod_compatible"],
+    neighborhoodId: "liberation",
+    weight: 0.7,
+    titleOverride: "Compat Upgrade",
+    flavorOverride: "Only open‑compatible kits accepted.",
+  },
+  {
+    id: "ord_102",
+    baseId: "base_segment_smart",
+    archetypeId: "tech_dad",
+    modifierIds: ["mod_compatible"],
+    neighborhoodId: "liberation",
+    weight: 0.6,
+    titleOverride: "Liberated Control",
+    flavorOverride: "Needs a compatible core.",
+  },
+  {
+    id: "ord_103",
+    baseId: "base_premium_1",
+    archetypeId: "boutique_owner",
+    modifierIds: ["mod_compatible"],
+    neighborhoodId: "liberation",
+    weight: 0.5,
+    titleOverride: "Compat Showcase",
+    flavorOverride: "Only liberated systems permitted.",
+  },
+  {
+    id: "ord_104",
+    baseId: "base_premium_track",
+    archetypeId: "neighbor_rival",
+    modifierIds: ["mod_compatible"],
+    neighborhoodId: "liberation",
+    weight: 0.5,
+    titleOverride: "Freedom Run",
+    flavorOverride: "Compatible rigs only. We’re done with lock‑in.",
+  },
+  {
+    id: "ord_105",
+    baseId: "base_premium_smart",
+    archetypeId: "sports_superfan",
+    modifierIds: ["mod_compatible"],
+    neighborhoodId: "liberation",
+    weight: 0.4,
+    titleOverride: "Compat Network",
+    flavorOverride: "Certified? No. Compatible, yes.",
+  },
+  {
+    id: "ord_106",
+    baseId: "base_smart_segment",
+    archetypeId: "hoa_enforcer",
+    modifierIds: ["mod_compatible"],
+    neighborhoodId: "liberation",
+    weight: 0.6,
+    titleOverride: "Liberation Standards",
+    flavorOverride: "Open‑compatible compliance required.",
+  },
 ];
 
 const TIER_CASH = { 1: 10, 2: 30, 3: 50, 4: 200, 5: 500 } as const;
@@ -1492,6 +1566,15 @@ export const ORDER_LIBRARY: OrderTemplate[] = (() => {
       if (mod.type === "certified") {
         type = "locked_required";
         requirements = requirements.map((r) => ({ ...r, family: "locked" }));
+      }
+      if (mod.type === "compatibility") {
+        type = "compatibility_required";
+        const maxTier = Math.max(...requirements.map((r) => r.tier));
+        requirements = requirements.map((r) =>
+          r.tier === maxTier
+            ? { ...r, family: "open", requiresCompatible: true }
+            : { ...r }
+        );
       }
       if (mod.type === "client_preference" && mod.clientPreference) {
         familyPreference = mod.clientPreference;

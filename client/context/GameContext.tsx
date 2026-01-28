@@ -240,6 +240,9 @@ const PERSISTED_STORY_LOG_LIMIT = 120;
 const MARKETING_BOOST_ORDERS = 3;
 const MARKETING_BOOST_MAX_STACK = 9;
 const MARKETING_BOOST_DIFFICULTY_BONUS = 2;
+const LATE_GAME_DIFFICULTY_FLOOR_TIER3 = 6;
+const LATE_GAME_DIFFICULTY_FLOOR_TIER4 = 7;
+const LATE_GAME_DIFFICULTY_FLOOR_TIER5 = 8;
 const BARON_CONTRACT_ORDERS = 3;
 const BARON_CONTRACT_MAX_STACK = 6;
 const BARON_CONTRACT_CASH_BONUS = 0.35;
@@ -261,6 +264,30 @@ function getNeighborhoodIndex(id: string) {
 
 function getOrderDifficulty(order: { requirements: { tier: PartTier; count: number }[] }) {
   return order.requirements.reduce((sum, req) => sum + req.tier * req.count, 0);
+}
+
+function getLateGameDifficultyFloor(reputationTier: number) {
+  if (reputationTier >= 5) return LATE_GAME_DIFFICULTY_FLOOR_TIER5;
+  if (reputationTier >= 4) return LATE_GAME_DIFFICULTY_FLOOR_TIER4;
+  if (reputationTier >= 3) return LATE_GAME_DIFFICULTY_FLOOR_TIER3;
+  return 0;
+}
+
+function orderRequiresTier(
+  order: { requirements: { tier: PartTier }[] },
+  minTier: PartTier
+) {
+  return order.requirements.some((req) => req.tier >= minTier);
+}
+
+function getOrderTierFloor(state: GameState, orders: Order[]): PartTier | undefined {
+  if (state.maxTierCrafted >= 5 && !orders.some((order) => orderRequiresTier(order, 5))) {
+    return 5;
+  }
+  if (state.maxTierCrafted >= 4 && !orders.some((order) => orderRequiresTier(order, 4))) {
+    return 4;
+  }
+  return undefined;
 }
 
 function getTargetOrderDifficulty(
@@ -611,17 +638,20 @@ function generateOrder(
   dependency: number,
   orders: Order[],
   rdUnlocked: boolean,
+  compatibilityUnlocked: boolean,
   currentNeighborhoodId: string,
   reputationTier: number,
   maxTierCrafted: number,
   upgrades: Record<string, number>,
-  marketingBoostOrdersRemaining: number
+  marketingBoostOrdersRemaining: number,
+  requiredMinTier?: PartTier
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
   const currentNeighborhood =
     NEIGHBORHOODS.find((n) => n.id === currentNeighborhoodId) || NEIGHBORHOODS[0];
   const rushActive = orders.some((o) => o.rushDeadline);
   const certifiedActive = orders.some((o) => o.type === "locked_required");
+  const compatibilityActive = orders.some((o) => o.type === "compatibility_required");
 
   const availableTemplates = ORDER_LIBRARY.filter((t) => {
     if (getNeighborhoodIndex(t.minNeighborhoodId) > neighborhoodIndex) return false;
@@ -632,11 +662,34 @@ function generateOrder(
       return false;
     if (t.type === "baron_certified" && dependency < 40) return false;
     if (t.type === "locked_required" && (dependency < 60 || !rdUnlocked)) return false;
+    if (t.type === "compatibility_required" && !compatibilityUnlocked) return false;
     if (t.type === "lab_request" && !rdUnlocked) return false;
     if (t.rushDeadline && rushActive) return false;
     if (t.type === "locked_required" && certifiedActive) return false;
+    if (t.type === "compatibility_required" && compatibilityActive) return false;
     return true;
   });
+
+  const tierFloor = requiredMinTier;
+  let candidateTemplates = availableTemplates;
+  if (tierFloor) {
+    const tierFiltered = candidateTemplates.filter((template) =>
+      orderRequiresTier(template, tierFloor)
+    );
+    if (tierFiltered.length > 0) {
+      candidateTemplates = tierFiltered;
+    }
+  }
+
+  const difficultyFloor = getLateGameDifficultyFloor(reputationTier);
+  if (difficultyFloor > 0) {
+    const diffFiltered = candidateTemplates.filter(
+      (template) => getOrderDifficulty(template) >= difficultyFloor
+    );
+    if (diffFiltered.length > 0) {
+      candidateTemplates = diffFiltered;
+    }
+  }
 
   const marketingBoost =
     marketingBoostOrdersRemaining > 0 ? MARKETING_BOOST_DIFFICULTY_BONUS : 0;
@@ -646,7 +699,7 @@ function generateOrder(
     upgrades,
     marketingBoost
   );
-  const weightedTemplates = availableTemplates.map((template) => {
+  const weightedTemplates = candidateTemplates.map((template) => {
     const diff = Math.max(0, neighborhoodIndex - getNeighborhoodIndex(template.minNeighborhoodId));
     const falloff = Math.pow(0.7, diff);
     const templateDifficulty = getOrderDifficulty(template);
@@ -720,6 +773,7 @@ function selectPartsForOrder(order: Order, board: (Part | null)[]): number[] | n
       const part = board[i];
       if (!part || used.has(i)) continue;
       if (part.tier !== req.tier) continue;
+      if (req.requiresCompatible && !part.compatible) continue;
       if (req.family !== "any") {
         const isCompatibleLocked =
           req.family === "locked" &&
@@ -1933,7 +1987,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         order.type !== "lab_request";
       if (canQueueAmbient) {
         let pool = GLOWMAIL_BEATS;
-        if (order.type === "locked_required" || order.type === "baron_certified" || hasLockedPart) {
+        if (order.type === "compatibility_required" || hasCompatiblePart) {
+          pool = RD_MEMO_BEATS;
+        } else if (
+          order.type === "locked_required" ||
+          order.type === "baron_certified" ||
+          hasLockedPart
+        ) {
           pool = BARON_FAX_BEATS;
         } else if (order.ecoAuditBonusResearch) {
           pool = RD_MEMO_BEATS;
@@ -2144,15 +2204,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       const remainingOrders = state.orders.filter((o) => o.id !== action.orderId);
       const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
+      const compatibilityUnlocked =
+        state.compatibleDiscoverySeen ||
+        state.rdNodes["freedom_build"] ||
+        state.freedomControllerCount > 0;
+      const requiredMinTier = getOrderTierFloor(state, remainingOrders);
       const newOrder = generateOrder(
         state.dependency,
         remainingOrders,
         rdUnlocked,
+        compatibilityUnlocked,
         state.currentNeighborhoodId,
         state.reputationTier,
         state.maxTierCrafted,
         state.upgrades,
-        state.marketingBoostOrdersRemaining
+        state.marketingBoostOrdersRemaining,
+        requiredMinTier
       );
       if (!newOrder) return state;
       const nextMarketingBoostOrdersRemaining = Math.max(
@@ -2570,15 +2637,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const cooldownMultiplier = pressureBand === "yellow" ? ORDER_SPAWN_YELLOW_MULT : 1;
 
       const rdUnlocked = workingState.upgrades["rd_unlock"] >= 1;
+      const compatibilityUnlocked =
+        workingState.compatibleDiscoverySeen ||
+        workingState.rdNodes["freedom_build"] ||
+        workingState.freedomControllerCount > 0;
+      const requiredMinTier = getOrderTierFloor(workingState, workingState.orders);
       const newOrder = generateOrder(
         workingState.dependency,
         workingState.orders,
         rdUnlocked,
+        compatibilityUnlocked,
         workingState.currentNeighborhoodId,
         workingState.reputationTier,
         workingState.maxTierCrafted,
         workingState.upgrades,
-        workingState.marketingBoostOrdersRemaining
+        workingState.marketingBoostOrdersRemaining,
+        requiredMinTier
       );
       if (!newOrder) return workingState;
       const nextMarketingBoostOrdersRemaining = Math.max(
