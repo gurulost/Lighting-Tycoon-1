@@ -335,6 +335,7 @@ function createLockoutLabOrder(): Order {
 
 const FIRST_SESSION_FORCED_DROPS: PartTier[] = [2, 2, 3, 3];
 const FIRST_SESSION_CHOICE_INDEX = 2;
+const FIRST_SESSION_CHOICE_COMPLETIONS = FIRST_SESSION_CHOICE_INDEX;
 
 const FIRST_SESSION_ORDERS: Omit<Order, "id">[] = [
   {
@@ -394,6 +395,55 @@ function createBaronContractOrder(): Order {
     modifierIds: ["first_session", "baron_contract"],
     familyPreference: "locked",
     penaltyIfWrongFamily: true,
+  };
+}
+
+function insertFirstSessionChoiceOrders(
+  state: GameState,
+  orders: Order[],
+  orderMetrics: GameState["orderMetrics"]
+): {
+  orders: Order[];
+  orderMetrics: GameState["orderMetrics"];
+  mentorOrderId?: string;
+  baronOrderId?: string;
+  highlightedOrderId?: string;
+  inserted: boolean;
+} {
+  const nonFirstSessionOrders = orders.filter(
+    (order) => !order.modifierIds?.includes("first_session")
+  );
+  const availableSlots = state.maxOrders - nonFirstSessionOrders.length;
+  if (availableSlots < 2) {
+    return {
+      orders,
+      orderMetrics,
+      highlightedOrderId: state.highlightedOrderId,
+      inserted: false,
+    };
+  }
+
+  const mentorOrder = createMentorJobOrder();
+  const baronOrder = createBaronContractOrder();
+  let nextOrderMetrics = updateOrderMetrics({ ...state, orderMetrics }, mentorOrder);
+  nextOrderMetrics = updateOrderMetrics(
+    { ...state, orderMetrics: nextOrderMetrics },
+    baronOrder
+  );
+
+  const nextOrders = [...nonFirstSessionOrders, mentorOrder, baronOrder];
+  const highlightedOrderId =
+    state.highlightedOrderId && nextOrders.some((order) => order.id === state.highlightedOrderId)
+      ? state.highlightedOrderId
+      : undefined;
+
+  return {
+    orders: nextOrders,
+    orderMetrics: nextOrderMetrics,
+    mentorOrderId: mentorOrder.id,
+    baronOrderId: baronOrder.id,
+    highlightedOrderId,
+    inserted: true,
   };
 }
 
@@ -1691,6 +1741,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextFirstSessionOrdersCompleted = state.firstSessionOrdersCompleted + 1;
       }
 
+      const shouldOfferChoiceNow =
+        firstSessionActive &&
+        !nextFirstSessionChoiceOffered &&
+        !nextFirstSessionChoiceResolved &&
+        nextFirstSessionOrderIndex >= FIRST_SESSION_CHOICE_INDEX &&
+        nextFirstSessionOrdersCompleted >= FIRST_SESSION_CHOICE_COMPLETIONS;
+
       const completedMentorJob = order.modifierIds?.includes("mentor_job");
       const completedBaronContract = order.modifierIds?.includes("baron_contract");
       const completedChoiceOrder = completedMentorJob || completedBaronContract;
@@ -1709,10 +1766,32 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
+      if (shouldOfferChoiceNow) {
+        const insertChoice = insertFirstSessionChoiceOrders(
+          state,
+          updatedOrders,
+          nextOrderMetrics
+        );
+        if (insertChoice.inserted) {
+          updatedOrders = insertChoice.orders;
+          nextOrderMetrics = insertChoice.orderMetrics;
+          nextFirstSessionChoiceOffered = true;
+          nextFirstSessionChoiceMentorOrderId = insertChoice.mentorOrderId;
+          nextFirstSessionChoiceBaronOrderId = insertChoice.baronOrderId;
+          queuedFirstSessionBeat = "first_session_choice";
+        }
+      }
+
+      const blockScriptedOrdersForChoice =
+        firstSessionActive &&
+        nextFirstSessionOrderIndex >= FIRST_SESSION_CHOICE_INDEX &&
+        !nextFirstSessionChoiceResolved;
+
       if (
         firstSessionActive &&
         updatedOrders.length < state.maxOrders &&
-        nextFirstSessionOrderIndex < FIRST_SESSION_ORDERS.length
+        nextFirstSessionOrderIndex < FIRST_SESSION_ORDERS.length &&
+        !blockScriptedOrdersForChoice
       ) {
         const scriptedOrder = createFirstSessionOrder(nextFirstSessionOrderIndex);
         if (scriptedOrder) {
@@ -1736,8 +1815,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       const shouldQueueSecondOffer =
         firstSessionActive &&
+        nextFirstSessionChoiceResolved &&
         !state.firstSessionSecondOfferTriggered &&
-        nextFirstSessionOrdersCompleted === 2 &&
+        nextFirstSessionOrdersCompleted >= FIRST_SESSION_CHOICE_COMPLETIONS + 1 &&
         state.baronOfferSeen &&
         !state.baronOfferAvailable;
       let nextHighlightedOrderId = updatedOrders.some(
@@ -2428,23 +2508,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           state.firstSessionOrderIndex === FIRST_SESSION_CHOICE_INDEX &&
           !state.firstSessionChoiceResolved
         ) {
+          if (state.firstSessionOrdersCompleted < FIRST_SESSION_CHOICE_COMPLETIONS) {
+            return state;
+          }
           if (!state.firstSessionChoiceOffered) {
-            const mentorOrder = createMentorJobOrder();
-            const baronOrder = createBaronContractOrder();
-            const availableSlots = state.maxOrders - state.orders.length;
-            if (availableSlots >= 2) {
-              let nextOrderMetrics = updateOrderMetrics(state, mentorOrder);
-              nextOrderMetrics = updateOrderMetrics(
-                { ...state, orderMetrics: nextOrderMetrics },
-                baronOrder
-              );
+            const choiceInsert = insertFirstSessionChoiceOrders(
+              state,
+              state.orders,
+              state.orderMetrics
+            );
+            if (choiceInsert.inserted) {
               let nextState: GameState = {
                 ...state,
-                orders: [...state.orders, mentorOrder, baronOrder],
-                orderMetrics: nextOrderMetrics,
+                orders: choiceInsert.orders,
+                orderMetrics: choiceInsert.orderMetrics,
+                highlightedOrderId: choiceInsert.highlightedOrderId,
                 firstSessionChoiceOffered: true,
-                firstSessionChoiceMentorOrderId: mentorOrder.id,
-                firstSessionChoiceBaronOrderId: baronOrder.id,
+                firstSessionChoiceMentorOrderId: choiceInsert.mentorOrderId,
+                firstSessionChoiceBaronOrderId: choiceInsert.baronOrderId,
               };
               nextState = queueStoryBeat(nextState, "first_session_choice");
               return nextState;
