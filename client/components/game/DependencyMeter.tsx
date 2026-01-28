@@ -1,12 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withSequence,
   withTiming,
-  interpolateColor,
   interpolate,
   Extrapolation,
 } from "react-native-reanimated";
@@ -17,26 +15,33 @@ import { AvatarImage } from "./AvatarImage";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
+import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
 
 const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
 
 interface DependencyMeterProps {
   value: number;
   compact?: boolean;
+  reducedMotion?: boolean;
 }
 
 const THRESHOLDS = [20, 40, 60, 80];
+const clampProgress = (input: number) => Math.max(0, Math.min(1, input));
 
-export function DependencyMeter({ value, compact = false }: DependencyMeterProps) {
-  const progress = useSharedValue(value / 100);
+export function DependencyMeter({
+  value,
+  compact = false,
+  reducedMotion = false,
+}: DependencyMeterProps) {
+  const [smoothProgress, setSmoothProgress] = useState(() => clampProgress(value / 100));
+  const progressRef = useRef(smoothProgress);
+  const animationRef = useRef<number | null>(null);
   const pulseScale = useSharedValue(1);
   const prevValue = useSharedValue(value);
   const warningPulse = useSharedValue(0);
   const baronOpacity = useSharedValue(0);
 
   useEffect(() => {
-    progress.value = withSpring(value / 100, { damping: 15 });
-
     const crossedThreshold = THRESHOLDS.some(
       (t) => prevValue.value < t && value >= t
     );
@@ -70,24 +75,53 @@ export function DependencyMeter({ value, compact = false }: DependencyMeterProps
     prevValue.value = value;
   }, [value]);
 
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${Math.max(2, progress.value * 100)}%`,
-  }));
+  useEffect(() => {
+    progressRef.current = smoothProgress;
+  }, [smoothProgress]);
 
-  const progressColorStyle = useAnimatedStyle(() => {
-    const color = interpolateColor(
-      progress.value,
-      [0, 0.4, 0.6, 0.8, 1],
-      [
-        GameColors.ui.success,
-        GameColors.ui.primary,
-        GameColors.ui.warning,
-        GameColors.ui.danger,
-        "#FF0000",
-      ]
-    );
-    return { backgroundColor: color };
-  });
+  useEffect(() => {
+    const target = clampProgress(value / 100);
+    if (reducedMotion) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      setSmoothProgress(target);
+      progressRef.current = target;
+      return;
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    const start = progressRef.current;
+    if (Math.abs(target - start) < 0.001) {
+      setSmoothProgress(target);
+      return;
+    }
+    const duration = 220;
+    const startTime = Date.now();
+
+    const tick = () => {
+      const now = Date.now();
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = t * (2 - t);
+      const next = start + (target - start) * eased;
+      setSmoothProgress(next);
+      progressRef.current = next;
+      if (t < 1) {
+        animationRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, [value]);
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
@@ -130,6 +164,8 @@ export function DependencyMeter({ value, compact = false }: DependencyMeterProps
   };
 
   const showExtras = !compact;
+  const stripPattern: TrimLightPattern =
+    value >= 60 ? "baron" : value >= 30 ? "classic" : "warmWhite";
 
   return (
     <Animated.View
@@ -181,11 +217,14 @@ export function DependencyMeter({ value, compact = false }: DependencyMeterProps
         </View>
 
         <View style={[styles.trackContainer, compact && styles.trackContainerCompact]}>
-          <View style={[styles.track, compact && styles.trackCompact]}>
-            <Animated.View style={[styles.progressBackground, progressStyle]}>
-              <Animated.View style={[styles.progressFill, progressColorStyle]} />
-            </Animated.View>
-          </View>
+          <TrimLightStrip
+            progress={smoothProgress}
+            bulbs={compact ? 10 : 14}
+            height={compact ? 14 : 18}
+            pattern={stripPattern}
+            animated={!compact && value >= 60}
+            reducedMotion={reducedMotion}
+          />
 
           {showExtras ? (
             <View style={styles.thresholds}>
@@ -301,31 +340,10 @@ const styles = StyleSheet.create({
   },
   trackContainer: {
     position: "relative",
-    height: 12,
+    height: 18,
   },
   trackContainerCompact: {
-    height: 8,
-  },
-  track: {
-    height: 12,
-    backgroundColor: "#1A1A2E",
-    borderRadius: 6,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-  },
-  trackCompact: {
-    height: 8,
-    borderRadius: 4,
-  },
-  progressBackground: {
-    height: "100%",
-    borderRadius: 5,
-    overflow: "hidden",
-  },
-  progressFill: {
-    flex: 1,
-    borderRadius: 5,
+    height: 14,
   },
   thresholds: {
     position: "absolute",

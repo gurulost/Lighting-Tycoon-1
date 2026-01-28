@@ -20,6 +20,7 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
 import { getPortraitSource } from "@/constants/characters";
+import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
 
 interface OrderCardProps {
   order: Order;
@@ -78,6 +79,26 @@ export function OrderCard({
     if (!p) return false;
     return order.requirements.some((req) => isPartValidForRequirement(p, req));
   });
+
+  const totalRequired = order.requirements.reduce((sum, req) => sum + req.count, 0);
+  const progressParts = [...state.board, ...state.backpack].filter(
+    (part): part is Part => !!part
+  );
+  const satisfied = order.requirements.reduce((sum, req) => {
+    const matching = progressParts.filter((part) => isPartValidForRequirement(part, req));
+    return sum + Math.min(matching.length, req.count);
+  }, 0);
+  const rawProgress = totalRequired > 0 ? satisfied / totalRequired : 0;
+  const partialProgress = Math.min(1, rawProgress);
+  const visualProgress = canFulfill ? 1 : Math.min(0.95, partialProgress);
+  const trimPattern: TrimLightPattern =
+    order.type === "baron_certified" || order.type === "locked_required"
+      ? "baron"
+      : order.type === "premium"
+      ? "rainbow"
+      : order.type === "style_match"
+      ? "classic"
+      : "warmWhite";
 
   const orderSource = order.modifierIds?.includes("mentor_job")
     ? "mentor"
@@ -401,6 +422,17 @@ export function OrderCard({
           </View>
         </View>
 
+        <View style={styles.trimStrip}>
+          <TrimLightStrip
+            progress={visualProgress}
+            bulbs={14}
+            height={22}
+            pattern={trimPattern}
+            animated={canFulfill && !reducedMotion}
+            reducedMotion={reducedMotion}
+          />
+        </View>
+
         {order.flavorText && showFlavor ? (
           <ThemedText style={styles.flavorText}>{order.flavorText}</ThemedText>
         ) : null}
@@ -658,6 +690,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
     marginBottom: Spacing.sm,
+  },
+  trimStrip: {
+    marginBottom: Spacing.sm,
+    opacity: 0.95,
   },
   dismissButton: {
     width: 30,

@@ -24,6 +24,8 @@ import { BaronOfferModal } from "@/components/game/BaronOfferModal";
 import { PartDetailModal } from "@/components/game/PartDetailModal";
 import { StoryLogModal } from "@/components/game/StoryLogModal";
 import { GlossaryModal } from "@/components/game/GlossaryModal";
+import { MissionStrip } from "@/components/game/MissionStrip";
+import { MissionDetailModal } from "@/components/game/MissionDetailModal";
 import { DebugOverlay } from "@/components/DebugOverlay";
 import { StoryToast } from "@/components/game/StoryToast";
 import { TutorialOverlay } from "@/components/game/TutorialOverlay";
@@ -71,7 +73,15 @@ const baronPortrait128 = require("../../assets/images/baron/baron-portrait-128.w
 const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.webp");
 const baronPortrait512 = require("../../assets/images/baron/baron-portrait-512.webp");
 
-type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | "glossary" | null;
+type ModalType =
+  | "orders"
+  | "upgrades"
+  | "rd"
+  | "settings"
+  | "story"
+  | "glossary"
+  | "missions"
+  | null;
 
 type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
 
@@ -198,6 +208,7 @@ export default function GameScreen() {
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
+  const missionRewardRef = useRef(state.lastMissionRewardId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storyCollapseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -303,6 +314,7 @@ export default function GameScreen() {
       setToastMessage(null);
     }, durationMs);
   }, []);
+
 
   const handleStoryPress = useCallback(() => {
     if (!state.activeStoryBeatId) return;
@@ -447,6 +459,23 @@ export default function GameScreen() {
     }
     recycleRewardRef.current = state.lastRecycleRewardId;
   }, [state.lastRecycleRewardId, state.lastRecycleReward, showToast, dispatch]);
+
+  useEffect(() => {
+    if (
+      state.lastMissionRewardId !== missionRewardRef.current &&
+      state.lastMissionReward
+    ) {
+      const { label, reward } = state.lastMissionReward;
+      const parts: string[] = [];
+      if (reward.cash) parts.push(`+${reward.cash} coins`);
+      if (reward.reputation) parts.push(`+${reward.reputation} rep`);
+      if (reward.research) parts.push(`+${reward.research} research`);
+      const rewardText = parts.length > 0 ? ` — ${parts.join(" · ")}` : "";
+      showToast(`Goal complete: ${label}${rewardText}`, 2600);
+      dispatch({ type: "CLEAR_MISSION_REWARD" });
+    }
+    missionRewardRef.current = state.lastMissionRewardId;
+  }, [state.lastMissionRewardId, state.lastMissionReward, showToast, dispatch]);
 
   useEffect(() => {
     if (!state.activeStoryBeatId) {
@@ -725,7 +754,11 @@ export default function GameScreen() {
           delayLongPress={350}
         >
           <View onLayout={setTarget("dependency")}>
-            <DependencyMeter value={state.dependency} compact />
+            <DependencyMeter
+              value={state.dependency}
+              compact
+              reducedMotion={state.settings.reducedMotion}
+            />
           </View>
         </Pressable>
         <View style={styles.statusItem}>
@@ -736,6 +769,13 @@ export default function GameScreen() {
           />
         </View>
       </View>
+
+      <MissionStrip
+        missions={state.missions}
+        locked={!state.tutorialComplete}
+        onPress={() => setActiveModal("missions")}
+        onLockedPress={() => showToast("Finish the tutorial to unlock goals.", 2200)}
+      />
 
       {tutorialSkipped ? (
         <Pressable style={styles.resumeBanner} onPress={handleResumeTutorial}>
@@ -982,6 +1022,15 @@ export default function GameScreen() {
         onRequestClose={closeModal}
       >
         <GlossaryModal onClose={closeModal} />
+      </Modal>
+
+      <Modal
+        visible={activeModal === "missions"}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeModal}
+      >
+        <MissionDetailModal onClose={closeModal} />
       </Modal>
 
       <Modal visible={state.baronOfferAvailable} animationType="fade" transparent>

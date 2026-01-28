@@ -22,6 +22,7 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import type { SfxId } from "@/audio/sounds";
 import { withRepeat } from "@/lib/reanimated";
+import { TrimLightStrip } from "@/components/game/TrimLightStrip";
 import {
   WORKBENCH_SLOT,
   ORDER_INBOX_SLOT,
@@ -845,12 +846,14 @@ export function MergeBoard({
               cachePolicy="memory-disk"
             />
             {!workbenchReady ? (
-              <View style={styles.cooldownBar}>
-                <View
-                  style={[
-                    styles.cooldownProgress,
-                    { width: `${cooldownProgress * 100}%` },
-                  ]}
+              <View style={styles.cooldownStrip}>
+                <TrimLightStrip
+                  progress={cooldownProgress}
+                  bulbs={6}
+                  height={10}
+                  pattern="classic"
+                  animated={false}
+                  reducedMotion
                 />
               </View>
             ) : null}
@@ -938,6 +941,16 @@ export function MergeBoard({
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}
       >
+        <View pointerEvents="none" style={styles.boardTrim}>
+          <TrimLightStrip
+            progress={1}
+            bulbs={18}
+            height={18}
+            pattern="warmWhite"
+            animated={false}
+            reducedMotion
+          />
+        </View>
         <View style={styles.gridLines}>
           {Array.from({ length: GRID_COLS + 1 }).map((_, i) => (
             <View
@@ -1154,6 +1167,13 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
     position: "relative",
   },
+  boardTrim: {
+    position: "absolute",
+    top: 6,
+    left: Spacing.md,
+    right: Spacing.md,
+    opacity: 0.7,
+  },
   gridLines: {
     position: "absolute",
     top: Spacing.md,
@@ -1254,20 +1274,12 @@ const styles = StyleSheet.create({
     width: "70%",
     height: "70%",
   },
-  cooldownBar: {
+  cooldownStrip: {
     position: "absolute",
-    bottom: 4,
-    left: 4,
-    right: 4,
-    height: 4,
-    backgroundColor: "#1A1A2E",
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  cooldownProgress: {
-    height: "100%",
-    backgroundColor: GameColors.ui.primary,
-    borderRadius: 2,
+    bottom: 3,
+    left: 6,
+    right: 6,
+    opacity: 0.9,
   },
   badge: {
     position: "absolute",

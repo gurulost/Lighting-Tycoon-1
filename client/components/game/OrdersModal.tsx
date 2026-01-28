@@ -10,6 +10,7 @@ import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
+import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
 
 interface OrdersModalProps {
   onClose: () => void;
@@ -55,6 +56,12 @@ export function OrdersModal({
   const [showOrdersHint, setShowOrdersHint] = React.useState(
     () => !state.ordersHelpNudgeSeen
   );
+  const installMomentTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const installMomentKey = React.useRef(0);
+  const [installMoment, setInstallMoment] = React.useState<{
+    key: number;
+    pattern: TrimLightPattern;
+  } | null>(null);
   const orderLegend = [
     { key: "C", label: "Clip" },
     { key: "T", label: "Track" },
@@ -132,6 +139,40 @@ export function OrdersModal({
     return () => clearTimeout(timeout);
   }, [showOrdersHint, handleDismissOrdersHint]);
 
+  React.useEffect(() => {
+    return () => {
+      if (installMomentTimeout.current) {
+        clearTimeout(installMomentTimeout.current);
+      }
+    };
+  }, []);
+
+  const triggerInstallMoment = React.useCallback(
+    (order: Order) => {
+      if (state.settings.reducedMotion) return;
+      const pattern: TrimLightPattern =
+        order.type === "baron_certified" || order.type === "locked_required"
+          ? "baron"
+          : order.type === "premium"
+          ? "rainbow"
+          : order.type === "style_match"
+          ? "classic"
+          : "warmWhite";
+      installMomentKey.current += 1;
+      setInstallMoment({
+        key: installMomentKey.current,
+        pattern,
+      });
+      if (installMomentTimeout.current) {
+        clearTimeout(installMomentTimeout.current);
+      }
+      installMomentTimeout.current = setTimeout(() => {
+        setInstallMoment(null);
+      }, 850);
+    },
+    [state.settings.reducedMotion]
+  );
+
   const handleFulfillOrder = (orderId: string) => {
     const order = state.orders.find((o) => o.id === orderId);
     if (!order) return;
@@ -139,6 +180,7 @@ export function OrdersModal({
     const partsToUse = getFulfillmentIndices(order);
     if (partsToUse) {
       fulfillOrder(orderId, partsToUse);
+      triggerInstallMoment(order);
       onOrderFulfilled?.(order);
       if (state.highlightedOrderId === orderId) {
         dispatch({ type: "HIGHLIGHT_ORDER" });
@@ -190,7 +232,37 @@ export function OrdersModal({
       iconColor={GameColors.currency.reputation}
       onClose={closeDisabled ? undefined : onClose}
       closeDisabled={closeDisabled}
+      contentStyle={styles.modalContent}
     >
+      {installMoment ? (
+        <Animated.View
+          key={`install-${installMoment.key}`}
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(180)}
+          pointerEvents="none"
+          style={styles.installMomentOverlay}
+        >
+          <View style={styles.installMomentPanel}>
+            <TrimLightStrip
+              progress={1}
+              bulbs={18}
+              height={24}
+              pattern={installMoment.pattern}
+              animated
+              reducedMotion={state.settings.reducedMotion}
+            />
+            <View style={styles.installMomentSpacer} />
+            <TrimLightStrip
+              progress={1}
+              bulbs={14}
+              height={20}
+              pattern={installMoment.pattern}
+              animated
+              reducedMotion={state.settings.reducedMotion}
+            />
+          </View>
+        </Animated.View>
+      ) : null}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Feather name="inbox" size={18} color={GameColors.currency.reputation} />
@@ -538,6 +610,30 @@ export function OrdersModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  modalContent: {
+    flex: 1,
+    position: "relative",
+  },
+  installMomentOverlay: {
+    position: "absolute",
+    top: Spacing.xl,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  installMomentPanel: {
+    width: "88%",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "rgba(10,10,20,0.75)",
+  },
+  installMomentSpacer: {
+    height: 6,
   },
   statsRow: {
     flexDirection: "row",

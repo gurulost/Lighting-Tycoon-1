@@ -18,6 +18,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
+import { TrimLightStrip } from "@/components/game/TrimLightStrip";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
@@ -29,6 +30,8 @@ const partSmartkitOpen = require("../../../assets/images/part-smartkit-open.webp
 const partSmartkitLocked = require("../../../assets/images/part-smartkit-locked.webp");
 const partPremiumOpen = require("../../../assets/images/part-premium-open.webp");
 const partPremiumLocked = require("../../../assets/images/part-premium-locked.webp");
+const mergeParticleOpen = require("../../../assets/images/particle-merge-open.png");
+const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.png");
 
 const PART_SPRITES: Record<PartTier, Record<PartFamily, ImageSourcePropType>> = {
   1: { open: partClipOpen, locked: partClipLocked },
@@ -165,6 +168,7 @@ export function PartItem({
   });
 
   const sprite = PART_SPRITES[part.tier][part.family];
+  const showPremiumLights = part.tier === 5;
 
   const content = (
     <Animated.View
@@ -199,6 +203,18 @@ export function PartItem({
           contentFit="contain"
           cachePolicy="memory-disk"
         />
+        {showPremiumLights ? (
+          <View pointerEvents="none" style={styles.premiumLights}>
+            <TrimLightStrip
+              progress={1}
+              bulbs={7}
+              height={12}
+              pattern="rainbow"
+              animated={!reducedMotion}
+              reducedMotion={reducedMotion}
+            />
+          </View>
+        ) : null}
       </LinearGradient>
 
       <View style={[styles.tierBadge, { backgroundColor: GameColors.tiers[part.tier] }]}>
@@ -280,6 +296,7 @@ export function MergeAnimation({
   }));
 
   const sprite = PART_SPRITES[tier][family];
+  const particle = isOpen ? mergeParticleOpen : mergeParticleLocked;
 
   return (
     <Animated.View
@@ -294,6 +311,12 @@ export function MergeAnimation({
         animatedStyle,
       ]}
     >
+      <Image
+        source={particle}
+        style={styles.mergeParticle}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+      />
       <Image source={sprite} style={styles.mergeSprite} contentFit="contain" cachePolicy="memory-disk" />
     </Animated.View>
   );
@@ -329,6 +352,13 @@ const styles = StyleSheet.create({
   },
   sprite: {
     zIndex: 1,
+  },
+  premiumLights: {
+    position: "absolute",
+    top: 6,
+    left: 8,
+    right: 8,
+    opacity: 0.9,
   },
   glowRing: {
     position: "absolute",
@@ -409,6 +439,12 @@ const styles = StyleSheet.create({
     elevation: 15,
     borderWidth: 3,
     backgroundColor: "#1A1A2E",
+  },
+  mergeParticle: {
+    position: "absolute",
+    width: "160%",
+    height: "160%",
+    opacity: 0.85,
   },
   mergeSprite: {
     width: "80%",

@@ -6,6 +6,7 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
+import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
 
 interface NeighborhoodBadgeProps {
   reputation: number;
@@ -32,6 +33,17 @@ export function NeighborhoodBadge({
       ? Math.min(1, Math.max(0, (reputation - prevRep) / (nextRep - prevRep)))
       : 1;
 
+  const neighborhoodPattern: TrimLightPattern =
+    current.id === "downtown"
+      ? "rainbow"
+      : current.id === "certified" || current.id === "lockout"
+      ? "baron"
+      : current.id === "liberation"
+      ? "classic"
+      : "warmWhite";
+  const bulbCount = compact ? 10 : 12;
+  const stripHeight = compact ? 14 : 18;
+
   return (
     <LinearGradient
       colors={["#1A1A2E", "#23233D", "#1A1A2E"]}
@@ -52,8 +64,15 @@ export function NeighborhoodBadge({
       </View>
 
       <View style={[styles.progressRow, compact && styles.progressRowCompact]}>
-        <View style={[styles.progressTrack, compact && styles.progressTrackCompact]}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        <View style={styles.progressStrip}>
+          <TrimLightStrip
+            progress={progress}
+            bulbs={bulbCount}
+            height={stripHeight}
+            pattern={neighborhoodPattern}
+            animated={false}
+            reducedMotion
+          />
         </View>
         <ThemedText style={[styles.progressText, compact && styles.progressTextCompact]}>
           {next ? `${reputation}/${nextRep} Rep` : "All unlocked"}
@@ -114,18 +133,8 @@ const styles = StyleSheet.create({
   progressRowCompact: {
     marginTop: Spacing.xs,
   },
-  progressTrack: {
-    height: 6,
-    backgroundColor: "#2A2A4A",
-    borderRadius: BorderRadius.full,
-    overflow: "hidden",
-  },
-  progressTrackCompact: {
-    height: 4,
-  },
-  progressFill: {
-    height: 6,
-    backgroundColor: GameColors.currency.reputation,
+  progressStrip: {
+    marginTop: Spacing.xs,
   },
   progressText: {
     marginTop: Spacing.xs,
