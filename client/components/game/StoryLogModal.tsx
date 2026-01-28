@@ -8,7 +8,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { AvatarImage } from "./AvatarImage";
 import { STORY_BEATS } from "@/constants/story";
-import { DialogueBubble } from "./DialogueBubble";
+import { StoryBeatCard } from "./StoryBeatCard";
+import { getPortraitSource } from "@/constants/characters";
 import { GameColors, Spacing } from "@/constants/theme";
 
 interface StoryLogModalProps {
@@ -19,9 +20,9 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
   const { state } = useGame();
   const insets = useSafeAreaInsets();
   const entries = state.storyLog.slice().reverse();
-  const tinaPortrait = require("../../../assets/images/tina/tina-portrait-128.webp");
-  const mentorPortrait = require("../../../assets/images/mentor/mentor-portrait-128.webp");
-  const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
+  const tinaPortrait = getPortraitSource("tina", "md", "portrait");
+  const mentorPortrait = getPortraitSource("mentor", "md", "portrait");
+  const baronPortrait = getPortraitSource("baron", "md", "portrait");
 
   return (
     <ModalShell
@@ -31,9 +32,9 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
       iconColor={GameColors.text.primary}
       headerRight={
         <View style={styles.castStrip}>
-          <AvatarImage source={tinaPortrait} size={20} borderColor="#2A2A4A" icon="smile" />
-          <AvatarImage source={mentorPortrait} size={20} borderColor="#2A2A4A" icon="user" />
-          <AvatarImage source={baronPortrait} size={20} borderColor="#2A2A4A" icon="briefcase" />
+          <AvatarImage source={tinaPortrait} size={24} borderColor="#2A2A4A" icon="smile" />
+          <AvatarImage source={mentorPortrait} size={24} borderColor="#2A2A4A" icon="user" />
+          <AvatarImage source={baronPortrait} size={24} borderColor="#2A2A4A" icon="briefcase" />
         </View>
       }
       onClose={onClose}
@@ -57,7 +58,7 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
             const isLast = index === entries.length - 1;
             return (
               <View key={`${entry.id}-${index}`} style={styles.logEntry}>
-                <DialogueBubble beat={beat} expanded showTag />
+                <StoryBeatCard beat={beat} variant="log" />
                 {!isLast ? <View style={styles.panelDivider} /> : null}
               </View>
             );

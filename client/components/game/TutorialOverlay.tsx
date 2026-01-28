@@ -52,7 +52,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 1,
     title: "First Merge",
-    description: "Drag one Clip onto another to make a Track.",
+    description: "Mentor: Parts climb tiers. Drag one Clip onto another to make a Track.",
     icon: "layers",
     highlight: "board",
     color: GameColors.openStandard.primary,
@@ -60,7 +60,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 2,
     title: "Second Merge",
-    description: "Merge two Tracks into a Segment.",
+    description: "Merge two Tracks into a Segment to unlock better orders.",
     icon: "shuffle",
     highlight: "board",
     color: GameColors.openStandard.primary,
@@ -68,7 +68,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 3,
     title: "Complete an Order",
-    description: "Open Orders and fulfill the Starter Install to earn rewards.",
+    description: "Customer wants clean glow. Open Orders and fulfill the Starter Install.",
     icon: "inbox",
     highlight: "orders",
     color: GameColors.currency.reputation,
@@ -76,7 +76,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 4,
     title: "Upgrade Your Space",
-    description: "Use your coins to unlock a new board slot. Space is oxygen.",
+    description: "Mentor: Space is oxygen. Spend coins to unlock a new slot.",
     icon: "grid",
     highlight: "upgrades",
     color: GameColors.currency.cash,
@@ -84,7 +84,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 5,
     title: "The Baron’s Offer",
-    description: "Decide whether to take the locked crate or stay open-standard.",
+    description: "Baron offers speed for dependency. Choose your path.",
     icon: "lock",
     highlight: "dependency",
     color: GameColors.locked.primary,
@@ -92,7 +92,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 6,
     title: "Locked Merge Demo",
-    description: "Merge a locked part with an open part. It stays locked and raises Dependency.",
+    description: "Merge locked + open. It stays locked and raises Dependency.",
     icon: "shield",
     highlight: "board",
     color: GameColors.locked.primary,
@@ -100,7 +100,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 7,
     title: "You're Ready!",
-    description: "Merge, fulfill orders, and choose your strategy. Good luck, Tycoon!",
+    description: "Merge, fulfill, and choose open vs certified. Good luck, Tycoon!",
     icon: "star",
     highlight: null,
     color: GameColors.ui.success,

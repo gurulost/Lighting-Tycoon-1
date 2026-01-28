@@ -179,7 +179,10 @@ function queueStoryBeat(state: GameState, beatId: string): GameState {
 
   return {
     ...state,
-    storyQueue: [...state.storyQueue, beatId],
+    storyQueue:
+      beat.priority === "high"
+        ? [beatId, ...state.storyQueue]
+        : [...state.storyQueue, beatId],
     storyLog: trimmedStoryLog,
     storySeen: { ...state.storySeen, [beatId]: true },
   };
@@ -331,6 +334,7 @@ function createLockoutLabOrder(): Order {
 }
 
 const FIRST_SESSION_FORCED_DROPS: PartTier[] = [2, 2, 3, 3];
+const FIRST_SESSION_CHOICE_INDEX = 2;
 
 const FIRST_SESSION_ORDERS: Omit<Order, "id">[] = [
   {
@@ -355,26 +359,43 @@ const FIRST_SESSION_ORDERS: Omit<Order, "id">[] = [
     modifierIds: ["first_session"],
   },
   {
-    title: "Certified Check",
-    type: "baron_certified",
-    requirements: [{ tier: 2, family: "any", count: 1 }],
-    rewards: { cash: 65, reputation: 12, research: 0 },
-    flavorText: "Certified clients pay full for locked runs.",
-    templateId: "first_session_3",
-    modifierIds: ["first_session"],
-    familyPreference: "locked",
-    penaltyIfWrongFamily: true,
-  },
-  {
     title: "Smart Setup",
     type: "basic",
     requirements: [{ tier: 4, family: "any", count: 1 }],
     rewards: { cash: 140, reputation: 28, research: 6 },
     flavorText: "Time to install your first smart kit.",
-    templateId: "first_session_4",
+    templateId: "first_session_3",
     modifierIds: ["first_session"],
   },
 ];
+
+const FIRST_SESSION_REQUIRED_COMPLETIONS = FIRST_SESSION_ORDERS.length + 1;
+
+function createMentorJobOrder(): Order {
+  return {
+    id: generateId(),
+    title: "Mentor Job: Open Install",
+    type: "style_match",
+    requirements: [{ tier: 2, family: "open", count: 1 }],
+    rewards: { cash: 55, reputation: 10, research: 6 },
+    flavorText: "Open-standard keeps your options wide.",
+    modifierIds: ["first_session", "mentor_job"],
+  };
+}
+
+function createBaronContractOrder(): Order {
+  return {
+    id: generateId(),
+    title: "Baron Contract: Certified Starter",
+    type: "baron_certified",
+    requirements: [{ tier: 2, family: "any", count: 1 }],
+    rewards: { cash: 85, reputation: 14, research: 0 },
+    flavorText: "Certified kits pay more. Open takes a cut.",
+    modifierIds: ["first_session", "baron_contract"],
+    familyPreference: "locked",
+    penaltyIfWrongFamily: true,
+  };
+}
 
 function createFirstSessionOrder(index: number): Order | null {
   const template = FIRST_SESSION_ORDERS[index];
@@ -387,6 +408,7 @@ function isProtectedOrder(state: GameState, order: Order) {
   if (order.isLockout || order.type === "lab_request") return true;
   if (order.modifierIds?.includes("first_session")) return true;
   if (order.modifierIds?.includes("tier5_showcase")) return true;
+  if (order.modifierIds?.includes("threshold_story")) return true;
   return false;
 }
 
@@ -424,6 +446,86 @@ function insertTier5ShowcaseOrder(
     highlightedOrderId: nextHighlightedOrderId,
     inserted: true,
   };
+}
+
+function insertStoryOrder(
+  state: GameState,
+  orders: Order[],
+  order: Order
+): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
+  if (orders.length < state.maxOrders) {
+    return {
+      orders: [...orders, order],
+      highlightedOrderId: state.highlightedOrderId,
+      inserted: true,
+    };
+  }
+
+  let removableIndex = -1;
+  for (let i = orders.length - 1; i >= 0; i -= 1) {
+    if (!isProtectedOrder(state, orders[i])) {
+      removableIndex = i;
+      break;
+    }
+  }
+  if (removableIndex === -1) {
+    return { orders, highlightedOrderId: state.highlightedOrderId, inserted: false };
+  }
+
+  const removedOrder = orders[removableIndex];
+  const nextOrders = orders.filter((_, index) => index !== removableIndex);
+  const nextHighlightedOrderId =
+    state.highlightedOrderId === removedOrder.id ? undefined : state.highlightedOrderId;
+
+  return {
+    orders: [...nextOrders, order],
+    highlightedOrderId: nextHighlightedOrderId,
+    inserted: true,
+  };
+}
+
+function createDependencyStoryOrder(state: GameState, beatId: string): Order | null {
+  const baseTier = Math.max(2, Math.min(4, state.maxTierCrafted));
+  if (beatId === "dependency_20") {
+    return {
+      id: generateId(),
+      title: "Certified Preview",
+      type: "baron_certified",
+      requirements: [{ tier: baseTier as PartTier, family: "any", count: 1 }],
+      rewards: { cash: 85, reputation: 16, research: 0 },
+      flavorText: "A taste of certified demand. Locked preferred.",
+      modifierIds: ["threshold_story"],
+      familyPreference: "locked",
+      penaltyIfWrongFamily: true,
+    };
+  }
+  if (beatId === "dependency_40") {
+    const tier = Math.max(3, baseTier);
+    return {
+      id: generateId(),
+      title: "Certified Client",
+      type: "baron_certified",
+      requirements: [{ tier: tier as PartTier, family: "any", count: 1 }],
+      rewards: { cash: 120, reputation: 22, research: 0 },
+      flavorText: "Certified installs pay full. Locked preferred.",
+      modifierIds: ["threshold_story"],
+      familyPreference: "locked",
+      penaltyIfWrongFamily: true,
+    };
+  }
+  if (beatId === "dependency_60") {
+    const tier = Math.max(3, Math.min(4, state.maxTierCrafted));
+    return {
+      id: generateId(),
+      title: "Locked Required",
+      type: "locked_required",
+      requirements: [{ tier: tier as PartTier, family: "locked", count: 1 }],
+      rewards: { cash: 180, reputation: 32, research: 4 },
+      flavorText: "Firmware update: certified kits required.",
+      modifierIds: ["threshold_story"],
+    };
+  }
+  return null;
 }
 
 function getRecycleReward(part: Part) {
@@ -696,6 +798,10 @@ function getInitialState(): GameState {
     firstSessionOrdersCompleted: 0,
     firstSessionForcedDrops: [],
     firstSessionSecondOfferTriggered: false,
+    firstSessionChoiceOffered: false,
+    firstSessionChoiceResolved: false,
+    firstSessionChoiceMentorOrderId: undefined,
+    firstSessionChoiceBaronOrderId: undefined,
     cash: 50,
     reputation: 0,
     research: 0,
@@ -954,6 +1060,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lockedDiscoverySeen: true,
           lastLockedDiscoveryId: state.lastLockedDiscoveryId + 1,
         };
+        if (state.tutorialComplete) {
+          nextState = queueStoryBeat(nextState, "discover_locked");
+        }
       }
       if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
         nextState = queueStoryBeat(nextState, "tina_intro");
@@ -1080,6 +1189,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextHighlightedOrderId = state.highlightedOrderId;
       let nextTier5ShowcaseSeen = state.tier5ShowcaseSeen;
       let nextTier5ShowcasePending = state.tier5ShowcasePending;
+      let nextOrderMetrics = state.orderMetrics;
       let nextTierDiscovery = state.tierDiscovery;
       let nextTierDiscoveryId = state.lastTierDiscoveryId;
       let nextTierDiscovered = state.lastTierDiscovered;
@@ -1087,19 +1197,47 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextLockedDiscoveryId = state.lastLockedDiscoveryId;
       let nextCompatibleDiscoverySeen = state.compatibleDiscoverySeen;
       let nextCompatibleDiscoveryId = state.lastCompatibleDiscoveryId;
+      const shouldQueueDiscovery = state.tutorialComplete;
+      const discoveryBeats: string[] = [];
 
       if (newTier >= 2 && !state.tierDiscovery[newTier]) {
         nextTierDiscovery = { ...state.tierDiscovery, [newTier]: true };
         nextTierDiscoveryId = state.lastTierDiscoveryId + 1;
         nextTierDiscovered = newTier;
+        if (shouldQueueDiscovery) {
+          const tierBeat =
+            newTier === 2
+              ? "discover_track"
+              : newTier === 3
+              ? "discover_segment"
+              : newTier === 4
+              ? "discover_smartkit"
+              : newTier === 5
+              ? "discover_system"
+              : null;
+          if (tierBeat) discoveryBeats.push(tierBeat);
+        }
       }
       if (sawLocked) {
         nextLockedDiscoverySeen = true;
         nextLockedDiscoveryId = state.lastLockedDiscoveryId + 1;
+        if (shouldQueueDiscovery) {
+          discoveryBeats.push("discover_locked");
+        }
       }
       if (sawCompatible) {
         nextCompatibleDiscoverySeen = true;
         nextCompatibleDiscoveryId = state.lastCompatibleDiscoveryId + 1;
+        if (shouldQueueDiscovery) {
+          discoveryBeats.push("discover_compatible");
+        }
+      }
+      if (
+        shouldQueueDiscovery &&
+        mergedFamily === "locked" &&
+        fromPart.family !== toPart.family
+      ) {
+        discoveryBeats.push("discover_locked_merge");
       }
 
       if (
@@ -1115,6 +1253,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextTier5ShowcasePending = false;
         } else {
           nextTier5ShowcasePending = true;
+        }
+      }
+      if (dependencyStory && state.tutorialComplete && !state.storySeen[dependencyStory]) {
+        const storyOrder = createDependencyStoryOrder(state, dependencyStory);
+        if (storyOrder) {
+          const insertResult = insertStoryOrder(state, nextOrders, storyOrder);
+          if (insertResult.inserted) {
+            nextOrders = insertResult.orders;
+            nextHighlightedOrderId = insertResult.highlightedOrderId;
+            nextOrderMetrics = updateOrderMetrics(
+              { ...state, orderMetrics: nextOrderMetrics },
+              storyOrder
+            );
+          }
         }
       }
       
@@ -1136,6 +1288,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialOrderId: tutorialOrder ? tutorialOrder.id : state.tutorialOrderId,
         orders: nextOrders,
         highlightedOrderId: nextHighlightedOrderId,
+        orderMetrics: nextOrderMetrics,
         tier5ShowcaseSeen: nextTier5ShowcaseSeen,
         tier5ShowcasePending: nextTier5ShowcasePending,
         tierDiscovery: nextTierDiscovery,
@@ -1170,6 +1323,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (tutorialStoryBeat) {
         nextState = queueStoryBeat(nextState, tutorialStoryBeat);
+      }
+      if (discoveryBeats.length > 0) {
+        discoveryBeats.forEach((beatId) => {
+          nextState = queueStoryBeat(nextState, beatId);
+        });
       }
       if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
         nextState = beginLockout(nextState);
@@ -1471,6 +1629,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextFirstSessionOrderIndex = state.firstSessionOrderIndex;
       let nextFirstSessionOrdersCompleted = state.firstSessionOrdersCompleted;
       let nextFirstSessionComplete = state.firstSessionComplete;
+      let nextFirstSessionChoiceOffered = state.firstSessionChoiceOffered;
+      let nextFirstSessionChoiceResolved = state.firstSessionChoiceResolved;
+      let nextFirstSessionChoiceMentorOrderId = state.firstSessionChoiceMentorOrderId;
+      let nextFirstSessionChoiceBaronOrderId = state.firstSessionChoiceBaronOrderId;
       let queuedFirstSessionBeat: string | null = null;
 
       let freedomControllerReward = 0;
@@ -1529,6 +1691,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextFirstSessionOrdersCompleted = state.firstSessionOrdersCompleted + 1;
       }
 
+      const completedMentorJob = order.modifierIds?.includes("mentor_job");
+      const completedBaronContract = order.modifierIds?.includes("baron_contract");
+      const completedChoiceOrder = completedMentorJob || completedBaronContract;
+      if (completedChoiceOrder && !state.firstSessionChoiceResolved) {
+        const otherId = completedMentorJob
+          ? state.firstSessionChoiceBaronOrderId
+          : state.firstSessionChoiceMentorOrderId;
+        if (otherId) {
+          updatedOrders = updatedOrders.filter((o) => o.id !== otherId);
+        }
+        nextFirstSessionChoiceResolved = true;
+        nextFirstSessionChoiceMentorOrderId = undefined;
+        nextFirstSessionChoiceBaronOrderId = undefined;
+        if (completedBaronContract) {
+          queuedFirstSessionBeat = "first_session_certified";
+        }
+      }
+
       if (
         firstSessionActive &&
         updatedOrders.length < state.maxOrders &&
@@ -1541,17 +1721,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             { ...state, orderMetrics: nextOrderMetrics },
             scriptedOrder
           );
-          if (scriptedOrder.templateId === "first_session_3") {
-            queuedFirstSessionBeat = "first_session_certified";
-          }
           nextFirstSessionOrderIndex += 1;
         }
       }
 
       if (
         firstSessionActive &&
-        nextFirstSessionOrdersCompleted >= FIRST_SESSION_ORDERS.length &&
-        nextFirstSessionOrderIndex >= FIRST_SESSION_ORDERS.length
+        nextFirstSessionOrdersCompleted >= FIRST_SESSION_REQUIRED_COMPLETIONS &&
+        nextFirstSessionOrderIndex >= FIRST_SESSION_ORDERS.length &&
+        nextFirstSessionChoiceResolved
       ) {
         nextFirstSessionComplete = true;
       }
@@ -1562,11 +1740,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextFirstSessionOrdersCompleted === 2 &&
         state.baronOfferSeen &&
         !state.baronOfferAvailable;
-      const nextHighlightedOrderId = updatedOrders.some(
+      let nextHighlightedOrderId = updatedOrders.some(
         (o) => o.id === state.highlightedOrderId
       )
         ? state.highlightedOrderId
         : undefined;
+      if (state.tutorialComplete && dependencyStory && !state.storySeen[dependencyStory]) {
+        const storyOrder = createDependencyStoryOrder(state, dependencyStory);
+        if (storyOrder) {
+          const insertResult = insertStoryOrder(state, updatedOrders, storyOrder);
+          if (insertResult.inserted) {
+            updatedOrders = insertResult.orders;
+            nextHighlightedOrderId = insertResult.highlightedOrderId;
+            nextOrderMetrics = updateOrderMetrics(
+              { ...state, orderMetrics: nextOrderMetrics },
+              storyOrder
+            );
+          }
+        }
+      }
       const nextBaronContractOrdersRemaining = contractActive
         ? Math.max(0, state.baronContractOrdersRemaining - 1)
         : state.baronContractOrdersRemaining;
@@ -1583,6 +1775,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           : state.firstSessionForcedDrops,
         firstSessionSecondOfferTriggered:
           state.firstSessionSecondOfferTriggered || shouldQueueSecondOffer,
+        firstSessionChoiceOffered: nextFirstSessionChoiceOffered,
+        firstSessionChoiceResolved: nextFirstSessionChoiceResolved,
+        firstSessionChoiceMentorOrderId: nextFirstSessionChoiceMentorOrderId,
+        firstSessionChoiceBaronOrderId: nextFirstSessionChoiceBaronOrderId,
         cash: state.cash + cashReward,
         reputation: state.reputation + repReward,
         research: state.research + researchReward,
@@ -1825,6 +2021,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       nextState = queueStoryBeat(nextState, "freedom_first_use");
+      if (sawCompatible && state.tutorialComplete) {
+        nextState = queueStoryBeat(nextState, "discover_compatible");
+      }
       return nextState;
     }
 
@@ -1841,6 +2040,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
       if (order.modifierIds?.includes("tier5_showcase")) {
+        return state;
+      }
+      if (order.modifierIds?.includes("threshold_story")) {
         return state;
       }
       return {
@@ -1963,6 +2165,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         if (dependencyStory) {
           nextState = queueStoryBeat(nextState, dependencyStory);
+          if (!state.storySeen[dependencyStory]) {
+            const storyOrder = createDependencyStoryOrder(state, dependencyStory);
+            if (storyOrder) {
+              const insertResult = insertStoryOrder(state, state.orders, storyOrder);
+              if (insertResult.inserted) {
+                nextState = {
+                  ...nextState,
+                  orders: insertResult.orders,
+                  highlightedOrderId: insertResult.highlightedOrderId,
+                  orderMetrics: updateOrderMetrics(state, storyOrder),
+                };
+              }
+            }
+          }
         }
         if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
           nextState = beginLockout(nextState);
@@ -2027,9 +2243,26 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         if (dependencyStory) {
           nextState = queueStoryBeat(nextState, dependencyStory);
+          if (!state.storySeen[dependencyStory]) {
+            const storyOrder = createDependencyStoryOrder(state, dependencyStory);
+            if (storyOrder) {
+              const insertResult = insertStoryOrder(state, state.orders, storyOrder);
+              if (insertResult.inserted) {
+                nextState = {
+                  ...nextState,
+                  orders: insertResult.orders,
+                  highlightedOrderId: insertResult.highlightedOrderId,
+                  orderMetrics: updateOrderMetrics(state, storyOrder),
+                };
+              }
+            }
+          }
         }
         if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
           nextState = beginLockout(nextState);
+        }
+        if (sawLocked && state.tutorialComplete) {
+          nextState = queueStoryBeat(nextState, "discover_locked");
         }
         return nextState;
       }
@@ -2100,9 +2333,26 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (dependencyStory) {
         nextState = queueStoryBeat(nextState, dependencyStory);
+        if (!state.storySeen[dependencyStory]) {
+          const storyOrder = createDependencyStoryOrder(state, dependencyStory);
+            if (storyOrder) {
+              const insertResult = insertStoryOrder(state, state.orders, storyOrder);
+              if (insertResult.inserted) {
+                nextState = {
+                  ...nextState,
+                  orders: insertResult.orders,
+                  highlightedOrderId: insertResult.highlightedOrderId,
+                  orderMetrics: updateOrderMetrics(state, storyOrder),
+                };
+              }
+            }
+        }
       }
       if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
         nextState = beginLockout(nextState);
+      }
+      if (sawLocked && state.tutorialComplete) {
+        nextState = queueStoryBeat(nextState, "discover_locked");
       }
       return nextState;
     }
@@ -2174,6 +2424,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
       let workingState = state;
       if (firstSessionActive) {
+        if (
+          state.firstSessionOrderIndex === FIRST_SESSION_CHOICE_INDEX &&
+          !state.firstSessionChoiceResolved
+        ) {
+          if (!state.firstSessionChoiceOffered) {
+            const mentorOrder = createMentorJobOrder();
+            const baronOrder = createBaronContractOrder();
+            const availableSlots = state.maxOrders - state.orders.length;
+            if (availableSlots >= 2) {
+              let nextOrderMetrics = updateOrderMetrics(state, mentorOrder);
+              nextOrderMetrics = updateOrderMetrics(
+                { ...state, orderMetrics: nextOrderMetrics },
+                baronOrder
+              );
+              let nextState: GameState = {
+                ...state,
+                orders: [...state.orders, mentorOrder, baronOrder],
+                orderMetrics: nextOrderMetrics,
+                firstSessionChoiceOffered: true,
+                firstSessionChoiceMentorOrderId: mentorOrder.id,
+                firstSessionChoiceBaronOrderId: baronOrder.id,
+              };
+              nextState = queueStoryBeat(nextState, "first_session_choice");
+              return nextState;
+            }
+          }
+          return state;
+        }
         if (state.firstSessionOrderIndex < FIRST_SESSION_ORDERS.length) {
           const scriptedOrder = createFirstSessionOrder(state.firstSessionOrderIndex);
           if (!scriptedOrder) return state;
@@ -2183,15 +2461,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             firstSessionOrderIndex: state.firstSessionOrderIndex + 1,
             orderMetrics: updateOrderMetrics(state, scriptedOrder),
           };
-          if (scriptedOrder.templateId === "first_session_3") {
-            nextState = queueStoryBeat(nextState, "first_session_certified");
-          }
           return nextState;
         }
         const hasFirstSessionOrders = state.orders.some((order) =>
           order.modifierIds?.includes("first_session")
         );
         if (hasFirstSessionOrders) {
+          return state;
+        }
+        if (state.firstSessionChoiceOffered && !state.firstSessionChoiceResolved) {
           return state;
         }
         workingState = {
@@ -2514,6 +2792,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         firstSessionOrdersCompleted: 0,
         firstSessionForcedDrops: [],
         firstSessionSecondOfferTriggered: false,
+        firstSessionChoiceOffered: false,
+        firstSessionChoiceResolved: false,
+        firstSessionChoiceMentorOrderId: undefined,
+        firstSessionChoiceBaronOrderId: undefined,
         baronOfferAvailable: false,
         baronOfferSeen: false,
         baronOfferCooldownUntil: 0,
@@ -2627,6 +2909,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.lockoutActive) return state;
       const emptySlot = findEmptySlot(state);
       let newBoard = state.board;
+      const sawLocked = emptySlot !== -1 && !state.lockedDiscoverySeen;
       if (emptySlot !== -1) {
         const tier = Math.random() < 0.5 ? 2 : 3;
         const part = createPart(emptySlot, "locked", tier as PartTier);
@@ -2641,8 +2924,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lockoutLabOrdersRemaining: 0,
         dependency: Math.min(100, state.dependency + 5),
         lastCriticalEventId: state.lastCriticalEventId + 1,
+        lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
+        lastLockedDiscoveryId: sawLocked
+          ? state.lastLockedDiscoveryId + 1
+          : state.lastLockedDiscoveryId,
       };
-      return queueStoryBeat(nextState, "lockout_choice_baron");
+      let queued = queueStoryBeat(nextState, "lockout_choice_baron");
+      if (sawLocked && state.tutorialComplete) {
+        queued = queueStoryBeat(queued, "discover_locked");
+      }
+      return queued;
     }
 
     case "LOCKOUT_CHOOSE_LAB": {
@@ -2789,6 +3080,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.firstSessionSecondOfferTriggered === "boolean"
           ? action.state.firstSessionSecondOfferTriggered
           : base.firstSessionSecondOfferTriggered;
+      const firstSessionChoiceOffered =
+        typeof action.state.firstSessionChoiceOffered === "boolean"
+          ? action.state.firstSessionChoiceOffered
+          : base.firstSessionChoiceOffered;
+      const firstSessionChoiceResolved =
+        typeof action.state.firstSessionChoiceResolved === "boolean"
+          ? action.state.firstSessionChoiceResolved
+          : base.firstSessionChoiceResolved;
+      const firstSessionChoiceMentorOrderId =
+        typeof action.state.firstSessionChoiceMentorOrderId === "string"
+          ? action.state.firstSessionChoiceMentorOrderId
+          : base.firstSessionChoiceMentorOrderId;
+      const firstSessionChoiceBaronOrderId =
+        typeof action.state.firstSessionChoiceBaronOrderId === "string"
+          ? action.state.firstSessionChoiceBaronOrderId
+          : base.firstSessionChoiceBaronOrderId;
       const orderSpawnCooldownUntil =
         typeof action.state.orderSpawnCooldownUntil === "number"
           ? action.state.orderSpawnCooldownUntil
@@ -2913,6 +3220,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : base.firstSessionOrdersCompleted,
         firstSessionForcedDrops,
         firstSessionSecondOfferTriggered,
+        firstSessionChoiceOffered,
+        firstSessionChoiceResolved,
+        firstSessionChoiceMentorOrderId,
+        firstSessionChoiceBaronOrderId,
         orderSpawnCooldownUntil,
         tutorialMergeCount:
           typeof action.state.tutorialMergeCount === "number"
@@ -3097,6 +3408,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.firstSessionOrdersCompleted,
       state.firstSessionForcedDrops,
       state.firstSessionSecondOfferTriggered,
+      state.firstSessionChoiceOffered,
+      state.firstSessionChoiceResolved,
+      state.firstSessionChoiceMentorOrderId,
+      state.firstSessionChoiceBaronOrderId,
       state.cash,
       state.reputation,
       state.research,

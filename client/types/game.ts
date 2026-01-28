@@ -93,6 +93,10 @@ export interface GameState {
   firstSessionOrdersCompleted: number;
   firstSessionForcedDrops: PartTier[];
   firstSessionSecondOfferTriggered: boolean;
+  firstSessionChoiceOffered: boolean;
+  firstSessionChoiceResolved: boolean;
+  firstSessionChoiceMentorOrderId?: string;
+  firstSessionChoiceBaronOrderId?: string;
 
   cash: number;
   reputation: number;

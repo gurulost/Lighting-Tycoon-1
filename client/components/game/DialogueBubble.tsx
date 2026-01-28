@@ -8,6 +8,7 @@ import Svg, { Defs, Pattern, Rect, Circle } from "react-native-svg";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, DialogueTokens, DialogueTypography, Fonts, Spacing, BorderRadius } from "@/constants/theme";
 import { StoryBeat, StorySpeaker } from "@/constants/story";
+import { getPortraitForBeat } from "@/constants/characters";
 
 interface DialogueBubbleProps {
   beat: StoryBeat;
@@ -19,16 +20,6 @@ interface DialogueBubbleProps {
 }
 
 type BubbleVariant = "speech" | "caption" | "legal";
-
-const TINA_PORTRAITS = {
-  portrait: require("../../../assets/images/tina/tina-portrait-128.webp"),
-  confident: require("../../../assets/images/tina/tina-confident-128.webp"),
-  focused: require("../../../assets/images/tina/tina-focused-128.webp"),
-  delighted: require("../../../assets/images/tina/tina-delighted-128.webp"),
-  concerned: require("../../../assets/images/tina/tina-concerned-128.webp"),
-} as const;
-const MENTOR_PORTRAIT = require("../../../assets/images/mentor/mentor-portrait-128.webp");
-const BARON_PORTRAIT = require("../../../assets/images/baron/baron-portrait-128.webp");
 
 const SPEAKER_LABEL: Record<StorySpeaker, string> = {
   mentor: "MENTOR",
@@ -74,6 +65,8 @@ const TAG_BY_CATEGORY: Record<NonNullable<StoryBeat["category"]>, string> = {
   system: "WORKSHOP RADIO",
   tutorial: "TUTORIAL",
   inner_monologue: "THOUGHTS",
+  discovery: "DISCOVERY",
+  mission: "MISSION",
 };
 
 const getTagText = (beat: StoryBeat) => {
@@ -114,13 +107,7 @@ export function DialogueBubble({
   const showStamp = beat.speaker === "baron" && expanded;
   const showCaptionTab = beat.speaker === "system";
   const showPortrait = beat.speaker === "tina" || beat.speaker === "mentor" || beat.speaker === "baron";
-  const portraitKey = beat.portrait ?? "portrait";
-  const portraitSource =
-    beat.speaker === "tina"
-      ? TINA_PORTRAITS[portraitKey] ?? TINA_PORTRAITS.portrait
-      : beat.speaker === "mentor"
-      ? MENTOR_PORTRAIT
-      : BARON_PORTRAIT;
+  const portraitSource = getPortraitForBeat(beat, "sm");
 
   return (
     <View style={styles.wrapper}>

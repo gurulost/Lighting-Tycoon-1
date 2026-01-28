@@ -2,7 +2,7 @@ import React from "react";
 import Animated, { FadeInDown, FadeOutUp, FadeIn, FadeOut } from "react-native-reanimated";
 
 import { STORY_BEATS } from "@/constants/story";
-import { DialogueBubble } from "./DialogueBubble";
+import { StoryBeatCard } from "./StoryBeatCard";
 
 interface StoryToastProps {
   beatId: string;
@@ -19,14 +19,7 @@ export function StoryToast({ beatId, reducedMotion = false, expanded = false }: 
 
   return (
     <Animated.View entering={enterAnim} exiting={exitAnim}>
-      <DialogueBubble
-        beat={beat}
-        compact={!expanded}
-        expanded={expanded}
-        withTail
-        showTag={expanded}
-        showHalftone={expanded}
-      />
+      <StoryBeatCard beat={beat} variant={expanded ? "expanded" : "chip"} />
     </Animated.View>
   );
 }

@@ -47,7 +47,8 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
     !order.isLockout &&
     !(state.lockoutActive && order.type === "lab_request") &&
     !order.modifierIds?.includes("first_session") &&
-    !order.modifierIds?.includes("tier5_showcase");
+    !order.modifierIds?.includes("tier5_showcase") &&
+    !order.modifierIds?.includes("threshold_story");
 
   const refreshTarget =
     state.highlightedOrderId &&
@@ -256,7 +257,8 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
                 !order.isLockout &&
                 !(state.lockoutActive && order.type === "lab_request") &&
                 !order.modifierIds?.includes("first_session") &&
-                !order.modifierIds?.includes("tier5_showcase")
+                !order.modifierIds?.includes("tier5_showcase") &&
+                !order.modifierIds?.includes("threshold_story")
               }
             />
           ))

@@ -7,6 +7,8 @@ export interface StoryBeat {
   line2?: string;
   onceOnly?: boolean;
   portrait?: "portrait" | "confident" | "focused" | "delighted" | "concerned";
+  priority?: "high" | "normal";
+  momentLockMs?: number;
   category?:
     | "baron_fax"
     | "glowmail"
@@ -14,7 +16,9 @@ export interface StoryBeat {
     | "rd_memo"
     | "system"
     | "tutorial"
-    | "inner_monologue";
+    | "inner_monologue"
+    | "discovery"
+    | "mission";
 }
 
 export const STORY_BEATS: Record<string, StoryBeat> = {
@@ -26,6 +30,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     portrait: "delighted",
     category: "inner_monologue",
+    priority: "high",
   },
   neighborhood_starter: {
     id: "neighborhood_starter",
@@ -68,28 +73,33 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   dependency_20: {
     id: "dependency_20",
     speaker: "baron",
-    line1: "A complimentary crate… because I believe in you.",
-    line2: "— Bulb Baron",
+    line1: "Certified installs begin soon. Clients will ask.",
+    line2: "Plan your parts. — Bulb Baron",
     onceOnly: true,
+    priority: "high",
   },
   dependency_40: {
     id: "dependency_40",
     speaker: "customer",
-    line1: "My cousin says only certified kits won’t glitch.",
-    line2: "Are you certified?",
+    line1: "Only certified kits don’t glitch, right?",
+    line2: "I’ll pay extra for locked.",
     onceOnly: true,
+    priority: "high",
   },
   dependency_60: {
     id: "dependency_60",
     speaker: "baron",
-    line1: "For your convenience, certification is now… required.",
+    line1: "Convenience update: certification required.",
+    line2: "Locked installs incoming.",
     onceOnly: true,
+    priority: "high",
   },
   dependency_80: {
     id: "dependency_80",
     speaker: "mentor",
     line1: "Notice the workbench? It’s… suggesting his parts.",
     onceOnly: true,
+    priority: "high",
   },
   dependency_100: {
     id: "dependency_100",
@@ -97,18 +107,21 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "A routine update. Nothing to fear.",
     line2: "Please do not resist.",
     onceOnly: true,
+    priority: "high",
   },
   rd_unlock: {
     id: "rd_unlock",
     speaker: "mentor",
     line1: "We stop begging when we can build.",
     onceOnly: true,
+    priority: "high",
   },
   rd_blueprint: {
     id: "rd_blueprint",
     speaker: "rd",
     line1: "He locked the controller. So… we unlock the lock.",
     onceOnly: true,
+    priority: "high",
   },
   freedom_first_use: {
     id: "freedom_first_use",
@@ -117,12 +130,14 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line2: "Okay, that’s gorgeous.",
     onceOnly: true,
     portrait: "delighted",
+    priority: "high",
   },
   baron_offer: {
     id: "baron_offer",
     speaker: "baron",
     line1: "A signature is just a hug… in legal form.",
     onceOnly: true,
+    priority: "high",
   },
   baron_offer_prompt: {
     id: "baron_offer_prompt",
@@ -130,6 +145,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "He’s offering speed. Read the fine print.",
     onceOnly: true,
     category: "tutorial",
+    priority: "high",
   },
   baron_offer_return: {
     id: "baron_offer_return",
@@ -142,19 +158,23 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   tutorial_merge_1: {
     id: "tutorial_merge_1",
     speaker: "mentor",
-    line1: "That’s it. Two become one.",
-    line2: "Keep climbing the chain.",
+    line1: "Track unlocked (Tier 2).",
+    line2: "Tracks merge into Segments.",
     onceOnly: true,
     category: "tutorial",
+    priority: "high",
+    momentLockMs: 600,
   },
   tutorial_merge_2: {
     id: "tutorial_merge_2",
     speaker: "tina",
-    line1: "Nice. Now let’s deliver.",
-    line2: "Get paid, get better.",
+    line1: "Segment built. Better installs unlocked.",
+    line2: "Orders pay more as tiers rise.",
     onceOnly: true,
     portrait: "confident",
     category: "tutorial",
+    priority: "high",
+    momentLockMs: 600,
   },
   tutorial_order: {
     id: "tutorial_order",
@@ -162,6 +182,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "Please—no flicker. My neighbors judge.",
     onceOnly: true,
     category: "tutorial",
+    priority: "high",
   },
   tina_customer_reply: {
     id: "tina_customer_reply",
@@ -169,6 +190,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "You got it. No flicker, just glow.",
     onceOnly: true,
     portrait: "delighted",
+    priority: "high",
   },
   tutorial_upgrade: {
     id: "tutorial_upgrade",
@@ -177,6 +199,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     portrait: "confident",
     category: "tutorial",
+    priority: "high",
   },
   backpack_unlocked: {
     id: "backpack_unlocked",
@@ -184,6 +207,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "Backpack unlocked. Store extras to keep the board clear.",
     onceOnly: true,
     category: "mentor_tip",
+    priority: "high",
   },
   first_session_certified: {
     id: "first_session_certified",
@@ -192,6 +216,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line2: "Open installs take a deduction.",
     onceOnly: true,
     category: "baron_fax",
+    priority: "high",
   },
   tutorial_baron_choice: {
     id: "tutorial_baron_choice",
@@ -199,6 +224,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "Choice is a luxury. Enjoy it.",
     onceOnly: true,
     category: "tutorial",
+    priority: "high",
   },
   tutorial_locked_merge: {
     id: "tutorial_locked_merge",
@@ -207,6 +233,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line2: "Power now, dependency later.",
     onceOnly: true,
     category: "tutorial",
+    priority: "high",
+    momentLockMs: 600,
   },
   baron_offer_accept: {
     id: "baron_offer_accept",
@@ -215,6 +243,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line2: "Exclusive glow, protected zip codes.",
     onceOnly: true,
     category: "baron_fax",
+    priority: "high",
   },
   baron_offer_decline: {
     id: "baron_offer_decline",
@@ -222,6 +251,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "Slow and steady. Open keeps you flexible.",
     onceOnly: true,
     category: "mentor_tip",
+    priority: "high",
   },
   tina_baron_accept: {
     id: "tina_baron_accept",
@@ -231,6 +261,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     portrait: "confident",
     category: "inner_monologue",
+    priority: "high",
   },
   tina_baron_decline: {
     id: "tina_baron_decline",
@@ -240,6 +271,86 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     portrait: "confident",
     category: "inner_monologue",
+    priority: "high",
+  },
+  discover_track: {
+    id: "discover_track",
+    speaker: "mentor",
+    line1: "Track (Tier 2) — used in basic installs.",
+    line2: "Merge Tracks to build a Segment.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  discover_segment: {
+    id: "discover_segment",
+    speaker: "mentor",
+    line1: "Segment (Tier 3) unlocked.",
+    line2: "Higher tiers unlock better orders.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  discover_smartkit: {
+    id: "discover_smartkit",
+    speaker: "mentor",
+    line1: "Smart Kit (Tier 4) — premium installs begin here.",
+    line2: "Hold space. These pay well.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  discover_system: {
+    id: "discover_system",
+    speaker: "mentor",
+    line1: "System (Tier 5) — signature installs only.",
+    line2: "Expect a premium showcase order.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  discover_locked: {
+    id: "discover_locked",
+    speaker: "baron",
+    line1: "Locked parts hit hotter… and tighten the leash.",
+    line2: "Dependency rises with every locked install.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  discover_locked_merge: {
+    id: "discover_locked_merge",
+    speaker: "mentor",
+    line1: "Locked + Open → Locked.",
+    line2: "Once it locks, it spreads.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  discover_compatible: {
+    id: "discover_compatible",
+    speaker: "rd",
+    line1: "Compatible kits count as locked-required installs.",
+    line2: "Freedom tech keeps you open.",
+    onceOnly: true,
+    category: "discovery",
+    priority: "high",
+    momentLockMs: 600,
+  },
+  first_session_choice: {
+    id: "first_session_choice",
+    speaker: "mentor",
+    line1: "Two paths: open reliability or certified profit.",
+    line2: "Complete one to set your tone.",
+    onceOnly: true,
+    category: "mission",
+    priority: "high",
   },
   lockout_begin: {
     id: "lockout_begin",

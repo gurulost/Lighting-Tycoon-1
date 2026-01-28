@@ -13,11 +13,13 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
+import { AvatarImage } from "@/components/game/AvatarImage";
 import { Order, Part, TIER_NAMES, PartTier } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
+import { getPortraitSource } from "@/constants/characters";
 
 interface OrderCardProps {
   order: Order;
@@ -72,6 +74,15 @@ export function OrderCard({
     if (!p) return false;
     return order.requirements.some((req) => isPartValidForRequirement(p, req));
   });
+
+  const orderSource = order.modifierIds?.includes("mentor_job")
+    ? "mentor"
+    : order.modifierIds?.includes("baron_contract")
+    ? "baron"
+    : null;
+  const orderSourcePortrait = orderSource
+    ? getPortraitSource(orderSource, "md", "portrait")
+    : null;
 
   useEffect(() => {
     if (reducedMotion) {
@@ -228,6 +239,27 @@ export function OrderCard({
     if (order.type === "locked_required" || order.type === "baron_certified") {
       badges.push({ label: "Certified", color: GameColors.locked.primary, icon: "lock" });
     }
+    if (order.modifierIds?.includes("mentor_job")) {
+      badges.push({
+        label: "Mentor Job",
+        color: GameColors.openStandard.primary,
+        icon: "compass",
+      });
+    }
+    if (order.modifierIds?.includes("baron_contract")) {
+      badges.push({
+        label: "Baron Contract",
+        color: GameColors.locked.primary,
+        icon: "briefcase",
+      });
+    }
+    if (order.modifierIds?.includes("threshold_story")) {
+      badges.push({
+        label: "Story",
+        color: GameColors.ui.primary,
+        icon: "book-open",
+      });
+    }
     if (order.rushDeadline) {
       badges.push({ label: "Rush", color: GameColors.ui.danger, icon: "clock" });
     }
@@ -302,6 +334,20 @@ export function OrderCard({
         <LinearGradient colors={getGradientColors()} style={styles.gradient}>
         <View style={styles.header}>
           <View style={styles.titleRow}>
+            {orderSourcePortrait ? (
+              <AvatarImage
+                source={orderSourcePortrait}
+                size={24}
+                borderColor={orderSource === "mentor" ? GameColors.openStandard.primary : GameColors.locked.primary}
+                icon={orderSource === "mentor" ? "compass" : "briefcase"}
+                iconColor={
+                  orderSource === "mentor"
+                    ? GameColors.openStandard.primary
+                    : GameColors.locked.primary
+                }
+                contentFit="cover"
+              />
+            ) : null}
             <LinearGradient
               colors={[`${typeColor}40`, `${typeColor}20`, `${typeColor}40`]}
               style={styles.typeIcon}

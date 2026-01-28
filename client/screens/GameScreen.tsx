@@ -32,8 +32,8 @@ import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { STORY_BEATS } from "@/constants/story";
 import SoundManager from "@/audio/SoundManager";
-import { TIER_NAMES } from "@/types/game";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
 const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
@@ -51,14 +51,25 @@ const partPremiumOpen = require("../../assets/images/part-premium-open.webp");
 const partPremiumLocked = require("../../assets/images/part-premium-locked.webp");
 const tinaPortrait128 = require("../../assets/images/tina/tina-portrait-128.webp");
 const tinaPortrait256 = require("../../assets/images/tina/tina-portrait-256.webp");
+const tinaPortrait512 = require("../../assets/images/tina/tina-portrait-512.webp");
 const tinaConfident128 = require("../../assets/images/tina/tina-confident-128.webp");
+const tinaConfident256 = require("../../assets/images/tina/tina-confident-256.webp");
+const tinaConfident512 = require("../../assets/images/tina/tina-confident-512.webp");
 const tinaFocused128 = require("../../assets/images/tina/tina-focused-128.webp");
+const tinaFocused256 = require("../../assets/images/tina/tina-focused-256.webp");
+const tinaFocused512 = require("../../assets/images/tina/tina-focused-512.webp");
 const tinaDelighted128 = require("../../assets/images/tina/tina-delighted-128.webp");
+const tinaDelighted256 = require("../../assets/images/tina/tina-delighted-256.webp");
+const tinaDelighted512 = require("../../assets/images/tina/tina-delighted-512.webp");
 const tinaConcerned128 = require("../../assets/images/tina/tina-concerned-128.webp");
+const tinaConcerned256 = require("../../assets/images/tina/tina-concerned-256.webp");
+const tinaConcerned512 = require("../../assets/images/tina/tina-concerned-512.webp");
 const mentorPortrait128 = require("../../assets/images/mentor/mentor-portrait-128.webp");
 const mentorPortrait256 = require("../../assets/images/mentor/mentor-portrait-256.webp");
+const mentorPortrait512 = require("../../assets/images/mentor/mentor-portrait-512.webp");
 const baronPortrait128 = require("../../assets/images/baron/baron-portrait-128.webp");
 const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.webp");
+const baronPortrait512 = require("../../assets/images/baron/baron-portrait-512.webp");
 
 type ModalType = "orders" | "upgrades" | "rd" | "settings" | "story" | "glossary" | null;
 
@@ -189,16 +200,15 @@ export default function GameScreen() {
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storyCollapseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draggingRef = useRef(false);
   const tutorialStepRef = useRef(state.tutorialStep);
   const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
-  const tierDiscoveryRef = useRef(state.lastTierDiscoveryId);
-  const lockedDiscoveryRef = useRef(state.lastLockedDiscoveryId);
-  const compatibleDiscoveryRef = useRef(state.lastCompatibleDiscoveryId);
   const marketingBoostRef = useRef(state.marketingBoostOrdersRemaining);
   const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
+  const [momentLockActive, setMomentLockActive] = useState(false);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
@@ -296,6 +306,7 @@ export default function GameScreen() {
 
   const handleStoryPress = useCallback(() => {
     if (!state.activeStoryBeatId) return;
+    if (momentLockActive) return;
     if (!storyExpanded) {
       setStoryExpanded(true);
       if (storyCollapseTimeout.current) {
@@ -313,7 +324,7 @@ export default function GameScreen() {
     } else {
       dispatch({ type: "DISMISS_STORY_BEAT" });
     }
-  }, [state.activeStoryBeatId, storyExpanded, dispatch]);
+  }, [state.activeStoryBeatId, storyExpanded, dispatch, momentLockActive]);
   const selectedPart =
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
   const showLockoutModal =
@@ -345,6 +356,9 @@ export default function GameScreen() {
       if (storyCollapseTimeout.current) {
         clearTimeout(storyCollapseTimeout.current);
       }
+      if (momentLockTimeout.current) {
+        clearTimeout(momentLockTimeout.current);
+      }
     };
   }, []);
 
@@ -359,14 +373,25 @@ export default function GameScreen() {
     const sources = [
       tinaPortrait128,
       tinaPortrait256,
+      tinaPortrait512,
       tinaConfident128,
+      tinaConfident256,
+      tinaConfident512,
       tinaFocused128,
+      tinaFocused256,
+      tinaFocused512,
       tinaDelighted128,
+      tinaDelighted256,
+      tinaDelighted512,
       tinaConcerned128,
+      tinaConcerned256,
+      tinaConcerned512,
       mentorPortrait128,
       mentorPortrait256,
+      mentorPortrait512,
       baronPortrait128,
       baronPortrait256,
+      baronPortrait512,
       stationWorkbenchImage,
       stationInboxImage,
       stationRdImage,
@@ -424,36 +449,27 @@ export default function GameScreen() {
   }, [state.lastRecycleRewardId, state.lastRecycleReward, showToast, dispatch]);
 
   useEffect(() => {
-    if (
-      state.lastTierDiscoveryId !== tierDiscoveryRef.current &&
-      state.lastTierDiscovered
-    ) {
-      const tier = state.lastTierDiscovered;
-      const tierLabel = TIER_NAMES[tier];
-      showToast(`New part: ${tierLabel} (Tier ${tier}).`, 2400);
+    if (!state.activeStoryBeatId) {
+      setMomentLockActive(false);
+      if (momentLockTimeout.current) {
+        clearTimeout(momentLockTimeout.current);
+        momentLockTimeout.current = null;
+      }
+      return;
     }
-    tierDiscoveryRef.current = state.lastTierDiscoveryId;
-  }, [state.lastTierDiscoveryId, state.lastTierDiscovered, showToast]);
-
-  useEffect(() => {
-    if (state.lastLockedDiscoveryId !== lockedDiscoveryRef.current) {
-      showToast(
-        "Locked parts stay locked when merged and raise Dependency.",
-        2800
-      );
+    const beat = STORY_BEATS[state.activeStoryBeatId];
+    if (!beat?.momentLockMs) {
+      setMomentLockActive(false);
+      return;
     }
-    lockedDiscoveryRef.current = state.lastLockedDiscoveryId;
-  }, [state.lastLockedDiscoveryId, showToast]);
-
-  useEffect(() => {
-    if (state.lastCompatibleDiscoveryId !== compatibleDiscoveryRef.current) {
-      showToast(
-        "Compatible parts can satisfy locked-required orders.",
-        2800
-      );
+    setMomentLockActive(true);
+    if (momentLockTimeout.current) {
+      clearTimeout(momentLockTimeout.current);
     }
-    compatibleDiscoveryRef.current = state.lastCompatibleDiscoveryId;
-  }, [state.lastCompatibleDiscoveryId, showToast]);
+    momentLockTimeout.current = setTimeout(() => {
+      setMomentLockActive(false);
+    }, beat.momentLockMs);
+  }, [state.activeStoryBeatId]);
 
   useEffect(() => {
     const previous = marketingBoostRef.current;
@@ -521,8 +537,12 @@ export default function GameScreen() {
   useEffect(() => {
     if (!state.activeStoryBeatId && state.storyQueue.length > 0) {
       const now = Date.now();
+      const nextBeatId = state.storyQueue[0];
+      const nextBeat = nextBeatId ? STORY_BEATS[nextBeatId] : null;
+      const cooldownSatisfied =
+        nextBeat?.priority === "high" || now - state.lastStoryShownAt >= 30000;
       if (
-        now - state.lastStoryShownAt >= 30000 &&
+        cooldownSatisfied &&
         !activeModal &&
         !state.baronOfferAvailable &&
         !showLockoutModal &&
@@ -562,12 +582,19 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (!state.activeStoryBeatId) return;
-    setStoryExpanded(false);
+    const beat = STORY_BEATS[state.activeStoryBeatId];
+    const autoExpand = beat?.priority === "high";
+    setStoryExpanded(autoExpand);
     if (storyTimeout.current) {
       clearTimeout(storyTimeout.current);
     }
     if (storyCollapseTimeout.current) {
       clearTimeout(storyCollapseTimeout.current);
+    }
+    if (autoExpand) {
+      storyCollapseTimeout.current = setTimeout(() => {
+        setStoryExpanded(false);
+      }, 2200);
     }
     storyTimeout.current = setTimeout(() => {
       dispatch({ type: "DISMISS_STORY_BEAT" });
@@ -720,6 +747,10 @@ export default function GameScreen() {
           </View>
           <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
         </Pressable>
+      ) : null}
+
+      {momentLockActive ? (
+        <View pointerEvents="auto" style={styles.momentLockBlocker} />
       ) : null}
 
       {state.activeStoryBeatId && !isDragging && !activeModal ? (
@@ -1052,7 +1083,15 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.xs,
     alignSelf: "flex-start",
-    maxWidth: "82%",
+    maxWidth: "92%",
+  },
+  momentLockBlocker: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
   },
   bottomBar: {
     flexDirection: "row",
