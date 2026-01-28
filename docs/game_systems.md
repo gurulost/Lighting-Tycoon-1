@@ -70,3 +70,10 @@ This document is the single source of truth for the core gameplay systems.
 - Forced drops and scripted orders
 - Two Baron offers appear in the first session
 - Dependency pressure shown softly, no lockout
+
+## Goals / Missions
+- Always-visible goals strip showing 1-2 active missions.
+- Missions are short objectives from Mentor, Baron, R&D, Customers, or the System.
+- Completion grants bonus cash/reputation/research and logs a recent-win entry.
+- Chains unlock after first session for multi-step story episodes.
+- Goals are optional; players can skip to reroll.

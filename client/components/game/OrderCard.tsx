@@ -213,8 +213,6 @@ export function OrderCard({
     switch (order.type) {
       case "baron_certified":
         return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
-      case "compatibility_required":
-        return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
       case "premium":
         return [`${GameColors.currency.cash}15`, "#1A1A2E", `${GameColors.currency.cash}15`];
       case "lab_request":

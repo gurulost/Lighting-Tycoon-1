@@ -115,6 +115,15 @@ These rules prevent long streaks of low-interest orders in late progression.
 
 ---
 
+## Goals / Missions
+- Max active goals: `MAX_ACTIVE_MISSIONS = 2`
+- Repeat cooldown: `MISSION_REPEAT_WINDOW_MS = 12 minutes`
+- History cap: `MISSION_HISTORY_LIMIT = 60`
+- Phase 1 (pre-first-session-complete): mentor/customer goals only, no chains
+- Phase 2 (post-first-session-complete): chains can appear and auto-advance
+
+---
+
 ## Save Debounce Parameters
 - Debounce window: `SAVE_DEBOUNCE_MS = 1200ms`
 - Max wait: `SAVE_MAX_WAIT_MS = 12000ms`

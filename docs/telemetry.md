@@ -17,6 +17,12 @@ Status: not yet fully instrumented.
 - `order_fulfill` (type, modifiers, rewards)
 - `order_dismiss` (type)
 
+## Goals / Missions (Why: retention + intent)
+- `mission_assigned` (templateId, giver, chainId, chainIndex)
+- `mission_progress` (templateId, progress, target)
+- `mission_complete` (templateId, giver, rewards)
+- `mission_skip` (templateId, giver)
+
 ## Strategy Layer (Why: lock-in dynamics)
 - `dependency_change` (delta, newValue)
 - `baron_offer_shown`

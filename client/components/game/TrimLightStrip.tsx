@@ -4,10 +4,10 @@ import Animated, {
   Easing,
   useAnimatedProps,
   useSharedValue,
-  withRepeat,
   withTiming,
   SharedValue,
 } from "react-native-reanimated";
+import { withRepeat } from "@/lib/reanimated";
 
 export type TrimLightPattern = "warmWhite" | "classic" | "rainbow" | "baron";
 

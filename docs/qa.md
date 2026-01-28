@@ -63,6 +63,16 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - At least one active order requires Tier 5.
   - After completing a Tier 5 order, the next generated order restores a Tier 5 requirement.
 
+## Goals / Missions
+- Complete tutorial and confirm 1-2 goals appear in the goals strip.
+- Merge parts and confirm merge-count goals progress.
+- Fulfill orders and confirm order goals progress (open-only vs locked installs).
+- Complete a goal and verify:
+  - Rewards are granted (cash/rep/research).
+  - Toast appears.
+  - Goal is replaced by a new one.
+- Skip a goal and verify it is replaced without reward.
+
 ## Tactical Boosts
 - Complete tutorial + first session.
 - Supplier Scout:

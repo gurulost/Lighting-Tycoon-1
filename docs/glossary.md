@@ -40,6 +40,14 @@ Use this as a quick reference for every icon, badge, and system.
 - Bulb Baron: locked supplier with tempting offers.
 - Freedom Controller: converts locked kits to open-compatible parts.
 
+## Goals / Missions
+- Goals: short optional objectives that grant bonus rewards.
+- Mentor Goals: open-only installs and steady progression.
+- Baron Goals: certified/locked installs and aggressive growth.
+- R&D Goals: Freedom Controller and compatible installs.
+- Customer Goals: keep installs flowing and reputation up.
+- System Goals: milestone targets (Tier 5 installs, lockout recovery).
+
 ## Order Badges
 - Certified: locked preferred or required for full rewards.
 - Rush: bonus decays over time (no hard fail).
