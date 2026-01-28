@@ -19,7 +19,6 @@ import {
   SupplierScoutRoute,
   WarrantyStampMode,
   Mission,
-  MissionReward,
   INITIAL_BOARD_SIZE,
   INITIAL_BACKPACK_SLOTS,
   INITIAL_BLOCKED_SLOTS,
@@ -377,7 +376,7 @@ function isChainCompleted(
   const templates = getChainTemplates(chainId);
   if (templates.length === 0) return false;
   return templates.every((template) =>
-    history.some((entry) => entry.templateId === template.id)
+    history.some((entry) => entry.templateId === template.id && !entry.skipped)
   );
 }
 
@@ -395,6 +394,9 @@ function isMissionTemplateEligible(
   const phase = getMissionPhase(state);
   if (phase === 0) return false;
   if (phase === 1 && template.chainId) return false;
+  if (phase === 1 && template.giver !== "mentor" && template.giver !== "customer") {
+    return false;
+  }
   if (typeof template.minRepTier === "number" && state.reputationTier < template.minRepTier) {
     return false;
   }
@@ -413,7 +415,12 @@ function isMissionTemplateEligible(
   if (template.requiresBaronSeen && !state.baronOfferSeen) return false;
   if (template.requiresRdUnlocked && (state.upgrades["rd_unlock"] || 0) < 1) return false;
   if (template.requiresFreedomBuild && !state.rdNodes["freedom_build"]) return false;
-  if (template.requiresFreedomController && state.freedomControllerCount < 1) return false;
+  if (
+    template.requiresFreedomController &&
+    state.freedomControllerCount < 1 &&
+    !state.rdNodes["freedom_build"]
+  )
+    return false;
   if (template.requiresCompatibleUnlocked && !state.compatibleDiscoverySeen) return false;
   if (state.missions.some((mission) => mission.templateId === template.id)) return false;
   if (!options.ignoreRepeatWindow) {
@@ -428,7 +435,9 @@ function isMissionTemplateEligible(
       const prevTemplate = getChainTemplate(template.chainId, template.chainIndex - 1);
       if (
         prevTemplate &&
-        !state.missionHistory.some((entry) => entry.templateId === prevTemplate.id)
+        !state.missionHistory.some(
+          (entry) => entry.templateId === prevTemplate.id && !entry.skipped
+        )
       ) {
         return false;
       }
@@ -494,6 +503,9 @@ function ensureMissions(state: GameState): GameState {
     if (!picked) break;
     nextMissions = [...nextMissions, createMissionFromTemplate(picked, state)];
     candidates = candidates.filter((template) => template.id !== picked.id);
+    if (picked.chainId) {
+      candidates = candidates.filter((template) => template.chainId !== picked.chainId);
+    }
   }
 
   if (nextMissions.length === state.missions.length) return state;
@@ -569,8 +581,8 @@ function maybeQueueNextChainMission(state: GameState, mission: Mission): GameSta
 }
 
 type MissionEvent =
-  | { type: "merge"; count: number; maxTierCrafted: PartTier }
-  | { type: "reach_tier"; maxTierCrafted: PartTier }
+  | { type: "merge"; count: number }
+  | { type: "reach_tier" }
   | { type: "fulfill_order"; order: Order; parts: Part[] }
   | { type: "accept_baron_offer" }
   | { type: "decline_baron_offer" }
@@ -578,7 +590,8 @@ type MissionEvent =
   | { type: "use_freedom_controller" };
 
 function applyMissionProgress(state: GameState, event: MissionEvent): GameState {
-  if (!state.tutorialComplete || state.missions.length === 0) return state;
+  if (!state.tutorialComplete) return state;
+  if (state.missions.length === 0) return ensureMissions(state);
   const updated: Mission[] = [];
   const completed: Mission[] = [];
   let progressChanged = false;
@@ -631,9 +644,7 @@ function applyMissionProgress(state: GameState, event: MissionEvent): GameState 
         break;
       }
       case "reach_tier": {
-        if (event.type === "merge" || event.type === "reach_tier") {
-          nextProgress = Math.min(target, event.maxTierCrafted);
-        }
+        nextProgress = Math.min(target, state.maxTierCrafted);
         break;
       }
       case "fulfill_tier5_order": {
@@ -1596,7 +1607,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (nextMaxTierCrafted > state.maxTierCrafted) {
         nextState = applyMissionProgress(nextState, {
           type: "reach_tier",
-          maxTierCrafted: nextMaxTierCrafted,
         });
       }
       return nextState;
@@ -1886,7 +1896,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       nextState = applyMissionProgress(nextState, {
         type: "merge",
         count: 1,
-        maxTierCrafted: nextMaxTierCrafted,
       });
       return nextState;
     }
@@ -2880,6 +2889,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const guaranteedTier = Math.min(4, Math.max(2, state.maxTierCrafted));
         const newBoard = [...state.board];
         let placedLocked = false;
+        const placedTier = emptySlot !== -1 ? (guaranteedTier as PartTier) : undefined;
+        const nextMaxTierCrafted = placedTier
+          ? Math.max(state.maxTierCrafted, placedTier)
+          : state.maxTierCrafted;
         if (emptySlot !== -1) {
           newBoard[emptySlot] = createPart(emptySlot, "locked", guaranteedTier as PartTier);
           placedLocked = true;
@@ -2908,6 +2921,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lastLockedDiscoveryId: sawLocked
             ? state.lastLockedDiscoveryId + 1
             : state.lastLockedDiscoveryId,
+          maxTierCrafted: nextMaxTierCrafted,
           cash: state.cash + (emptySlot === -1 ? 40 : 0),
           research: state.research + (emptySlot === -1 ? 4 : 0),
           tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
@@ -2964,6 +2978,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const bonusCash = 60;
       const bonusResearch = 6;
       const missingSlots = Math.max(0, 2 - emptySlots.length);
+      const placedTiers: PartTier[] = [];
 
       const newBoard = [...state.board];
       if (emptySlots[0] !== undefined) {
@@ -2972,6 +2987,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           "locked",
           guaranteedTier as PartTier
         );
+        placedTiers.push(guaranteedTier as PartTier);
       }
       if (emptySlots[1] !== undefined) {
         newBoard[emptySlots[1]] = createPart(
@@ -2979,7 +2995,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           "locked",
           secondaryTier as PartTier
         );
+        placedTiers.push(secondaryTier as PartTier);
       }
+      const nextMaxTierCrafted =
+        placedTiers.length > 0
+          ? Math.max(state.maxTierCrafted, ...placedTiers)
+          : state.maxTierCrafted;
 
       const dependencyOutcome = applyDependency(state, 5, allowLockout);
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
@@ -2999,6 +3020,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastLockedDiscoveryId: sawLocked
           ? state.lastLockedDiscoveryId + 1
           : state.lastLockedDiscoveryId,
+        maxTierCrafted: nextMaxTierCrafted,
         cash: state.cash + bonusCash + missingSlots * 20,
         research: state.research + bonusResearch + missingSlots * 4,
         tutorialStep: tutorialAdvance ? tutorialAdvance.tutorialStep : state.tutorialStep,
@@ -3943,6 +3965,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.installStreakBest === "number"
           ? action.state.installStreakBest
           : base.installStreakBest;
+      const rawMissions = Array.isArray(action.state.missions)
+        ? action.state.missions
+        : base.missions;
+      const normalizedMissions = rawMissions.filter(
+        (mission) =>
+          mission &&
+          typeof mission.id === "string" &&
+          typeof mission.target === "number" &&
+          typeof mission.progress === "number" &&
+          mission.progress < mission.target
+      );
+      const rawHistory = Array.isArray(action.state.missionHistory)
+        ? action.state.missionHistory
+        : base.missionHistory;
+      const normalizedHistory = rawHistory
+        .filter(
+          (entry) =>
+            entry &&
+            typeof entry.templateId === "string" &&
+            typeof entry.completedAt === "number"
+        )
+        .slice(-MISSION_HISTORY_LIMIT);
       const derivedMaxTier = Math.max(
         1,
         ...(Array.isArray(action.state.board)
@@ -4031,6 +4075,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mentorClinicMergesRemaining,
         warrantyStampMode: resolvedWarrantyMode,
         warrantyStampOrdersRemaining,
+        missions: action.state.tutorialComplete ? normalizedMissions : base.missions,
+        missionHistory: normalizedHistory,
+        lastMissionRewardId: 0,
+        lastMissionReward: null,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -4086,6 +4134,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? restoredState.highlightedOrderId
             : undefined,
         };
+      }
+      if (restoredState.tutorialComplete) {
+        restoredState = ensureMissions(restoredState);
       }
 
       return restoredState;
@@ -4156,6 +4207,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       activeStoryBeatId: undefined,
       lastRecycleRewardId: 0,
       lastRecycleReward: null,
+      lastMissionRewardId: 0,
+      lastMissionReward: null,
       orderSpawnCooldownUntil: 0,
       lastCriticalEventId: 0,
     }),
@@ -4242,6 +4295,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.mentorClinicMergesRemaining,
       state.warrantyStampMode,
       state.warrantyStampOrdersRemaining,
+      state.missions,
+      state.missionHistory,
+      state.lastMissionRewardId,
+      state.lastMissionReward,
     ]
   );
 

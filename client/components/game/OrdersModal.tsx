@@ -126,12 +126,6 @@ export function OrdersModal({
   }, [dispatch, state.ordersHelpNudgeSeen]);
 
   React.useEffect(() => {
-    if (!state.ordersHelpNudgeSeen) {
-      dispatch({ type: "SET_ORDERS_HELP_SEEN" });
-    }
-  }, [state.ordersHelpNudgeSeen, dispatch]);
-
-  React.useEffect(() => {
     if (!showOrdersHint) return;
     const timeout = setTimeout(() => {
       handleDismissOrdersHint();
