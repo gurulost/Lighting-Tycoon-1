@@ -47,6 +47,7 @@ type GameAction =
   | { type: "RECYCLE_PART"; source: "board" | "backpack"; index: number }
   | { type: "HIGHLIGHT_ORDER"; orderId?: string }
   | { type: "CLEAR_RECYCLE_REWARD" }
+  | { type: "SET_ORDERS_HELP_SEEN" }
   | { type: "FULFILL_ORDER"; orderId: string; partIndices: number[] }
   | { type: "PURCHASE_UPGRADE"; upgradeId: string }
   | { type: "UNLOCK_RD_NODE"; nodeId: string }
@@ -719,6 +720,7 @@ function getInitialState(): GameState {
     highlightedOrderId: undefined,
     lastRecycleRewardId: 0,
     lastRecycleReward: null,
+    ordersHelpNudgeSeen: false,
     tierDiscovery: {},
     lastTierDiscoveryId: 0,
     lastTierDiscovered: undefined,
@@ -764,6 +766,8 @@ function getInitialState(): GameState {
     lastCriticalEventId: 0,
     maxTierCrafted: 1,
     marketingBoostOrdersRemaining: 0,
+    installStreakCurrent: 0,
+    installStreakBest: 0,
   };
 }
 
@@ -1354,6 +1358,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "SET_ORDERS_HELP_SEEN": {
+      if (state.ordersHelpNudgeSeen) return state;
+      return {
+        ...state,
+        ordersHelpNudgeSeen: true,
+        undoSnapshot: undefined,
+      };
+    }
+
     case "FULFILL_ORDER": {
       const { orderId, partIndices } = action;
       const order = state.orders.find((o) => o.id === orderId);
@@ -1413,6 +1426,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         cashReward = Math.floor(cashReward * (1 + BARON_CONTRACT_CASH_BONUS));
         dependencyChange += BARON_CONTRACT_DEPENDENCY_DELTA;
       }
+
+      const shouldIncrementStreak =
+        state.tutorialComplete &&
+        !order.isTutorial &&
+        !order.isLockout &&
+        order.type !== "lab_request";
+      const nextInstallStreakCurrent = shouldIncrementStreak
+        ? state.installStreakCurrent + 1
+        : state.installStreakCurrent;
+      const nextInstallStreakBest = Math.max(
+        state.installStreakBest,
+        nextInstallStreakCurrent
+      );
 
       const allowLockout = state.firstSessionComplete;
       const dependencyOutcome = applyDependency(state, dependencyChange, allowLockout);
@@ -1589,6 +1615,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialOrderId: completedTutorialOrder ? undefined : state.tutorialOrderId,
         highlightedOrderId: nextHighlightedOrderId,
         orderMetrics: nextOrderMetrics,
+        installStreakCurrent: nextInstallStreakCurrent,
+        installStreakBest: nextInstallStreakBest,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -1820,6 +1848,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orders: state.orders.filter((o) => o.id !== action.orderId),
         highlightedOrderId:
           state.highlightedOrderId === action.orderId ? undefined : state.highlightedOrderId,
+        installStreakCurrent: 0,
         undoSnapshot: undefined,
       };
     }
@@ -1855,6 +1884,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orders: [...remainingOrders, newOrder],
         orderMetrics: updateOrderMetrics(state, newOrder),
         marketingBoostOrdersRemaining: nextMarketingBoostOrdersRemaining,
+        installStreakCurrent: 0,
         highlightedOrderId:
           state.highlightedOrderId === action.orderId ? undefined : state.highlightedOrderId,
         orderSpawnCooldownUntil: Date.now() + getOrderIntervalMs(state.reputationTier),
@@ -2834,6 +2864,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.marketingBoostOrdersRemaining === "number"
           ? action.state.marketingBoostOrdersRemaining
           : base.marketingBoostOrdersRemaining;
+      const ordersHelpNudgeSeen =
+        typeof action.state.ordersHelpNudgeSeen === "boolean"
+          ? action.state.ordersHelpNudgeSeen
+          : base.ordersHelpNudgeSeen;
+      const installStreakCurrent =
+        typeof action.state.installStreakCurrent === "number"
+          ? action.state.installStreakCurrent
+          : base.installStreakCurrent;
+      const installStreakBest =
+        typeof action.state.installStreakBest === "number"
+          ? action.state.installStreakBest
+          : base.installStreakBest;
       const derivedMaxTier = Math.max(
         1,
         ...(Array.isArray(action.state.board)
@@ -2910,6 +2952,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCompatibleDiscoveryId: resolvedCompatibleId,
         maxTierCrafted,
         marketingBoostOrdersRemaining,
+        ordersHelpNudgeSeen,
+        installStreakCurrent,
+        installStreakBest,
         currentNeighborhoodId:
           hasValidNeighborhood ? action.state.currentNeighborhoodId : computedNeighborhood.id,
         reputationTier:
@@ -3109,6 +3154,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.lastCompatibleDiscoveryId,
       state.maxTierCrafted,
       state.marketingBoostOrdersRemaining,
+      state.ordersHelpNudgeSeen,
+      state.installStreakCurrent,
+      state.installStreakBest,
     ]
   );
 

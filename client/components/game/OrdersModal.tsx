@@ -26,6 +26,9 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
+  const [showOrdersHint, setShowOrdersHint] = React.useState(
+    () => !state.ordersHelpNudgeSeen
+  );
   const orderLegend = [
     { key: "C", label: "Clip" },
     { key: "T", label: "Track" },
@@ -56,6 +59,27 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
   const canRefresh = state.tutorialComplete && Boolean(refreshTarget) && state.cash >= refreshCost;
   const canStartCampaign =
     state.tutorialComplete && state.cash >= marketingCost && !marketingAtCap;
+
+  const handleDismissOrdersHint = React.useCallback(() => {
+    setShowOrdersHint(false);
+    if (!state.ordersHelpNudgeSeen) {
+      dispatch({ type: "SET_ORDERS_HELP_SEEN" });
+    }
+  }, [dispatch, state.ordersHelpNudgeSeen]);
+
+  React.useEffect(() => {
+    if (!state.ordersHelpNudgeSeen) {
+      dispatch({ type: "SET_ORDERS_HELP_SEEN" });
+    }
+  }, [state.ordersHelpNudgeSeen, dispatch]);
+
+  React.useEffect(() => {
+    if (!showOrdersHint) return;
+    const timeout = setTimeout(() => {
+      handleDismissOrdersHint();
+    }, 3200);
+    return () => clearTimeout(timeout);
+  }, [showOrdersHint, handleDismissOrdersHint]);
 
   const handleFulfillOrder = (orderId: string) => {
     const order = state.orders.find((o) => o.id === orderId);
@@ -108,7 +132,31 @@ export function OrdersModal({ onClose, closeDisabled = false }: OrdersModalProps
           </ThemedText>
           <ThemedText style={styles.statLabel}>Coins</ThemedText>
         </View>
+
+        <View style={styles.statItem}>
+          <Feather name="repeat" size={18} color={GameColors.currency.reputation} />
+          <View style={styles.statStack}>
+            <ThemedText style={styles.statValue}>
+              {state.installStreakCurrent}
+            </ThemedText>
+            <ThemedText style={styles.statSub}>Best {state.installStreakBest}</ThemedText>
+          </View>
+          <ThemedText style={styles.statLabel}>Streak</ThemedText>
+        </View>
       </View>
+
+      {showOrdersHint ? (
+        <Pressable style={styles.helpBanner} onPress={handleDismissOrdersHint}>
+          <Feather name="info" size={16} color={GameColors.ui.primary} />
+          <View style={styles.helpCopy}>
+            <ThemedText style={styles.helpTitle}>Orders Help</ThemedText>
+            <ThemedText style={styles.helpText}>
+              Legend now shows letters + tile badges.
+            </ThemedText>
+          </View>
+          <Feather name="x" size={14} color={GameColors.text.secondary} />
+        </Pressable>
+      ) : null}
 
       {state.tutorialComplete ? (
         <View style={styles.actionStack}>
@@ -383,6 +431,38 @@ const styles = StyleSheet.create({
     color: GameColors.currency.reputation,
   },
   statLabel: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+  },
+  statStack: {
+    gap: 2,
+  },
+  statSub: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
+  },
+  helpBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}40`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  helpCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  helpTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  helpText: {
     fontSize: 12,
     color: GameColors.text.secondary,
   },

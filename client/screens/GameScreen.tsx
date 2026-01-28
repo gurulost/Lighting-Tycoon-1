@@ -503,7 +503,7 @@ export default function GameScreen() {
           1: "Nice! Parts on the board.",
           2: "Great merge!",
           3: "Segment built.",
-          4: "Order complete.",
+          4: "Order complete — Clips build Tracks; higher tiers unlock better jobs.",
           5: "Space upgraded.",
           6: "Choice made.",
           7: "Locked merge complete.",

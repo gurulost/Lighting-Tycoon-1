@@ -128,6 +128,7 @@ export interface GameState {
   highlightedOrderId?: string;
   lastRecycleRewardId: number;
   lastRecycleReward: { cash: number; research: number } | null;
+  ordersHelpNudgeSeen: boolean;
   tierDiscovery: Record<number, boolean>;
   lastTierDiscoveryId: number;
   lastTierDiscovered?: PartTier;
@@ -202,6 +203,9 @@ export interface GameState {
   maxTierCrafted: number;
 
   marketingBoostOrdersRemaining: number;
+
+  installStreakCurrent: number;
+  installStreakBest: number;
 }
 
 export const INITIAL_BOARD_SIZE = 30;
