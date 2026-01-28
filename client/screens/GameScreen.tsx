@@ -102,6 +102,7 @@ interface BottomButtonProps {
   disabled?: boolean;
   onDisabledPress?: () => void;
   onLayout?: (event: any) => void;
+  compact?: boolean;
 }
 
 function BottomButton({
@@ -114,6 +115,7 @@ function BottomButton({
   disabled,
   onDisabledPress,
   onLayout,
+  compact = false,
 }: BottomButtonProps) {
   const pulseAnim = useSharedValue(0);
 
@@ -160,9 +162,13 @@ function BottomButton({
       >
         <LinearGradient
           colors={[`${color}20`, `${color}08`, `${color}20`]}
-          style={styles.buttonGradient}
+          style={[styles.buttonGradient, compact && styles.buttonGradientCompact]}
         >
-          <Feather name={icon} size={22} color={disabled ? GameColors.text.disabled : color} />
+          <Feather
+            name={icon}
+            size={compact ? 20 : 22}
+            color={disabled ? GameColors.text.disabled : color}
+          />
         </LinearGradient>
         {badge && badge > 0 ? (
           <View style={styles.badge}>
@@ -176,7 +182,11 @@ function BottomButton({
         ) : null}
       </Animated.View>
       <ThemedText
-        style={[styles.buttonLabel, { color: disabled ? GameColors.text.disabled : color }]}
+        style={[
+          styles.buttonLabel,
+          compact && styles.buttonLabelCompact,
+          { color: disabled ? GameColors.text.disabled : color },
+        ]}
       >
         {label}
       </ThemedText>
@@ -205,6 +215,8 @@ export default function GameScreen() {
   >({});
   const [topBarLayout, setTopBarLayout] = useState<LayoutRect | null>(null);
   const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(null);
+  const [screenHeight, setScreenHeight] = useState(0);
+  const [boardContainerHeight, setBoardContainerHeight] = useState(0);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
@@ -238,6 +250,8 @@ export default function GameScreen() {
     });
     return count;
   }, [state.orders, state.board, getFulfillmentIndices]);
+  const availableBoardHeight = boardContainerHeight > 0 ? boardContainerHeight : undefined;
+  const isCompactLayout = screenHeight > 0 && screenHeight < 740;
 
   const closeModal = () => setActiveModal(null);
   const handleResumeTutorial = () => {
@@ -673,7 +687,14 @@ export default function GameScreen() {
   }, [state.tutorialStep, state.tutorialComplete]);
 
   return (
-    <LinearGradient colors={["#0A0A14", "#0F0F1F", "#0A0A14"]} style={[styles.container, { paddingTop: insets.top }]}>
+    <LinearGradient
+      colors={["#0A0A14", "#0F0F1F", "#0A0A14"]}
+      style={[styles.container, { paddingTop: insets.top }]}
+      onLayout={(event) => {
+        const { height } = event.nativeEvent.layout;
+        setScreenHeight((prev) => (prev === height ? prev : height));
+      }}
+    >
       {__DEV__ ? (
         <DebugOverlay
           visible={debugOverlayVisible}
@@ -684,127 +705,138 @@ export default function GameScreen() {
           showLockoutModal={showLockoutModal}
         />
       ) : null}
-      <View style={styles.topBar} onLayout={(event) => setTopBarLayout(event.nativeEvent.layout)}>
-        <View onLayout={setTarget("currency")}>
-          <CurrencyDisplay
-            cash={state.cash}
-            reputation={state.reputation}
-            research={state.research}
-            onCashPress={
-              !state.tutorialComplete && state.tutorialStep < 4
-                ? undefined
-                : () => setActiveModal("upgrades")
-            }
-            onCashLongPress={() =>
-              showToast("Cash buys upgrades and expansions.", 2400)
-            }
-            onReputationLongPress={() =>
-              showToast("Reputation unlocks neighborhoods and better orders.", 2600)
-            }
-            onResearchLongPress={() =>
-              showToast("Research unlocks R&D and the Freedom Controller.", 2600)
-            }
-            reducedMotion={state.settings.reducedMotion}
-          />
-        </View>
-        <View style={styles.topActions}>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => setActiveModal("story")}
-          >
-            <LinearGradient
-              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-              style={styles.settingsGradient}
-            >
-              <Feather name="book-open" size={20} color={GameColors.text.secondary} />
-            </LinearGradient>
-          </Pressable>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => setActiveModal("glossary")}
-          >
-            <LinearGradient
-              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-              style={styles.settingsGradient}
-            >
-              <Feather name="help-circle" size={20} color={GameColors.text.secondary} />
-            </LinearGradient>
-          </Pressable>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => setActiveModal("settings")}
-            testID="settings-button"
-          >
-            <LinearGradient
-              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-              style={styles.settingsGradient}
-            >
-              <Feather name="settings" size={20} color={GameColors.text.secondary} />
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.statusRow}>
-        <Pressable
-          style={styles.statusItem}
-          onLongPress={() =>
-            showToast("Dependency rises with locked parts. Higher levels add certified orders.", 2800)
-          }
-          delayLongPress={350}
-        >
-          <View onLayout={setTarget("dependency")}>
-            <DependencyMeter
-              value={state.dependency}
-              compact
+      <View>
+        <View style={styles.topBar} onLayout={(event) => setTopBarLayout(event.nativeEvent.layout)}>
+          <View onLayout={setTarget("currency")}>
+            <CurrencyDisplay
+              cash={state.cash}
+              reputation={state.reputation}
+              research={state.research}
+              onCashPress={
+                !state.tutorialComplete && state.tutorialStep < 4
+                  ? undefined
+                  : () => setActiveModal("upgrades")
+              }
+              onCashLongPress={() =>
+                showToast("Cash buys upgrades and expansions.", 2400)
+              }
+              onReputationLongPress={() =>
+                showToast("Reputation unlocks neighborhoods and better orders.", 2600)
+              }
+              onResearchLongPress={() =>
+                showToast("Research unlocks R&D and the Freedom Controller.", 2600)
+              }
               reducedMotion={state.settings.reducedMotion}
             />
           </View>
-        </Pressable>
-        <View style={styles.statusItem}>
-          <NeighborhoodBadge
-            reputation={state.reputation}
-            currentNeighborhoodId={state.currentNeighborhoodId}
-            compact
-          />
-        </View>
-      </View>
-
-      <MissionStrip
-        missions={state.missions}
-        locked={!state.tutorialComplete}
-        onPress={() => setActiveModal("missions")}
-        onLockedPress={() => showToast("Finish the tutorial to unlock goals.", 2200)}
-      />
-
-      {tutorialSkipped ? (
-        <Pressable style={styles.resumeBanner} onPress={handleResumeTutorial}>
-          <View style={styles.resumeBannerContent}>
-            <Feather name="play-circle" size={16} color={GameColors.ui.primary} />
-            <ThemedText style={styles.resumeBannerText}>
-              Tutorial skipped — tap to resume
-            </ThemedText>
+          <View style={styles.topActions}>
+            <Pressable
+              style={styles.settingsButton}
+              onPress={() => setActiveModal("story")}
+            >
+              <LinearGradient
+                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                style={styles.settingsGradient}
+              >
+                <Feather name="book-open" size={20} color={GameColors.text.secondary} />
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              style={styles.settingsButton}
+              onPress={() => setActiveModal("glossary")}
+            >
+              <LinearGradient
+                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                style={styles.settingsGradient}
+              >
+                <Feather name="help-circle" size={20} color={GameColors.text.secondary} />
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              style={styles.settingsButton}
+              onPress={() => setActiveModal("settings")}
+              testID="settings-button"
+            >
+              <LinearGradient
+                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                style={styles.settingsGradient}
+              >
+                <Feather name="settings" size={20} color={GameColors.text.secondary} />
+              </LinearGradient>
+            </Pressable>
           </View>
-          <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
-        </Pressable>
-      ) : null}
+        </View>
+
+        <View style={[styles.statusRow, isCompactLayout && styles.statusRowCompact]}>
+          <Pressable
+            style={styles.statusItem}
+            onLongPress={() =>
+              showToast("Dependency rises with locked parts. Higher levels add certified orders.", 2800)
+            }
+            delayLongPress={350}
+          >
+            <View onLayout={setTarget("dependency")}>
+              <DependencyMeter
+                value={state.dependency}
+                compact
+                reducedMotion={state.settings.reducedMotion}
+              />
+            </View>
+          </Pressable>
+          <View style={styles.statusItem}>
+            <NeighborhoodBadge
+              reputation={state.reputation}
+              currentNeighborhoodId={state.currentNeighborhoodId}
+              compact
+            />
+          </View>
+        </View>
+
+        <MissionStrip
+          missions={state.missions}
+          locked={!state.tutorialComplete}
+          onPress={() => setActiveModal("missions")}
+          onLockedPress={() => showToast("Finish the tutorial to unlock goals.", 2200)}
+          compact={isCompactLayout}
+        />
+
+        {tutorialSkipped ? (
+          <Pressable style={styles.resumeBanner} onPress={handleResumeTutorial}>
+            <View style={styles.resumeBannerContent}>
+              <Feather name="play-circle" size={16} color={GameColors.ui.primary} />
+              <ThemedText style={styles.resumeBannerText}>
+                Tutorial skipped — tap to resume
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
+          </Pressable>
+        ) : null}
+
+        {state.activeStoryBeatId && !isDragging && !activeModal ? (
+          <Pressable style={styles.storyToastContainer} onPress={handleStoryPress}>
+            <StoryToast
+              beatId={state.activeStoryBeatId}
+              reducedMotion={state.settings.reducedMotion}
+              expanded={storyExpanded}
+            />
+          </Pressable>
+        ) : null}
+      </View>
 
       {momentLockActive ? (
         <View pointerEvents="auto" style={styles.momentLockBlocker} />
       ) : null}
 
-      {state.activeStoryBeatId && !isDragging && !activeModal ? (
-        <Pressable style={styles.storyToastContainer} onPress={handleStoryPress}>
-          <StoryToast
-            beatId={state.activeStoryBeatId}
-            reducedMotion={state.settings.reducedMotion}
-            expanded={storyExpanded}
-          />
-        </Pressable>
-      ) : null}
-
-      <View style={styles.boardContainer} onLayout={setTarget("board")}>
+      <View
+        style={styles.boardContainer}
+        onLayout={(event) => {
+          setTarget("board")(event);
+          const { height } = event.nativeEvent.layout;
+          setBoardContainerHeight((prev) => (prev === height ? prev : height));
+        }}
+      >
         <MergeBoard
+          maxHeight={availableBoardHeight}
           onWorkbenchPress={(result) => {
             if (result === "blocked") {
               showToast("Board is full — merge or fulfill an order.");
@@ -857,7 +889,11 @@ export default function GameScreen() {
 
       <LinearGradient
         colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-        style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md }]}
+        style={[
+          styles.bottomBar,
+          isCompactLayout && styles.bottomBarCompact,
+          { paddingBottom: insets.bottom + (isCompactLayout ? Spacing.sm : Spacing.md) },
+        ]}
         onLayout={(event) => setBottomBarLayout(event.nativeEvent.layout)}
       >
         <BottomButton
@@ -872,6 +908,7 @@ export default function GameScreen() {
           paused={orderSpawnPaused}
           disabled={!state.tutorialComplete && state.tutorialStep < 3}
           onLayout={setTarget("orders")}
+          compact={isCompactLayout}
         />
 
         <BottomButton
@@ -884,18 +921,20 @@ export default function GameScreen() {
           }
           disabled={!state.tutorialComplete && state.tutorialStep < 4}
           onLayout={setTarget("upgrades")}
+          compact={isCompactLayout}
         />
 
-      <BottomButton
-        icon="cpu"
-        label="R&D"
-        color={GameColors.currency.research}
-        onPress={() => setActiveModal("rd")}
-        onDisabledPress={() =>
-          showToast("Unlock R&D via upgrades to access the lab.", 2200)
-        }
-        disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
-      />
+        <BottomButton
+          icon="cpu"
+          label="R&D"
+          color={GameColors.currency.research}
+          onPress={() => setActiveModal("rd")}
+          onDisabledPress={() =>
+            showToast("Unlock R&D via upgrades to access the lab.", 2200)
+          }
+          disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
+          compact={isCompactLayout}
+        />
 
         {state.freedomControllerCount > 0 ? (
           <View style={styles.freedomIndicator}>
@@ -1093,13 +1132,16 @@ const styles = StyleSheet.create({
   },
   boardContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   statusRow: {
     flexDirection: "row",
     gap: Spacing.sm,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.sm,
+  },
+  statusRowCompact: {
+    marginTop: Spacing.xs,
   },
   statusItem: {
     flex: 1,
@@ -1155,6 +1197,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: "#2A2A4A",
   },
+  bottomBarCompact: {
+    paddingTop: Spacing.sm,
+    gap: Spacing.lg,
+  },
   bottomButton: {
     alignItems: "center",
     gap: Spacing.xs,
@@ -1177,9 +1223,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2A2A4A",
   },
+  buttonGradientCompact: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
   buttonLabel: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  buttonLabelCompact: {
+    fontSize: 11,
   },
   badge: {
     position: "absolute",

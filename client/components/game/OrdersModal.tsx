@@ -275,14 +275,17 @@ export function OrdersModal({
         </View>
 
         <View style={styles.statItem}>
-          <Feather name="repeat" size={18} color={GameColors.currency.reputation} />
-          <View style={styles.statStack}>
-            <ThemedText style={styles.statValue}>
-              {state.installStreakCurrent}
-            </ThemedText>
-            <ThemedText style={styles.statSub}>Best {state.installStreakBest}</ThemedText>
-          </View>
-          <ThemedText style={styles.statLabel}>Streak</ThemedText>
+          <Feather name="zap" size={18} color={GameColors.currency.reputation} />
+          <ThemedText style={styles.statValue}>
+            {state.installStreakCurrent}
+          </ThemedText>
+          <ThemedText
+            style={[styles.statLabel, styles.statLabelCompact]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            Streak · Best {state.installStreakBest}
+          </ThemedText>
         </View>
       </View>
 
@@ -852,12 +855,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
   },
-  statStack: {
-    gap: 2,
-  },
-  statSub: {
+  statLabelCompact: {
     fontSize: 11,
-    color: GameColors.text.secondary,
+    flexShrink: 1,
   },
   helpBanner: {
     flexDirection: "row",

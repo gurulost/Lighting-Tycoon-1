@@ -14,6 +14,7 @@ interface MissionStripProps {
   locked?: boolean;
   onPress?: () => void;
   onLockedPress?: () => void;
+  compact?: boolean;
 }
 
 export function MissionStrip({
@@ -21,8 +22,11 @@ export function MissionStrip({
   locked = false,
   onPress,
   onLockedPress,
+  compact = false,
 }: MissionStripProps) {
-  const activeMissions = missions.slice(0, 2);
+  const maxVisible = compact ? 1 : 2;
+  const activeMissions = missions.slice(0, maxVisible);
+  const visibleCount = Math.min(missions.length, maxVisible);
   const isEmpty = activeMissions.length === 0;
   const canPress = !locked;
   const handlePress = () => {
@@ -38,7 +42,11 @@ export function MissionStrip({
     <Pressable onPress={handlePress} disabled={!canPress && !locked}>
       <LinearGradient
         colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-        style={[styles.container, locked && styles.containerLocked]}
+        style={[
+          styles.container,
+          compact && styles.containerCompact,
+          locked && styles.containerLocked,
+        ]}
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -52,7 +60,7 @@ export function MissionStrip({
             <ThemedText style={styles.headerTitle}>Goals</ThemedText>
           </View>
           <ThemedText style={styles.headerMeta}>
-            {locked ? "Locked" : `${missions.length}/${2}`}
+            {locked ? "Locked" : `${visibleCount}/${maxVisible}`}
           </ThemedText>
         </View>
 
@@ -122,6 +130,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2A2A4A",
     gap: Spacing.sm,
+  },
+  containerCompact: {
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.xs,
   },
   containerLocked: {
     opacity: 0.75,

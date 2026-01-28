@@ -63,6 +63,7 @@ interface MergeBoardProps {
   tutorialFocus?: "workbench" | "orders" | "rd" | null;
   onDragStateChange?: (isDragging: boolean) => void;
   onStationLayout?: (stationLayouts: Partial<Record<"workbench", LayoutRect>>) => void;
+  maxHeight?: number;
 }
 
 function AnimatedStation({
@@ -140,6 +141,7 @@ export function MergeBoard({
   tutorialFocus,
   onDragStateChange,
   onStationLayout,
+  maxHeight,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, spawnPart, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -209,16 +211,92 @@ export function MergeBoard({
   const screenWidth = Dimensions.get("window").width;
   const boardPadding = Spacing.lg * 2;
   const totalGapWidth = (GRID_COLS - 1) * Spacing.tileGap;
-  const tileSize = Math.floor((screenWidth - boardPadding - totalGapWidth) / GRID_COLS);
-  const gridWidth = GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
+  const baseTileSize = Math.floor(
+    (screenWidth - boardPadding - totalGapWidth) / GRID_COLS
+  );
   const backpackGap = Spacing.sm;
-  const desiredBackpackSlotSize = Math.max(44, Math.round(tileSize * 0.8));
   const backpackSlotCount = Math.max(1, state.backpackSlots);
+  const defaultMinBackpackSlotSize = 44;
+  const defaultMinRecycleSize = 52;
+  const compactMinBackpackSlotSize = 36;
+  const compactMinRecycleSize = 44;
+  const minTileSize = 34;
+  const estimateBoardHeight = (
+    tile: number,
+    minBackpackSlotSize: number,
+    minRecycleSize: number
+  ) => {
+    const gridHeight = GRID_ROWS * tile + (GRID_ROWS - 1) * Spacing.tileGap;
+    const boardInset = Spacing.md * 2;
+    const gridWidth =
+      GRID_COLS * (tile + Spacing.tileGap) - Spacing.tileGap;
+    const desiredBackpackSlotSize = Math.round(tile * 0.8);
+    const maxBackpackSlotSize = Math.floor(
+      (gridWidth - (backpackSlotCount - 1) * backpackGap) / backpackSlotCount
+    );
+    const backpackSlotSize = Math.max(
+      minBackpackSlotSize,
+      Math.min(desiredBackpackSlotSize, maxBackpackSlotSize)
+    );
+    const recycleSize = Math.max(minRecycleSize, backpackSlotSize);
+    const backpackHeaderHeight = 18;
+    const recycleLabelHeight = 16;
+    const utilityHeight = Math.max(
+      backpackHeaderHeight + Spacing.xs + backpackSlotSize,
+      recycleLabelHeight + Spacing.xs + recycleSize
+    );
+    const containerPadding = Spacing.md * 2;
+    const utilityGap = Spacing.md;
+    return containerPadding + gridHeight + boardInset + utilityGap + utilityHeight;
+  };
+  let tileSize = baseTileSize;
+  let minBackpackSlotSize = defaultMinBackpackSlotSize;
+  let minRecycleSize = defaultMinRecycleSize;
+  if (typeof maxHeight === "number" && maxHeight > 0) {
+    let estimatedHeight = estimateBoardHeight(
+      tileSize,
+      minBackpackSlotSize,
+      minRecycleSize
+    );
+    if (estimatedHeight > maxHeight) {
+      minBackpackSlotSize = compactMinBackpackSlotSize;
+      minRecycleSize = compactMinRecycleSize;
+      estimatedHeight = estimateBoardHeight(
+        tileSize,
+        minBackpackSlotSize,
+        minRecycleSize
+      );
+    }
+    if (estimatedHeight > maxHeight) {
+      const scale = maxHeight / estimatedHeight;
+      tileSize = Math.max(minTileSize, Math.floor(tileSize * scale));
+      let adjustedHeight = estimateBoardHeight(
+        tileSize,
+        minBackpackSlotSize,
+        minRecycleSize
+      );
+      let guard = 0;
+      while (adjustedHeight > maxHeight && tileSize > minTileSize && guard < 20) {
+        tileSize -= 1;
+        adjustedHeight = estimateBoardHeight(
+          tileSize,
+          minBackpackSlotSize,
+          minRecycleSize
+        );
+        guard += 1;
+      }
+    }
+  }
+  const gridWidth = GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
+  const desiredBackpackSlotSize = Math.round(tileSize * 0.8);
   const maxBackpackSlotSize = Math.floor(
     (gridWidth - (backpackSlotCount - 1) * backpackGap) / backpackSlotCount
   );
-  const backpackSlotSize = Math.max(36, Math.min(desiredBackpackSlotSize, maxBackpackSlotSize));
-  const recycleSize = Math.max(52, backpackSlotSize);
+  const backpackSlotSize = Math.max(
+    minBackpackSlotSize,
+    Math.min(desiredBackpackSlotSize, maxBackpackSlotSize)
+  );
+  const recycleSize = Math.max(minRecycleSize, backpackSlotSize);
 
   const isSlotBlocked = useCallback(
     (index: number) => {
