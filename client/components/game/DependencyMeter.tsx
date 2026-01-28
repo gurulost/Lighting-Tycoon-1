@@ -6,7 +6,6 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
-  withRepeat,
   interpolateColor,
   interpolate,
   Extrapolation,
@@ -17,6 +16,7 @@ import { AvatarImage } from "./AvatarImage";
 
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { withRepeat } from "@/lib/reanimated";
 
 const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
 

@@ -3,7 +3,6 @@ import { View, StyleSheet, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
   FadeIn,
@@ -18,6 +17,7 @@ import { useGame } from "@/context/GameContext";
 import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
+import { withRepeat } from "@/lib/reanimated";
 
 interface LockoutModalProps {
   onClose: () => void;

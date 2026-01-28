@@ -4,7 +4,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withRepeat,
   withSequence,
   withTiming,
   FadeIn,
@@ -22,6 +21,7 @@ import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import type { SfxId } from "@/audio/sounds";
+import { withRepeat } from "@/lib/reanimated";
 import {
   WORKBENCH_SLOT,
   ORDER_INBOX_SLOT,

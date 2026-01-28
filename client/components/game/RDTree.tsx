@@ -5,7 +5,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -17,6 +16,7 @@ import { RD_DEFINITIONS, RDNode } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
+import { withRepeat } from "@/lib/reanimated";
 
 interface RDTreeProps {
   onCraftFreedomController: () => void;

@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { withRepeat } from "@/lib/reanimated";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");

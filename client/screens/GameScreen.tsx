@@ -7,7 +7,6 @@ import { Image } from "expo-image";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -31,6 +30,7 @@ import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
+import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { TIER_NAMES } from "@/types/game";
