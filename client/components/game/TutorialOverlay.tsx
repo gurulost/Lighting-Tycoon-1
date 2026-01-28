@@ -91,6 +91,14 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 6,
+    title: "Locked Merge Demo",
+    description: "Merge a locked part with an open part. It stays locked and raises Dependency.",
+    icon: "shield",
+    highlight: "board",
+    color: GameColors.locked.primary,
+  },
+  {
+    id: 7,
     title: "You're Ready!",
     description: "Merge, fulfill orders, and choose your strategy. Good luck, Tycoon!",
     icon: "star",

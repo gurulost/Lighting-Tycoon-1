@@ -473,6 +473,7 @@ export default function GameScreen() {
           4: "Order complete.",
           5: "Space upgraded.",
           6: "Choice made.",
+          7: "Locked merge complete.",
         };
         const message = toastMap[nextStep];
         if (message) {
@@ -577,7 +578,7 @@ export default function GameScreen() {
       setActiveModal("orders");
     } else if (state.tutorialStep === 4) {
       setActiveModal("upgrades");
-    } else if (state.tutorialStep === 5) {
+    } else if (state.tutorialStep >= 5) {
       setActiveModal(null);
     }
   }, [state.tutorialStep, state.tutorialComplete]);

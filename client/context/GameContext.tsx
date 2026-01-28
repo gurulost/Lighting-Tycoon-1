@@ -61,6 +61,7 @@ type GameAction =
   | { type: "ENSURE_TUTORIAL_ORDER" }
   | { type: "AUTO_COMPLETE_TUTORIAL_BARON" }
   | { type: "ENSURE_TUTORIAL_BARON_OFFER" }
+  | { type: "ENSURE_TUTORIAL_LOCKED_SAMPLE" }
   | { type: "COMPLETE_TUTORIAL"; skipped?: boolean }
   | { type: "RESUME_TUTORIAL" }
   | { type: "RESET_TUTORIAL" }
@@ -728,10 +729,11 @@ function getInitialState(): GameState {
   };
 }
 
-function findEmptySlot(state: GameState): number {
+function findEmptySlot(state: GameState, boardOverride?: (Part | null)[]): number {
+  const board = boardOverride ?? state.board;
   for (let i = 0; i < state.boardSize; i++) {
     if (
-      state.board[i] === null &&
+      board[i] === null &&
       !state.stationSlots.includes(i) &&
       !state.blockedSlots.includes(i)
     ) {
@@ -739,6 +741,85 @@ function findEmptySlot(state: GameState): number {
     }
   }
   return -1;
+}
+
+function findEmptyBackpackSlot(state: GameState, backpackOverride?: (Part | null)[]): number {
+  const backpack = backpackOverride ?? state.backpack;
+  for (let i = 0; i < backpack.length; i++) {
+    if (backpack[i] === null) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function getTutorialLockedMergeStatus(state: GameState): {
+  targetTier: PartTier;
+  needsLocked: boolean;
+  needsOpen: boolean;
+  hasPair: boolean;
+} {
+  const parts = [...state.board, ...state.backpack].filter(Boolean) as Part[];
+  const lockedTiers = new Set<PartTier>();
+  const openTiers = new Set<PartTier>();
+  parts.forEach((part) => {
+    if (part.family === "locked") {
+      lockedTiers.add(part.tier);
+    } else {
+      openTiers.add(part.tier);
+    }
+  });
+
+  let targetTier: PartTier = 1;
+  let hasPair = false;
+  for (const tier of lockedTiers) {
+    if (openTiers.has(tier)) {
+      targetTier = tier;
+      hasPair = true;
+      break;
+    }
+  }
+
+  if (!hasPair) {
+    if (lockedTiers.size > 0) {
+      targetTier = Math.min(...Array.from(lockedTiers)) as PartTier;
+    } else if (openTiers.size > 0) {
+      targetTier = Math.min(...Array.from(openTiers)) as PartTier;
+    }
+  }
+
+  const needsLocked = !lockedTiers.has(targetTier);
+  const needsOpen = !openTiers.has(targetTier);
+  return { targetTier, needsLocked, needsOpen, hasPair };
+}
+
+function placeTutorialPart(
+  state: GameState,
+  board: (Part | null)[],
+  backpack: (Part | null)[],
+  family: PartFamily,
+  tier: PartTier
+): {
+  board: (Part | null)[];
+  backpack: (Part | null)[];
+  placed: boolean;
+  placedInBackpack: boolean;
+} {
+  const emptySlot = findEmptySlot(state, board);
+  if (emptySlot !== -1) {
+    const nextBoard = [...board];
+    nextBoard[emptySlot] = createPart(emptySlot, family, tier);
+    return { board: nextBoard, backpack, placed: true, placedInBackpack: false };
+  }
+  if (state.backpackUnlocked) {
+    const emptyBackpackSlot = findEmptyBackpackSlot(state, backpack);
+    if (emptyBackpackSlot !== -1) {
+      const nextBackpack = [...backpack];
+      nextBackpack[emptyBackpackSlot] = createPart(-1, family, tier);
+      return { board, backpack: nextBackpack, placed: true, placedInBackpack: true };
+    }
+  }
+  return { board, backpack, placed: false, placedInBackpack: false };
 }
 
 function findEmptySlots(state: GameState, count: number): number[] {
@@ -943,6 +1024,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialOrders = [...trimmedOrders, tutorialOrder];
         tutorialBonusRep = 2;
         tutorialStoryBeat = "tutorial_merge_2";
+      }
+
+      if (isTutorial && state.tutorialStep === 6 && mergedFamily === "locked") {
+        tutorialUpdate = advanceTutorialStep(state, 7);
+        tutorialStoryBeat = "tutorial_locked_merge";
       }
 
       let nextOrders = tutorialOrders || state.orders;
@@ -2001,6 +2087,73 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return nextState;
     }
 
+    case "ENSURE_TUTORIAL_LOCKED_SAMPLE": {
+      if (state.tutorialComplete) return state;
+      if (state.tutorialStep !== 6) return state;
+
+      const status = getTutorialLockedMergeStatus(state);
+      if (!status.needsLocked && !status.needsOpen) {
+        return state;
+      }
+
+      let nextBoard = state.board;
+      let nextBackpack = state.backpack;
+      let hint = state.tutorialHint;
+      let placedLocked = false;
+
+      if (status.needsLocked) {
+        const placement = placeTutorialPart(
+          state,
+          nextBoard,
+          nextBackpack,
+          "locked",
+          status.targetTier
+        );
+        nextBoard = placement.board;
+        nextBackpack = placement.backpack;
+        placedLocked = placement.placed;
+        if (!placement.placed) {
+          hint = "Clear a slot so we can drop a locked part.";
+        }
+      }
+
+      if (status.needsOpen) {
+        const placement = placeTutorialPart(
+          state,
+          nextBoard,
+          nextBackpack,
+          "open",
+          status.targetTier
+        );
+        nextBoard = placement.board;
+        nextBackpack = placement.backpack;
+        if (!placement.placed) {
+          hint = hint ?? "Clear a slot so we can drop an open part.";
+        }
+      }
+
+      const postStatus = getTutorialLockedMergeStatus({
+        ...state,
+        board: nextBoard,
+        backpack: nextBackpack,
+      });
+      if (!postStatus.needsLocked && !postStatus.needsOpen) {
+        hint = undefined;
+      }
+
+      const sawLocked = placedLocked && !state.lockedDiscoverySeen;
+
+      return {
+        ...state,
+        board: nextBoard,
+        backpack: nextBackpack,
+        tutorialHint: hint,
+        lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
+        lastLockedDiscoveryId: sawLocked ? state.lastLockedDiscoveryId + 1 : state.lastLockedDiscoveryId,
+        undoSnapshot: undefined,
+      };
+    }
+
     case "COMPLETE_TUTORIAL": {
       const now = Date.now();
       const metrics = {
@@ -2170,6 +2323,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       } else if (state.tutorialStep === 5) {
         hint = "Choose the Baron’s offer to continue.";
+      } else if (state.tutorialStep === 6) {
+        const status = getTutorialLockedMergeStatus(state);
+        if (status.needsLocked || status.needsOpen) {
+          hint = "Make room for the locked/open demo parts.";
+        } else {
+          hint = "Merge a locked part with an open part to see it stay locked.";
+        }
       }
 
       return {
@@ -2804,6 +2964,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     state.baronOfferSeen,
     state.baronOfferAvailable,
   ]);
+
+  useEffect(() => {
+    if (state.tutorialComplete) return;
+    if (state.tutorialStep !== 6) return;
+    const status = getTutorialLockedMergeStatus(state);
+    if (!status.needsLocked && !status.needsOpen) return;
+    dispatch({ type: "ENSURE_TUTORIAL_LOCKED_SAMPLE" });
+  }, [state.tutorialComplete, state.tutorialStep, state.board, state.backpack]);
 
   const spawnPart = useCallback((): boolean => {
     if (!isWorkbenchReady(state)) return false;

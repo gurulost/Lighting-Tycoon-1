@@ -200,6 +200,14 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     onceOnly: true,
     category: "tutorial",
   },
+  tutorial_locked_merge: {
+    id: "tutorial_locked_merge",
+    speaker: "mentor",
+    line1: "Locked parts stay locked when merged.",
+    line2: "Power now, dependency later.",
+    onceOnly: true,
+    category: "tutorial",
+  },
   baron_offer_accept: {
     id: "baron_offer_accept",
     speaker: "baron",
