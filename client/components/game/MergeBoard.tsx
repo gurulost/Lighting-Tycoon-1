@@ -511,9 +511,11 @@ export function MergeBoard({
     };
   }, [highlightedOrder, state.board, state.backpack, isStationSlot, isSlotBlocked]);
 
-  const measureContainer = useCallback(() => {
+  const measureContainer = useCallback((onMeasured?: (layout: LayoutRect) => void) => {
     containerRef.current?.measureInWindow((x, y, width, height) => {
-      setContainerLayout({ x, y, width, height });
+      const layout = { x, y, width, height };
+      setContainerLayout(layout);
+      onMeasured?.(layout);
     });
   }, []);
 
@@ -559,9 +561,6 @@ export function MergeBoard({
       measureGrid();
       measureBackpack();
       measureRecycle();
-      measureContainer();
-      setDragFromIndex(index);
-      setDragSource({ source, index });
       const dragSize = source === "board" ? tileSize - 10 : backpackSlotSize - 8;
       let originX = absoluteX - dragSize / 2;
       let originY = absoluteY - dragSize / 2;
@@ -581,12 +580,20 @@ export function MergeBoard({
         originX = rect.x + inset;
         originY = rect.y + inset;
       }
-      const containerX = containerLayout?.x ?? 0;
-      const containerY = containerLayout?.y ?? 0;
-      dragOffsetX.value = absoluteX - originX + containerX;
-      dragOffsetY.value = absoluteY - originY + containerY;
-      dragPreviewX.value = originX - containerX;
-      dragPreviewY.value = originY - containerY;
+      const applyContainerOffset = (layout?: LayoutRect | null) => {
+        const containerX = layout?.x ?? containerLayout?.x ?? 0;
+        const containerY = layout?.y ?? containerLayout?.y ?? 0;
+        dragOffsetX.value = absoluteX - originX + containerX;
+        dragOffsetY.value = absoluteY - originY + containerY;
+        dragPreviewX.value = originX - containerX;
+        dragPreviewY.value = originY - containerY;
+      };
+      if (containerLayout) {
+        applyContainerOffset(containerLayout);
+      }
+      measureContainer((layout) => applyContainerOffset(layout));
+      setDragFromIndex(index);
+      setDragSource({ source, index });
       if (hapticsEnabled) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
@@ -914,6 +921,7 @@ export function MergeBoard({
                 dragPreviewX={dragPreviewX}
                 dragPreviewY={dragPreviewY}
                 dragPreviewScale={dragPreviewScale}
+                dragLift={dragLift}
                 dragOffsetX={dragOffsetX}
                 dragOffsetY={dragOffsetY}
               />
@@ -1261,6 +1269,7 @@ export function MergeBoard({
                         dragPreviewX={dragPreviewX}
                         dragPreviewY={dragPreviewY}
                         dragPreviewScale={dragPreviewScale}
+                        dragLift={dragLift}
                         dragOffsetX={dragOffsetX}
                         dragOffsetY={dragOffsetY}
                       />
@@ -1613,6 +1622,8 @@ const styles = StyleSheet.create({
   },
   dragPreviewItem: {
     position: "absolute",
+    top: 0,
+    left: 0,
     zIndex: 1000,
     elevation: 1000,
   },

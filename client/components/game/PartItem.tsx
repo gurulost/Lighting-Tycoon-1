@@ -67,6 +67,7 @@ interface PartItemProps {
   dragPreviewX?: SharedValue<number>;
   dragPreviewY?: SharedValue<number>;
   dragPreviewScale?: SharedValue<number>;
+  dragLift?: SharedValue<number>;
   dragOffsetX?: SharedValue<number>;
   dragOffsetY?: SharedValue<number>;
 }
@@ -83,6 +84,7 @@ export function PartItem({
   dragPreviewX,
   dragPreviewY,
   dragPreviewScale,
+  dragLift,
   dragOffsetX,
   dragOffsetY,
 }: PartItemProps) {
@@ -164,6 +166,9 @@ export function PartItem({
       if (dragPreviewScale) {
         dragPreviewScale.value = withSpring(1.2, { damping: 12, stiffness: 200 });
       }
+      if (dragLift) {
+        dragLift.value = withSpring(8, { damping: 12, stiffness: 200 });
+      }
       runOnJS(handleDragStart)(event.absoluteX, event.absoluteY);
     })
     .onUpdate((event) => {
@@ -189,6 +194,9 @@ export function PartItem({
       zIndex.value = 0;
       if (dragPreviewScale) {
         dragPreviewScale.value = withSpring(1, { damping: 15 });
+      }
+      if (dragLift) {
+        dragLift.value = withSpring(0, { damping: 15 });
       }
     });
 
