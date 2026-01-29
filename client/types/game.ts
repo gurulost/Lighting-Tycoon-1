@@ -145,6 +145,12 @@ export interface GameState {
   reputation: number;
   research: number;
   dependency: number;
+  gamePhase: 1 | 2;
+  liberationComplete: boolean;
+  liberationCompletedAt?: number;
+  baronPressure: number;
+  baronSupplySpawnsRemaining: number;
+  baronRushSpawnsRemaining: number;
 
   orders: Order[];
   maxOrders: number;
@@ -188,6 +194,7 @@ export interface GameState {
   lockoutPhase: number;
   lockoutOrderId?: string;
   lockoutLabOrdersRemaining: number;
+  lockoutLabOrdersTarget: number;
   lockoutChoice?: "baron" | "lab";
 
   baronOfferAvailable: boolean;
@@ -213,6 +220,7 @@ export interface GameState {
     reputation: number;
     research: number;
     dependency: number;
+    baronPressure: number;
     lockoutActive: boolean;
     lockoutPhase: number;
     mergeChainCount: number;

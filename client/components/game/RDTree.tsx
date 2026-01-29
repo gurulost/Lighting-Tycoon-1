@@ -163,7 +163,7 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
     return node.prerequisites.every((p) => state.rdNodes[p]);
   };
 
-  const canCraft = state.rdNodes["freedom_build"] && state.research >= 100;
+  const canCraft = state.rdNodes["freedom_build"] && state.research >= 300;
 
   return (
     <ScrollView
@@ -248,7 +248,7 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
                 { color: canCraft ? "#0F0F1F" : GameColors.text.disabled },
               ]}
             >
-              Craft (100 Research)
+              Craft (300 Research)
             </ThemedText>
           </Pressable>
         </View>

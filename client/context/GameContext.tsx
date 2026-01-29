@@ -37,7 +37,7 @@ import {
   TINA_BEATS,
 } from "@/constants/story";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
-import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
+import { getLockoutLabRequestTarget } from "@/constants/lockout";
 import { ORDER_LIBRARY, ARCHETYPES } from "@/constants/orderContentPack";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 
@@ -96,24 +96,35 @@ function generateId(): string {
 function getRandomFamily(
   dependency: number,
   rdNodes: Record<string, boolean>,
-  baronOfferSeen: boolean,
-  baronChoice?: "accepted" | "declined",
+  gamePhase: 1 | 2,
+  baronContractOrdersRemaining: number,
+  baronSupplySpawnsRemaining: number,
+  baronRushSpawnsRemaining: number,
   scoutRoute?: SupplierScoutRoute
 ): PartFamily {
-  if (!baronOfferSeen) return "open";
-  const choice = baronChoice ?? "declined";
-  const baseLockedChance = choice === "accepted" ? 0.15 : 0.03;
-  const maxExtra = choice === "accepted" ? 0.1 : 0.05;
-  let lockedChance = baseLockedChance + (dependency / 100) * maxExtra;
+  const normalized = Math.max(0, Math.min(1, dependency / 100));
+  let lockedChance =
+    gamePhase === 2
+      ? PHASE_TWO_LOCKED_CHANCE
+      : 0.05 + 0.88 * Math.pow(normalized, 1.2);
   if (rdNodes["open_standard_2"]) {
-    lockedChance -= 0.08;
+    lockedChance -= 0.12;
   }
   if (scoutRoute === "open") {
     lockedChance -= SCOUT_FAMILY_SHIFT;
   } else if (scoutRoute === "locked") {
     lockedChance += SCOUT_FAMILY_SHIFT;
   }
-  lockedChance = Math.max(0, Math.min(0.85, lockedChance));
+  if (baronContractOrdersRemaining > 0) {
+    lockedChance += BARON_CONTRACT_LOCKED_SHIFT;
+  }
+  if (baronSupplySpawnsRemaining > 0) {
+    lockedChance += BARON_SUPPLY_LOCKED_SHIFT;
+  }
+  if (baronRushSpawnsRemaining > 0) {
+    lockedChance += BARON_RUSH_LOCKED_SHIFT;
+  }
+  lockedChance = Math.max(0.02, Math.min(0.98, lockedChance));
   return Math.random() < lockedChance ? "locked" : "open";
 }
 
@@ -125,7 +136,7 @@ function getRandomTier(
 ): PartTier {
   const qualityBonus = (upgrades["workbench_quality_1"] || 0) * 10 + extraQualityBonus;
   const lockedBoost =
-    family === "locked" ? Math.min(15, Math.floor(Math.max(0, dependency - 10) / 5)) : 0;
+    family === "locked" ? Math.min(6, Math.floor(Math.max(0, dependency - 10) / 5)) : 0;
   const roll = Math.random() * 100;
   const tier1Threshold = Math.max(25, 60 - qualityBonus - lockedBoost);
   const tier2Threshold = Math.max(tier1Threshold + 10, 85 - qualityBonus / 2 - lockedBoost / 2);
@@ -159,25 +170,77 @@ function createPart(
   return { id: generateId(), family, tier, position, compatible };
 }
 
-function applyDependency(state: GameState, delta: number, allowLockout = true) {
-  let next = Math.max(0, Math.min(100, state.dependency + delta));
-  const crossed = state.dependency < 100 && next >= 100;
+type DependencyOutcome = {
+  dependency: number;
+  lockoutActive: boolean;
+  lockoutPhase: number;
+  baronPressure: number;
+  pressureBeat: boolean;
+};
+
+function applyDependency(
+  state: GameState,
+  delta: number,
+  allowLockout = true,
+  pressureDelta = 0
+): DependencyOutcome {
+  const phaseFrozen = state.liberationComplete || state.gamePhase === 2;
+  if (phaseFrozen) {
+    return {
+      dependency: 0,
+      lockoutActive: false,
+      lockoutPhase: 0,
+      baronPressure: 0,
+      pressureBeat: false,
+    };
+  }
+  const prevPressure = typeof state.baronPressure === "number" ? state.baronPressure : 0;
+  let nextDependency = state.dependency + delta;
+  let overflow = 0;
+  if (nextDependency > 100) {
+    overflow = nextDependency - 100;
+    nextDependency = 100;
+  }
+  if (nextDependency < 0) {
+    nextDependency = 0;
+  }
+  let nextPressure =
+    prevPressure + pressureDelta + overflow * BARON_PRESSURE_MULTIPLIER;
+  nextPressure = Math.max(0, Math.min(BARON_PRESSURE_MAX, nextPressure));
+  const pressureBeat =
+    prevPressure < BARON_PRESSURE_BEAT_THRESHOLD &&
+    nextPressure >= BARON_PRESSURE_BEAT_THRESHOLD;
+
+  const crossed =
+    state.dependency > CRACKDOWN_THRESHOLD && nextDependency <= CRACKDOWN_THRESHOLD;
   if (!allowLockout && crossed) {
-    next = 99;
+    nextDependency = CRACKDOWN_THRESHOLD + 1;
+  }
+  if ((state.lockoutActive || (allowLockout && crossed)) && nextDependency < CRACKDOWN_THRESHOLD) {
+    nextDependency = CRACKDOWN_THRESHOLD;
   }
   return {
-    dependency: next,
+    dependency: nextDependency,
     lockoutActive: state.lockoutActive || (allowLockout && crossed),
     lockoutPhase: allowLockout && crossed ? 1 : state.lockoutPhase,
+    baronPressure: nextPressure,
+    pressureBeat,
   };
 }
 
+function maybeQueueBaronPressureBeat(
+  state: GameState,
+  outcome: DependencyOutcome
+): GameState {
+  if (!outcome.pressureBeat) return state;
+  return queueStoryBeat(state, "baron_attention");
+}
+
 function getDependencyStoryBeat(prev: number, next: number): string | null {
-  if (prev < 20 && next >= 20) return "dependency_20";
-  if (prev < 40 && next >= 40) return "dependency_40";
-  if (prev < 60 && next >= 60) return "dependency_60";
-  if (prev < 80 && next >= 80) return "dependency_80";
-  if (prev < 100 && next >= 100) return "dependency_100";
+  if (prev > 80 && next <= 80) return "dependency_80";
+  if (prev > 60 && next <= 60) return "dependency_60";
+  if (prev > 40 && next <= 40) return "dependency_40";
+  if (prev > 20 && next <= 20) return "dependency_20";
   return null;
 }
 
@@ -288,7 +351,19 @@ const BARON_CONTRACT_ORDERS = 3;
 const BARON_CONTRACT_MAX_STACK = 6;
 const BARON_CONTRACT_CASH_BONUS = 0.35;
 const BARON_CONTRACT_DEPENDENCY_DELTA = 1;
+const BARON_CONTRACT_LOCKED_SHIFT = 0.03;
 const BARON_RUSH_DEPENDENCY = 3;
+const BARON_RUSH_SPAWNS = 6;
+const BARON_RUSH_LOCKED_SHIFT = 0.02;
+const BARON_SUPPLY_SPAWNS = 12;
+const BARON_SUPPLY_LOCKED_SHIFT = 0.05;
+const BARON_PRESSURE_MAX = 100;
+const BARON_PRESSURE_MULTIPLIER = 2;
+const BARON_PRESSURE_DECAY = 1;
+const BARON_PRESSURE_BEAT_THRESHOLD = 40;
+const CRACKDOWN_THRESHOLD = 20;
+const PHASE_TWO_LOCKED_CHANCE = 0.08;
+const PHASE_TWO_DIFFICULTY_BONUS = 1;
 const MAX_ACTIVE_MISSIONS = 2;
 const MISSION_HISTORY_LIMIT = 60;
 const MISSION_REPEAT_WINDOW_MS = 1000 * 60 * 12;
@@ -741,11 +816,11 @@ function pickWeightedTemplate<T extends { weight?: number }>(items: T[]): T | nu
 function createLockoutOrder(): Order {
   return {
     id: generateId(),
-    title: "Locked Required (Firmware)",
+    title: "Compliance Audit (Certified)",
     type: "locked_required",
     requirements: [{ tier: 4, family: "locked", count: 1 }],
     rewards: { cash: 350, reputation: 70, research: 0 },
-    flavorText: "Firmware update: Open kits rejected without certification.",
+    flavorText: "Audit notice: only certified kits pass inspection.",
     isLockout: true,
   };
 }
@@ -753,11 +828,11 @@ function createLockoutOrder(): Order {
 function createLockoutLabOrder(): Order {
   return {
     id: generateId(),
-    title: "Lab Request (Urgent)",
+    title: "Lab Request (Crackdown)",
     type: "lab_request",
     requirements: [{ tier: 3, family: "open", count: 1 }],
     rewards: { cash: 140, reputation: 20, research: 40 },
-    flavorText: "Prototype diagnostics. Open-standard only.",
+    flavorText: "Countermeasure diagnostics. Open-standard only.",
   };
 }
 
@@ -967,11 +1042,11 @@ function createDependencyStoryOrder(state: GameState, beatId: string): Order | n
   if (beatId === "dependency_20") {
     return {
       id: generateId(),
-      title: "Certified Preview",
+      title: "Audit Preview",
       type: "baron_certified",
       requirements: [{ tier: baseTier as PartTier, family: "any", count: 1 }],
       rewards: { cash: 85, reputation: 16, research: 0 },
-      flavorText: "A taste of certified demand. Locked preferred.",
+      flavorText: "Compliance check in progress. Locked preferred.",
       modifierIds: ["threshold_story"],
       familyPreference: "locked",
       penaltyIfWrongFamily: true,
@@ -1006,20 +1081,36 @@ function createDependencyStoryOrder(state: GameState, beatId: string): Order | n
   return null;
 }
 
+function createPhase2GoalOrder(state: GameState): Order {
+  const targetTier = Math.max(3, Math.min(4, state.maxTierCrafted));
+  return {
+    id: generateId(),
+    title: "Open Spark Showcase",
+    type: "compatibility_required",
+    requirements: [
+      { tier: targetTier as PartTier, family: "open", requiresCompatible: true, count: 1 },
+    ],
+    rewards: { cash: 220, reputation: 40, research: 8 },
+    flavorText: "Freedom installs are the standard now. Show what open can do.",
+    modifierIds: ["threshold_story", "phase2_goal"],
+  };
+}
+
 function getRecycleReward(part: Part) {
   const baseValue = { 1: 20, 2: 50, 3: 100, 4: 200, 5: 400 }[part.tier];
   const cash = Math.max(1, Math.floor(baseValue * 0.2));
   let research = part.family === "open" ? Math.max(0, part.tier - 2) : 0;
   if (part.tier === 5) {
-    research = Math.max(research, part.family === "open" ? 12 : 8);
+    research = Math.max(research, part.family === "open" ? 12 : 1);
   }
   return { cash, research };
 }
 
 
 function beginLockout(state: GameState): GameState {
-  if (state.lockoutActive || state.lockoutOrderId) return state;
+  if (state.lockoutOrderId || state.liberationComplete) return state;
   const lockoutOrder = createLockoutOrder();
+  const lockoutLabOrdersTarget = getLockoutLabRequestTarget(state.baronPressure);
   const nextOrders = state.orders.filter((o) => !o.isLockout);
   const nextState = {
     ...state,
@@ -1027,7 +1118,9 @@ function beginLockout(state: GameState): GameState {
     lockoutPhase: 1,
     lockoutOrderId: lockoutOrder.id,
     lockoutLabOrdersRemaining: 0,
+    lockoutLabOrdersTarget,
     lockoutChoice: undefined,
+    baronPressure: 0,
     orders: [lockoutOrder, ...nextOrders].slice(0, state.maxOrders),
   };
   let queued = queueStoryBeat(nextState, "lockout_begin");
@@ -1045,6 +1138,7 @@ function generateOrder(
   maxTierCrafted: number,
   upgrades: Record<string, number>,
   marketingBoostOrdersRemaining: number,
+  gamePhase: 1 | 2,
   requiredMinTier?: PartTier
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
@@ -1094,11 +1188,12 @@ function generateOrder(
 
   const marketingBoost =
     marketingBoostOrdersRemaining > 0 ? MARKETING_BOOST_DIFFICULTY_BONUS : 0;
+  const phaseDifficultyBonus = gamePhase === 2 ? PHASE_TWO_DIFFICULTY_BONUS : 0;
   const targetDifficulty = getTargetOrderDifficulty(
     reputationTier,
     maxTierCrafted,
     upgrades,
-    marketingBoost
+    marketingBoost + phaseDifficultyBonus
   );
   const weightedTemplates = candidateTemplates.map((template) => {
     const diff = Math.max(0, neighborhoodIndex - getNeighborhoodIndex(template.minNeighborhoodId));
@@ -1106,7 +1201,12 @@ function generateOrder(
     const templateDifficulty = getOrderDifficulty(template);
     const difficultyDelta = Math.abs(templateDifficulty - targetDifficulty);
     const difficultyWeight = Math.pow(0.75, difficultyDelta);
-    return { ...template, weight: (template.weight ?? 1) * falloff * difficultyWeight };
+    const phaseWeight =
+      gamePhase === 2 && template.type === "compatibility_required" ? 1.6 : 1;
+    return {
+      ...template,
+      weight: (template.weight ?? 1) * falloff * difficultyWeight * phaseWeight,
+    };
   });
 
   const template = pickWeightedTemplate(weightedTemplates);
@@ -1310,7 +1410,13 @@ function getInitialState(): GameState {
     cash: 50,
     reputation: 0,
     research: 0,
-    dependency: 0,
+    dependency: 100,
+    gamePhase: 1,
+    liberationComplete: false,
+    liberationCompletedAt: undefined,
+    baronPressure: 0,
+    baronSupplySpawnsRemaining: 0,
+    baronRushSpawnsRemaining: 0,
     orders: [],
     maxOrders: 2,
     workbenchMaxCooldown: 3000,
@@ -1343,6 +1449,7 @@ function getInitialState(): GameState {
     lockoutPhase: 0,
     lockoutOrderId: undefined,
     lockoutLabOrdersRemaining: 0,
+    lockoutLabOrdersTarget: 0,
     lockoutChoice: undefined,
     baronOfferAvailable: false,
     baronOfferSeen: false,
@@ -1517,7 +1624,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       
       const isTutorial = !state.tutorialComplete;
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
-      const forceOpenParts = !state.baronOfferSeen;
+      const forceOpenParts = isTutorial && state.tutorialStep < 6;
       const forceTierOne = isTutorial && state.tutorialStep <= 2;
       const forcedTier =
         firstSessionActive && state.firstSessionForcedDrops.length > 0
@@ -1528,17 +1635,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const scoutRoute = scoutActive ? state.supplierScoutRoute : undefined;
       const scoutTierBonus =
         scoutActive && scoutRoute === "tier" ? SCOUT_TIER_QUALITY_BONUS : 0;
-      const family = forceOpenParts
-        ? "open"
-        : forcedTier
-        ? "open"
-        : getRandomFamily(
-            state.dependency,
-            state.rdNodes,
-            state.baronOfferSeen,
-            state.baronChoice,
-            scoutRoute
-          );
+      const usesRandomFamily = !forceOpenParts && typeof forcedTier !== "number";
+      const family =
+        forceOpenParts || forcedTier
+          ? "open"
+          : getRandomFamily(
+              state.dependency,
+              state.rdNodes,
+              state.gamePhase,
+              state.baronContractOrdersRemaining,
+              state.baronSupplySpawnsRemaining,
+              state.baronRushSpawnsRemaining,
+              scoutRoute
+            );
       const tier =
         forceTierOne ? 1 : forcedTier ?? getRandomTier(state.upgrades, family, state.dependency, scoutTierBonus);
       const part = createPart(emptySlot, family, tier);
@@ -1553,6 +1662,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ? Math.max(0, state.supplierScoutSpawnsRemaining - 1)
         : state.supplierScoutSpawnsRemaining;
       const nextScoutRoute = nextScoutRemaining > 0 ? state.supplierScoutRoute : undefined;
+      const shouldConsumeBaronSupply =
+        usesRandomFamily && state.baronSupplySpawnsRemaining > 0;
+      const shouldConsumeBaronRush =
+        usesRandomFamily && state.baronRushSpawnsRemaining > 0;
+      const nextBaronSupplyRemaining = shouldConsumeBaronSupply
+        ? Math.max(0, state.baronSupplySpawnsRemaining - 1)
+        : state.baronSupplySpawnsRemaining;
+      const nextBaronRushRemaining = shouldConsumeBaronRush
+        ? Math.max(0, state.baronRushSpawnsRemaining - 1)
+        : state.baronRushSpawnsRemaining;
       
       const newBoard = [...state.board];
       newBoard[emptySlot] = part;
@@ -1589,6 +1708,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         maxTierCrafted: nextMaxTierCrafted,
         supplierScoutRoute: nextScoutRoute,
         supplierScoutSpawnsRemaining: nextScoutRemaining,
+        baronSupplySpawnsRemaining: nextBaronSupplyRemaining,
+        baronRushSpawnsRemaining: nextBaronRushRemaining,
         undoSnapshot: undefined,
       };
       if (sawLocked) {
@@ -1603,6 +1724,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
         nextState = queueStoryBeat(nextState, "tina_intro");
+        if (state.dependency >= 100) {
+          nextState = queueStoryBeat(nextState, "dependency_100");
+        }
       }
       if (nextMaxTierCrafted > state.maxTierCrafted) {
         nextState = applyMissionProgress(nextState, {
@@ -1823,6 +1947,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         board: tutorialBoard,
         dependency: dependencyOutcome.dependency,
+        baronPressure: dependencyOutcome.baronPressure,
         lockoutActive: dependencyOutcome.lockoutActive,
         lockoutPhase: dependencyOutcome.lockoutPhase,
         cash: state.cash + cashBonus + bonusCash + chainBonusCash + tutorialBonusCash,
@@ -1858,6 +1983,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           reputation: state.reputation,
           research: state.research,
           dependency: state.dependency,
+          baronPressure: state.baronPressure,
           lockoutActive: state.lockoutActive,
           lockoutPhase: state.lockoutPhase,
           mergeChainCount: state.mergeChainCount,
@@ -1923,6 +2049,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           reputation: state.reputation,
           research: state.research,
           dependency: state.dependency,
+          baronPressure: state.baronPressure,
           lockoutActive: state.lockoutActive,
           lockoutPhase: state.lockoutPhase,
           mergeChainCount: state.mergeChainCount,
@@ -1955,6 +2082,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           reputation: state.reputation,
           research: state.research,
           dependency: state.dependency,
+          baronPressure: state.baronPressure,
           lockoutActive: state.lockoutActive,
           lockoutPhase: state.lockoutPhase,
           mergeChainCount: state.mergeChainCount,
@@ -1987,6 +2115,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           reputation: state.reputation,
           research: state.research,
           dependency: state.dependency,
+          baronPressure: state.baronPressure,
           lockoutActive: state.lockoutActive,
           lockoutPhase: state.lockoutPhase,
           mergeChainCount: state.mergeChainCount,
@@ -2017,6 +2146,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           reputation: state.reputation,
           research: state.research,
           dependency: state.dependency,
+          baronPressure: state.baronPressure,
           lockoutActive: state.lockoutActive,
           lockoutPhase: state.lockoutPhase,
           mergeChainCount: state.mergeChainCount,
@@ -2102,6 +2232,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let repReward = order.rewards.reputation;
       let researchReward = order.rewards.research;
       let dependencyChange = 0;
+      let nextBoard = newBoard;
+      let nextBackpack = state.backpack;
+      let nextMaxTierCrafted = state.maxTierCrafted;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
       const warrantyMode = warrantyActive ? state.warrantyStampMode : undefined;
@@ -2110,16 +2243,43 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const hasLockedPart = partsUsed.some((p) => p.family === "locked");
       const hasOpenPart = partsUsed.some((p) => p.family === "open");
       const hasCompatiblePart = partsUsed.some((p) => p.compatible);
+      const usingCompatibleForLockedRequired =
+        order.type === "locked_required" && hasCompatiblePart;
+      const openOnly =
+        hasOpenPart && !hasLockedPart && !usingCompatibleForLockedRequired;
       
       if (hasLockedPart) {
-        dependencyChange += 1;
+        const lockedPenalty = state.dependency <= 40 ? 2 : 1;
+        dependencyChange += lockedPenalty;
       }
-      if (hasOpenPart && !hasLockedPart) {
-        const usingCompatibleForLockedRequired =
-          order.type === "locked_required" && hasCompatiblePart;
-        if (!usingCompatibleForLockedRequired) {
-          dependencyChange -= 2;
-          researchReward += 2;
+      if (openOnly) {
+        const openReduction = state.dependency >= 70 ? -1 : -2;
+        dependencyChange += openReduction;
+        researchReward += 2;
+      }
+      const qualifiesOpenDrop = openOnly;
+      if (qualifiesOpenDrop) {
+        const dropTier: PartTier = Math.random() < 0.75 ? 1 : 2;
+        const emptySlot = findEmptySlot(state, nextBoard);
+        if (emptySlot !== -1) {
+          const updatedBoard = [...nextBoard];
+          updatedBoard[emptySlot] = createPart(emptySlot, "open", dropTier);
+          nextBoard = updatedBoard;
+          nextMaxTierCrafted = Math.max(nextMaxTierCrafted, dropTier);
+        } else if (state.backpackUnlocked) {
+          const emptyBackpack = findEmptyBackpackSlot(state, nextBackpack);
+          if (emptyBackpack !== -1) {
+            const updatedBackpack = [...nextBackpack];
+            updatedBackpack[emptyBackpack] = createPart(-1, "open", dropTier);
+            nextBackpack = updatedBackpack;
+            nextMaxTierCrafted = Math.max(nextMaxTierCrafted, dropTier);
+          } else {
+            cashReward += 10;
+            researchReward += 1;
+          }
+        } else {
+          cashReward += 10;
+          researchReward += 1;
         }
       }
       
@@ -2178,15 +2338,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextWarrantyOrdersRemaining > 0 ? state.warrantyStampMode : undefined;
 
       const allowLockout = state.firstSessionComplete;
-      const dependencyOutcome = applyDependency(state, dependencyChange, allowLockout);
+      const pressureDelta = openOnly ? -BARON_PRESSURE_DECAY : 0;
+      const dependencyOutcome = applyDependency(
+        state,
+        dependencyChange,
+        allowLockout,
+        pressureDelta
+      );
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
+      const baronGate = state.gamePhase === 2 ? true : dependencyOutcome.dependency >= 20;
       const canTriggerBaron =
         state.tutorialComplete &&
         !firstSessionActive &&
         !state.baronOfferAvailable &&
         Date.now() >= state.baronOfferCooldownUntil &&
-        dependencyOutcome.dependency >= 20;
+        baronGate;
       const shouldShowBaronOffer =
         (!state.baronOfferSeen && state.tutorialComplete) ||
         (canTriggerBaron && Math.random() < 0.25);
@@ -2229,7 +2396,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       let lockoutResolution: "baron" | "freedom" | null = null;
       if (state.lockoutActive && isLockoutOrder) {
-        if (state.lockoutChoice === "lab" && hasCompatiblePart) {
+        if (
+          state.lockoutChoice === "lab" &&
+          state.lockoutPhase === 3 &&
+          hasCompatiblePart
+        ) {
           lockoutResolution = "freedom";
         } else if (state.lockoutChoice === "baron" || !state.lockoutChoice) {
           lockoutResolution = "baron";
@@ -2245,11 +2416,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       let nextDependency = dependencyOutcome.dependency;
+      let nextLiberationComplete = state.liberationComplete;
+      let nextGamePhase = state.gamePhase;
+      let nextLiberationCompletedAt = state.liberationCompletedAt;
+      let nextBaronPressure = dependencyOutcome.baronPressure;
       if (lockoutResolution === "baron") {
-        nextDependency = Math.min(100, nextDependency + 5);
+        nextDependency = 60;
       }
       if (lockoutResolution === "freedom") {
-        nextDependency = Math.max(0, nextDependency - 40);
+        nextDependency = 0;
+        nextLiberationComplete = true;
+        nextGamePhase = 2;
+        nextLiberationCompletedAt =
+          typeof state.liberationCompletedAt === "number"
+            ? state.liberationCompletedAt
+            : Date.now();
+        nextBaronPressure = 0;
       }
 
       const lockoutActiveValue = lockoutResolution
@@ -2368,13 +2550,26 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
       }
+      if (lockoutResolution === "freedom") {
+        const phase2Order = createPhase2GoalOrder(state);
+        const insertResult = insertStoryOrder(state, updatedOrders, phase2Order);
+        if (insertResult.inserted) {
+          updatedOrders = insertResult.orders;
+          nextHighlightedOrderId = insertResult.highlightedOrderId;
+          nextOrderMetrics = updateOrderMetrics(
+            { ...state, orderMetrics: nextOrderMetrics },
+            phase2Order
+          );
+        }
+      }
       const nextBaronContractOrdersRemaining = contractActive
         ? Math.max(0, state.baronContractOrdersRemaining - 1)
         : state.baronContractOrdersRemaining;
 
       let nextState: GameState = {
         ...state,
-        board: newBoard,
+        board: nextBoard,
+        backpack: nextBackpack,
         orders: updatedOrders,
         firstSessionOrderIndex: nextFirstSessionOrderIndex,
         firstSessionOrdersCompleted: nextFirstSessionOrdersCompleted,
@@ -2393,10 +2588,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         research: state.research + researchReward,
         freedomControllerCount: state.freedomControllerCount + freedomControllerReward,
         dependency: nextDependency,
+        baronPressure: nextBaronPressure,
+        gamePhase: nextGamePhase,
+        liberationComplete: nextLiberationComplete,
+        liberationCompletedAt: nextLiberationCompletedAt,
         lockoutActive: lockoutActiveValue,
         lockoutPhase: lockoutPhaseValue,
         lockoutOrderId: lockoutResolution ? undefined : nextLockoutOrderId,
         lockoutLabOrdersRemaining: lockoutResolution ? 0 : nextLabRemaining,
+        lockoutLabOrdersTarget: lockoutResolution ? 0 : state.lockoutLabOrdersTarget,
         lockoutChoice: lockoutResolution ? undefined : nextLockoutChoice,
         baronOfferAvailable: shouldQueueSecondOffer
           ? true
@@ -2422,6 +2622,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialOrderId: completedTutorialOrder ? undefined : state.tutorialOrderId,
         highlightedOrderId: nextHighlightedOrderId,
         orderMetrics: nextOrderMetrics,
+        maxTierCrafted: nextMaxTierCrafted,
         installStreakCurrent: nextInstallStreakCurrent,
         installStreakBest: nextInstallStreakBest,
         undoSnapshot: undefined,
@@ -2431,6 +2632,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (dependencyStory) {
         nextState = queueStoryBeat(nextState, dependencyStory);
       }
+      nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
       if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
         nextState = beginLockout(nextState);
       }
@@ -2445,6 +2647,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (lockoutResolution === "freedom") {
         nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
+        nextState = queueStoryBeat(nextState, "liberation_victory");
+        nextState = queueStoryBeat(nextState, "phase2_goal");
       }
       if (queuedFirstSessionBeat) {
         nextState = queueStoryBeat(nextState, queuedFirstSessionBeat);
@@ -2527,6 +2731,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         cash: state.cash - cost,
         upgrades: { ...state.upgrades, [upgrade.id]: currentLevel + 1 },
       };
+      let dependencyOutcome: DependencyOutcome | null = null;
+      let dependencyStory: string | null = null;
 
       if (!state.backpackUnlocked) {
         newState.backpackUnlocked = true;
@@ -2550,7 +2756,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (upgrade.effect.startsWith("dependency_reduce_")) {
         const reduction = parseInt(upgrade.effect.split("_")[2]);
-        newState.dependency = Math.max(0, state.dependency - reduction);
+        const allowLockout = state.firstSessionComplete;
+        dependencyOutcome = applyDependency(state, -reduction, allowLockout);
+        dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
+        newState.dependency = dependencyOutcome.dependency;
+        newState.baronPressure = dependencyOutcome.baronPressure;
+        newState.lockoutActive = dependencyOutcome.lockoutActive;
+        newState.lockoutPhase = dependencyOutcome.lockoutPhase;
       }
       
       const tutorialAdvance = isTutorialUpgradeStep
@@ -2588,6 +2800,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.backpackUnlocked) {
         nextState = queueStoryBeat(nextState, "backpack_unlocked");
       }
+      if (dependencyStory) {
+        nextState = queueStoryBeat(nextState, dependencyStory);
+      }
+      if (dependencyOutcome) {
+        nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
+      }
+      if (dependencyOutcome?.lockoutActive && !state.lockoutActive) {
+        nextState = beginLockout(nextState);
+      }
       return nextState;
     }
 
@@ -2615,11 +2836,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "CRAFT_FREEDOM_CONTROLLER": {
       if (!state.rdNodes["freedom_build"]) return state;
-      if (state.research < 100) return state;
+      if (state.research < 300) return state;
       
       let nextState: GameState = {
         ...state,
-        research: state.research - 100,
+        research: state.research - 300,
         freedomControllerCount: state.freedomControllerCount + 1,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
@@ -2637,12 +2858,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const newBoard = [...state.board];
       newBoard[partIndex] = { ...part, family: "open", compatible: true };
       const sawCompatible = !state.compatibleDiscoverySeen;
+      const allowLockout = state.firstSessionComplete;
+      const dependencyOutcome = applyDependency(state, -5, allowLockout);
+      const dependencyStory = getDependencyStoryBeat(
+        state.dependency,
+        dependencyOutcome.dependency
+      );
       
       let nextState: GameState = {
         ...state,
         board: newBoard,
         freedomControllerCount: state.freedomControllerCount - 1,
-        dependency: Math.max(0, state.dependency - 10),
+        dependency: dependencyOutcome.dependency,
+        baronPressure: dependencyOutcome.baronPressure,
+        lockoutActive: dependencyOutcome.lockoutActive,
+        lockoutPhase: dependencyOutcome.lockoutPhase,
         compatibleDiscoverySeen: sawCompatible ? true : state.compatibleDiscoverySeen,
         lastCompatibleDiscoveryId: sawCompatible
           ? state.lastCompatibleDiscoveryId + 1
@@ -2651,6 +2881,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
       nextState = queueStoryBeat(nextState, "freedom_first_use");
+      if (dependencyStory) {
+        nextState = queueStoryBeat(nextState, dependencyStory);
+      }
+      nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
+      if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
+        nextState = beginLockout(nextState);
+      }
       if (sawCompatible && state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "discover_compatible");
       }
@@ -2710,6 +2947,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.maxTierCrafted,
         state.upgrades,
         state.marketingBoostOrdersRemaining,
+        state.gamePhase,
         requiredMinTier
       );
       if (!newOrder) return state;
@@ -2751,7 +2989,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "START_SUPPLIER_SCOUT": {
-      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
+      if (!state.tutorialComplete) return state;
       const cost = getSupplierScoutCost(state.reputationTier);
       if (state.cash < cost) return state;
       const nextRemaining = Math.min(
@@ -2831,6 +3069,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         let nextState: GameState = {
           ...state,
           dependency: dependencyOutcome.dependency,
+          baronPressure: dependencyOutcome.baronPressure,
           lockoutActive: dependencyOutcome.lockoutActive,
           lockoutPhase: dependencyOutcome.lockoutPhase,
           baronOfferAvailable: false,
@@ -2877,6 +3116,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             }
           }
         }
+        nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
         if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
           nextState = beginLockout(nextState);
         }
@@ -2898,6 +3138,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           placedLocked = true;
         }
 
+        const nextBaronRushSpawnsRemaining =
+          state.baronRushSpawnsRemaining + BARON_RUSH_SPAWNS;
         const dependencyOutcome = applyDependency(state, BARON_RUSH_DEPENDENCY, allowLockout);
         const dependencyStory = getDependencyStoryBeat(
           state.dependency,
@@ -2910,6 +3152,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           board: newBoard,
           workbenchCooldownUntil: 0,
           dependency: dependencyOutcome.dependency,
+          baronPressure: dependencyOutcome.baronPressure,
           lockoutActive: dependencyOutcome.lockoutActive,
           lockoutPhase: dependencyOutcome.lockoutPhase,
           baronOfferAvailable: false,
@@ -2917,6 +3160,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           baronOfferCooldownUntil: Date.now() + 60000,
           baronChoice: "accepted",
           baronOfferType: undefined,
+          baronRushSpawnsRemaining: nextBaronRushSpawnsRemaining,
           lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
           lastLockedDiscoveryId: sawLocked
             ? state.lastLockedDiscoveryId + 1
@@ -2961,6 +3205,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             }
           }
         }
+        nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
         if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
           nextState = beginLockout(nextState);
         }
@@ -3002,6 +3247,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? Math.max(state.maxTierCrafted, ...placedTiers)
           : state.maxTierCrafted;
 
+      const nextBaronSupplySpawnsRemaining =
+        state.baronSupplySpawnsRemaining + BARON_SUPPLY_SPAWNS;
       const dependencyOutcome = applyDependency(state, 5, allowLockout);
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
 
@@ -3009,6 +3256,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         board: newBoard,
         dependency: dependencyOutcome.dependency,
+        baronPressure: dependencyOutcome.baronPressure,
         lockoutActive: dependencyOutcome.lockoutActive,
         lockoutPhase: dependencyOutcome.lockoutPhase,
         baronOfferAvailable: false,
@@ -3016,6 +3264,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferCooldownUntil: Date.now() + 60000,
         baronChoice: "accepted",
         baronOfferType: undefined,
+        baronSupplySpawnsRemaining: nextBaronSupplySpawnsRemaining,
         lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
         lastLockedDiscoveryId: sawLocked
           ? state.lastLockedDiscoveryId + 1
@@ -3060,6 +3309,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             }
         }
       }
+      nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
       if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
         nextState = beginLockout(nextState);
       }
@@ -3219,6 +3469,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.maxTierCrafted,
         workingState.upgrades,
         workingState.marketingBoostOrdersRemaining,
+        workingState.gamePhase,
         requiredMinTier
       );
       if (!newOrder) return workingState;
@@ -3526,6 +3777,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronChoice: undefined,
         baronOfferType: undefined,
         baronContractOrdersRemaining: 0,
+        baronPressure: 0,
+        baronSupplySpawnsRemaining: 0,
+        baronRushSpawnsRemaining: 0,
         orderSpawnCooldownUntil: 0,
         tier5ShowcaseSeen: false,
         tier5ShowcasePending: false,
@@ -3535,6 +3789,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mentorClinicMergesRemaining: 0,
         warrantyStampMode: undefined,
         warrantyStampOrdersRemaining: 0,
+        lockoutLabOrdersTarget: 0,
         missions: [],
         missionHistory: [],
         lastMissionRewardId: 0,
@@ -3667,13 +3922,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         newBoard = [...state.board];
         newBoard[emptySlot] = part;
       }
+      const dependencyOutcome = applyDependency(state, 5, false);
       const nextState: GameState = {
         ...state,
         board: newBoard,
         lockoutPhase: 2,
         lockoutChoice: "baron",
         lockoutLabOrdersRemaining: 0,
-        dependency: Math.min(100, state.dependency + 5),
+        dependency: dependencyOutcome.dependency,
+        baronPressure: dependencyOutcome.baronPressure,
         lastCriticalEventId: state.lastCriticalEventId + 1,
         lockedDiscoverySeen: sawLocked ? true : state.lockedDiscoverySeen,
         lastLockedDiscoveryId: sawLocked
@@ -3681,6 +3938,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           : state.lastLockedDiscoveryId,
       };
       let queued = queueStoryBeat(nextState, "lockout_choice_baron");
+      queued = maybeQueueBaronPressureBeat(queued, dependencyOutcome);
       if (sawLocked && state.tutorialComplete) {
         queued = queueStoryBeat(queued, "discover_locked");
       }
@@ -3693,12 +3951,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const lockoutOrder = existingLockoutOrder || createLockoutOrder();
       const nextOrders = [lockoutOrder];
       nextOrders.push(createLockoutLabOrder());
+      const lockoutLabOrdersTarget =
+        state.lockoutLabOrdersTarget || getLockoutLabRequestTarget(state.baronPressure);
       let nextState: GameState = {
         ...state,
         orders: nextOrders,
         lockoutPhase: 2,
         lockoutChoice: "lab",
-        lockoutLabOrdersRemaining: LOCKOUT_LAB_REQUESTS,
+        lockoutLabOrdersRemaining: lockoutLabOrdersTarget,
+        lockoutLabOrdersTarget,
         lockoutOrderId: lockoutOrder.id,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -3724,6 +3985,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reputation: state.undoSnapshot.reputation,
         research: state.undoSnapshot.research,
         dependency: state.undoSnapshot.dependency,
+        baronPressure: state.undoSnapshot.baronPressure,
         lockoutActive: state.undoSnapshot.lockoutActive,
         lockoutPhase: state.undoSnapshot.lockoutPhase,
         mergeChainCount: state.undoSnapshot.mergeChainCount,
@@ -3767,23 +4029,52 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lockoutPhase: 0,
           lockoutOrderId: undefined,
           lockoutLabOrdersRemaining: 0,
+          lockoutLabOrdersTarget: 0,
           lockoutChoice: undefined,
           orders: state.orders.filter((o) => !o.isLockout),
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
       } else {
-        const nextState = queueStoryBeat(state, "freedom_first_use");
+        let nextState = queueStoryBeat(state, "freedom_first_use");
+        nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
+        nextState = queueStoryBeat(nextState, "liberation_victory");
+        nextState = queueStoryBeat(nextState, "phase2_goal");
+        const filteredOrders = state.orders.filter((o) => !o.isLockout);
+        const phase2Order = createPhase2GoalOrder(state);
+        const insertResult = insertStoryOrder(state, filteredOrders, phase2Order);
+        const nextOrders = insertResult.inserted ? insertResult.orders : filteredOrders;
+        const baseHighlightedOrderId = filteredOrders.some(
+          (order) => order.id === state.highlightedOrderId
+        )
+          ? state.highlightedOrderId
+          : undefined;
+        const nextHighlightedOrderId = insertResult.inserted
+          ? insertResult.highlightedOrderId
+          : baseHighlightedOrderId;
+        const nextOrderMetrics = insertResult.inserted
+          ? updateOrderMetrics(state, phase2Order)
+          : state.orderMetrics;
         return {
           ...nextState,
           lockoutActive: false,
           lockoutPhase: 0,
-          dependency: Math.max(0, state.dependency - 40),
+          dependency: 0,
+          baronPressure: 0,
+          gamePhase: 2,
+          liberationComplete: true,
+          liberationCompletedAt:
+            typeof state.liberationCompletedAt === "number"
+              ? state.liberationCompletedAt
+              : Date.now(),
           freedomControllerCount: Math.max(0, state.freedomControllerCount - 1),
           lockoutOrderId: undefined,
           lockoutLabOrdersRemaining: 0,
+          lockoutLabOrdersTarget: 0,
           lockoutChoice: undefined,
-          orders: state.orders.filter((o) => !o.isLockout),
+          orders: nextOrders,
+          highlightedOrderId: nextHighlightedOrderId,
+          orderMetrics: nextOrderMetrics,
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
@@ -3812,6 +4103,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               ...Array(restoredBackpackSlots - restoredBackpackRaw.length).fill(null),
             ]
           : restoredBackpackRaw;
+      const restoredDependency =
+        typeof action.state.dependency === "number"
+          ? action.state.dependency
+          : base.dependency;
+      const liberationComplete =
+        typeof action.state.liberationComplete === "boolean"
+          ? action.state.liberationComplete
+          : restoredDependency <= 0;
+      const gamePhase =
+        action.state.gamePhase === 1 || action.state.gamePhase === 2
+          ? action.state.gamePhase
+          : liberationComplete
+          ? 2
+          : 1;
+      const liberationCompletedAt =
+        typeof action.state.liberationCompletedAt === "number"
+          ? action.state.liberationCompletedAt
+          : base.liberationCompletedAt;
       const firstSessionComplete =
         typeof action.state.firstSessionComplete === "boolean"
           ? action.state.firstSessionComplete
@@ -3873,6 +4182,32 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.baronContractOrdersRemaining === "number"
           ? action.state.baronContractOrdersRemaining
           : base.baronContractOrdersRemaining;
+      const baronPressureRaw =
+        typeof action.state.baronPressure === "number"
+          ? action.state.baronPressure
+          : base.baronPressure;
+      const baronPressure = Math.max(
+        0,
+        Math.min(BARON_PRESSURE_MAX, baronPressureRaw)
+      );
+      const baronSupplySpawnsRemaining = Math.max(
+        0,
+        typeof action.state.baronSupplySpawnsRemaining === "number"
+          ? action.state.baronSupplySpawnsRemaining
+          : base.baronSupplySpawnsRemaining
+      );
+      const baronRushSpawnsRemaining = Math.max(
+        0,
+        typeof action.state.baronRushSpawnsRemaining === "number"
+          ? action.state.baronRushSpawnsRemaining
+          : base.baronRushSpawnsRemaining
+      );
+      const lockoutLabOrdersTarget =
+        typeof action.state.lockoutLabOrdersTarget === "number"
+          ? action.state.lockoutLabOrdersTarget
+          : action.state.lockoutActive
+          ? getLockoutLabRequestTarget(baronPressure)
+          : base.lockoutLabOrdersTarget;
       const tier5ShowcaseSeen =
         typeof action.state.tier5ShowcaseSeen === "boolean"
           ? action.state.tier5ShowcaseSeen
@@ -4007,6 +4342,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ...base.settings,
           ...(action.state.settings || {}),
         },
+        dependency: restoredDependency,
+        baronPressure,
+        baronSupplySpawnsRemaining,
+        baronRushSpawnsRemaining,
+        gamePhase,
+        liberationComplete,
+        liberationCompletedAt,
         backpackSlots: restoredBackpackSlots,
         backpack: restoredBackpack,
         backpackUnlocked:
@@ -4056,6 +4398,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferType:
           action.state.baronOfferAvailable && !baronOfferType ? "crate" : baronOfferType,
         baronContractOrdersRemaining,
+        lockoutLabOrdersTarget,
         tier5ShowcaseSeen,
         tier5ShowcasePending,
         tierDiscovery,
@@ -4088,7 +4431,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCriticalEventId,
       };
 
-      if (restoredState.lockoutActive) {
+      if (restoredState.liberationComplete || restoredState.gamePhase === 2) {
+        restoredState = {
+          ...restoredState,
+          dependency: 0,
+          baronPressure: 0,
+          lockoutActive: false,
+          lockoutPhase: 0,
+          lockoutOrderId: undefined,
+          lockoutLabOrdersRemaining: 0,
+          lockoutLabOrdersTarget: 0,
+          lockoutChoice: undefined,
+        };
+      } else if (restoredState.lockoutActive) {
         let orders = Array.isArray(restoredState.orders) ? [...restoredState.orders] : [];
         let lockoutOrderId = restoredState.lockoutOrderId;
         const lockoutIndex = orders.findIndex(
@@ -4234,6 +4589,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.reputation,
       state.research,
       state.dependency,
+      state.gamePhase,
+      state.liberationComplete,
+      state.liberationCompletedAt,
+      state.baronPressure,
+      state.baronSupplySpawnsRemaining,
+      state.baronRushSpawnsRemaining,
       state.orders,
       state.maxOrders,
       state.workbenchMaxCooldown,
@@ -4254,6 +4615,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.lockoutPhase,
       state.lockoutOrderId,
       state.lockoutLabOrdersRemaining,
+      state.lockoutLabOrdersTarget,
       state.lockoutChoice,
       state.baronOfferAvailable,
       state.baronOfferSeen,

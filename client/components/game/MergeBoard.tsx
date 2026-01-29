@@ -157,10 +157,12 @@ export function MergeBoard({
     tier: number;
     family: "open" | "locked";
   } | null>(null);
+  const [containerLayout, setContainerLayout] = useState<LayoutRect | null>(null);
   const [gridLayout, setGridLayout] = useState<LayoutRect | null>(null);
   const [backpackLayout, setBackpackLayout] = useState<LayoutRect | null>(null);
   const [recycleLayout, setRecycleLayout] = useState<LayoutRect | null>(null);
   const [cooldownNow, setCooldownNow] = useState(() => Date.now());
+  const containerRef = useRef<View>(null);
   const gridRef = useRef<View>(null);
   const backpackRef = useRef<View>(null);
   const recycleRef = useRef<View>(null);
@@ -168,6 +170,12 @@ export function MergeBoard({
   const orderPulse = useSharedValue(0);
   const backpackGlow = useSharedValue(0);
   const recyclePulse = useSharedValue(0);
+  const dragPreviewX = useSharedValue(0);
+  const dragPreviewY = useSharedValue(0);
+  const dragPreviewScale = useSharedValue(1);
+  const dragLift = useSharedValue(0);
+  const dragOffsetX = useSharedValue(0);
+  const dragOffsetY = useSharedValue(0);
   const isDragging = dragSource !== null;
 
   const playMergeSound = useCallback((tier: number) => {
@@ -387,6 +395,14 @@ export function MergeBoard({
     shadowOpacity: 0.2 + recyclePulse.value * 0.5,
   }));
 
+  const dragPreviewStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: dragPreviewX.value },
+      { translateY: dragPreviewY.value - dragLift.value },
+      { scale: dragPreviewScale.value },
+    ],
+  }));
+
   const {
     orderHighlightSlots,
     ghostSlotMap,
@@ -495,6 +511,12 @@ export function MergeBoard({
     };
   }, [highlightedOrder, state.board, state.backpack, isStationSlot, isSlotBlocked]);
 
+  const measureContainer = useCallback(() => {
+    containerRef.current?.measureInWindow((x, y, width, height) => {
+      setContainerLayout({ x, y, width, height });
+    });
+  }, []);
+
   const measureGrid = useCallback(() => {
     gridRef.current?.measureInWindow((x, y, width, height) => {
       setGridLayout({ x, y, width, height });
@@ -533,12 +555,38 @@ export function MergeBoard({
   }, [backpackLayout, backpackSlotSize, backpackGap, state.backpack]);
 
   const handleDragStart = useCallback(
-    (source: "board" | "backpack", index: number) => {
+    (source: "board" | "backpack", index: number, absoluteX: number, absoluteY: number) => {
       measureGrid();
       measureBackpack();
       measureRecycle();
+      measureContainer();
       setDragFromIndex(index);
       setDragSource({ source, index });
+      const dragSize = source === "board" ? tileSize - 10 : backpackSlotSize - 8;
+      let originX = absoluteX - dragSize / 2;
+      let originY = absoluteY - dragSize / 2;
+      if (source === "board" && gridLayout) {
+        const cellWidth = tileSize + Spacing.tileGap;
+        const cellHeight = tileSize + Spacing.tileGap;
+        const col = index % GRID_COLS;
+        const row = Math.floor(index / GRID_COLS);
+        const tileX = gridLayout.x + col * cellWidth;
+        const tileY = gridLayout.y + row * cellHeight;
+        const inset = (tileSize - dragSize) / 2;
+        originX = tileX + inset;
+        originY = tileY + inset;
+      } else if (source === "backpack" && backpackSlotRects[index]) {
+        const rect = backpackSlotRects[index];
+        const inset = (rect.width - dragSize) / 2;
+        originX = rect.x + inset;
+        originY = rect.y + inset;
+      }
+      const containerX = containerLayout?.x ?? 0;
+      const containerY = containerLayout?.y ?? 0;
+      dragOffsetX.value = absoluteX - originX + containerX;
+      dragOffsetY.value = absoluteY - originY + containerY;
+      dragPreviewX.value = originX - containerX;
+      dragPreviewY.value = originY - containerY;
       if (hapticsEnabled) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
@@ -564,6 +612,16 @@ export function MergeBoard({
       measureGrid,
       measureBackpack,
       measureRecycle,
+      measureContainer,
+      tileSize,
+      backpackSlotSize,
+      gridLayout,
+      backpackSlotRects,
+      containerLayout,
+      dragOffsetX,
+      dragOffsetY,
+      dragPreviewX,
+      dragPreviewY,
     ]
   );
 
@@ -742,6 +800,10 @@ export function MergeBoard({
         }
       }
 
+      dragOffsetX.value = 0;
+      dragOffsetY.value = 0;
+      dragPreviewX.value = 0;
+      dragPreviewY.value = 0;
       setDragFromIndex(null);
       setDragSource(null);
       setHighlightedSlots([]);
@@ -761,6 +823,10 @@ export function MergeBoard({
       backpackSlotRects,
       gridLayout,
       dispatch,
+      dragOffsetX,
+      dragOffsetY,
+      dragPreviewX,
+      dragPreviewY,
     ]
   );
 
@@ -837,14 +903,21 @@ export function MergeBoard({
           end={{ x: 1, y: 1 }}
         >
           {part ? (
-            <PartItem
-              part={part}
-              size={tileSize - 10}
-              onDragStart={() => handleDragStart("board", index)}
-              onDragEnd={(tx, ty, ax, ay) => handleDragEnd("board", index, tx, ty, ax, ay)}
-              onLongPress={() => onPartLongPress?.(index)}
-              reducedMotion={reducedMotion}
-            />
+            <View style={isDragged ? styles.draggedPartHidden : undefined}>
+              <PartItem
+                part={part}
+                size={tileSize - 10}
+                onDragStart={(ax, ay) => handleDragStart("board", index, ax, ay)}
+                onDragEnd={(tx, ty, ax, ay) => handleDragEnd("board", index, tx, ty, ax, ay)}
+                onLongPress={() => onPartLongPress?.(index)}
+                reducedMotion={reducedMotion}
+                dragPreviewX={dragPreviewX}
+                dragPreviewY={dragPreviewY}
+                dragPreviewScale={dragPreviewScale}
+                dragOffsetX={dragOffsetX}
+                dragOffsetY={dragOffsetY}
+              />
+            </View>
           ) : (
             <View style={styles.emptySlotIndicator}>
               {ghostTier ? (
@@ -1026,7 +1099,7 @@ export function MergeBoard({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} ref={containerRef} onLayout={measureContainer}>
       <LinearGradient
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}
@@ -1150,6 +1223,8 @@ export function MergeBoard({
           >
             {state.backpack.map((part, index) => {
               const isBackpackHighlighted = backpackHighlightSlots.includes(index);
+              const isBackpackDragged =
+                dragSource?.source === "backpack" && dragSource.index === index;
               return (
                 <View
                   key={`backpack-${index}`}
@@ -1173,16 +1248,23 @@ export function MergeBoard({
                     style={styles.backpackGradient}
                   >
                     {part ? (
-                    <PartItem
-                      part={part}
-                      size={backpackSlotSize - 8}
-                      disabled={!state.backpackUnlocked}
-                      onDragStart={() => handleDragStart("backpack", index)}
-                      onDragEnd={(tx, ty, ax, ay) =>
-                        handleDragEnd("backpack", index, tx, ty, ax, ay)
-                      }
-                      reducedMotion={reducedMotion}
-                    />
+                    <View style={isBackpackDragged ? styles.draggedPartHidden : undefined}>
+                      <PartItem
+                        part={part}
+                        size={backpackSlotSize - 8}
+                        disabled={!state.backpackUnlocked}
+                        onDragStart={(ax, ay) => handleDragStart("backpack", index, ax, ay)}
+                        onDragEnd={(tx, ty, ax, ay) =>
+                          handleDragEnd("backpack", index, tx, ty, ax, ay)
+                        }
+                        reducedMotion={reducedMotion}
+                        dragPreviewX={dragPreviewX}
+                        dragPreviewY={dragPreviewY}
+                        dragPreviewScale={dragPreviewScale}
+                        dragOffsetX={dragOffsetX}
+                        dragOffsetY={dragOffsetY}
+                      />
+                    </View>
                     ) : (
                       <Feather
                         name="plus"
@@ -1240,6 +1322,36 @@ export function MergeBoard({
           </Animated.View>
         </View>
       </View>
+      {dragSource &&
+      (dragSource.source === "board"
+        ? state.board[dragSource.index]
+        : state.backpack[dragSource.index]) ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.dragPreviewItem,
+            dragPreviewStyle,
+            {
+              width:
+                dragSource.source === "board" ? tileSize - 10 : backpackSlotSize - 8,
+              height:
+                dragSource.source === "board" ? tileSize - 10 : backpackSlotSize - 8,
+            },
+          ]}
+        >
+          <PartItem
+            part={
+              dragSource.source === "board"
+                ? (state.board[dragSource.index] as Part)
+                : (state.backpack[dragSource.index] as Part)
+            }
+            size={dragSource.source === "board" ? tileSize - 10 : backpackSlotSize - 8}
+            disabled
+            reducedMotion={reducedMotion}
+            dragPreview
+          />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -1498,5 +1610,13 @@ const styles = StyleSheet.create({
   recycleHint: {
     fontSize: 10,
     color: GameColors.text.secondary,
+  },
+  dragPreviewItem: {
+    position: "absolute",
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  draggedPartHidden: {
+    opacity: 0,
   },
 });

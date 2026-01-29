@@ -14,7 +14,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { TinaChip } from "./TinaChip";
 import { useGame } from "@/context/GameContext";
-import { LOCKOUT_LAB_REQUESTS } from "@/constants/lockout";
+import { LOCKOUT_LAB_REQUESTS_BASE } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
@@ -84,7 +84,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
   const isPhase2 = state.lockoutPhase === 2;
   const isPhase3 = state.lockoutPhase === 3;
   const labRemaining = Math.max(0, state.lockoutLabOrdersRemaining);
-  const labTarget = Number(LOCKOUT_LAB_REQUESTS);
+  const labTarget = state.lockoutLabOrdersTarget || LOCKOUT_LAB_REQUESTS_BASE;
   const labRemainingLabel = `${labRemaining} Request${labRemaining === 1 ? "" : "s"}`;
   const labTargetLabel = `${labTarget} Request${labTarget === 1 ? "" : "s"}`;
 
@@ -96,8 +96,8 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
       >
         <ModalShell
           variant="card"
-          title="Firmware Update"
-          subtitle="The Bulb Baron has pushed a firmware update."
+          title="Compliance Audit"
+          subtitle="The Bulb Baron has initiated a crackdown."
           icon="alert-triangle"
           iconColor={GameColors.ui.danger}
           headerRight={<TinaChip expression="concerned" />}
@@ -105,8 +105,8 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           <View style={styles.messageBox}>
             <Feather name="lock" size={20} color={GameColors.locked.primary} />
             <ThemedText style={styles.message}>
-              Your workshop is now dependent on locked technology. Certain installs will reject
-              open-standard parts unless they're certified.
+              Audit agents demand certified installs. Open-standard parts are flagged until
+              you pass the review.
             </ThemedText>
           </View>
 
@@ -127,11 +127,11 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
                   </View>
                   <ThemedText style={styles.choiceName}>Emergency Crate</ThemedText>
                   <ThemedText style={styles.choiceDescription}>
-                    Accept Baron's help. Get locked parts fast, but deepen your dependency.
+                    Accept Baron's compliance crate. The audit passes, but Dependency resets to 60.
                   </ThemedText>
                   <View style={styles.choiceTag}>
                     <Feather name="alert-circle" size={12} color={GameColors.ui.danger} />
-                    <ThemedText style={styles.choiceTagText}>+5 Dependency</ThemedText>
+                    <ThemedText style={styles.choiceTagText}>Dependency set to 60</ThemedText>
                   </View>
                 </Pressable>
 
@@ -157,7 +157,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           {isPhase2 && state.lockoutChoice === "baron" ? (
             <View style={styles.phaseHint}>
               <ThemedText style={styles.choiceDescription}>
-                Complete the Locked Required order using Baron parts to end the lockout.
+                Complete the compliance audit order using Baron parts to end the crackdown.
               </ThemedText>
             </View>
           ) : null}
@@ -181,13 +181,13 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
               <ThemedText style={styles.choiceName}>Break Free</ThemedText>
               <ThemedText style={styles.choiceDescription}>
                 {canUseFreedom
-                  ? "Use a Freedom Controller to break the lock-in and reduce dependency."
+                  ? "Use a Freedom Controller to end the audit and reset Dependency to 0."
                   : "Craft a Freedom Controller in R&D to use this option."}
               </ThemedText>
               <View style={[styles.choiceTag, { backgroundColor: GameColors.ui.success + "20" }]}>
                 <Feather name="trending-down" size={12} color={GameColors.ui.success} />
                 <ThemedText style={[styles.choiceTagText, { color: GameColors.ui.success }]}>
-                  -40 Dependency
+                  Dependency to 0
                 </ThemedText>
               </View>
             </Pressable>

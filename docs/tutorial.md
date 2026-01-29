@@ -40,7 +40,7 @@ Goals:
 - Merge to Smart Kit
 - Complete 3–5 orders
 - See Baron offer twice
-- See soft dependency impact (no lockout)
+- See dependency feedback (no crackdown yet)
 
 ### Forced Drops
 - `FIRST_SESSION_FORCED_DROPS = [2, 2, 3, 3]`
@@ -57,7 +57,7 @@ Goals:
 
 ### Guardrails
 - Lockout suppressed during first session
-- Dependency can rise but caps at 99
+- Dependency starts at 100 and will not drop below 21 during first session
 - No hard penalties before R&D tease
 
 ---
@@ -67,4 +67,3 @@ Goals:
 - Tutorial skip
 - Time to first order
 - First upgrade timing
-

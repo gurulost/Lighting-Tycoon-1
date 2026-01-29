@@ -17,8 +17,8 @@ Date: 2026-01-26
 3. Fulfill orders by consuming parts.
 4. Earn cash, reputation, and research.
 5. Buy upgrades, unlock R&D, craft Freedom Controller.
-6. Dependency rises with locked usage and drops with open usage.
-7. Lockout triggers at Dependency 100 (after first-session track).
+6. Dependency starts at 100, drops with open usage, and rises with locked usage.
+7. Lockout (crackdown) triggers when Dependency drops below the threshold (after first-session track).
 
 ### Key Systems Implemented
 - Single merge board (6x5) with fixed stations and unlockable tiles.

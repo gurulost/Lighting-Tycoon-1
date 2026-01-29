@@ -7,7 +7,7 @@ This document is the single source of truth for the core gameplay systems.
 2. Merge matching tiers to climb the chain.
 3. Fulfill orders for cash, reputation, research.
 4. Buy upgrades to expand capacity and improve drops.
-5. Choose Open vs Locked strategy and manage Dependency.
+5. Choose Open vs Locked strategy and drive Dependency down.
 
 ## Merge Board
 - Grid: 6x5 (30 slots)
@@ -20,17 +20,20 @@ This document is the single source of truth for the core gameplay systems.
 - Tiers: Clip, Track, Segment, Smart Kit, Premium System
 - Families:
   - Open: slower early, research-oriented
-  - Locked: faster early, increases Dependency
+  - Locked: faster early, reinforces Dependency
 
 ## Workbench / Spawning
 - Cooldown-based part spawn
 - Drop tier depends on upgrades and Dependency
 - Locked bias increases with Dependency
+- Baron supply modifiers: crates/rushes temporarily push spawns more locked while active
+- Phase 2: base locked chance is low with occasional Baron-driven spikes
 
 ## Orders
 - Data-driven templates with modifiers
 - Types: basic, style match, rush, premium, certified, locked required, lab request
 - Modifiers add constraints without adding new items
+- Phase 2 inserts a one-time compatibility-focused goal order on liberation
 
 ## Order Spawn Pressure
 - Orders spawn on a timer, but pause when the board is congested.
@@ -40,10 +43,13 @@ This document is the single source of truth for the core gameplay systems.
   - Red: 0–1 free slots (spawn paused)
 
 ## Dependency
-- 0-100 meter
+- 0-100 meter (starts at 100)
+- Drops with open-only installs and Freedom Controller use
 - Rises with locked merges/orders
-- Drops with open orders and Freedom Controller use
-- Thresholds unlock Baron pressure and lockout
+- Downward thresholds trigger story beats and Baron retaliation
+- Baron Pressure: overflow at the cap converts into pressure; open-only installs bleed it down
+- Pressure cashes out into higher lockout lab request targets
+- Post-liberation (Phase 2) freezes Dependency at 0 and weights compatibility-required orders higher
 
 ## R&D
 - Research is earned primarily via Open play
@@ -56,10 +62,12 @@ This document is the single source of truth for the core gameplay systems.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 
 ## Lockout Event
-- Triggers at Dependency 100
-- Phase 1: forced locked-required order
-- Phase 2: choose Baron (fast locked) or Lab (earn research)
-- Phase 3: resolve with Freedom Controller or Baron purchase
+- Triggers when Dependency drops below the crackdown threshold (~20)
+- Phase 1: audit alert
+- Phase 2: choose Baron compliance (locked) or Lab route (research)
+- Phase 3: resolve with Freedom Controller or compliance order
+- Dependency will not drop below the crackdown threshold while the audit is active
+- Lab request target scales with Baron Pressure at lockout start
 
 ## Persistence
 - Saves are debounced to reduce disk writes.
@@ -69,7 +77,7 @@ This document is the single source of truth for the core gameplay systems.
 ## First Session Track
 - Forced drops and scripted orders
 - Two Baron offers appear in the first session
-- Dependency pressure shown softly, no lockout
+- Dependency pressure shown softly; crackdown suppressed
 
 ## Goals / Missions
 - Always-visible goals strip showing 1-2 active missions.

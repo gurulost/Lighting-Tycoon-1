@@ -26,7 +26,7 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
     crate: {
       title: "Certified Crate",
       description:
-        "Get two locked parts now (one at your best tier) plus a bonus payout. Dependency rises with every locked merge.",
+        "Get two locked parts now (one at your best tier) plus a bonus payout. Locked merges reinforce Dependency.",
       acceptText: "Accept Crate (+5 Dependency, +60 coins, +6 research)",
       icon: "package" as const,
     },

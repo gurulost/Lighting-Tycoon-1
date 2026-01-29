@@ -10,7 +10,7 @@ Use this as a quick reference for every icon, badge, and system.
 - Premium System (Open): top-tier open system.
 
 ## Parts (Locked Certified)
-- Clip (Locked): certified part, raises Dependency.
+- Clip (Locked): certified part, reinforces Dependency.
 - Track (Locked): tier 2 locked track.
 - Segment (Locked): tier 3 locked segment.
 - Smart Kit (Locked): tier 4 locked smart kit.
@@ -36,7 +36,7 @@ Use this as a quick reference for every icon, badge, and system.
 - Research: unlocks R&D and the Freedom Controller.
 
 ## Dependency + Villain
-- Dependency Meter: rises with locked parts; high levels add certified/locked orders.
+- Dependency Meter: starts at 100 and drops with open work; locked work reinforces it.
 - Bulb Baron: locked supplier with tempting offers.
 - Freedom Controller: converts locked kits to open-compatible parts.
 
@@ -55,4 +55,4 @@ Use this as a quick reference for every icon, badge, and system.
 - Preference: prefers Open/Locked, wrong family reduces payout.
 - Exact Tiers: no substitutions allowed.
 - Eco Audit: open kits grant bonus research.
-- Lockout: firmware lock; use locked or compatible kits.
+- Lockout: audit crackdown triggered near freedom; choose compliance or the lab route.

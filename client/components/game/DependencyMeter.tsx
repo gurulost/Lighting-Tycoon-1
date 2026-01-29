@@ -43,7 +43,7 @@ export function DependencyMeter({
 
   useEffect(() => {
     const crossedThreshold = THRESHOLDS.some(
-      (t) => prevValue.value < t && value >= t
+      (t) => prevValue.value > t && value <= t
     );
 
     if (crossedThreshold) {
@@ -140,26 +140,26 @@ export function DependencyMeter({
   }));
 
   const getStatusText = () => {
-    if (value < 20) return "Independent";
-    if (value < 40) return "Tempted";
-    if (value < 60) return "Hooked";
-    if (value < 80) return "Dependent";
-    return "Locked In";
+    if (value <= 20) return "Liberation";
+    if (value <= 40) return "Retaliation";
+    if (value <= 60) return "Breakthrough";
+    if (value <= 80) return "Resistance";
+    return "Indentured";
   };
 
   const getStatusColor = () => {
-    if (value < 20) return GameColors.ui.success;
-    if (value < 40) return GameColors.ui.primary;
-    if (value < 60) return GameColors.ui.warning;
-    if (value < 80) return GameColors.ui.danger;
+    if (value <= 20) return GameColors.ui.success;
+    if (value <= 40) return GameColors.ui.primary;
+    if (value <= 60) return GameColors.ui.warning;
+    if (value <= 80) return GameColors.ui.danger;
     return "#FF0000";
   };
 
   const getStatusIcon = (): keyof typeof Feather.glyphMap => {
-    if (value < 20) return "shield";
-    if (value < 40) return "eye";
-    if (value < 60) return "alert-circle";
-    if (value < 80) return "alert-triangle";
+    if (value <= 20) return "shield";
+    if (value <= 40) return "eye";
+    if (value <= 60) return "alert-circle";
+    if (value <= 80) return "alert-triangle";
     return "lock";
   };
 

@@ -64,7 +64,9 @@ export function OrdersModal({
   const scoutAtCap = scoutRemaining >= scoutMax;
   const clinicAtCap = clinicRemaining >= clinicMax;
   const warrantyAtCap = warrantyRemaining >= warrantyMax;
-  const canUseBoosts = state.tutorialComplete && state.firstSessionComplete;
+  const canUseBoosts = state.tutorialComplete;
+  const canUseClinic = state.tutorialComplete && state.firstSessionComplete;
+  const canUseWarranty = state.tutorialComplete && state.firstSessionComplete;
   const [showScoutOptions, setShowScoutOptions] = React.useState(false);
   const [showWarrantyOptions, setShowWarrantyOptions] = React.useState(false);
   const [showOrdersHint, setShowOrdersHint] = React.useState(
@@ -109,8 +111,8 @@ export function OrdersModal({
   const canStartCampaign =
     state.tutorialComplete && state.cash >= marketingCost && !marketingAtCap;
   const canStartScout = canUseBoosts && state.cash >= scoutCost && !scoutAtCap;
-  const canStartClinic = canUseBoosts && state.cash >= clinicCost && !clinicAtCap;
-  const canStartWarranty = canUseBoosts && state.cash >= warrantyCost && !warrantyAtCap;
+  const canStartClinic = canUseClinic && state.cash >= clinicCost && !clinicAtCap;
+  const canStartWarranty = canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
 
@@ -581,7 +583,9 @@ export function OrdersModal({
                   </View>
                 ) : (
                   <ThemedText style={styles.boostHint}>
-                    Next {clinicMerges} merges: open merges grant +1 research and reduce dependency.
+                    {canUseClinic
+                      ? `Next ${clinicMerges} merges: open merges grant +1 research and reduce dependency.`
+                      : "Finish your first session to unlock the clinic."}
                   </ThemedText>
                 )}
               </View>
@@ -614,7 +618,9 @@ export function OrdersModal({
                   </View>
                 ) : (
                   <ThemedText style={styles.boostHint}>
-                    Next {warrantyOrders} orders: reduce wrong-family penalties or boost contracts.
+                    {canUseWarranty
+                      ? `Next ${warrantyOrders} orders: reduce wrong-family penalties or boost contracts.`
+                      : "Finish your first session to unlock the warranty stamp."}
                   </ThemedText>
                 )}
                 {showWarrantyOptions ? (
@@ -649,7 +655,7 @@ export function OrdersModal({
             </View>
           ) : (
             <ThemedText style={styles.boostLockedHint}>
-              Tactical boosts unlock after your first session.
+              Finish the tutorial to unlock boosts.
             </ThemedText>
           )}
         </View>

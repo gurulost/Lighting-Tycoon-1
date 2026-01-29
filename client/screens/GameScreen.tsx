@@ -38,6 +38,7 @@ import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
+import { LOCKOUT_LAB_REQUESTS_BASE } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
@@ -257,6 +258,14 @@ export default function GameScreen() {
   const isCompactLayout = screenHeight > 0 && screenHeight < 740;
   const isCompactScreen = screenHeight > 0 && screenHeight < 800;
   const topCondensed = hudCollapsed || isCompactScreen;
+  const lockoutLabTarget =
+    state.lockoutLabOrdersTarget || LOCKOUT_LAB_REQUESTS_BASE;
+  const lockoutProgressLabel =
+    state.lockoutChoice === "lab"
+      ? `Audit: ${Math.max(0, state.lockoutLabOrdersRemaining)}/${lockoutLabTarget} lab requests`
+      : state.lockoutChoice === "baron"
+      ? "Audit: compliance order pending"
+      : "Audit: choose a response";
 
   const closeModal = () => setActiveModal(null);
   const handleResumeTutorial = () => {
@@ -804,7 +813,10 @@ export default function GameScreen() {
           <Pressable
             style={styles.statusItem}
             onLongPress={() =>
-              showToast("Dependency rises with locked parts. Higher levels add certified orders.", 2800)
+              showToast(
+                "Dependency starts maxed. Open work lowers it; locked work reinforces it.",
+                2800
+              )
             }
             delayLongPress={350}
           >
@@ -824,6 +836,26 @@ export default function GameScreen() {
             />
           </View>
         </View>
+
+        {state.lockoutActive ? (
+          <View
+            style={[styles.lockoutHintRow, topCondensed && styles.lockoutHintRowCompact]}
+          >
+            <Feather
+              name="alert-circle"
+              size={12}
+              color={GameColors.ui.danger}
+            />
+            <View style={styles.lockoutHintTextWrap}>
+              <ThemedText style={styles.lockoutHintText}>
+                Audit in progress - Dependency can't drop below 20.
+              </ThemedText>
+              <ThemedText style={styles.lockoutHintSubtext}>
+                {lockoutProgressLabel}
+              </ThemedText>
+            </View>
+          </View>
+        ) : null}
 
         <MissionStrip
           missions={state.missions}
@@ -1190,6 +1222,28 @@ const styles = StyleSheet.create({
   },
   statusItem: {
     flex: 1,
+  },
+  lockoutHintRow: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xs,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.xs,
+  },
+  lockoutHintRowCompact: {
+    marginTop: 2,
+  },
+  lockoutHintTextWrap: {
+    flex: 1,
+  },
+  lockoutHintText: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
+    fontWeight: "600",
+  },
+  lockoutHintSubtext: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
   },
   resumeBanner: {
     marginHorizontal: Spacing.lg,

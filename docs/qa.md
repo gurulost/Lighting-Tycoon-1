@@ -26,8 +26,33 @@ Use this lightweight checklist to validate core friction fixes and first-session
 ## First-Session Lockout Suppression
 - During the first-session track, take the Baron offer and perform locked merges.
 - Verify:
-  - Dependency can rise but does not trigger lockout (caps at 99).
+  - Dependency can move but does not trigger crackdown (won’t drop below 21).
   - No lockout modal appears before first-session completion.
+
+## Crackdown Trigger
+- After first-session completion, complete open-only installs until Dependency crosses below 20.
+- Verify:
+  - Lockout modal appears.
+  - A compliance audit order is inserted.
+  - Dependency does not drop below 20 until the audit is resolved.
+
+## Baron Pressure + Lockout Scaling
+- While Dependency is capped at 100, take Baron actions that add Dependency (contract/offer).
+- Verify:
+  - Baron Pressure increases (lockout lab target increases to base+1 at 40, base+2 at 70).
+  - Story beat "baron_attention" triggers the first time pressure crosses 40.
+- Trigger lockout and choose Lab route.
+- Verify:
+  - Lab request target matches the pressure tier captured at lockout start.
+  - Open-only installs reduce pressure by 1 (use a debug log or inspect follow-up lockout target).
+
+## Phase 2 Transition
+- Complete lockout via Freedom Controller.
+- Verify:
+  - Dependency stays at 0 (merges/orders do not change it).
+  - Phase 2 goal order is inserted once and highlighted.
+  - Compatibility-required orders appear more frequently.
+  - Target difficulty feels +1 higher on average.
 
 ## Second Baron Offer Trigger
 - In first-session:
@@ -74,10 +99,14 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Skip a goal and verify it is replaced without reward.
 
 ## Tactical Boosts
-- Complete tutorial + first session.
+- Complete tutorial.
 - Supplier Scout:
   - Choose Open route. Verify next 6 spawns skew Open and counter decrements.
   - Verify forced/tutorial spawns do not consume the counter.
+- Baron supply modifiers:
+  - Accept a Baron crate or rush offer and verify locked skew for the next N successful spawns.
+  - Confirm counters only decrement when a part is actually placed.
+- Before first session completion, clinic/warranty remain disabled with a clear hint.
 - Mentor Workshop Clinic:
   - Activate clinic. Verify next open merges grant +1 research and reduce dependency by 1.
   - Counter decrements on every merge, then expires at 0.

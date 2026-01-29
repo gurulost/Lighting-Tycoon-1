@@ -6,9 +6,14 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 
 ## Drop Rates (Open vs Locked)
 **Family roll** (`getRandomFamily`):
-- Base locked chance: `0.30`
-- Scales with dependency: `+ (dependency / 100) * 0.30` (max +0.30)
-- Open Standardization II reduces locked chance by `0.10`
+- Phase 1 locked chance curve: `0.05 + 0.88 * pow(dependency/100, 1.2)`
+- Phase 2 base locked chance: `0.08`
+- Open Standardization II reduces locked chance by `0.12`
+- Scout route shift: `±0.20` (clamped 0.02–0.98)
+- Baron modifiers:
+  - Contract active: `+0.03`
+  - Crate bonus: `+0.05` for next 12 successful spawns
+  - Rush bonus: `+0.02` for next 6 successful spawns
 
 **Tier roll** (`getRandomTier`):
 - Base tier thresholds:
@@ -19,7 +24,7 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 
 **Modifiers**
 - `qualityBonus = workbench_quality_1 * 10`
-- `lockedBoost` for locked parts: `min(15, floor(max(0, dependency-10)/5))`
+- `lockedBoost` for locked parts: `min(6, floor(max(0, dependency-10)/5))`
 
 ---
 
@@ -29,12 +34,31 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 - Open merge: `0`
 
 **Orders**
-- If any locked parts used: `+1`
-- If only open parts used: `-2` and `+2 research`
+- If any locked parts used: `+1` (or `+2` when dependency ≤ 40)
+- If only open parts used: `-2` (or `-1` when dependency ≥ 70) and `+2 research`
 - Compatible open for locked_required avoids penalty but does **not** apply open bonus
+- Open-only installs attempt a bonus open drop (tier 1–2); if no space, convert to +10 cash / +1 research
+- Baron pressure: overflow at dependency cap converts to pressure (`overflow * 2`), and open-only installs reduce pressure by `1`
 
 **Freedom Controller**
-- On use: `-10 dependency`
+- On use: `-5 dependency`
+
+**Lockout Lab Target**
+- Base requests: `5`
+- +1 if Baron Pressure >= 40
+- +2 if Baron Pressure >= 70
+
+---
+
+## Recycle Rewards
+- Open parts: research `max(0, tier-2)` (tier 5 gives 12)
+- Locked parts: research 0 (tier 5 gives 1)
+
+---
+
+## Phase 2 Mix
+- `compatibility_required` orders receive a `1.6x` weight boost when `gamePhase = 2`.
+- Phase 2 target difficulty bumps by `+1`.
 
 ---
 
@@ -49,7 +73,7 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 ---
 
 ## Tactical Boosts (Post-Session Cash Sinks)
-Unlocked after tutorial + first session completion.
+Unlocked after tutorial (Supplier Scout) and after first session completion (others).
 
 **Supplier Scout**
 - Cost: `90 + reputationTier * 30`

@@ -84,7 +84,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 5,
     title: "The Baron’s Offer",
-    description: "Baron offers speed for dependency. Choose your path.",
+    description: "Dependency starts maxed. Open work lowers it. Baron offers speed for lock-in.",
     icon: "lock",
     highlight: "dependency",
     color: GameColors.locked.primary,
@@ -92,7 +92,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 6,
     title: "Locked Merge Demo",
-    description: "Merge locked + open. It stays locked and raises Dependency.",
+    description: "Merge locked + open. It stays locked and reinforces Dependency.",
     icon: "shield",
     highlight: "board",
     color: GameColors.locked.primary,

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet, ImageSourcePropType } from "react-native";
 import Animated, {
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -51,7 +52,7 @@ const TIER_NAMES: Record<PartTier, string> = {
 
 interface PartItemProps {
   part: Part;
-  onDragStart?: () => void;
+  onDragStart?: (absoluteX: number, absoluteY: number) => void;
   onDragEnd?: (
     translationX: number,
     translationY: number,
@@ -62,6 +63,12 @@ interface PartItemProps {
   size?: number;
   disabled?: boolean;
   reducedMotion?: boolean;
+  dragPreview?: boolean;
+  dragPreviewX?: SharedValue<number>;
+  dragPreviewY?: SharedValue<number>;
+  dragPreviewScale?: SharedValue<number>;
+  dragOffsetX?: SharedValue<number>;
+  dragOffsetY?: SharedValue<number>;
 }
 
 export function PartItem({
@@ -72,13 +79,19 @@ export function PartItem({
   size = Spacing.partSize,
   disabled = false,
   reducedMotion = false,
+  dragPreview = false,
+  dragPreviewX,
+  dragPreviewY,
+  dragPreviewScale,
+  dragOffsetX,
+  dragOffsetY,
 }: PartItemProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  const scale = useSharedValue(reducedMotion ? 1 : 0);
+  const scale = useSharedValue(reducedMotion || dragPreview ? 1 : 0);
   const zIndex = useSharedValue(0);
   const glowPulse = useSharedValue(0);
-  const spawnGlow = useSharedValue(reducedMotion ? 0 : 1);
+  const spawnGlow = useSharedValue(reducedMotion || dragPreview ? 0 : 1);
   const hasSpawned = React.useRef(false);
 
   const isOpen = part.family === "open";
@@ -90,7 +103,7 @@ export function PartItem({
 
   // Materialize spawn animation
   React.useEffect(() => {
-    if (hasSpawned.current || reducedMotion) {
+    if (hasSpawned.current || reducedMotion || dragPreview) {
       scale.value = 1;
       spawnGlow.value = 0;
       hasSpawned.current = true;
@@ -130,8 +143,8 @@ export function PartItem({
     };
   }, [reducedMotion]);
 
-  const handleDragStart = () => {
-    onDragStart?.();
+  const handleDragStart = (absoluteX: number, absoluteY: number) => {
+    onDragStart?.(absoluteX, absoluteY);
   };
 
   const handleDragEnd = (tx: number, ty: number, ax: number, ay: number) => {
@@ -144,16 +157,23 @@ export function PartItem({
 
   const panGesture = Gesture.Pan()
     .enabled(!disabled)
-    .onStart(() => {
+    .onStart((event) => {
       "worklet";
       zIndex.value = 100;
       scale.value = withSpring(1.2, { damping: 12, stiffness: 200 });
-      runOnJS(handleDragStart)();
+      if (dragPreviewScale) {
+        dragPreviewScale.value = withSpring(1.2, { damping: 12, stiffness: 200 });
+      }
+      runOnJS(handleDragStart)(event.absoluteX, event.absoluteY);
     })
     .onUpdate((event) => {
       "worklet";
       translateX.value = event.translationX;
       translateY.value = event.translationY;
+      if (dragPreviewX && dragPreviewY && dragOffsetX && dragOffsetY) {
+        dragPreviewX.value = event.absoluteX - dragOffsetX.value;
+        dragPreviewY.value = event.absoluteY - dragOffsetY.value;
+      }
     })
     .onEnd((event) => {
       "worklet";
@@ -167,6 +187,9 @@ export function PartItem({
       translateY.value = withSpring(0, { damping: 15 });
       scale.value = withSpring(1, { damping: 15 });
       zIndex.value = 0;
+      if (dragPreviewScale) {
+        dragPreviewScale.value = withSpring(1, { damping: 15 });
+      }
     });
 
   const longPressGesture = Gesture.LongPress()

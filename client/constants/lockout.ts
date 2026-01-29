@@ -1,1 +1,15 @@
-export const LOCKOUT_LAB_REQUESTS = 2;
+export const LOCKOUT_LAB_REQUESTS_BASE = 5;
+export const LOCKOUT_PRESSURE_BONUS_LOW = 1;
+export const LOCKOUT_PRESSURE_BONUS_HIGH = 2;
+export const LOCKOUT_PRESSURE_THRESHOLD_LOW = 40;
+export const LOCKOUT_PRESSURE_THRESHOLD_HIGH = 70;
+
+export function getLockoutLabRequestTarget(pressure: number) {
+  if (pressure >= LOCKOUT_PRESSURE_THRESHOLD_HIGH) {
+    return LOCKOUT_LAB_REQUESTS_BASE + LOCKOUT_PRESSURE_BONUS_HIGH;
+  }
+  if (pressure >= LOCKOUT_PRESSURE_THRESHOLD_LOW) {
+    return LOCKOUT_LAB_REQUESTS_BASE + LOCKOUT_PRESSURE_BONUS_LOW;
+  }
+  return LOCKOUT_LAB_REQUESTS_BASE;
+}

@@ -100,7 +100,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "part-locked-1",
         title: "Clip (Locked)",
-        description: "Certified part; faster early gains, raises Dependency.",
+        description: "Certified part; faster early gains, reinforces Dependency.",
         part: { tier: 1, family: "locked" },
       },
       {
@@ -262,7 +262,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "dependency-meter",
         title: "Dependency Meter",
-        description: "Rises with locked parts. High levels add certified/locked orders.",
+        description: "Starts at 100. Open work lowers it; locked work reinforces it.",
         icon: "activity",
         color: GameColors.ui.warning,
       },

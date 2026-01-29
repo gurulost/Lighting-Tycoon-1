@@ -61,6 +61,7 @@ Additional gating:
 - `lab_request` requires R&D unlocked.
 - Only one rush order at a time.
 - Only one locked_required order at a time.
+- Dependency starts at 100 and decreases; certified/locked orders naturally fade as freedom grows.
 
 ---
 
@@ -79,4 +80,3 @@ Additional gating:
 - Keep flavor lines 1 sentence max.
 - Avoid stacking multiple modifiers on early neighborhoods.
 - Keep rush orders rare.
-
