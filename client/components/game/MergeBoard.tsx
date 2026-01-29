@@ -870,10 +870,9 @@ export function MergeBoard({
           )}
           {isOrderHighlighted ? (
             <Animated.View
-              pointerEvents="none"
               style={[
                 styles.orderHighlightOverlay,
-                { borderColor: `${orderHighlightColor}80` },
+                { borderColor: `${orderHighlightColor}80`, pointerEvents: "none" },
                 orderPulseStyle,
               ]}
             />
@@ -1032,7 +1031,7 @@ export function MergeBoard({
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}
       >
-        <View pointerEvents="none" style={styles.boardTrim}>
+        <View style={[styles.boardTrim, { pointerEvents: "none" }]}>
           <TrimLightStrip
             progress={1}
             bulbs={18}
@@ -1194,10 +1193,9 @@ export function MergeBoard({
                   </LinearGradient>
                   {isBackpackHighlighted ? (
                     <Animated.View
-                      pointerEvents="none"
                       style={[
                         styles.orderHighlightOverlay,
-                        { borderColor: `${orderHighlightColor}80` },
+                        { borderColor: `${orderHighlightColor}80`, pointerEvents: "none" },
                         orderPulseStyle,
                       ]}
                     />

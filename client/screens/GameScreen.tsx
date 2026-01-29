@@ -834,7 +834,7 @@ export default function GameScreen() {
       </View>
 
       {momentLockActive ? (
-        <View pointerEvents="auto" style={styles.momentLockBlocker} />
+        <View style={[styles.momentLockBlocker, { pointerEvents: "auto" }]} />
       ) : null}
 
       <View

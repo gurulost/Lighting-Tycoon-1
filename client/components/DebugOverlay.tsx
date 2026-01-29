@@ -155,7 +155,7 @@ export function DebugOverlay({
     value <= 0 ? "ready" : `${Math.ceil(value / 1000)}s`;
 
   return (
-    <View pointerEvents="box-none" style={styles.overlay}>
+    <View style={[styles.overlay, { pointerEvents: "box-none" }]}>
       <View style={styles.card}>
         <View style={styles.header}>
           <ThemedText style={styles.title}>Debug Overlay</ThemedText>

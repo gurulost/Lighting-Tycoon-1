@@ -262,8 +262,7 @@ export function OrdersModal({
           key={`install-${installMoment.key}`}
           entering={FadeIn.duration(100)}
           exiting={FadeOut.duration(250)}
-          pointerEvents="none"
-          style={styles.installMomentOverlay}
+          style={[styles.installMomentOverlay, { pointerEvents: "none" }]}
         >
           {/* Radial glow burst behind panel */}
           <Animated.View
