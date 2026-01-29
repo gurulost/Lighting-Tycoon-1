@@ -148,6 +148,7 @@ export interface GameState {
   gamePhase: 1 | 2;
   liberationComplete: boolean;
   liberationCompletedAt?: number;
+  phase2GoalPending: boolean;
   baronPressure: number;
   baronSupplySpawnsRemaining: number;
   baronRushSpawnsRemaining: number;

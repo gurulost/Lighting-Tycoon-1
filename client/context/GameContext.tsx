@@ -1414,6 +1414,7 @@ function getInitialState(): GameState {
     gamePhase: 1,
     liberationComplete: false,
     liberationCompletedAt: undefined,
+    phase2GoalPending: false,
     baronPressure: 0,
     baronSupplySpawnsRemaining: 0,
     baronRushSpawnsRemaining: 0,
@@ -2424,6 +2425,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextGamePhase = state.gamePhase;
       let nextLiberationCompletedAt = state.liberationCompletedAt;
       let nextBaronPressure = dependencyOutcome.baronPressure;
+      let nextPhase2GoalPending = state.phase2GoalPending;
       if (lockoutResolution === "baron") {
         nextDependency = 60;
       }
@@ -2566,6 +2568,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             phase2Order
           );
           phase2GoalInserted = true;
+          nextPhase2GoalPending = false;
+        } else {
+          nextPhase2GoalPending = true;
         }
       }
       const nextBaronContractOrdersRemaining = contractActive
@@ -2598,6 +2603,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         gamePhase: nextGamePhase,
         liberationComplete: nextLiberationComplete,
         liberationCompletedAt: nextLiberationCompletedAt,
+        phase2GoalPending: nextPhase2GoalPending,
         lockoutActive: lockoutActiveValue,
         lockoutPhase: lockoutPhaseValue,
         lockoutOrderId: lockoutResolution ? undefined : nextLockoutOrderId,
@@ -3378,13 +3384,42 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case "SPAWN_ORDER": {
       if (!state.tutorialComplete) return state;
       if (state.lockoutActive) return state;
-      if (state.orders.length >= state.maxOrders) return state;
+      let workingState = state;
 
-      if (state.tier5ShowcasePending && !state.tier5ShowcaseSeen) {
-        const showcaseResult = insertTier5ShowcaseOrder(state, state.orders);
+      if (workingState.phase2GoalPending && workingState.gamePhase === 2) {
+        const hasPhase2Goal = workingState.orders.some((order) =>
+          order.modifierIds?.includes("phase2_goal")
+        );
+        if (hasPhase2Goal) {
+          workingState = { ...workingState, phase2GoalPending: false };
+        } else {
+          const phase2Order = createPhase2GoalOrder(workingState);
+          const insertResult = insertStoryOrder(
+            workingState,
+            workingState.orders,
+            phase2Order
+          );
+          if (insertResult.inserted) {
+            let nextState: GameState = {
+              ...workingState,
+              orders: insertResult.orders,
+              highlightedOrderId: insertResult.highlightedOrderId,
+              orderMetrics: updateOrderMetrics(workingState, phase2Order),
+              phase2GoalPending: false,
+            };
+            nextState = queueStoryBeat(nextState, "phase2_goal");
+            return nextState;
+          }
+        }
+      }
+
+      if (workingState.orders.length >= workingState.maxOrders) return workingState;
+
+      if (workingState.tier5ShowcasePending && !workingState.tier5ShowcaseSeen) {
+        const showcaseResult = insertTier5ShowcaseOrder(workingState, workingState.orders);
         if (showcaseResult.inserted) {
           return {
-            ...state,
+            ...workingState,
             orders: showcaseResult.orders,
             highlightedOrderId: showcaseResult.highlightedOrderId,
             tier5ShowcaseSeen: true,
@@ -3393,25 +3428,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
-      const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
-      let workingState = state;
+      const firstSessionActive =
+        workingState.tutorialComplete && !workingState.firstSessionComplete;
       if (firstSessionActive) {
         if (
-          state.firstSessionOrderIndex === FIRST_SESSION_CHOICE_INDEX &&
-          !state.firstSessionChoiceResolved
+          workingState.firstSessionOrderIndex === FIRST_SESSION_CHOICE_INDEX &&
+          !workingState.firstSessionChoiceResolved
         ) {
-          if (state.firstSessionOrdersCompleted < FIRST_SESSION_CHOICE_COMPLETIONS) {
-            return state;
+          if (workingState.firstSessionOrdersCompleted < FIRST_SESSION_CHOICE_COMPLETIONS) {
+            return workingState;
           }
-          if (!state.firstSessionChoiceOffered) {
+          if (!workingState.firstSessionChoiceOffered) {
             const choiceInsert = insertFirstSessionChoiceOrders(
-              state,
-              state.orders,
-              state.orderMetrics
+              workingState,
+              workingState.orders,
+              workingState.orderMetrics
             );
             if (choiceInsert.inserted) {
               let nextState: GameState = {
-                ...state,
+                ...workingState,
                 orders: choiceInsert.orders,
                 orderMetrics: choiceInsert.orderMetrics,
                 highlightedOrderId: choiceInsert.highlightedOrderId,
@@ -3423,30 +3458,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               return nextState;
             }
           }
-          return state;
+          return workingState;
         }
-        if (state.firstSessionOrderIndex < FIRST_SESSION_ORDERS.length) {
-          const scriptedOrder = createFirstSessionOrder(state.firstSessionOrderIndex);
-          if (!scriptedOrder) return state;
+        if (workingState.firstSessionOrderIndex < FIRST_SESSION_ORDERS.length) {
+          const scriptedOrder = createFirstSessionOrder(workingState.firstSessionOrderIndex);
+          if (!scriptedOrder) return workingState;
           let nextState: GameState = {
-            ...state,
-            orders: [...state.orders, scriptedOrder],
-            firstSessionOrderIndex: state.firstSessionOrderIndex + 1,
-            orderMetrics: updateOrderMetrics(state, scriptedOrder),
+            ...workingState,
+            orders: [...workingState.orders, scriptedOrder],
+            firstSessionOrderIndex: workingState.firstSessionOrderIndex + 1,
+            orderMetrics: updateOrderMetrics(workingState, scriptedOrder),
           };
           return nextState;
         }
-        const hasFirstSessionOrders = state.orders.some((order) =>
+        const hasFirstSessionOrders = workingState.orders.some((order) =>
           order.modifierIds?.includes("first_session")
         );
         if (hasFirstSessionOrders) {
-          return state;
+          return workingState;
         }
-        if (state.firstSessionChoiceOffered && !state.firstSessionChoiceResolved) {
-          return state;
+        if (workingState.firstSessionChoiceOffered && !workingState.firstSessionChoiceResolved) {
+          return workingState;
         }
         workingState = {
-          ...state,
+          ...workingState,
           firstSessionComplete: true,
           firstSessionForcedDrops: [],
         };
@@ -4051,6 +4086,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const phase2Order = createPhase2GoalOrder(state);
         const insertResult = insertStoryOrder(state, filteredOrders, phase2Order);
         const nextOrders = insertResult.inserted ? insertResult.orders : filteredOrders;
+        const phase2GoalPending = !insertResult.inserted;
         const baseHighlightedOrderId = filteredOrders.some(
           (order) => order.id === state.highlightedOrderId
         )
@@ -4085,6 +4121,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           orders: nextOrders,
           highlightedOrderId: nextHighlightedOrderId,
           orderMetrics: nextOrderMetrics,
+          phase2GoalPending,
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
@@ -4212,6 +4249,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? action.state.baronRushSpawnsRemaining
           : base.baronRushSpawnsRemaining
       );
+      const hasPhase2GoalOrder =
+        Array.isArray(action.state.orders) &&
+        action.state.orders.some((order) => order?.modifierIds?.includes("phase2_goal"));
+      const phase2GoalSeen =
+        action.state.storySeen && typeof action.state.storySeen === "object"
+          ? !!action.state.storySeen["phase2_goal"]
+          : false;
+      const phase2GoalPendingRaw =
+        typeof action.state.phase2GoalPending === "boolean"
+          ? action.state.phase2GoalPending
+          : gamePhase === 2 && !phase2GoalSeen && !hasPhase2GoalOrder;
+      const phase2GoalPending =
+        phase2GoalPendingRaw && gamePhase === 2 && !hasPhase2GoalOrder && !phase2GoalSeen;
       const lockoutLabOrdersTarget =
         typeof action.state.lockoutLabOrdersTarget === "number"
           ? action.state.lockoutLabOrdersTarget
@@ -4359,6 +4409,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         gamePhase,
         liberationComplete,
         liberationCompletedAt,
+        phase2GoalPending,
         backpackSlots: restoredBackpackSlots,
         backpack: restoredBackpack,
         backpackUnlocked:
@@ -4603,6 +4654,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.gamePhase,
       state.liberationComplete,
       state.liberationCompletedAt,
+      state.phase2GoalPending,
       state.baronPressure,
       state.baronSupplySpawnsRemaining,
       state.baronRushSpawnsRemaining,

@@ -52,6 +52,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Verify:
   - Dependency stays at 0 (merges/orders do not change it).
   - Phase 2 goal order is inserted once and highlighted.
+  - If the goal order cannot be inserted immediately, it appears on the next available spawn.
   - Compatibility-required orders appear more frequently.
   - Target difficulty feels +1 higher on average.
 
