@@ -9,10 +9,13 @@ import Animated, {
   useSharedValue,
   withSequence,
   withTiming,
+  FadeIn,
+  FadeOut,
 } from "react-native-reanimated";
 
 import { MergeBoard } from "@/components/game/MergeBoard";
 import { CurrencyDisplay } from "@/components/game/CurrencyDisplay";
+import { TrimLightStrip } from "@/components/game/TrimLightStrip";
 import { DependencyMeter } from "@/components/game/DependencyMeter";
 import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
@@ -229,6 +232,9 @@ export default function GameScreen() {
   const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
   const [momentLockActive, setMomentLockActive] = useState(false);
+  const [milestoneCelebration, setMilestoneCelebration] = useState(false);
+  const reputationTierRef = useRef(state.reputationTier);
+  const milestoneTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
@@ -645,6 +651,30 @@ export default function GameScreen() {
     }
   }, [state.tutorialStep, state.tutorialComplete]);
 
+  // Milestone celebration for reputation tier-ups
+  useEffect(() => {
+    if (state.reputationTier > reputationTierRef.current && state.tutorialComplete) {
+      if (!state.settings.reducedMotion) {
+        setMilestoneCelebration(true);
+        if (milestoneTimeout.current) {
+          clearTimeout(milestoneTimeout.current);
+        }
+        milestoneTimeout.current = setTimeout(() => {
+          setMilestoneCelebration(false);
+        }, 1800);
+      }
+    }
+    reputationTierRef.current = state.reputationTier;
+  }, [state.reputationTier, state.tutorialComplete, state.settings.reducedMotion]);
+
+  useEffect(() => {
+    return () => {
+      if (milestoneTimeout.current) {
+        clearTimeout(milestoneTimeout.current);
+      }
+    };
+  }, []);
+
   return (
     <LinearGradient
       colors={["#0A0A14", "#0F0F1F", "#0A0A14"]}
@@ -664,6 +694,27 @@ export default function GameScreen() {
           showLockoutModal={showLockoutModal}
         />
       ) : null}
+
+      {/* Milestone celebration for tier-ups */}
+      {milestoneCelebration ? (
+        <Animated.View
+          style={styles.milestoneCelebration}
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(400)}
+          pointerEvents="none"
+        >
+          <TrimLightStrip
+            progress={1}
+            bulbs={24}
+            height={20}
+            pattern="rainbow"
+            animationMode="meteor"
+            animated
+            reducedMotion={state.settings.reducedMotion}
+          />
+        </Animated.View>
+      ) : null}
+
       <View>
         <View style={styles.topBar} onLayout={(event) => setTopBarLayout(event.nativeEvent.layout)}>
           <View onLayout={setTarget("currency")}>
@@ -1062,6 +1113,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     overflow: "visible",
+  },
+  milestoneCelebration: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
   topBar: {
     flexDirection: "row",
