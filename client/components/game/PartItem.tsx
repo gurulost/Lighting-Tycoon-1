@@ -18,7 +18,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
-import { TrimLightStrip } from "@/components/game/TrimLightStrip";
+import { TrimLightStrip, TrimLightAnimation } from "@/components/game/TrimLightStrip";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
@@ -249,7 +249,8 @@ export function PartItem({
               progress={1}
               bulbs={7}
               height={12}
-              pattern="rainbow"
+              pattern={isOpen ? "rainbow" : "baron"}
+              animationMode={isOpen ? "wave" : "chase"}
               animated={!reducedMotion}
               reducedMotion={reducedMotion}
             />
