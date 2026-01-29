@@ -23,6 +23,7 @@ interface DependencyMeterProps {
   value: number;
   compact?: boolean;
   reducedMotion?: boolean;
+  lockoutActive?: boolean;
 }
 
 const THRESHOLDS = [20, 40, 60, 80];
@@ -32,6 +33,7 @@ export function DependencyMeter({
   value,
   compact = false,
   reducedMotion = false,
+  lockoutActive = false,
 }: DependencyMeterProps) {
   const [smoothProgress, setSmoothProgress] = useState(() => clampProgress(value / 100));
   const progressRef = useRef(smoothProgress);
@@ -140,6 +142,7 @@ export function DependencyMeter({
   }));
 
   const getStatusText = () => {
+    if (lockoutActive) return "Audit";
     if (value <= 20) return "Liberation";
     if (value <= 40) return "Retaliation";
     if (value <= 60) return "Breakthrough";
@@ -148,6 +151,7 @@ export function DependencyMeter({
   };
 
   const getStatusColor = () => {
+    if (lockoutActive) return GameColors.ui.danger;
     if (value <= 20) return GameColors.ui.success;
     if (value <= 40) return GameColors.ui.primary;
     if (value <= 60) return GameColors.ui.warning;
@@ -156,6 +160,7 @@ export function DependencyMeter({
   };
 
   const getStatusIcon = (): keyof typeof Feather.glyphMap => {
+    if (lockoutActive) return "alert-triangle";
     if (value <= 20) return "shield";
     if (value <= 40) return "eye";
     if (value <= 60) return "alert-circle";

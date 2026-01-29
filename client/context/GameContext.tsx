@@ -1999,6 +1999,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (dependencyStory) {
         nextState = queueStoryBeat(nextState, dependencyStory);
       }
+      nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
       if (tutorialStoryBeat) {
         nextState = queueStoryBeat(nextState, tutorialStoryBeat);
       }
@@ -2348,14 +2349,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
       const baronGate = state.gamePhase === 2 ? true : dependencyOutcome.dependency >= 20;
+      const lockoutBlockingOffers =
+        state.lockoutActive || dependencyOutcome.lockoutActive;
       const canTriggerBaron =
         state.tutorialComplete &&
         !firstSessionActive &&
         !state.baronOfferAvailable &&
         Date.now() >= state.baronOfferCooldownUntil &&
-        baronGate;
+        baronGate &&
+        !lockoutBlockingOffers;
       const shouldShowBaronOffer =
-        (!state.baronOfferSeen && state.tutorialComplete) ||
+        (!lockoutBlockingOffers && !state.baronOfferSeen && state.tutorialComplete) ||
         (canTriggerBaron && Math.random() < 0.25);
       const completedTutorialOrder = state.tutorialOrderId === orderId;
       const tutorialAdvanceAfterOrder =
@@ -2536,6 +2540,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       )
         ? state.highlightedOrderId
         : undefined;
+      let phase2GoalInserted = false;
       if (state.tutorialComplete && dependencyStory && !state.storySeen[dependencyStory]) {
         const storyOrder = createDependencyStoryOrder(state, dependencyStory);
         if (storyOrder) {
@@ -2560,6 +2565,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             { ...state, orderMetrics: nextOrderMetrics },
             phase2Order
           );
+          phase2GoalInserted = true;
         }
       }
       const nextBaronContractOrdersRemaining = contractActive
@@ -2648,7 +2654,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (lockoutResolution === "freedom") {
         nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
         nextState = queueStoryBeat(nextState, "liberation_victory");
-        nextState = queueStoryBeat(nextState, "phase2_goal");
+        if (phase2GoalInserted) {
+          nextState = queueStoryBeat(nextState, "phase2_goal");
+        }
       }
       if (queuedFirstSessionBeat) {
         nextState = queueStoryBeat(nextState, queuedFirstSessionBeat);
@@ -4039,7 +4047,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         let nextState = queueStoryBeat(state, "freedom_first_use");
         nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
         nextState = queueStoryBeat(nextState, "liberation_victory");
-        nextState = queueStoryBeat(nextState, "phase2_goal");
         const filteredOrders = state.orders.filter((o) => !o.isLockout);
         const phase2Order = createPhase2GoalOrder(state);
         const insertResult = insertStoryOrder(state, filteredOrders, phase2Order);
@@ -4055,6 +4062,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const nextOrderMetrics = insertResult.inserted
           ? updateOrderMetrics(state, phase2Order)
           : state.orderMetrics;
+        if (insertResult.inserted) {
+          nextState = queueStoryBeat(nextState, "phase2_goal");
+        }
         return {
           ...nextState,
           lockoutActive: false,
@@ -4485,6 +4495,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ...restoredState,
           orders,
           lockoutOrderId,
+          baronPressure: 0,
           highlightedOrderId: highlightStillValid
             ? restoredState.highlightedOrderId
             : undefined,

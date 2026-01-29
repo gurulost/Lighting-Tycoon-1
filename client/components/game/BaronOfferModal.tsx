@@ -26,21 +26,21 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
     crate: {
       title: "Certified Crate",
       description:
-        "Get two locked parts now (one at your best tier) plus a bonus payout. Locked merges reinforce Dependency.",
+        "Get two locked parts now (one at your best tier) plus a bonus payout. Certified supply leans locked for the next 12 spawns.",
       acceptText: "Accept Crate (+5 Dependency, +60 coins, +6 research)",
       icon: "package" as const,
     },
     contract: {
       title: "Territory Contract",
       description:
-        "Next 3 orders pay +35% coins. Each completion nudges Dependency upward.",
+        "Next 3 orders pay +35% coins. Each completion nudges Dependency upward; certified supply pressure stays active.",
       acceptText: "Sign Contract (+35% coins for 3 orders)",
       icon: "trending-up" as const,
     },
     rush: {
       title: "Emergency Rush Kit",
       description:
-        "Instant workbench reset and a locked kit delivered now. Dependency spikes slightly.",
+        "Instant workbench reset and a locked kit delivered now. Certified supply leans locked for the next 6 spawns.",
       acceptText: "Take Rush Kit (Reset cooldown + locked kit)",
       icon: "zap" as const,
     },

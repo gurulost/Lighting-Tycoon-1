@@ -825,6 +825,7 @@ export default function GameScreen() {
                 value={state.dependency}
                 compact
                 reducedMotion={state.settings.reducedMotion}
+                lockoutActive={state.lockoutActive}
               />
             </View>
           </Pressable>

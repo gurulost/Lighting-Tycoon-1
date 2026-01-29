@@ -35,6 +35,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Lockout modal appears.
   - A compliance audit order is inserted.
   - Dependency does not drop below 20 until the audit is resolved.
+  - Baron offers do not appear while the audit is active.
 
 ## Baron Pressure + Lockout Scaling
 - While Dependency is capped at 100, take Baron actions that add Dependency (contract/offer).
