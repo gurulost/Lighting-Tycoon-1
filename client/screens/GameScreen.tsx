@@ -203,6 +203,7 @@ export default function GameScreen() {
   const [undoTick, setUndoTick] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [debugOverlayVisible, setDebugOverlayVisible] = useState(false);
+  const [hudCollapsed, setHudCollapsed] = useState(false);
   const [tutorialTargets, setTutorialTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
@@ -248,8 +249,8 @@ export default function GameScreen() {
     return count;
   }, [state.orders, state.board, getFulfillmentIndices]);
   const isCompactLayout = screenHeight > 0 && screenHeight < 740;
-  const topCondensed =
-    state.tutorialComplete || (screenHeight > 0 && screenHeight < 800);
+  const isCompactScreen = screenHeight > 0 && screenHeight < 800;
+  const topCondensed = hudCollapsed || isCompactScreen;
 
   const closeModal = () => setActiveModal(null);
   const handleResumeTutorial = () => {
@@ -374,6 +375,12 @@ export default function GameScreen() {
       SoundManager.unload();
     };
   }, []);
+
+  useEffect(() => {
+    if (state.tutorialComplete) {
+      setHudCollapsed(true);
+    }
+  }, [state.tutorialComplete]);
 
   useEffect(() => {
     const sources = [
@@ -689,10 +696,10 @@ export default function GameScreen() {
             />
           </View>
           <View style={styles.topActions}>
-            <Pressable
-              style={styles.settingsButton}
-              onPress={() => setActiveModal("story")}
-            >
+          <Pressable
+            style={styles.settingsButton}
+            onPress={() => setActiveModal("story")}
+          >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
                 style={styles.settingsGradient}
@@ -700,10 +707,10 @@ export default function GameScreen() {
                 <Feather name="book-open" size={20} color={GameColors.text.secondary} />
               </LinearGradient>
             </Pressable>
-            <Pressable
-              style={styles.settingsButton}
-              onPress={() => setActiveModal("glossary")}
-            >
+          <Pressable
+            style={styles.settingsButton}
+            onPress={() => setActiveModal("glossary")}
+          >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
                 style={styles.settingsGradient}
@@ -711,20 +718,37 @@ export default function GameScreen() {
                 <Feather name="help-circle" size={20} color={GameColors.text.secondary} />
               </LinearGradient>
             </Pressable>
-            <Pressable
-              style={styles.settingsButton}
-              onPress={() => setActiveModal("settings")}
-              testID="settings-button"
+          <Pressable
+            style={styles.settingsButton}
+            onPress={() => setActiveModal("settings")}
+            testID="settings-button"
+          >
+            <LinearGradient
+              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+              style={styles.settingsGradient}
             >
-              <LinearGradient
-                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={styles.settingsGradient}
-              >
-                <Feather name="settings" size={20} color={GameColors.text.secondary} />
-              </LinearGradient>
-            </Pressable>
-          </View>
+              <Feather name="settings" size={20} color={GameColors.text.secondary} />
+            </LinearGradient>
+          </Pressable>
+          <Pressable
+            style={[styles.settingsButton, isCompactScreen && styles.settingsButtonDisabled]}
+            onPress={
+              isCompactScreen ? undefined : () => setHudCollapsed((prev) => !prev)
+            }
+          >
+            <LinearGradient
+              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+              style={styles.settingsGradient}
+            >
+              <Feather
+                name={topCondensed ? "chevrons-down" : "chevrons-up"}
+                size={20}
+                color={isCompactScreen ? GameColors.text.disabled : GameColors.text.secondary}
+              />
+            </LinearGradient>
+          </Pressable>
         </View>
+      </View>
 
         <View style={[styles.statusRow, topCondensed && styles.statusRowCompact]}>
           <Pressable
@@ -772,7 +796,7 @@ export default function GameScreen() {
           </Pressable>
         ) : null}
 
-        {state.activeStoryBeatId && !isDragging && !activeModal ? (
+        {state.activeStoryBeatId && !isDragging && !activeModal && !topCondensed ? (
           <Pressable style={styles.storyToastContainer} onPress={handleStoryPress}>
             <StoryToast
               beatId={state.activeStoryBeatId}
@@ -1077,6 +1101,9 @@ const styles = StyleSheet.create({
   settingsButton: {
     borderRadius: 22,
     overflow: "hidden",
+  },
+  settingsButtonDisabled: {
+    opacity: 0.6,
   },
   settingsGradient: {
     width: 44,
