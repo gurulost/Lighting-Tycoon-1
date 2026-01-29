@@ -24,7 +24,7 @@ import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
-import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
+import { TrimLightStrip, TrimLightPattern, TrimLightAnimation } from "@/components/game/TrimLightStrip";
 
 interface OrdersModalProps {
   onClose: () => void;
@@ -75,6 +75,7 @@ export function OrdersModal({
   const [installMoment, setInstallMoment] = React.useState<{
     key: number;
     pattern: TrimLightPattern;
+    animationMode: TrimLightAnimation;
   } | null>(null);
   const orderLegend = [
     { key: "C", label: "Clip" },
@@ -158,6 +159,8 @@ export function OrdersModal({
   const triggerInstallMoment = React.useCallback(
     (order: Order) => {
       if (state.settings.reducedMotion) return;
+      
+      // Select pattern based on order type
       const pattern: TrimLightPattern =
         order.type === "baron_certified" || order.type === "locked_required"
           ? "baron"
@@ -166,10 +169,22 @@ export function OrdersModal({
           : order.type === "style_match"
           ? "classic"
           : "warmWhite";
+      
+      // Select animation mode based on order type for variety
+      const animationMode: TrimLightAnimation =
+        order.type === "premium"
+          ? "meteor"  // Premium orders get dramatic meteor effect
+          : order.type === "baron_certified" || order.type === "locked_required"
+          ? "chase"   // Baron orders get chase effect
+          : order.type === "style_match"
+          ? "wave"    // Style match orders get smooth wave
+          : "twinkle"; // Standard orders get classic twinkle
+      
       installMomentKey.current += 1;
       setInstallMoment({
         key: installMomentKey.current,
         pattern,
+        animationMode,
       });
       if (installMomentTimeout.current) {
         clearTimeout(installMomentTimeout.current);
@@ -295,6 +310,7 @@ export function OrdersModal({
               bulbs={20}
               height={26}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
@@ -306,6 +322,7 @@ export function OrdersModal({
               bulbs={16}
               height={22}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
@@ -317,6 +334,7 @@ export function OrdersModal({
               bulbs={12}
               height={18}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
@@ -340,6 +358,7 @@ export function OrdersModal({
               bulbs={6}
               height={14}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
@@ -353,6 +372,7 @@ export function OrdersModal({
               bulbs={6}
               height={14}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
