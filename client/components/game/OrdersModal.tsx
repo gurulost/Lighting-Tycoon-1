@@ -2,7 +2,21 @@ import React from "react";
 import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInUp,
+  ZoomIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withTiming,
+  withSpring,
+  interpolate,
+  Extrapolation,
+  runOnJS,
+} from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/ThemedText";
 import { OrderCard } from "./OrderCard";
@@ -10,7 +24,7 @@ import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
-import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
+import { TrimLightStrip, TrimLightPattern, TrimLightAnimation } from "@/components/game/TrimLightStrip";
 
 interface OrdersModalProps {
   onClose: () => void;
@@ -61,6 +75,7 @@ export function OrdersModal({
   const [installMoment, setInstallMoment] = React.useState<{
     key: number;
     pattern: TrimLightPattern;
+    animationMode: TrimLightAnimation;
   } | null>(null);
   const orderLegend = [
     { key: "C", label: "Clip" },
@@ -144,6 +159,8 @@ export function OrdersModal({
   const triggerInstallMoment = React.useCallback(
     (order: Order) => {
       if (state.settings.reducedMotion) return;
+      
+      // Select pattern based on order type
       const pattern: TrimLightPattern =
         order.type === "baron_certified" || order.type === "locked_required"
           ? "baron"
@@ -152,17 +169,29 @@ export function OrdersModal({
           : order.type === "style_match"
           ? "classic"
           : "warmWhite";
+      
+      // Select animation mode based on order type for variety
+      const animationMode: TrimLightAnimation =
+        order.type === "premium"
+          ? "meteor"  // Premium orders get dramatic meteor effect
+          : order.type === "baron_certified" || order.type === "locked_required"
+          ? "chase"   // Baron orders get chase effect
+          : order.type === "style_match"
+          ? "wave"    // Style match orders get smooth wave
+          : "twinkle"; // Standard orders get classic twinkle
+      
       installMomentKey.current += 1;
       setInstallMoment({
         key: installMomentKey.current,
         pattern,
+        animationMode,
       });
       if (installMomentTimeout.current) {
         clearTimeout(installMomentTimeout.current);
       }
       installMomentTimeout.current = setTimeout(() => {
         setInstallMoment(null);
-      }, 850);
+      }, 1200);
     },
     [state.settings.reducedMotion]
   );
@@ -231,30 +260,122 @@ export function OrdersModal({
       {installMoment ? (
         <Animated.View
           key={`install-${installMoment.key}`}
-          entering={FadeIn.duration(180)}
-          exiting={FadeOut.duration(180)}
-          pointerEvents="none"
-          style={styles.installMomentOverlay}
+          entering={FadeIn.duration(100)}
+          exiting={FadeOut.duration(250)}
+          style={[styles.installMomentOverlay, { pointerEvents: "none" }]}
         >
-          <View style={styles.installMomentPanel}>
+          {/* Radial glow burst behind panel */}
+          <Animated.View
+            entering={ZoomIn.duration(300).springify()}
+            style={styles.installGlowBurst}
+          >
+            <LinearGradient
+              colors={[
+                installMoment.pattern === "baron" ? "#A855F780" :
+                installMoment.pattern === "rainbow" ? "#FF6B6B80" :
+                "#00D9FF80",
+                "transparent"
+              ]}
+              style={styles.glowBurstGradient}
+              start={{ x: 0.5, y: 0.5 }}
+              end={{ x: 0.5, y: 0 }}
+            />
+          </Animated.View>
+
+          {/* Main celebration panel */}
+          <Animated.View
+            entering={SlideInUp.duration(350).springify().damping(12)}
+            style={styles.installMomentPanel}
+          >
+            {/* Success icon */}
+            <Animated.View
+              entering={ZoomIn.delay(100).duration(200).springify()}
+              style={styles.successIconContainer}
+            >
+              <Feather
+                name="zap"
+                size={24}
+                color={
+                  installMoment.pattern === "baron" ? GameColors.locked.accent :
+                  installMoment.pattern === "rainbow" ? "#FFD700" :
+                  GameColors.openStandard.primary
+                }
+              />
+            </Animated.View>
+
+            {/* Top light strip - main */}
             <TrimLightStrip
               progress={1}
-              bulbs={18}
-              height={24}
+              bulbs={20}
+              height={26}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
             <View style={styles.installMomentSpacer} />
+
+            {/* Middle light strip */}
             <TrimLightStrip
               progress={1}
-              bulbs={14}
-              height={20}
+              bulbs={16}
+              height={22}
               pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
               animated
               reducedMotion={state.settings.reducedMotion}
             />
-          </View>
+            <View style={styles.installMomentSpacer} />
+
+            {/* Bottom light strip - accent */}
+            <TrimLightStrip
+              progress={1}
+              bulbs={12}
+              height={18}
+              pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
+              animated
+              reducedMotion={state.settings.reducedMotion}
+            />
+
+            {/* Success text */}
+            <Animated.View
+              entering={FadeIn.delay(150).duration(200)}
+              style={styles.successTextContainer}
+            >
+              <ThemedText style={styles.successText}>Installation Complete!</ThemedText>
+            </Animated.View>
+          </Animated.View>
+
+          {/* Side accent strips */}
+          <Animated.View
+            entering={FadeIn.delay(200).duration(300)}
+            style={styles.sideStripLeft}
+          >
+            <TrimLightStrip
+              progress={1}
+              bulbs={6}
+              height={14}
+              pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
+              animated
+              reducedMotion={state.settings.reducedMotion}
+            />
+          </Animated.View>
+          <Animated.View
+            entering={FadeIn.delay(250).duration(300)}
+            style={styles.sideStripRight}
+          >
+            <TrimLightStrip
+              progress={1}
+              bulbs={6}
+              height={14}
+              pattern={installMoment.pattern}
+              animationMode={installMoment.animationMode}
+              animated
+              reducedMotion={state.settings.reducedMotion}
+            />
+          </Animated.View>
         </Animated.View>
       ) : null}
       <ScrollView
@@ -619,23 +740,71 @@ const styles = StyleSheet.create({
   },
   installMomentOverlay: {
     position: "absolute",
-    top: Spacing.xl,
+    top: Spacing.lg,
     left: 0,
     right: 0,
     alignItems: "center",
     zIndex: 10,
   },
+  installGlowBurst: {
+    position: "absolute",
+    top: -60,
+    width: 280,
+    height: 180,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glowBurstGradient: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 140,
+  },
   installMomentPanel: {
-    width: "88%",
-    paddingVertical: Spacing.sm,
+    width: "92%",
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-    backgroundColor: "rgba(10,10,20,0.75)",
+    borderRadius: BorderRadius.lg,
+    borderWidth: 2,
+    borderColor: "#3A3A5A",
+    backgroundColor: "rgba(10,10,25,0.92)",
+    shadowColor: "#00D9FF",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 12,
+    alignItems: "center",
+  },
+  successIconContainer: {
+    marginBottom: Spacing.sm,
   },
   installMomentSpacer: {
-    height: 6,
+    height: 8,
+  },
+  successTextContainer: {
+    marginTop: Spacing.md,
+  },
+  successText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+    textAlign: "center",
+    textShadowColor: "#00D9FF80",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  sideStripLeft: {
+    position: "absolute",
+    left: 8,
+    top: 80,
+    transform: [{ rotate: "-15deg" }],
+    opacity: 0.7,
+  },
+  sideStripRight: {
+    position: "absolute",
+    right: 8,
+    top: 80,
+    transform: [{ rotate: "15deg" }],
+    opacity: 0.7,
   },
   statsRow: {
     flexDirection: "row",

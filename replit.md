@@ -89,6 +89,20 @@ Preferred communication style: Simple, everyday language.
 - Steps cover: Welcome, Merge Board, Part Families, Customer Orders, Dependency Meter, Getting Started
 - Skip option and progress dots for navigation
 
+### TrimLight Animation System
+- **TrimLightStrip component**: Programmable light strip inspired by Trimlight with multiple animation modes
+- Animation modes: `twinkle` (random sparkle), `chase` (light chaser), `wave` (gentle pulse), `meteor` (shooting star), `colorFade` (color cycling)
+- Pattern options: `open` (blue/cyan), `locked` (gold/purple), `rainbow`, `singleColor`
+- Strategic placement follows "accent and augment" principle - light effects enhance gameplay without overwhelming
+- **Order fulfillment celebrations**: Different animation modes signal order types (meteor for premium, chase for baron contracts, wave for style match, twinkle for standard)
+- **Tier 5 Premium parts**: Subtle animated programs (wave for open parts, chase for locked parts)
+- **Milestone celebrations**: Rainbow meteor TrimLightStrip appears briefly when player reaches new reputation tier
+- All animations respect reduced motion accessibility setting
+
+### Code Quality Fixes
+- **Fixed React Native Web deprecation warnings**: All `pointerEvents` usage converted from prop-based (`pointerEvents="none"`) to style-based (`style={{ pointerEvents: "none" }}`) across 7 files (15+ instances)
+- Affected files: GameScreen, MergeBoard, TutorialOverlay, OrdersModal, PartItem, DialogueBubble, DebugOverlay
+
 ### Asset Files
 All game assets are stored in `assets/images/`:
 - Part sprites: `part-{tier}-{family}.png` (e.g., `part-clip-open.png`, `part-premium-locked.png`)

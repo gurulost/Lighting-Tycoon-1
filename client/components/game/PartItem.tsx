@@ -18,7 +18,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
-import { TrimLightStrip } from "@/components/game/TrimLightStrip";
+import { TrimLightStrip, TrimLightAnimation } from "@/components/game/TrimLightStrip";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
@@ -75,9 +75,11 @@ export function PartItem({
 }: PartItemProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
+  const scale = useSharedValue(reducedMotion ? 1 : 0);
   const zIndex = useSharedValue(0);
   const glowPulse = useSharedValue(0);
+  const spawnGlow = useSharedValue(reducedMotion ? 0 : 1);
+  const hasSpawned = React.useRef(false);
 
   const isOpen = part.family === "open";
   const primaryColor = isOpen ? GameColors.openStandard.primary : GameColors.locked.primary;
@@ -86,6 +88,30 @@ export function PartItem({
     ? ["#4A9EFF20", "#00D9FF40", "#4A9EFF20"]
     : ["#FFB84D20", "#A855F740", "#FFB84D20"];
 
+  // Materialize spawn animation
+  React.useEffect(() => {
+    if (hasSpawned.current || reducedMotion) {
+      scale.value = 1;
+      spawnGlow.value = 0;
+      hasSpawned.current = true;
+      return;
+    }
+    hasSpawned.current = true;
+    
+    // Scale: 0 -> 1.15 -> 1 with spring bounce
+    scale.value = withSequence(
+      withTiming(1.15, { duration: 180 }),
+      withSpring(1, { damping: 8, stiffness: 200 })
+    );
+    
+    // Bright glow pulse that fades out
+    spawnGlow.value = withSequence(
+      withTiming(1.5, { duration: 100 }),
+      withTiming(0, { duration: 400 })
+    );
+  }, []);
+
+  // Ambient glow pulse
   React.useEffect(() => {
     if (reducedMotion) {
       glowPulse.value = 0;
@@ -154,7 +180,11 @@ export function PartItem({
   const composedGesture = Gesture.Race(panGesture, longPressGesture);
 
   const animatedStyle = useAnimatedStyle(() => {
-    const glowOpacity = interpolate(glowPulse.value, [0, 1], [0.4, 0.8], Extrapolation.CLAMP);
+    const baseGlow = interpolate(glowPulse.value, [0, 1], [0.4, 0.8], Extrapolation.CLAMP);
+    const spawnBoost = interpolate(spawnGlow.value, [0, 1, 1.5], [0, 0.5, 1], Extrapolation.CLAMP);
+    const glowOpacity = Math.min(1, baseGlow + spawnBoost);
+    const shadowRadius = 12 + spawnGlow.value * 20;
+    
     return {
       transform: [
         { translateX: translateX.value },
@@ -164,6 +194,16 @@ export function PartItem({
       zIndex: zIndex.value,
       elevation: zIndex.value,
       shadowOpacity: glowOpacity,
+      shadowRadius: shadowRadius,
+    };
+  });
+  
+  const spawnRingStyle = useAnimatedStyle(() => {
+    const ringScale = interpolate(spawnGlow.value, [0, 1.5], [1, 1.8], Extrapolation.CLAMP);
+    const ringOpacity = interpolate(spawnGlow.value, [0, 0.5, 1.5], [0, 0.6, 0], Extrapolation.CLAMP);
+    return {
+      transform: [{ scale: ringScale }],
+      opacity: ringOpacity,
     };
   });
 
@@ -204,18 +244,28 @@ export function PartItem({
           cachePolicy="memory-disk"
         />
         {showPremiumLights ? (
-          <View pointerEvents="none" style={styles.premiumLights}>
+          <View style={[styles.premiumLights, { pointerEvents: "none" }]}>
             <TrimLightStrip
               progress={1}
               bulbs={7}
               height={12}
-              pattern="rainbow"
+              pattern={isOpen ? "rainbow" : "baron"}
+              animationMode={isOpen ? "wave" : "chase"}
               animated={!reducedMotion}
               reducedMotion={reducedMotion}
             />
           </View>
         ) : null}
       </LinearGradient>
+
+      {/* Spawn ring effect */}
+      <Animated.View
+        style={[
+          styles.spawnRing,
+          { borderColor: glowColor, width: size, height: size, pointerEvents: "none" },
+          spawnRingStyle,
+        ]}
+      />
 
       <View style={[styles.tierBadge, { backgroundColor: GameColors.tiers[part.tier] }]}>
         <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
@@ -331,6 +381,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     position: "relative",
+    overflow: "visible",
   },
   glowBackground: {
     flex: 1,
@@ -369,6 +420,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs + 3,
     borderWidth: 1,
     opacity: 0.4,
+  },
+  spawnRing: {
+    position: "absolute",
+    borderRadius: BorderRadius.xs,
+    borderWidth: 3,
   },
   tierBadge: {
     position: "absolute",

@@ -10,6 +10,7 @@ import Animated, {
 import { withRepeat } from "@/lib/reanimated";
 
 export type TrimLightPattern = "warmWhite" | "classic" | "rainbow" | "baron";
+export type TrimLightAnimation = "twinkle" | "chase" | "wave" | "meteor" | "colorFade";
 
 const PATTERNS: Record<TrimLightPattern, string[]> = {
   warmWhite: ["#FFE6B8"],
@@ -51,6 +52,8 @@ function Bulb({
   t,
   color,
   animated,
+  animationMode,
+  totalBulbs,
 }: {
   x: number;
   lit: boolean;
@@ -59,23 +62,75 @@ function Bulb({
   t: SharedValue<number>;
   color: string;
   animated: boolean;
+  animationMode: TrimLightAnimation;
+  totalBulbs: number;
 }) {
   const bulbY = 13;
   const wireY = 6;
 
   const animatedProps = useAnimatedProps(
     () => {
-      const base = lit ? 0.78 : 0.22;
-      const amp = lit && animated ? 0.18 : 0;
-      const phase = index * 0.9;
+      if (!lit || !animated) {
+        return { opacity: lit ? 0.78 : 0.22 } as any;
+      }
 
-      const s = Math.sin(t.value * Math.PI * 2 + phase);
-      const twinkle = 0.5 + 0.5 * s;
-      const opacity = clamp01(base + amp * twinkle);
+      const safeTotalBulbs = Math.max(1, totalBulbs);
+      const normalizedIndex = index / Math.max(1, safeTotalBulbs - 1);
+      let opacity = 0.78;
 
-      return { opacity } as any;
+      switch (animationMode) {
+        case "chase": {
+          // Lights chase along the strip - 3 bulbs lit at a time
+          const chasePos = (t.value * safeTotalBulbs) % safeTotalBulbs;
+          const dist = Math.abs(index - chasePos);
+          const wrappedDist = Math.min(dist, safeTotalBulbs - dist);
+          const chaseWidth = 3;
+          const intensity = Math.max(0, 1 - wrappedDist / chaseWidth);
+          opacity = 0.3 + 0.7 * intensity;
+          break;
+        }
+        case "wave": {
+          // Smooth brightness wave propagates across
+          const wavePhase = t.value * Math.PI * 2 - normalizedIndex * Math.PI * 2;
+          const wave = 0.5 + 0.5 * Math.sin(wavePhase);
+          opacity = 0.4 + 0.6 * wave;
+          break;
+        }
+        case "meteor": {
+          // Bright head with fading tail
+          const meteorPos = t.value * (safeTotalBulbs + 4) - 2;
+          const tailLength = 5;
+          const distBehind = meteorPos - index;
+          if (distBehind >= 0 && distBehind <= tailLength) {
+            const tailIntensity = 1 - distBehind / tailLength;
+            opacity = 0.3 + 0.7 * tailIntensity * tailIntensity;
+          } else if (distBehind < 0 && distBehind > -1) {
+            opacity = 0.9;
+          } else {
+            opacity = 0.25;
+          }
+          break;
+        }
+        case "colorFade": {
+          // All lights pulse together
+          const pulse = 0.5 + 0.5 * Math.sin(t.value * Math.PI * 2);
+          opacity = 0.5 + 0.5 * pulse;
+          break;
+        }
+        case "twinkle":
+        default: {
+          // Original twinkle effect
+          const phase = index * 0.9;
+          const s = Math.sin(t.value * Math.PI * 2 + phase);
+          const twinkle = 0.5 + 0.5 * s;
+          opacity = 0.78 + 0.18 * twinkle;
+          break;
+        }
+      }
+
+      return { opacity: clamp01(opacity) } as any;
     },
-    [lit, animated]
+    [lit, animated, animationMode, totalBulbs]
   );
 
   return (
@@ -113,6 +168,15 @@ function Bulb({
   );
 }
 
+// Animation durations per mode (ms)
+const ANIMATION_DURATIONS: Record<TrimLightAnimation, number> = {
+  twinkle: 2200,
+  chase: 1200,
+  wave: 1800,
+  meteor: 1400,
+  colorFade: 2000,
+};
+
 export function TrimLightStrip({
   progress,
   bulbs = 12,
@@ -122,6 +186,7 @@ export function TrimLightStrip({
   animated = false,
   reducedMotion = false,
   width = "100%",
+  animationMode = "twinkle",
 }: {
   progress: number;
   bulbs?: number;
@@ -131,6 +196,7 @@ export function TrimLightStrip({
   animated?: boolean;
   reducedMotion?: boolean;
   width?: number | string;
+  animationMode?: TrimLightAnimation;
 }) {
   const viewW = 100;
   const viewH = 20;
@@ -147,15 +213,16 @@ export function TrimLightStrip({
       t.value = 0;
       return;
     }
+    const duration = ANIMATION_DURATIONS[animationMode] || 2200;
     t.value = withRepeat(
-      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1, { duration, easing: Easing.linear }),
       -1,
       false
     );
     return () => {
       t.value = 0;
     };
-  }, [reducedMotion, animated, t]);
+  }, [reducedMotion, animated, animationMode, t]);
 
   const startX = 6;
   const endX = 94;
@@ -180,6 +247,8 @@ export function TrimLightStrip({
             t={t}
             color={c}
             animated={animated && !reducedMotion}
+            animationMode={animationMode}
+            totalBulbs={bulbs}
           />
         );
       })}

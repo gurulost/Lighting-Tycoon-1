@@ -225,10 +225,9 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
     <Animated.View
       entering={FadeIn.duration(300)}
       exiting={FadeOut.duration(200)}
-      pointerEvents="box-none"
-      style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+      style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom, pointerEvents: "box-none" }]}
     >
-      <View pointerEvents="none" style={styles.backdropLayer}>
+      <View style={[styles.backdropLayer, { pointerEvents: "none" }]}>
         {dimPanels.map((panel, index) => (
           <View key={`dim-${index}`} style={[styles.dimPanel, panel]} />
         ))}
@@ -250,7 +249,6 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
 
       {highlightRect ? (
         <Animated.View
-          pointerEvents="none"
           style={[
             styles.highlight,
             highlightStyle,
@@ -261,13 +259,13 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
               top: Math.max(8, highlightRect.y - 6),
               width: Math.min(SCREEN_WIDTH - 16, highlightRect.width + 12),
               height: Math.min(SCREEN_HEIGHT - 16, highlightRect.height + 12),
+              pointerEvents: "none",
             },
           ]}
         />
       ) : null}
       {holeRect ? (
         <Animated.View
-          pointerEvents="none"
           style={[
             styles.cutoutGlow,
             cutoutGlowStyle,
@@ -279,12 +277,13 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
               width: holeRect.width,
               height: holeRect.height,
               borderRadius: holeRect.rx,
+              pointerEvents: "none",
             },
           ]}
         />
       ) : null}
 
-      <View style={[styles.content, cardPositionStyle]} pointerEvents={cardPointerEvents}>
+      <View style={[styles.content, cardPositionStyle, { pointerEvents: cardPointerEvents }]}>
         <Animated.View
           key={currentStep.id}
           entering={SlideInDown.duration(400).springify()}
@@ -293,8 +292,8 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
             clampHeight ? { maxHeight: clampHeight } : null,
             compactMode ? styles.cardCompact : null,
             nanoMode ? styles.cardNano : null,
+            { pointerEvents: cardPointerEvents },
           ]}
-          pointerEvents={cardPointerEvents}
         >
           <LinearGradient
             colors={["#1A1A2E", "#252542", "#1A1A2E"]}
@@ -392,7 +391,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
       </View>
 
       {!microMode ? (
-        <View style={styles.stepIndicator} pointerEvents="none">
+        <View style={[styles.stepIndicator, { pointerEvents: "none" }]}>
           <ThemedText style={styles.stepText}>
             Step {state.tutorialStep + 1} of {TUTORIAL_STEPS.length}
           </ThemedText>

@@ -128,13 +128,13 @@ export function DialogueBubble({
       >
         {showCaptionTab ? (
           <View
-            pointerEvents="none"
             style={[
               styles.captionTab,
               {
                 backgroundColor: tabColor,
                 borderColor: palette.border,
                 borderWidth: palette.borderWidth,
+                pointerEvents: "none",
               },
             ]}
           />
@@ -150,10 +150,9 @@ export function DialogueBubble({
           <View style={[styles.accent, { backgroundColor: accentColor }]} />
           {showHalftone ? (
             <Svg
-              pointerEvents="none"
               width="100%"
               height="100%"
-              style={styles.halftone}
+              style={[styles.halftone, { pointerEvents: "none" }]}
             >
               <Defs>
                 <Pattern
@@ -260,13 +259,13 @@ export function DialogueBubble({
           </View>
         </LinearGradient>
         <View
-          pointerEvents="none"
           style={[
             styles.innerBorder,
             {
               borderColor: palette.innerBorder,
               top: innerInset,
               left: innerInset,
+              pointerEvents: "none",
               right: innerInset,
               bottom: innerInset,
               borderRadius: Math.max(BorderRadius.sm, innerRadius - 2),

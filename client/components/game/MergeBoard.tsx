@@ -870,10 +870,9 @@ export function MergeBoard({
           )}
           {isOrderHighlighted ? (
             <Animated.View
-              pointerEvents="none"
               style={[
                 styles.orderHighlightOverlay,
-                { borderColor: `${orderHighlightColor}80` },
+                { borderColor: `${orderHighlightColor}80`, pointerEvents: "none" },
                 orderPulseStyle,
               ]}
             />
@@ -1032,7 +1031,7 @@ export function MergeBoard({
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}
       >
-        <View pointerEvents="none" style={styles.boardTrim}>
+        <View style={[styles.boardTrim, { pointerEvents: "none" }]}>
           <TrimLightStrip
             progress={1}
             bulbs={18}
@@ -1194,10 +1193,9 @@ export function MergeBoard({
                   </LinearGradient>
                   {isBackpackHighlighted ? (
                     <Animated.View
-                      pointerEvents="none"
                       style={[
                         styles.orderHighlightOverlay,
-                        { borderColor: `${orderHighlightColor}80` },
+                        { borderColor: `${orderHighlightColor}80`, pointerEvents: "none" },
                         orderPulseStyle,
                       ]}
                     />
@@ -1250,6 +1248,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     paddingVertical: Spacing.md,
+    overflow: "visible",
   },
   boardBackground: {
     padding: Spacing.md,
@@ -1257,6 +1256,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#2A2A4A",
     position: "relative",
+    overflow: "visible",
   },
   boardTrim: {
     position: "absolute",
@@ -1284,6 +1284,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: Spacing.tileGap,
+    overflow: "visible",
   },
   mergeOverlay: {
     position: "absolute",
@@ -1302,6 +1303,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "visible",
   },
   emptySlotIndicator: {
     width: "100%",
@@ -1405,9 +1407,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: Spacing.md,
+    overflow: "visible",
   },
   backpackSection: {
     flex: 1,
+    overflow: "visible",
   },
   backpackHeader: {
     flexDirection: "row",
@@ -1438,11 +1442,12 @@ const styles = StyleSheet.create({
   backpackSlots: {
     flexDirection: "row",
     alignItems: "center",
+    overflow: "visible",
   },
   backpackSlot: {
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
-    overflow: "hidden",
+    overflow: "visible",
   },
   backpackSlotActive: {
     borderColor: `${GameColors.ui.primary}80`,
@@ -1454,6 +1459,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "visible",
   },
   backpackLockOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1464,6 +1470,7 @@ const styles = StyleSheet.create({
   recycleSection: {
     alignItems: "center",
     gap: Spacing.xs,
+    overflow: "visible",
   },
   recycleLabel: {
     fontSize: 13,
