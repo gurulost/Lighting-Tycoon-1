@@ -99,6 +99,10 @@ Preferred communication style: Simple, everyday language.
 - **Milestone celebrations**: Rainbow meteor TrimLightStrip appears briefly when player reaches new reputation tier
 - All animations respect reduced motion accessibility setting
 
+### Code Quality Fixes
+- **Fixed React Native Web deprecation warnings**: All `pointerEvents` usage converted from prop-based (`pointerEvents="none"`) to style-based (`style={{ pointerEvents: "none" }}`) across 7 files (15+ instances)
+- Affected files: GameScreen, MergeBoard, TutorialOverlay, OrdersModal, PartItem, DialogueBubble, DebugOverlay
+
 ### Asset Files
 All game assets are stored in `assets/images/`:
 - Part sprites: `part-{tier}-{family}.png` (e.g., `part-clip-open.png`, `part-premium-locked.png`)
