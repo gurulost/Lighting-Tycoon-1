@@ -244,7 +244,7 @@ export function PartItem({
           cachePolicy="memory-disk"
         />
         {showPremiumLights ? (
-          <View pointerEvents="none" style={styles.premiumLights}>
+          <View style={[styles.premiumLights, { pointerEvents: "none" }]}>
             <TrimLightStrip
               progress={1}
               bulbs={7}
@@ -260,10 +260,9 @@ export function PartItem({
 
       {/* Spawn ring effect */}
       <Animated.View
-        pointerEvents="none"
         style={[
           styles.spawnRing,
-          { borderColor: glowColor, width: size, height: size },
+          { borderColor: glowColor, width: size, height: size, pointerEvents: "none" },
           spawnRingStyle,
         ]}
       />

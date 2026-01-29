@@ -74,15 +74,16 @@ function Bulb({
         return { opacity: lit ? 0.78 : 0.22 } as any;
       }
 
-      const normalizedIndex = index / Math.max(1, totalBulbs - 1);
+      const safeTotalBulbs = Math.max(1, totalBulbs);
+      const normalizedIndex = index / Math.max(1, safeTotalBulbs - 1);
       let opacity = 0.78;
 
       switch (animationMode) {
         case "chase": {
           // Lights chase along the strip - 3 bulbs lit at a time
-          const chasePos = (t.value * totalBulbs) % totalBulbs;
+          const chasePos = (t.value * safeTotalBulbs) % safeTotalBulbs;
           const dist = Math.abs(index - chasePos);
-          const wrappedDist = Math.min(dist, totalBulbs - dist);
+          const wrappedDist = Math.min(dist, safeTotalBulbs - dist);
           const chaseWidth = 3;
           const intensity = Math.max(0, 1 - wrappedDist / chaseWidth);
           opacity = 0.3 + 0.7 * intensity;
@@ -97,7 +98,7 @@ function Bulb({
         }
         case "meteor": {
           // Bright head with fading tail
-          const meteorPos = t.value * (totalBulbs + 4) - 2;
+          const meteorPos = t.value * (safeTotalBulbs + 4) - 2;
           const tailLength = 5;
           const distBehind = meteorPos - index;
           if (distBehind >= 0 && distBehind <= tailLength) {

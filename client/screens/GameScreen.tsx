@@ -698,10 +698,9 @@ export default function GameScreen() {
       {/* Milestone celebration for tier-ups */}
       {milestoneCelebration ? (
         <Animated.View
-          style={styles.milestoneCelebration}
+          style={[styles.milestoneCelebration, { pointerEvents: "none" }]}
           entering={FadeIn.duration(200)}
           exiting={FadeOut.duration(400)}
-          pointerEvents="none"
         >
           <TrimLightStrip
             progress={1}
