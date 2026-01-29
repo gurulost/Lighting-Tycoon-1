@@ -331,6 +331,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     position: "relative",
+    overflow: "visible",
   },
   glowBackground: {
     flex: 1,

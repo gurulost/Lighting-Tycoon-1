@@ -1250,6 +1250,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     paddingVertical: Spacing.md,
+    overflow: "visible",
   },
   boardBackground: {
     padding: Spacing.md,
@@ -1257,6 +1258,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#2A2A4A",
     position: "relative",
+    overflow: "visible",
   },
   boardTrim: {
     position: "absolute",
@@ -1284,6 +1286,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: Spacing.tileGap,
+    overflow: "visible",
   },
   mergeOverlay: {
     position: "absolute",
@@ -1302,6 +1305,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "visible",
   },
   emptySlotIndicator: {
     width: "100%",
