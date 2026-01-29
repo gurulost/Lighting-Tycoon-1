@@ -1409,9 +1409,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: Spacing.md,
+    overflow: "visible",
   },
   backpackSection: {
     flex: 1,
+    overflow: "visible",
   },
   backpackHeader: {
     flexDirection: "row",
@@ -1442,11 +1444,12 @@ const styles = StyleSheet.create({
   backpackSlots: {
     flexDirection: "row",
     alignItems: "center",
+    overflow: "visible",
   },
   backpackSlot: {
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
-    overflow: "hidden",
+    overflow: "visible",
   },
   backpackSlotActive: {
     borderColor: `${GameColors.ui.primary}80`,
@@ -1458,6 +1461,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "visible",
   },
   backpackLockOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1468,6 +1472,7 @@ const styles = StyleSheet.create({
   recycleSection: {
     alignItems: "center",
     gap: Spacing.xs,
+    overflow: "visible",
   },
   recycleLabel: {
     fontSize: 13,

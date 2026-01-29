@@ -1061,6 +1061,7 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    overflow: "visible",
   },
   topBar: {
     flexDirection: "row",
@@ -1090,6 +1091,7 @@ const styles = StyleSheet.create({
   boardContainer: {
     flex: 1,
     justifyContent: "flex-start",
+    overflow: "visible",
   },
   statusRow: {
     flexDirection: "row",
