@@ -17,17 +17,17 @@ This document is the single source of truth for the core gameplay systems.
 - Recycle Bin: delete parts for small refund
 
 ## Parts and Families
-- Tiers: Clip, Track, Segment, Smart Kit, Premium System
+- Tiers: Clip, Track, Segment, Smart Kit, Premium System, Routing Array, Network Spine, Control Stack, Signature Grid, Kingdom Install
 - Families:
   - Open: slower early, research-oriented
   - Locked: faster early, reinforces Dependency
 
 ## Workbench / Spawning
-- Cooldown-based part spawn
-- Drop tier depends on upgrades and Dependency
-- Locked bias increases with Dependency
-- Baron supply modifiers: crates/rushes temporarily push spawns more locked while active
-- Phase 2: base locked chance is low with occasional Baron-driven spikes
+- Workbench opens the Supplier panel (Baron, Open, Salvage)
+- Each supplier has charges and a cooldown
+- Drop tiers are driven by supplier level tables
+- Baron offers add a temporary **bonus locked roll**
+- Phase 2 freezes Dependency at 0; Baron offers can still inject locked spikes
 
 ## Orders
 - Data-driven templates with modifiers
@@ -57,7 +57,7 @@ This document is the single source of truth for the core gameplay systems.
 - Freedom Controller converts locked kits to open-compatible
 
 ## Tactical Boosts (Post-Session)
-- Supplier Scout: spend cash to skew the next spawns toward Open, Locked, or higher tiers.
+- Supplier Scout: spend cash to force the next spawns to Open, Locked, or +1 tier.
 - Mentor Workshop Clinic: spend cash to enhance the next merges with extra research and lower dependency.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 

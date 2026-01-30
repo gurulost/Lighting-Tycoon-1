@@ -122,3 +122,4 @@ Refurb subtable (Level 3):
 - Baron deals apply a time‑limited chance to spawn an extra locked part.
 - Merge Momentum can force the next supplier drop to a minimum tier.
 - Workbench Quality upgrades have a chance to bump supplier drops by +1 tier.
+- Open Standardization II adds a +1 tier chance to Open supplier drops.

@@ -398,6 +398,7 @@ export function MergeBoard({
       part: Part,
       req: { tier: PartTier; family: "open" | "locked" | "any"; requiresCompatible?: boolean }
     ) => {
+      if (part.family === "waste") return false;
       if (part.tier !== req.tier) return false;
       if (req.requiresCompatible && !part.compatible) return false;
       if (req.family === "any") return true;

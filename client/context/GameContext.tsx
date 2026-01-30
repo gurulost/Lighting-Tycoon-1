@@ -105,59 +105,6 @@ function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
 
-function getRandomFamily(
-  dependency: number,
-  rdNodes: Record<string, boolean>,
-  gamePhase: 1 | 2,
-  baronContractOrdersRemaining: number,
-  baronSupplySpawnsRemaining: number,
-  baronRushSpawnsRemaining: number,
-  scoutRoute?: SupplierScoutRoute
-): PartFamily {
-  const normalized = Math.max(0, Math.min(1, dependency / 100));
-  let lockedChance =
-    gamePhase === 2
-      ? PHASE_TWO_LOCKED_CHANCE
-      : 0.05 + 0.88 * Math.pow(normalized, 1.2);
-  if (rdNodes["open_standard_2"]) {
-    lockedChance -= 0.12;
-  }
-  if (scoutRoute === "open") {
-    lockedChance -= SCOUT_FAMILY_SHIFT;
-  } else if (scoutRoute === "locked") {
-    lockedChance += SCOUT_FAMILY_SHIFT;
-  }
-  if (baronContractOrdersRemaining > 0) {
-    lockedChance += BARON_CONTRACT_LOCKED_SHIFT;
-  }
-  if (baronSupplySpawnsRemaining > 0) {
-    lockedChance += BARON_SUPPLY_LOCKED_SHIFT;
-  }
-  if (baronRushSpawnsRemaining > 0) {
-    lockedChance += BARON_RUSH_LOCKED_SHIFT;
-  }
-  lockedChance = Math.max(0.02, Math.min(0.98, lockedChance));
-  return Math.random() < lockedChance ? "locked" : "open";
-}
-
-function getRandomTier(
-  upgrades: Record<string, number>,
-  family: PartFamily,
-  dependency: number,
-  extraQualityBonus = 0
-): PartTier {
-  const qualityBonus = (upgrades["workbench_quality_1"] || 0) * 10 + extraQualityBonus;
-  const lockedBoost =
-    family === "locked" ? Math.min(6, Math.floor(Math.max(0, dependency - 10) / 5)) : 0;
-  const roll = Math.random() * 100;
-  const tier1Threshold = Math.max(25, 60 - qualityBonus - lockedBoost);
-  const tier2Threshold = Math.max(tier1Threshold + 10, 85 - qualityBonus / 2 - lockedBoost / 2);
-  if (roll < tier1Threshold) return 1;
-  if (roll < tier2Threshold) return 2;
-  if (roll < 95) return 3;
-  return 4;
-}
-
 function getSupplierConfig(
   supplierId: SupplierId,
   level: number,
@@ -469,8 +416,6 @@ const MARKETING_BOOST_MAX_STACK = 9;
 const MARKETING_BOOST_DIFFICULTY_BONUS = 2;
 const SCOUT_SPAWNS = 6;
 const SCOUT_MAX_STACK = 12;
-const SCOUT_FAMILY_SHIFT = 0.2;
-const SCOUT_TIER_QUALITY_BONUS = 15;
 const CLINIC_MERGES = 10;
 const CLINIC_MAX_STACK = 20;
 const CLINIC_OPEN_RESEARCH_BONUS = 1;
@@ -498,11 +443,11 @@ const BARON_PRESSURE_MULTIPLIER = 2;
 const BARON_PRESSURE_DECAY = 1;
 const BARON_PRESSURE_BEAT_THRESHOLD = 40;
 const CRACKDOWN_THRESHOLD = 20;
-const PHASE_TWO_LOCKED_CHANCE = 0.08;
 const PHASE_TWO_DIFFICULTY_BONUS = 1;
 const SUPPLIER_COOLDOWN_REDUCTION_MS_PER_LEVEL = 2000;
 const SUPPLIER_COOLDOWN_MIN_MS = 15000;
 const SUPPLIER_QUALITY_BONUS_CHANCE = 0.1;
+const OPEN_STANDARD_TIER_BONUS_CHANCE = 0.12;
 const MERGE_MOMENTUM_THRESHOLDS = [3, 6, 10];
 const MERGE_CHAIN_WINDOW_MS = 10000;
 const MAX_PART_TIER: PartTier = 10;
@@ -1788,11 +1733,13 @@ function placePartOnBoardOrBackpack(
     nextBoard[emptySlot] = createPart(emptySlot, family, tier, compatible);
     return { board: nextBoard, backpack: [...backpack], placed: true };
   }
-  const emptyBackpackSlot = findEmptyBackpackSlot(state, backpack);
-  if (emptyBackpackSlot !== -1) {
-    const nextBackpack = [...backpack];
-    nextBackpack[emptyBackpackSlot] = createPart(-1, family, tier, compatible);
-    return { board: [...board], backpack: nextBackpack, placed: true };
+  if (state.backpackUnlocked) {
+    const emptyBackpackSlot = findEmptyBackpackSlot(state, backpack);
+    if (emptyBackpackSlot !== -1) {
+      const nextBackpack = [...backpack];
+      nextBackpack[emptyBackpackSlot] = createPart(-1, family, tier, compatible);
+      return { board: [...board], backpack: nextBackpack, placed: true };
+    }
   }
   return { board: [...board], backpack: [...backpack], placed: false };
 }
@@ -1959,6 +1906,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       const qualityLevel = state.upgrades["workbench_quality_1"] || 0;
+      const openStandardBonus = !!state.rdNodes["open_standard_2"];
       const tierFloor = state.mergeMomentumDropFloor;
       const bonusesAllowed =
         !forceOpenParts && typeof forcedTier !== "number" && !forceTierOne;
@@ -1971,7 +1919,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             appliedTierFloor = true;
             nextTier = Math.max(nextTier, tierFloor) as PartTier;
           }
-          if (qualityLevel > 0 && Math.random() < SUPPLIER_QUALITY_BONUS_CHANCE * qualityLevel) {
+          const qualityChance =
+            qualityLevel > 0 ? SUPPLIER_QUALITY_BONUS_CHANCE * qualityLevel : 0;
+          const openStandardChance =
+            openStandardBonus && item.family === "open" && supplierId !== "baron"
+              ? OPEN_STANDARD_TIER_BONUS_CHANCE
+              : 0;
+          const tierBonusChance = Math.min(0.95, qualityChance + openStandardChance);
+          if (tierBonusChance > 0 && Math.random() < tierBonusChance) {
             nextTier = Math.min(MAX_PART_TIER, nextTier + 1) as PartTier;
           }
           return { ...item, tier: nextTier };
@@ -2021,12 +1976,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       let nextBaronSupplyRemaining = state.baronSupplySpawnsRemaining;
       let nextBaronRushRemaining = state.baronRushSpawnsRemaining;
+      const baronBonusAllowed =
+        !forceOpenParts && typeof forcedTier !== "number" && !forceTierOne;
       const bonusLockedChance =
-        (state.baronSupplySpawnsRemaining > 0 ? BARON_SUPPLY_LOCKED_SHIFT : 0) +
-        (state.baronRushSpawnsRemaining > 0 ? BARON_RUSH_LOCKED_SHIFT : 0) +
-        (state.baronContractOrdersRemaining > 0 ? BARON_CONTRACT_LOCKED_SHIFT : 0);
+        baronBonusAllowed
+          ? (state.baronSupplySpawnsRemaining > 0 ? BARON_SUPPLY_LOCKED_SHIFT : 0) +
+            (state.baronRushSpawnsRemaining > 0 ? BARON_RUSH_LOCKED_SHIFT : 0) +
+            (state.baronContractOrdersRemaining > 0 ? BARON_CONTRACT_LOCKED_SHIFT : 0)
+          : 0;
       if (bonusLockedChance > 0 && Math.random() < bonusLockedChance) {
-        const bonusTier = rollWeightedTier(BARON_TABLES[1].tiers);
+        const baronLevel = Math.max(1, Math.min(3, state.suppliers.baron.level || 1));
+        const bonusTier = rollWeightedTier(
+          (BARON_TABLES[baronLevel] || BARON_TABLES[1]).tiers
+        );
         const placement = placePartOnBoardOrBackpack(
           state,
           "locked",
@@ -2040,10 +2002,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextBackpack = placement.backpack;
         }
       }
-      if (state.baronSupplySpawnsRemaining > 0) {
-        nextBaronSupplyRemaining = Math.max(0, state.baronSupplySpawnsRemaining - 1);
-      } else if (state.baronRushSpawnsRemaining > 0) {
-        nextBaronRushRemaining = Math.max(0, state.baronRushSpawnsRemaining - 1);
+      if (baronBonusAllowed) {
+        if (state.baronSupplySpawnsRemaining > 0) {
+          nextBaronSupplyRemaining = Math.max(0, state.baronSupplySpawnsRemaining - 1);
+        } else if (state.baronRushSpawnsRemaining > 0) {
+          nextBaronRushRemaining = Math.max(0, state.baronRushSpawnsRemaining - 1);
+        }
       }
 
       const config = getSupplierConfig(supplierId, supplier.level, speedLevel);
@@ -2898,6 +2862,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextBackpack = state.backpack;
       let nextMaxTierCrafted = state.maxTierCrafted;
       let nextSuppliers = state.suppliers;
+      let nextRdNodes = state.rdNodes;
       let nextUpgradeMaterials = state.upgradeMaterials;
       let nextCompatibilityComponents = state.compatibilityComponents;
       let queuedTier10ShowcaseBeat = false;
@@ -3125,6 +3090,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               ...state.suppliers,
               open: { level: nextLevel, chargesRemaining: config.maxCharges, cooldownEndsAt: 0 },
             };
+            const upgradedNodes = { ...nextRdNodes };
+            for (let level = 1; level <= nextLevel; level += 1) {
+              upgradedNodes[`open_workshop_${level}`] = true;
+            }
+            nextRdNodes = upgradedNodes;
           }
         } else {
           nextUpgradeMaterials += 2;
@@ -3279,6 +3249,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         firstSessionChoiceMentorOrderId: nextFirstSessionChoiceMentorOrderId,
         firstSessionChoiceBaronOrderId: nextFirstSessionChoiceBaronOrderId,
         suppliers: nextSuppliers,
+        rdNodes: nextRdNodes,
         upgradeMaterials: nextUpgradeMaterials,
         compatibilityComponents: nextCompatibilityComponents,
         cash: state.cash + cashReward,
@@ -4616,7 +4587,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextCash = state.cash;
 
       if (state.tutorialStep === 0) {
-        hint = "Tap the Workbench, then tap a supplier to spawn Clips.";
+        hint = "Tap Workbench, then tap Baron Supply Depot. Charges refill over time.";
         if (state.tutorialSpawnCount < 2) {
           const spawned = spawnTutorialPart(state, 1);
           if (spawned.spawned) {
@@ -4660,7 +4631,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextCash = spaceUpgrade.cost;
         }
       } else if (state.tutorialStep === 5) {
-        hint = "Choose the Baron’s offer to continue.";
+        hint = "Accept or decline the Baron’s offer to continue.";
       } else if (state.tutorialStep === 6) {
         const status = getTutorialLockedMergeStatus(state);
         if (status.needsLocked || status.needsOpen) {
@@ -5447,6 +5418,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCriticalEventId,
       };
 
+      const {
+        workbenchMaxCooldown: _removedWorkbenchMax,
+        workbenchCooldownUntil: _removedWorkbenchUntil,
+        ...cleanedRestoredState
+      } = restoredState as GameState & {
+        workbenchMaxCooldown?: number;
+        workbenchCooldownUntil?: number;
+      };
+      restoredState = cleanedRestoredState as GameState;
+
       if (restoredState.liberationComplete || restoredState.gamePhase === 2) {
         restoredState = {
           ...restoredState,
@@ -5845,7 +5826,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       );
       if (supplier.level <= 0) return false;
       if (supplier.chargesRemaining <= 0) return false;
-      if (findEmptySlot(state) === -1 && findEmptyBackpackSlot(state) === -1) {
+      const hasBoardSpace = findEmptySlot(state) !== -1;
+      const hasBackpackSpace =
+        state.backpackUnlocked && findEmptyBackpackSlot(state) !== -1;
+      if (!hasBoardSpace && !hasBackpackSpace) {
         return false;
       }
       dispatch({ type: "TAP_SUPPLIER", supplierId });

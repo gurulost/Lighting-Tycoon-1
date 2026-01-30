@@ -292,7 +292,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "boost-scout",
         title: "Supplier Scout",
-        description: "Spend cash to skew the next spawns toward Open, Locked, or higher tiers.",
+        description: "Spend cash to force the next spawns to Open, Locked, or +1 tier.",
         icon: "compass",
         color: GameColors.ui.primary,
       },

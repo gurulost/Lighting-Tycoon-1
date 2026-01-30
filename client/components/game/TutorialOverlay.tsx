@@ -43,8 +43,8 @@ interface TutorialStep {
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 0,
-    title: "Open Suppliers",
-    description: "Tap the Workbench to open suppliers, then tap a source to spawn two Clips.",
+    title: "Tap a Supplier",
+    description: "Tap the Workbench, then tap Baron Supply Depot twice. Charges refill over time.",
     icon: "tool",
     highlight: "workbench",
     color: GameColors.ui.primary,
@@ -84,15 +84,15 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 5,
     title: "The Baron’s Offer",
-    description: "Dependency starts maxed. Open work lowers it. Baron offers speed for lock-in.",
+    description: "Dependency starts maxed. Open installs lower it. Baron offers speed with lock-in.",
     icon: "lock",
     highlight: "dependency",
     color: GameColors.locked.primary,
   },
   {
     id: 6,
-    title: "Locked Merge Demo",
-    description: "Merge locked + open. It stays locked and reinforces Dependency.",
+    title: "Locked vs Open",
+    description: "Merge locked + open. It stays locked and reinforces Dependency. Open parts are your escape.",
     icon: "shield",
     highlight: "board",
     color: GameColors.locked.primary,
@@ -100,7 +100,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 7,
     title: "You're Ready!",
-    description: "Merge, fulfill, and choose open vs certified. Good luck, Tycoon!",
+    description: "Unlock R&D for the Open Workshop, and recycle waste to speed it up. Keep space for smart chains.",
     icon: "star",
     highlight: null,
     color: GameColors.ui.success,

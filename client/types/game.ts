@@ -336,7 +336,7 @@ export const UPGRADE_DEFINITIONS: Upgrade[] = [
 
 export const RD_DEFINITIONS: RDNode[] = [
   { id: "open_standard_1", name: "Open Standardization I", description: "Reduces Dependency gain from locked merges", cost: 50, unlocked: false, prerequisites: [] },
-  { id: "open_standard_2", name: "Open Standardization II", description: "Increases Open drop odds", cost: 100, unlocked: false, prerequisites: ["open_standard_1"] },
+  { id: "open_standard_2", name: "Open Standardization II", description: "Open supplier drops can roll +1 tier", cost: 100, unlocked: false, prerequisites: ["open_standard_1"] },
   {
     id: "open_workshop_1",
     name: "Open Workshop I",

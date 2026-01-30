@@ -519,7 +519,7 @@ export function OrdersModal({
                   </View>
                 ) : (
                   <ThemedText style={styles.boostHint}>
-                    Next {scoutSpawns} spawns: choose Open, Locked, or Tier route.
+                    Next {scoutSpawns} spawns: force Open, Locked, or +1 tier drops.
                   </ThemedText>
                 )}
                 {showScoutOptions ? (
@@ -533,7 +533,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("open") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Open Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>More open spawns</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Force Open parts</ThemedText>
                     </Pressable>
                     <Pressable
                       style={[
@@ -544,7 +544,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("locked") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Locked Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>More locked spawns</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Force Locked parts</ThemedText>
                     </Pressable>
                     <Pressable
                       style={[
@@ -555,7 +555,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("tier") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Tier Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>Better tier odds</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>+1 tier on base drop</ThemedText>
                     </Pressable>
                   </View>
                 ) : null}

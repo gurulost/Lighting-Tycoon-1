@@ -103,11 +103,11 @@ Use this lightweight checklist to validate core friction fixes and first-session
 ## Tactical Boosts
 - Complete tutorial.
 - Supplier Scout:
-  - Choose Open route. Verify next 6 spawns skew Open and counter decrements.
+  - Choose Open route. Verify next 6 spawns force Open on the base drop and counter decrements.
   - Verify forced/tutorial spawns do not consume the counter.
 - Baron supply modifiers:
-  - Accept a Baron crate or rush offer and verify locked skew for the next N successful spawns.
-  - Confirm counters only decrement when a part is actually placed.
+  - Accept a Baron crate or rush offer and verify the bonus locked roll for the next N non‑forced spawns.
+  - Confirm counters only decrement on non‑forced spawns with successful placement.
 - Before first session completion, clinic/warranty remain disabled with a clear hint.
 - Mentor Workshop Clinic:
   - Activate clinic. Verify next open merges grant +1 research and reduce dependency by 1.

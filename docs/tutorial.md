@@ -6,7 +6,8 @@ This document defines the onboarding flow and first-session pacing.
 
 ## Tutorial Steps (0–6)
 **Step 0 — Tap Workbench**
-- Spawn two Clips (workbench tap)
+- Open Suppliers (Workbench), then tap Baron Supply Depot twice to spawn two Clips
+- Charges refill over time
 - Story beat: `tina_intro`
 
 **Step 1 — First Merge**
@@ -24,9 +25,12 @@ This document defines the onboarding flow and first-session pacing.
 - Purchase Space upgrade `space_1`
 
 **Step 5 — Baron Offer**
-- Accept or decline locked crate
+- Accept or decline the Baron offer (speed vs lock-in)
 
-**Step 6 — Completion**
+**Step 6 — Locked vs Open**
+- Merge locked + open to see it stay locked and reinforce Dependency
+
+**Step 7 — Completion**
 - Tutorial complete
 
 Guardrails:
