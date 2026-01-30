@@ -109,8 +109,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   tina_compat_order: {
     id: "tina_compat_order",
     speaker: "tina",
-    line1: "Compatibility job just hit.",
-    line2: "Needs compatible parts.",
+    line1: "Compatibility jobs need compatible parts. I should save those components.",
     onceOnly: true,
     portrait: "focused",
     category: "inner_monologue",
@@ -118,8 +117,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   tina_phase2: {
     id: "tina_phase2",
     speaker: "tina",
-    line1: "Freedom’s real.",
-    line2: "Now it’s about scale and clean installs.",
+    line1: "Freedom’s real. Now it’s about scale and clean installs.",
     onceOnly: true,
     portrait: "delighted",
     category: "inner_monologue",
@@ -127,8 +125,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   tina_marketing: {
     id: "tina_marketing",
     speaker: "tina",
-    line1: "Marketing campaign live.",
-    line2: "Bigger orders incoming.",
+    line1: "Boosting order tiers for the next few jobs.",
     onceOnly: true,
     portrait: "confident",
     category: "inner_monologue",
@@ -145,8 +142,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_recycle_waste: {
     id: "mentor_recycle_waste",
     speaker: "mentor",
-    line1: "Recycling waste pays off.",
-    line2: "Cash + workshop boosts.",
+    line1: "Recycling waste can reduce workshop cooldowns.",
     onceOnly: true,
     portrait: "focused",
     category: "mentor_tip",
@@ -154,8 +150,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_freedom_controller: {
     id: "mentor_freedom_controller",
     speaker: "mentor",
-    line1: "Freedom Controller built.",
-    line2: "Use it to convert locked kits into compatible open installs.",
+    line1: "Use it to convert locked kits into compatible open installs.",
     onceOnly: true,
     portrait: "confident",
     category: "mentor_tip",
@@ -172,8 +167,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_scout_tier: {
     id: "mentor_scout_tier",
     speaker: "mentor",
-    line1: "Tier scout nudges drops upward.",
-    line2: "It won’t change locked vs open.",
+    line1: "Tier route improves drops but doesn’t change locked/open.",
     onceOnly: true,
     portrait: "focused",
     category: "mentor_tip",
@@ -181,8 +175,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_warranty_stamp: {
     id: "mentor_warranty_stamp",
     speaker: "mentor",
-    line1: "Stamp mode changes penalties.",
-    line2: "Use it when contracts get tight.",
+    line1: "Stamp mode changes how penalties apply.",
     onceOnly: true,
     portrait: "concerned",
     category: "mentor_tip",
@@ -190,8 +183,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_phase2_pressure: {
     id: "mentor_phase2_pressure",
     speaker: "mentor",
-    line1: "Freedom’s real, but he can still squeeze margins.",
-    line2: "Clean installs protect rewards.",
+    line1: "Freedom’s real, but he can still squeeze margins. Clean installs protect rewards.",
     onceOnly: true,
     portrait: "concerned",
     category: "mentor_tip",
@@ -199,8 +191,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   baron_contract_live: {
     id: "baron_contract_live",
     speaker: "baron",
-    line1: "Contract live. Certified installs only.",
-    line2: "Deliver, and I’ll pay.",
+    line1: "Contract live. You’ll deliver locked kits for cash.",
     onceOnly: true,
     portrait: "confident",
     category: "baron_fax",
@@ -610,8 +601,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   lockout_begin: {
     id: "lockout_begin",
     speaker: "system",
-    line1: "Compliance audit triggered: certified installs only.",
-    line2: "Open kits flagged for review.",
+    line1: "Audit active — dependency won’t drop below 20.",
     onceOnly: true,
     category: "system",
   },
