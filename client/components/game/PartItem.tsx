@@ -31,6 +31,16 @@ const partSmartkitOpen = require("../../../assets/images/part-smartkit-open.webp
 const partSmartkitLocked = require("../../../assets/images/part-smartkit-locked.webp");
 const partPremiumOpen = require("../../../assets/images/part-premium-open.webp");
 const partPremiumLocked = require("../../../assets/images/part-premium-locked.webp");
+const partArrayOpen = require("../../../assets/images/part-array-open.png");
+const partArrayLocked = require("../../../assets/images/part-array-locked.png");
+const partSpineOpen = require("../../../assets/images/part-spine-open.png");
+const partSpineLocked = require("../../../assets/images/part-spine-locked.png");
+const partStackOpen = require("../../../assets/images/part-stack-open.png");
+const partStackLocked = require("../../../assets/images/part-stack-locked.png");
+const partGridOpen = require("../../../assets/images/part-grid-open.png");
+const partGridLocked = require("../../../assets/images/part-grid-locked.png");
+const partKingdomOpen = require("../../../assets/images/part-kingdom-open.png");
+const partKingdomLocked = require("../../../assets/images/part-kingdom-locked.png");
 const mergeParticleOpen = require("../../../assets/images/particle-merge-open.png");
 const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.png");
 
@@ -40,11 +50,11 @@ const PART_SPRITES: Record<PartTier, Record<Exclude<PartFamily, "waste">, ImageS
   3: { open: partSegmentOpen, locked: partSegmentLocked },
   4: { open: partSmartkitOpen, locked: partSmartkitLocked },
   5: { open: partPremiumOpen, locked: partPremiumLocked },
-  6: { open: partPremiumOpen, locked: partPremiumLocked },
-  7: { open: partPremiumOpen, locked: partPremiumLocked },
-  8: { open: partPremiumOpen, locked: partPremiumLocked },
-  9: { open: partPremiumOpen, locked: partPremiumLocked },
-  10: { open: partPremiumOpen, locked: partPremiumLocked },
+  6: { open: partArrayOpen, locked: partArrayLocked },
+  7: { open: partSpineOpen, locked: partSpineLocked },
+  8: { open: partStackOpen, locked: partStackLocked },
+  9: { open: partGridOpen, locked: partGridLocked },
+  10: { open: partKingdomOpen, locked: partKingdomLocked },
 };
 
 const TIER_NAMES: Record<PartTier, string> = {
