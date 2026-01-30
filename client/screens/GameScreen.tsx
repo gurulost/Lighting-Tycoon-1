@@ -895,7 +895,7 @@ export default function GameScreen() {
           </Pressable>
         ) : null}
 
-        {state.activeStoryBeatId && !isDragging && !activeModal && !topCondensed ? (
+        {state.activeStoryBeatId && !isDragging && !activeModal ? (
           <View style={styles.storyToastContainer}>
             <StoryToast
               beatId={state.activeStoryBeatId}
