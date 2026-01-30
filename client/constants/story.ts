@@ -70,6 +70,15 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     line1: "Open Spark Workshop is ready when you are.",
     onceOnly: true,
   },
+  mentor_waste_tip: {
+    id: "mentor_waste_tip",
+    speaker: "mentor",
+    line1: "Those Baron shipments leave packaging waste.",
+    line2: "Merge or recycle it for value.",
+    onceOnly: true,
+    portrait: "focused",
+    category: "mentor_tip",
+  },
   dependency_20: {
     id: "dependency_20",
     speaker: "baron",

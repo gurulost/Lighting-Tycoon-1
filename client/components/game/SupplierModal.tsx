@@ -102,6 +102,10 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
                 : supplierId === "salvage"
                 ? "Unlock via Upgrades: Salvage Corner (350 cash)."
                 : undefined;
+            const mentorTip =
+              supplierId === "baron"
+                ? "Mentor tip: Baron shipments include waste — merge or recycle it for value."
+                : undefined;
             const speedLevel = state.upgrades["workbench_speed_1"] || 0;
             const config = getEffectiveSupplierConfig(
               supplierId,
@@ -134,6 +138,9 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
                     <ThemedText style={styles.cardSubtitle}>{meta.description}</ThemedText>
                     {locked && lockedHint ? (
                       <ThemedText style={styles.lockedHint}>{lockedHint}</ThemedText>
+                    ) : null}
+                    {mentorTip ? (
+                      <ThemedText style={styles.mentorTip}>{mentorTip}</ThemedText>
                     ) : null}
                   </View>
                   <View style={styles.levelPill}>
@@ -232,6 +239,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     color: GameColors.text.secondary,
+  },
+  mentorTip: {
+    marginTop: 6,
+    fontSize: 11,
+    color: GameColors.text.primary,
   },
   levelPill: {
     borderRadius: BorderRadius.full,

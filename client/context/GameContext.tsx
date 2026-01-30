@@ -1969,6 +1969,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextBoard = [...state.board];
       let nextBackpack = [...state.backpack];
       let placedBase = true;
+      let placedWaste = false;
       for (const item of rollResult.baseItems) {
         const placement = placePartOnBoardOrBackpack(
           state,
@@ -1981,6 +1982,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (!placement.placed) {
           placedBase = false;
           break;
+        }
+        if (item.family === "waste") {
+          placedWaste = true;
         }
         nextBoard = placement.board;
         nextBackpack = placement.backpack;
@@ -2002,6 +2006,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextBackpack
         );
         if (placement.placed) {
+          if (item.family === "waste") {
+            placedWaste = true;
+          }
           nextBoard = placement.board;
           nextBackpack = placement.backpack;
         }
@@ -2294,6 +2301,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (dependencyOutcome.pressureBeat) {
         nextState = queueStoryBeat(nextState, "baron_attention");
+      }
+      if (placedWaste) {
+        nextState = queueStoryBeat(nextState, "mentor_waste_tip");
       }
       if (discoveryBeats.length > 0) {
         discoveryBeats.forEach((beatId) => {
