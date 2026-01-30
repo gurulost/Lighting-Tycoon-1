@@ -105,7 +105,18 @@ Preferred communication style: Simple, everyday language.
 
 ### Asset Files
 All game assets are stored in `assets/images/`:
-- Part sprites: `part-{tier}-{family}.png` (e.g., `part-clip-open.png`, `part-premium-locked.png`)
-- Station icons: `station-workbench.png`, `station-inbox.png`, `station-rd.png`
-- Characters: `bulb-baron.png`, `freedom-controller.png`
+- Part sprites (Tiers 1-5, webp format): `part-{tier}-{family}.webp`
+  - Tier 1: `part-clip-open.webp`, `part-clip-locked.webp`
+  - Tier 2: `part-track-open.webp`, `part-track-locked.webp`
+  - Tier 3: `part-segment-open.webp`, `part-segment-locked.webp`
+  - Tier 4: `part-smartkit-open.webp`, `part-smartkit-locked.webp`
+  - Tier 5: `part-premium-open.webp`, `part-premium-locked.webp`
+- Part sprites (Tiers 6-10, png format): `part-{tier}-{family}.png`
+  - Tier 6 (Array): `part-array-open.png`, `part-array-locked.png`
+  - Tier 7 (Spine): `part-spine-open.png`, `part-spine-locked.png`
+  - Tier 8 (Stack): `part-stack-open.png`, `part-stack-locked.png`
+  - Tier 9 (Grid): `part-grid-open.png`, `part-grid-locked.png`
+  - Tier 10 (Kingdom): `part-kingdom-open.png`, `part-kingdom-locked.png`
+- Station icons: `station-workbench.webp`, `station-inbox.webp`, `station-rd.webp`
+- Characters: `bulb-baron.png`, `freedom-controller.webp`
 - Effects: `particle-merge-open.png`, `particle-merge-locked.png`
