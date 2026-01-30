@@ -50,6 +50,7 @@ This document is the single source of truth for the core gameplay systems.
 - Baron Pressure: overflow at the cap converts into pressure; open-only installs bleed it down
 - Pressure cashes out into higher lockout lab request targets
 - Post-liberation (Phase 2) freezes Dependency at 0 and weights compatibility-required orders higher
+- Phase 2: Baron Pressure applies a reward tax to cash + research (40+ = -10%, 70+ = -20%)
 
 ## R&D
 - Research is earned primarily via Open play
@@ -57,7 +58,7 @@ This document is the single source of truth for the core gameplay systems.
 - Freedom Controller converts locked kits to open-compatible
 
 ## Tactical Boosts (Post-Session)
-- Supplier Scout: spend cash to force the next spawns to Open, Locked, or +1 tier.
+- Supplier Scout: spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.
 - Mentor Workshop Clinic: spend cash to enhance the next merges with extra research and lower dependency.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 

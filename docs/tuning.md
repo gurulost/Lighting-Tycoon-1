@@ -14,7 +14,7 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 
 **Tier bonuses**
 - Workbench Quality: `+1 tier` chance per level (`0.10 * level`) on supplier drops.
-- Open Standardization II: additional `+1 tier` chance on **open-family** drops (`0.12`).
+- Open Standardization II: weakens Baron influence (reduces extra locked drop chance).
 - Merge Momentum: applies a temporary minimum tier floor to supplier drops.
 
 **Baron modifiers (extra locked roll)**
@@ -28,6 +28,7 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
   - Locked Route: force base drop to Locked.
   - Tier Route: `+1 tier` on base drop.
 - Consumption: only on non-forced spawns.
+ - Locked Route: shorter burst, adds Baron pressure per spawn.
 
 ---
 
@@ -62,6 +63,9 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 ## Phase 2 Mix
 - `compatibility_required` orders receive a `1.6x` weight boost when `gamePhase = 2`.
 - Phase 2 target difficulty bumps by `+1`.
+- Phase 2 Baron Pressure reward tax:
+  - 40–69 pressure: `-10%` cash + research
+  - 70–100 pressure: `-20%` cash + research
 
 ---
 
@@ -80,10 +84,10 @@ Unlocked after tutorial (Supplier Scout) and after first session completion (oth
 
 **Supplier Scout**
 - Cost: `90 + reputationTier * 30`
-- Duration: 6 spawns (stack to 12)
+- Duration: Open/Tier = 6 spawns, Locked = 4 spawns (stack to 12)
 - Routes:
   - Open Route: force base drop to Open
-  - Locked Route: force base drop to Locked
+  - Locked Route: force base drop to Locked (+1 Baron pressure per spawn)
   - Tier Route: `+1 tier` on base drop
 - Consumption: only on non-forced spawns
 

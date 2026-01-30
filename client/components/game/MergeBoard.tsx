@@ -1057,7 +1057,7 @@ export function MergeBoard({
   }
 
   return (
-      <View style={styles.container} ref={containerRef} onLayout={handleContainerLayout}>
+    <View style={styles.container} ref={containerRef} onLayout={handleContainerLayout}>
       <LinearGradient
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}

@@ -46,7 +46,7 @@ Use this as a quick reference for every icon, badge, and system.
 - Recycle Bin: delete parts for cash/research; waste also boosts the workshop.
 
 ## Tactical Boosts
-- Supplier Scout: spend cash to force the next spawns to Open, Locked, or +1 tier.
+- Supplier Scout: spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.
 - Mentor Workshop Clinic: spend cash to boost the next merges with extra research and lower dependency.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 

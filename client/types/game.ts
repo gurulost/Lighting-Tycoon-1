@@ -210,6 +210,7 @@ export interface GameState {
   highlightedOrderId?: string;
   lastRecycleRewardId: number;
   lastRecycleReward: RecycleReward | null;
+  lastBaronShipmentId: number;
   ordersHelpNudgeSeen: boolean;
   tierDiscovery: Record<number, boolean>;
   lastTierDiscoveryId: number;
@@ -324,7 +325,7 @@ export const UPGRADE_DEFINITIONS: Upgrade[] = [
   { id: "space_1", category: "space", name: "Unlock Slot 1", description: "Unlock an extra board slot", cost: 100, level: 0, maxLevel: 1, effect: "unlock_slot_27" },
   { id: "space_2", category: "space", name: "Unlock Slot 2", description: "Unlock another board slot", cost: 200, level: 0, maxLevel: 1, effect: "unlock_slot_28" },
   { id: "space_3", category: "space", name: "Unlock Slot 3", description: "Unlock the final slot", cost: 400, level: 0, maxLevel: 1, effect: "unlock_slot_29" },
-  { id: "workbench_speed_1", category: "workbench", name: "Quick Hands I", description: "Reduce supplier recharge time", cost: 150, level: 0, maxLevel: 3, effect: "cooldown_-500" },
+  { id: "workbench_speed_1", category: "workbench", name: "Quick Hands I", description: "Reduce supplier recharge time", cost: 150, level: 0, maxLevel: 3, effect: "cooldown_-2000" },
   { id: "workbench_quality_1", category: "workbench", name: "Better Parts I", description: "Occasionally bump supplier drops up a tier", cost: 200, level: 0, maxLevel: 3, effect: "drop_quality_+10" },
   { id: "quality_bonus_1", category: "quality", name: "Quality Tools I", description: "Bonus cash on merges", cost: 250, level: 0, maxLevel: 3, effect: "merge_cash_+5" },
   { id: "open_standard_initiative", category: "quality", name: "Open Standards Initiative", description: "Reduce Dependency by 10", cost: 300, level: 0, maxLevel: 1, effect: "dependency_reduce_10" },
@@ -336,7 +337,7 @@ export const UPGRADE_DEFINITIONS: Upgrade[] = [
 
 export const RD_DEFINITIONS: RDNode[] = [
   { id: "open_standard_1", name: "Open Standardization I", description: "Reduces Dependency gain from locked merges", cost: 50, unlocked: false, prerequisites: [] },
-  { id: "open_standard_2", name: "Open Standardization II", description: "Open supplier drops can roll +1 tier", cost: 100, unlocked: false, prerequisites: ["open_standard_1"] },
+  { id: "open_standard_2", name: "Open Standardization II", description: "Weakens the Baron's supply manipulation", cost: 100, unlocked: false, prerequisites: ["open_standard_1"] },
   {
     id: "open_workshop_1",
     name: "Open Workshop I",

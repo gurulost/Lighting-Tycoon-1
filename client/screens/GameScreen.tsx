@@ -227,6 +227,7 @@ export default function GameScreen() {
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
+  const baronShipmentRef = useRef(state.lastBaronShipmentId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draggingRef = useRef(false);
@@ -452,6 +453,13 @@ export default function GameScreen() {
     }
     mergeBonusRef.current = state.lastMergeBonusId;
   }, [state.lastMergeBonusId, state.lastMergeBonusCash, state.mergeChainCount, showToast, dispatch]);
+
+  useEffect(() => {
+    if (state.lastBaronShipmentId !== baronShipmentRef.current) {
+      baronShipmentRef.current = state.lastBaronShipmentId;
+      showToast("Baron shipment arrived.", 1800);
+    }
+  }, [state.lastBaronShipmentId, showToast]);
 
   useEffect(() => {
     if (

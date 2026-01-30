@@ -130,6 +130,7 @@ export function PartItem({
     : GameColors.locked.accent;
   const tierAccent =
     !isWaste && part.tier >= 6 ? GameColors.tiers[part.tier] : undefined;
+  const isLegendary = !isWaste && part.tier >= 8;
   const gradientColors = isWaste
     ? ["#3A3A45", "#4A4A5A", "#3A3A45"]
     : tierAccent
@@ -339,6 +340,15 @@ export function PartItem({
         ]}
       />
 
+      {isLegendary ? (
+        <View
+          style={[
+            styles.legendaryHalo,
+            { borderColor: `${tierAccent ?? glowColor}90` },
+          ]}
+        />
+      ) : null}
+
       <View style={[styles.tierBadge, { backgroundColor: GameColors.tiers[part.tier] }]}>
         <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
       </View>
@@ -508,6 +518,16 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs + 3,
     borderWidth: 1,
     opacity: 0.4,
+  },
+  legendaryHalo: {
+    position: "absolute",
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: -6,
+    borderRadius: BorderRadius.xs + 6,
+    borderWidth: 2,
+    opacity: 0.35,
   },
   spawnRing: {
     position: "absolute",

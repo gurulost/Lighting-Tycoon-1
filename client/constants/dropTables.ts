@@ -1,4 +1,4 @@
-import { PartTier, SupplierId } from "@/types/game";
+import { PartTier } from "@/types/game";
 
 export interface TierWeight {
   tier: PartTier;
@@ -15,31 +15,6 @@ export interface SupplierTable {
   tiers: TierWeight[];
   bonus?: SupplierBonus[];
 }
-
-export interface SupplierConfig {
-  maxCharges: number;
-  cooldownMs: number;
-}
-
-export const SUPPLIER_CONFIG: Record<SupplierId, Record<number, SupplierConfig>> = {
-  baron: {
-    1: { maxCharges: 6, cooldownMs: 45000 },
-    2: { maxCharges: 8, cooldownMs: 42000 },
-    3: { maxCharges: 10, cooldownMs: 40000 },
-  },
-  open: {
-    1: { maxCharges: 3, cooldownMs: 60000 },
-    2: { maxCharges: 4, cooldownMs: 56000 },
-    3: { maxCharges: 5, cooldownMs: 52000 },
-    4: { maxCharges: 6, cooldownMs: 48000 },
-    5: { maxCharges: 7, cooldownMs: 44000 },
-  },
-  salvage: {
-    1: { maxCharges: 4, cooldownMs: 75000 },
-    2: { maxCharges: 5, cooldownMs: 68000 },
-    3: { maxCharges: 6, cooldownMs: 62000 },
-  },
-};
 
 export const BARON_TABLES: Record<number, SupplierTable> = {
   1: {

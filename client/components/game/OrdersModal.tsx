@@ -41,7 +41,8 @@ export function OrdersModal({
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
   const marketingOrders = 3;
   const marketingMax = 9;
-  const scoutSpawns = 6;
+  const scoutSpawnsOpen = 6;
+  const scoutSpawnsLocked = 4;
   const scoutMax = 12;
   const clinicMerges = 10;
   const clinicMax = 20;
@@ -519,7 +520,7 @@ export function OrdersModal({
                   </View>
                 ) : (
                   <ThemedText style={styles.boostHint}>
-                    Next {scoutSpawns} spawns: force Open, Locked, or +1 tier drops.
+                    Next {scoutSpawnsOpen} spawns (Open/Tier) or {scoutSpawnsLocked} spawns (Locked).
                   </ThemedText>
                 )}
                 {showScoutOptions ? (
@@ -544,7 +545,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("locked") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Locked Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>Force Locked parts</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Force Locked parts (+pressure)</ThemedText>
                     </Pressable>
                     <Pressable
                       style={[

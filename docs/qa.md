@@ -51,6 +51,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Complete lockout via Freedom Controller.
 - Verify:
   - Dependency stays at 0 (merges/orders do not change it).
+  - Baron Pressure applies a reward tax at 40+ (-10%) and 70+ (-20%) to cash + research.
   - Phase 2 goal order is inserted once and highlighted.
   - If the goal order cannot be inserted immediately, it appears on the next available spawn.
   - Compatibility-required orders appear more frequently.
@@ -104,6 +105,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Complete tutorial.
 - Supplier Scout:
   - Choose Open route. Verify next 6 spawns force Open on the base drop and counter decrements.
+  - Choose Locked route. Verify next 4 spawns force Locked and add +1 Baron Pressure per spawn.
   - Verify forced/tutorial spawns do not consume the counter.
 - Baron supply modifiers:
   - Accept a Baron crate or rush offer and verify the bonus locked roll for the next N non‑forced spawns.

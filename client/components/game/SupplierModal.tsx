@@ -7,7 +7,7 @@ import { ModalShell } from "./ModalShell";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
-import { SUPPLIER_CONFIG } from "@/constants/dropTables";
+import { getSupplierConfig } from "@/constants/suppliers";
 import type { SupplierId } from "@/types/game";
 
 interface SupplierModalProps {
@@ -40,38 +40,17 @@ const SUPPLIER_META: Record<
   },
 };
 
-const SUPPLIER_COOLDOWN_REDUCTION_MS_PER_LEVEL = 2000;
-const SUPPLIER_COOLDOWN_MIN_MS = 15000;
-
-function getSupplierConfig(supplierId: SupplierId, level: number, speedLevel = 0) {
-  const config = SUPPLIER_CONFIG[supplierId] || {};
-  if (config[level]) return config[level];
-  const levels = Object.keys(config)
-    .map((entry) => Number(entry))
-    .filter((value) => Number.isFinite(value));
-  const fallbackLevel = levels.length > 0 ? Math.max(...levels) : 1;
-  const base = config[fallbackLevel] || { maxCharges: 0, cooldownMs: 60000 };
-  if (!speedLevel) return base;
-  const reduction = speedLevel * SUPPLIER_COOLDOWN_REDUCTION_MS_PER_LEVEL;
-  return {
-    ...base,
-    cooldownMs: Math.max(SUPPLIER_COOLDOWN_MIN_MS, base.cooldownMs - reduction),
-  };
-}
-
 export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps) {
-  const { state, tapSupplier, dispatch } = useGame();
+  const { state, tapSupplier } = useGame();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!visible) return;
-    dispatch({ type: "TICK_SUPPLIERS" });
     const timer = setInterval(() => {
       setNow(Date.now());
-      dispatch({ type: "TICK_SUPPLIERS" });
     }, 1000);
     return () => clearInterval(timer);
-  }, [visible, dispatch]);
+  }, [visible]);
 
   const handleTap = (supplierId: SupplierId) => {
     const success = tapSupplier(supplierId);
