@@ -2916,7 +2916,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextPressure = Math.max(0, nextPressure - appliedPressureReduction);
         }
       }
-      return {
+      let nextState: GameState = {
         ...state,
         board: newBoard,
         backpack: newBackpack,
@@ -2934,6 +2934,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         },
         undoSnapshot: undefined,
       };
+      if (part.family === "waste") {
+        nextState = queueStoryBeat(nextState, "mentor_recycle_waste");
+      }
+      return nextState;
     }
 
     case "HIGHLIGHT_ORDER": {
@@ -3705,6 +3709,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      if (state.freedomControllerCount === 0) {
+        nextState = queueStoryBeat(nextState, "mentor_freedom_controller");
+      }
       nextState = applyMissionProgress(nextState, { type: "craft_freedom_controller" });
       return nextState;
     }
@@ -3842,13 +3849,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.marketingBoostOrdersRemaining + MARKETING_BOOST_ORDERS
       );
       if (nextRemaining === state.marketingBoostOrdersRemaining) return state;
-      return {
+      let nextState: GameState = {
         ...state,
         cash: state.cash - cost,
         marketingBoostOrdersRemaining: nextRemaining,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      nextState = queueStoryBeat(nextState, "tina_marketing");
+      return nextState;
     }
 
     case "START_SUPPLIER_SCOUT": {
@@ -3872,6 +3881,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
       if (action.route === "locked") {
         nextState = queueStoryBeat(nextState, "mentor_scout_locked");
+      } else if (action.route === "tier") {
+        nextState = queueStoryBeat(nextState, "mentor_scout_tier");
       }
       return nextState;
     }
@@ -3906,7 +3917,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.warrantyStampOrdersRemaining + WARRANTY_ORDERS
       );
       if (nextRemaining === state.warrantyStampOrdersRemaining) return state;
-      return {
+      let nextState: GameState = {
         ...state,
         cash: state.cash - cost,
         warrantyStampMode: action.mode,
@@ -3914,6 +3925,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      nextState = queueStoryBeat(nextState, "mentor_warranty_stamp");
+      return nextState;
     }
 
     case "ACCEPT_BARON_OFFER": {
@@ -3961,6 +3974,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
         nextState = queueStoryBeat(nextState, "baron_offer");
+        nextState = queueStoryBeat(nextState, "baron_contract_live");
         if (state.tutorialComplete) {
           nextState = queueStoryBeat(nextState, "baron_offer_accept");
           nextState = queueStoryBeat(nextState, "tina_baron_accept");
@@ -4265,6 +4279,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               phase2GoalPending: false,
             };
             nextState = queueStoryBeat(nextState, "phase2_goal");
+            nextState = queueStoryBeat(nextState, "tina_compat_order");
             return nextState;
           }
         }
@@ -4390,8 +4405,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.marketingBoostOrdersRemaining -
           (workingState.marketingBoostOrdersRemaining > 0 ? 1 : 0)
       );
-
-      return {
+      let nextState: GameState = {
         ...workingState,
         orders: [...workingState.orders, newOrder],
         orderMetrics: updateOrderMetrics(workingState, newOrder),
@@ -4399,6 +4413,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orderSpawnCooldownUntil:
           now + Math.round(getOrderIntervalMs(workingState.reputationTier) * cooldownMultiplier),
       };
+      if (newOrder.type === "compatibility_required") {
+        nextState = queueStoryBeat(nextState, "tina_compat_order");
+      }
+      return nextState;
     }
 
     case "ADVANCE_TUTORIAL": {
@@ -5092,6 +5110,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         let nextState = queueStoryBeat(state, "freedom_first_use");
         nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
         nextState = queueStoryBeat(nextState, "liberation_victory");
+        nextState = queueStoryBeat(nextState, "tina_phase2");
         const filteredOrders = state.orders.filter((o) => !o.isLockout);
         const phase2Order = createPhase2GoalOrder(state);
         const insertResult = insertStoryOrder(state, filteredOrders, phase2Order);
