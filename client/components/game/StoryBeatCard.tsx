@@ -77,7 +77,7 @@ export function StoryBeatCard({
   const tagText = getTagText(beat);
   const isChip = variant === "chip";
   const isLog = variant === "log";
-  const portraitSize = isChip ? 80 : isLog ? 56 : 96;
+  const portraitSize = isChip ? 88 : isLog ? 56 : 96;
   const portraitSource = getPortraitForBeat(beat, isChip ? "sm" : isLog ? "md" : "lg");
   const hasPortrait = Boolean(portraitSource);
 
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
@@ -296,14 +296,14 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   chipLabel: {
-    fontSize: 13,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 17,
     fontWeight: "800",
     letterSpacing: 0.6,
   },
   chipLine: {
-    fontSize: 16,
-    lineHeight: 21,
+    fontSize: 17,
+    lineHeight: 22,
     color: GameColors.text.secondary,
   },
   chipDismiss: {
