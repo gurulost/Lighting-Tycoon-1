@@ -9,6 +9,7 @@
 - `tutorial.md` - tutorial and first-session spec
 - `content_pipeline.md` - how orders are generated
 - `tuning.md` - balance knobs
+- `drop_tables.md` - supplier drop tables and rates
 
 ## Engineering & Operations
 - `api.md` - REST API reference

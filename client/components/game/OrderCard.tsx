@@ -37,6 +37,11 @@ const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
   3: "box",
   4: "cpu",
   5: "star",
+  6: "layers",
+  7: "git-merge",
+  8: "grid",
+  9: "aperture",
+  10: "award",
 };
 
 export function OrderCard({
@@ -61,6 +66,7 @@ export function OrderCard({
     part: Part,
     req: { tier: PartTier; family: "open" | "locked" | "any"; requiresCompatible?: boolean }
   ) => {
+    if (part.family === "waste") return false;
     if (part.tier !== req.tier) return false;
     if (req.requiresCompatible && !part.compatible) return false;
     if (req.family === "any") return true;

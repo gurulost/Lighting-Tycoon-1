@@ -23,7 +23,6 @@ export function DebugOverlay({
   showLockoutModal,
 }: DebugOverlayProps) {
   const { state } = useGame();
-  const [now, setNow] = useState(() => Date.now());
   const [jsFps, setJsFps] = useState(0);
   const [rendersPerSecond, setRendersPerSecond] = useState(0);
   const renderCountRef = useRef(0);
@@ -40,7 +39,6 @@ export function DebugOverlay({
     tutorialComplete: false,
     baronOffer: false,
     lockoutActive: false,
-    cooldownRemaining: 0,
   });
 
   renderCountRef.current += 1;
@@ -49,7 +47,6 @@ export function DebugOverlay({
     () => state.board.reduce((count, part) => (part ? count + 1 : count), 0),
     [state.board]
   );
-  const cooldownRemaining = Math.max(0, state.workbenchCooldownUntil - now);
   const orderMods = Object.keys(state.orderMetrics.generatedByModifier).length;
   const orderMixes = Object.keys(state.orderMetrics.generatedByNeighborhoodModifier).length;
   const orderTypes = Object.keys(state.orderMetrics.generatedByType).length;
@@ -69,7 +66,6 @@ export function DebugOverlay({
       tutorialComplete: state.tutorialComplete,
       baronOffer: state.baronOfferAvailable,
       lockoutActive: state.lockoutActive,
-      cooldownRemaining,
     };
   }, [
     state.orders.length,
@@ -84,16 +80,7 @@ export function DebugOverlay({
     state.tutorialComplete,
     state.baronOfferAvailable,
     state.lockoutActive,
-    cooldownRemaining,
   ]);
-
-  useEffect(() => {
-    if (!visible) return undefined;
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [visible]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -150,9 +137,6 @@ export function DebugOverlay({
   }, [visible, jsFps, rendersPerSecond, activeModal, selectedPartIndex, isDragging, showLockoutModal]);
 
   if (!visible) return null;
-
-  const formatMs = (value: number) =>
-    value <= 0 ? "ready" : `${Math.ceil(value / 1000)}s`;
 
   return (
     <View style={[styles.overlay, { pointerEvents: "box-none" }]}>
@@ -211,10 +195,6 @@ export function DebugOverlay({
           <ThemedText style={styles.value}>
             {state.tutorialComplete ? "done" : `step ${state.tutorialStep + 1}`}
           </ThemedText>
-        </View>
-        <View style={styles.row}>
-          <ThemedText style={styles.label}>Workbench</ThemedText>
-          <ThemedText style={styles.value}>{formatMs(cooldownRemaining)}</ThemedText>
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Modal</ThemedText>

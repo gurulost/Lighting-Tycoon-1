@@ -91,6 +91,36 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         description: "Top-tier open system.",
         part: { tier: 5, family: "open" },
       },
+      {
+        id: "part-open-6",
+        title: "Routing Array (Open)",
+        description: "Tier 6 routing array for major runs.",
+        part: { tier: 6, family: "open" },
+      },
+      {
+        id: "part-open-7",
+        title: "Network Spine (Open)",
+        description: "Tier 7 backbone for large installs.",
+        part: { tier: 7, family: "open" },
+      },
+      {
+        id: "part-open-8",
+        title: "Control Stack (Open)",
+        description: "Tier 8 controller stack for synchronized installs.",
+        part: { tier: 8, family: "open" },
+      },
+      {
+        id: "part-open-9",
+        title: "Signature Grid (Open)",
+        description: "Tier 9 signature grid for flagship builds.",
+        part: { tier: 9, family: "open" },
+      },
+      {
+        id: "part-open-10",
+        title: "Kingdom Install (Open)",
+        description: "Tier 10 legacy install for true mastery.",
+        part: { tier: 10, family: "open" },
+      },
     ],
   },
   {
@@ -127,6 +157,60 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         description: "Top-tier locked system.",
         part: { tier: 5, family: "locked" },
       },
+      {
+        id: "part-locked-6",
+        title: "Routing Array (Locked)",
+        description: "Tier 6 certified routing array.",
+        part: { tier: 6, family: "locked" },
+      },
+      {
+        id: "part-locked-7",
+        title: "Network Spine (Locked)",
+        description: "Tier 7 certified backbone installs.",
+        part: { tier: 7, family: "locked" },
+      },
+      {
+        id: "part-locked-8",
+        title: "Control Stack (Locked)",
+        description: "Tier 8 certified controller stack.",
+        part: { tier: 8, family: "locked" },
+      },
+      {
+        id: "part-locked-9",
+        title: "Signature Grid (Locked)",
+        description: "Tier 9 certified signature grid.",
+        part: { tier: 9, family: "locked" },
+      },
+      {
+        id: "part-locked-10",
+        title: "Kingdom Install (Locked)",
+        description: "Tier 10 certified legacy install.",
+        part: { tier: 10, family: "locked" },
+      },
+    ],
+  },
+  {
+    id: "parts-waste",
+    title: "Waste & Salvage",
+    items: [
+      {
+        id: "waste-1",
+        title: "Packaging Waste",
+        description: "Clutter from certified shipments. Merge or recycle to recover value.",
+        part: { tier: 1, family: "waste" },
+      },
+      {
+        id: "waste-2",
+        title: "Cardboard Stack",
+        description: "Consolidated waste. Recycle to speed up the Open Workshop.",
+        part: { tier: 2, family: "waste" },
+      },
+      {
+        id: "waste-3",
+        title: "Salvage Bale",
+        description: "Compressed salvage. Cash it out for a workshop boost.",
+        part: { tier: 3, family: "waste" },
+      },
     ],
   },
   {
@@ -136,7 +220,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "station-workbench",
         title: "Workbench",
-        description: "Tap to spawn parts. Cooldown improves with upgrades.",
+        description: "Tap to open suppliers. Each source has charges and cooldowns.",
         image: stationWorkbench,
       },
       {

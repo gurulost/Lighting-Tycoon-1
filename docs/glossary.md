@@ -8,6 +8,11 @@ Use this as a quick reference for every icon, badge, and system.
 - Segment (Open): tier 3 segment.
 - Smart Kit (Open): tier 4 smart kit.
 - Premium System (Open): top-tier open system.
+- Routing Array (Open): tier 6 routing backbone.
+- Network Spine (Open): tier 7 backbone for large installs.
+- Control Stack (Open): tier 8 controller stack.
+- Signature Grid (Open): tier 9 flagship grid.
+- Kingdom Install (Open): tier 10 legacy build.
 
 ## Parts (Locked Certified)
 - Clip (Locked): certified part, reinforces Dependency.
@@ -15,15 +20,30 @@ Use this as a quick reference for every icon, badge, and system.
 - Segment (Locked): tier 3 locked segment.
 - Smart Kit (Locked): tier 4 locked smart kit.
 - Premium System (Locked): top-tier locked system.
+- Routing Array (Locked): tier 6 locked routing backbone.
+- Network Spine (Locked): tier 7 locked backbone.
+- Control Stack (Locked): tier 8 locked controller stack.
+- Signature Grid (Locked): tier 9 locked grid.
+- Kingdom Install (Locked): tier 10 locked legacy build.
+
+## Waste & Salvage
+- Packaging Waste: clutter from certified shipments; merge or recycle.
+- Cardboard Stack: consolidated waste; recycle to speed the Open Workshop.
+- Salvage Bale: compressed salvage; cash out for a workshop boost.
 
 ## Stations
-- Workbench: tap to spawn parts; cooldown improves with upgrades.
+- Workbench: tap to open suppliers (charges + cooldowns).
 - Order Inbox: view and fulfill orders.
 - R&D Bench: spend research to unlock Freedom tech.
 
+## Suppliers
+- Baron Supply Depot: fast locked supply; increases pressure and clutter.
+- Open Workshop: open supply; upgrades expand tier drops and bonuses.
+- Salvage Corner: refurb drops plus cleanup value.
+
 ## Utilities
 - Backpack: temporary storage; drag items in and out.
-- Recycle Bin: delete parts for a small cash/research refund.
+- Recycle Bin: delete parts for cash/research; waste also boosts the workshop.
 
 ## Tactical Boosts
 - Supplier Scout: spend cash to skew the next spawns toward Open, Locked, or higher tiers.

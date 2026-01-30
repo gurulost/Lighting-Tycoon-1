@@ -27,6 +27,8 @@ import { BaronOfferModal } from "@/components/game/BaronOfferModal";
 import { PartDetailModal } from "@/components/game/PartDetailModal";
 import { StoryLogModal } from "@/components/game/StoryLogModal";
 import { GlossaryModal } from "@/components/game/GlossaryModal";
+import { SupplierModal } from "@/components/game/SupplierModal";
+import { MergeMomentumModal } from "@/components/game/MergeMomentumModal";
 import { MissionStrip } from "@/components/game/MissionStrip";
 import { MissionDetailModal } from "@/components/game/MissionDetailModal";
 import { DebugOverlay } from "@/components/DebugOverlay";
@@ -85,6 +87,7 @@ type ModalType =
   | "story"
   | "glossary"
   | "missions"
+  | "suppliers"
   | null;
 
 type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
@@ -200,7 +203,7 @@ function BottomButton({
 
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, undoLastMove, getFulfillmentIndices } = useGame();
+  const { state, dispatch, undoLastMove, getFulfillmentIndices, claimMergeMomentum } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -466,10 +469,23 @@ export default function GameScreen() {
       state.lastRecycleRewardId !== recycleRewardRef.current &&
       state.lastRecycleReward
     ) {
-      const { cash, research } = state.lastRecycleReward;
+      const {
+        cash,
+        research,
+        openCooldownMs,
+        openCharge,
+        pressureReduction,
+      } = state.lastRecycleReward;
       const parts: string[] = [];
       if (cash > 0) parts.push(`+${cash} coins`);
       if (research > 0) parts.push(`+${research} research`);
+      if (openCharge && openCharge > 0) parts.push(`+${openCharge} Workshop charge`);
+      if (openCooldownMs && openCooldownMs > 0) {
+        parts.push(`-${Math.ceil(openCooldownMs / 1000)}s Workshop cooldown`);
+      }
+      if (pressureReduction && pressureReduction > 0) {
+        parts.push(`-${pressureReduction} Baron pressure`);
+      }
       showToast(`Recycled ${parts.join(" · ")}`);
       dispatch({ type: "CLEAR_RECYCLE_REWARD" });
     }
@@ -901,12 +917,8 @@ export default function GameScreen() {
         }}
       >
         <MergeBoard
-          onWorkbenchPress={(result) => {
-            if (result === "blocked") {
-              showToast("Board is full — merge or fulfill an order.");
-            } else if (result === "cooldown") {
-              showToast("Workbench cooling down.");
-            }
+          onWorkbenchPress={() => {
+            setActiveModal("suppliers");
           }}
           onOrderInboxPress={() => {
             if (!state.tutorialComplete && state.tutorialStep < 3) {
@@ -924,7 +936,7 @@ export default function GameScreen() {
           }}
           onStationLongPress={(station) => {
             if (station === "workbench") {
-              showToast("Workbench: tap to spawn parts. Cooldown improves with upgrades.", 2600);
+              showToast("Suppliers: tap to access your supply panel.", 2600);
             } else if (station === "orders") {
               showToast("Orders: fulfill installs for cash, reputation, and research.", 2600);
             } else {
@@ -1062,6 +1074,25 @@ export default function GameScreen() {
           }
         />
       </Modal>
+
+      <Modal
+        visible={activeModal === "suppliers"}
+        animationType="fade"
+        transparent
+        onRequestClose={closeModal}
+      >
+        <SupplierModal
+          visible={activeModal === "suppliers"}
+          onClose={closeModal}
+          onToast={showToast}
+        />
+      </Modal>
+
+      <MergeMomentumModal
+        visible={Boolean(state.mergeMomentumPending)}
+        threshold={state.mergeMomentumPending?.threshold ?? 0}
+        onChoose={(choice) => claimMergeMomentum(choice)}
+      />
 
       <Modal
         visible={activeModal === "upgrades"}

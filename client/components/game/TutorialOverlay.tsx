@@ -43,8 +43,8 @@ interface TutorialStep {
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 0,
-    title: "Tap the Workbench",
-    description: "Spawn two Clips to get started. Tap the glowing Workbench tile on the board.",
+    title: "Open Suppliers",
+    description: "Tap the Workbench to open suppliers, then tap a source to spawn two Clips.",
     icon: "tool",
     highlight: "workbench",
     color: GameColors.ui.primary,

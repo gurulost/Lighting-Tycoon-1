@@ -138,6 +138,18 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     minRepTier: 3,
     minTierCrafted: 5,
   },
+  {
+    id: "milestone_tier10",
+    giver: "system",
+    type: "fulfill_tier10_order",
+    label: "Fulfill a Tier 10 install",
+    description: "Kingdom installs define your legacy.",
+    target: 1,
+    reward: { cash: 400, reputation: 60, research: 20 },
+    weight: 0.4,
+    minRepTier: 4,
+    minTierCrafted: 10,
+  },
 
   // Mentor episode: Open Standards
   {

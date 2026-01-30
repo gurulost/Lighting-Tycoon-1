@@ -80,11 +80,16 @@ export function OrdersModal({
     animationMode: TrimLightAnimation;
   } | null>(null);
   const orderLegend = [
-    { key: "C", label: "Clip" },
-    { key: "T", label: "Track" },
-    { key: "S", label: "Segment" },
-    { key: "K", label: "Kit" },
-    { key: "P", label: "System" },
+    { key: "CL", label: "Clip" },
+    { key: "TR", label: "Track" },
+    { key: "SG", label: "Segment" },
+    { key: "KT", label: "Kit" },
+    { key: "PR", label: "System" },
+    { key: "AR", label: "Array" },
+    { key: "SP", label: "Spine" },
+    { key: "ST", label: "Stack" },
+    { key: "GR", label: "Grid" },
+    { key: "KI", label: "Kingdom" },
   ];
   const badgeLegend = [
     { key: "O", label: "Open" },
@@ -98,6 +103,7 @@ export function OrdersModal({
     !(state.lockoutActive && order.type === "lab_request") &&
     !order.modifierIds?.includes("first_session") &&
     !order.modifierIds?.includes("tier5_showcase") &&
+    !order.modifierIds?.includes("tier10_showcase") &&
     !order.modifierIds?.includes("threshold_story");
 
   const refreshTarget =
@@ -672,8 +678,8 @@ export function OrdersModal({
         <View style={styles.legendGroup}>
           <ThemedText style={styles.legendGroupLabel}>Order letters</ThemedText>
           <View style={styles.legendRow}>
-            {orderLegend.map((item) => (
-              <View key={item.key} style={styles.legendChip}>
+            {orderLegend.map((item, index) => (
+              <View key={`${item.key}-${index}`} style={styles.legendChip}>
                 <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
                 <ThemedText style={styles.legendLabel}>{item.label}</ThemedText>
               </View>
@@ -709,6 +715,7 @@ export function OrdersModal({
                 !(state.lockoutActive && order.type === "lab_request") &&
                 !order.modifierIds?.includes("first_session") &&
                 !order.modifierIds?.includes("tier5_showcase") &&
+                !order.modifierIds?.includes("tier10_showcase") &&
                 !order.modifierIds?.includes("threshold_story")
               }
             />

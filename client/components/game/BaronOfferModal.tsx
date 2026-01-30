@@ -40,8 +40,8 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
     rush: {
       title: "Emergency Rush Kit",
       description:
-        "Instant workbench reset and a locked kit delivered now. Certified supply leans locked for the next 6 spawns.",
-      acceptText: "Take Rush Kit (Reset cooldown + locked kit)",
+        "Locked kit delivered now. Certified supply leans locked for the next 6 spawns.",
+      acceptText: "Take Rush Kit (+3 Dependency, locked kit + rush spawns)",
       icon: "zap" as const,
     },
   };

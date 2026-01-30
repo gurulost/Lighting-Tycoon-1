@@ -27,7 +27,6 @@ export const gameSaves = pgTable("game_saves", {
   rdNodes: jsonb("rd_nodes").notNull().default({}),
   freedomControllerCount: integer("freedom_controller_count").notNull().default(0),
   maxOrders: integer("max_orders").notNull().default(2),
-  workbenchMaxCooldown: integer("workbench_max_cooldown").notNull().default(3000),
   tutorialComplete: boolean("tutorial_complete").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

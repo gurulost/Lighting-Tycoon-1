@@ -19,7 +19,6 @@ Fields (from `shared/schema.ts`):
 - `rdNodes` (object)
 - `freedomControllerCount` (number)
 - `maxOrders` (number)
-- `workbenchMaxCooldown` (number)
 - `tutorialComplete` (boolean)
 - `createdAt` (timestamp, server-managed)
 - `updatedAt` (timestamp, server-managed)
