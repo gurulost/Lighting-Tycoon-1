@@ -7,7 +7,7 @@ import { ModalShell } from "./ModalShell";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
-import { getSupplierConfig } from "@/constants/suppliers";
+import { getEffectiveSupplierConfig } from "@/constants/suppliers";
 import type { SupplierId } from "@/types/game";
 
 interface SupplierModalProps {
@@ -43,6 +43,8 @@ const SUPPLIER_META: Record<
 export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps) {
   const { state, tapSupplier } = useGame();
   const [now, setNow] = useState(() => Date.now());
+  const baronEarlyRelief =
+    state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
 
   useEffect(() => {
     if (!visible) return;
@@ -94,11 +96,18 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
             const meta = SUPPLIER_META[supplierId];
             const supplier = state.suppliers[supplierId];
             const locked = supplier.level <= 0;
+            const lockedHint =
+              supplierId === "open"
+                ? "Requires R&D Access + Open Workshop I (1 Upgrade Material). Upgrade Materials come from Salvage (unlock in Upgrades)."
+                : supplierId === "salvage"
+                ? "Unlock via Upgrades: Salvage Corner (350 cash)."
+                : undefined;
             const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-            const config = getSupplierConfig(
+            const config = getEffectiveSupplierConfig(
               supplierId,
               Math.max(1, supplier.level),
-              speedLevel
+              speedLevel,
+              { baronEarlyRelief }
             );
             const cooldownRemaining = Math.max(0, supplier.cooldownEndsAt - now);
             const charges = supplier.chargesRemaining;
@@ -123,6 +132,9 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
                   <View style={styles.cardTitleWrap}>
                     <ThemedText style={styles.cardTitle}>{meta.name}</ThemedText>
                     <ThemedText style={styles.cardSubtitle}>{meta.description}</ThemedText>
+                    {locked && lockedHint ? (
+                      <ThemedText style={styles.lockedHint}>{lockedHint}</ThemedText>
+                    ) : null}
                   </View>
                   <View style={styles.levelPill}>
                     <ThemedText style={styles.levelText}>{locked ? "L0" : `L${supplier.level}`}</ThemedText>
@@ -214,6 +226,11 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     marginTop: 4,
     fontSize: 12,
+    color: GameColors.text.secondary,
+  },
+  lockedHint: {
+    marginTop: 6,
+    fontSize: 11,
     color: GameColors.text.secondary,
   },
   levelPill: {

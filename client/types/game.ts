@@ -211,6 +211,8 @@ export interface GameState {
   lastRecycleRewardId: number;
   lastRecycleReward: RecycleReward | null;
   lastBaronShipmentId: number;
+  lastCooldownHintId: number;
+  baronCooldownHintShown: boolean;
   ordersHelpNudgeSeen: boolean;
   tierDiscovery: Record<number, boolean>;
   lastTierDiscoveryId: number;

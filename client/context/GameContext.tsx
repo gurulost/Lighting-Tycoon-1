@@ -48,7 +48,7 @@ import {
   SALVAGE_TOP_ROLL,
   SALVAGE_REFURB_TABLES,
 } from "@/constants/dropTables";
-import { getSupplierConfig } from "@/constants/suppliers";
+import { getEffectiveSupplierConfig } from "@/constants/suppliers";
 
 type GameAction =
   | { type: "TAP_SUPPLIER"; supplierId: SupplierId }
@@ -108,12 +108,15 @@ function normalizeSupplierState(
   supplierId: SupplierId,
   supplier: GameState["suppliers"][SupplierId],
   now: number,
-  speedLevel = 0
+  speedLevel = 0,
+  baronEarlyRelief = false
 ) {
   if (supplier.level <= 0) return supplier;
   if (supplier.chargesRemaining > 0) return supplier;
   if (supplier.cooldownEndsAt && supplier.cooldownEndsAt > now) return supplier;
-  const config = getSupplierConfig(supplierId, supplier.level, speedLevel);
+  const config = getEffectiveSupplierConfig(supplierId, supplier.level, speedLevel, {
+    baronEarlyRelief,
+  });
   return {
     ...supplier,
     chargesRemaining: config.maxCharges,
@@ -194,7 +197,11 @@ function applyBaronSupplierUpgrade(state: GameState): GameState {
   if (currentLevel >= 3) return state;
   const nextLevel = currentLevel + 1;
   const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-  const config = getSupplierConfig("baron", nextLevel, speedLevel);
+  const baronEarlyRelief =
+    state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
+  const config = getEffectiveSupplierConfig("baron", nextLevel, speedLevel, {
+    baronEarlyRelief,
+  });
   return {
     ...state,
     suppliers: {
@@ -1639,6 +1646,8 @@ function getInitialState(): GameState {
     lastRecycleRewardId: 0,
     lastRecycleReward: null,
     lastBaronShipmentId: 0,
+    lastCooldownHintId: 0,
+    baronCooldownHintShown: false,
     ordersHelpNudgeSeen: false,
     tierDiscovery: {},
     lastTierDiscoveryId: 0,
@@ -1854,6 +1863,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case "TICK_SUPPLIERS": {
       const now = Date.now();
       const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+      const baronEarlyRelief =
+        state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
       let suppliersChanged = false;
       const nextSuppliers: GameState["suppliers"] = { ...state.suppliers };
       (Object.keys(state.suppliers) as SupplierId[]).forEach((supplierId) => {
@@ -1862,7 +1873,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           supplierId,
           current,
           now,
-          speedLevel
+          speedLevel,
+          baronEarlyRelief
         );
         if (normalized !== current) {
           suppliersChanged = true;
@@ -1876,11 +1888,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const now = Date.now();
       const supplierId = action.supplierId;
       const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+      const baronEarlyRelief =
+        state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
       const supplier = normalizeSupplierState(
         supplierId,
         state.suppliers[supplierId],
         now,
-        speedLevel
+        speedLevel,
+        baronEarlyRelief
       );
       if (supplier.level <= 0) {
         return state;
@@ -2057,13 +2072,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextBaronRushRemaining = Math.max(0, state.baronRushSpawnsRemaining - 1);
       }
 
-      const config = getSupplierConfig(supplierId, supplier.level, speedLevel);
+      const config = getEffectiveSupplierConfig(supplierId, supplier.level, speedLevel, {
+        baronEarlyRelief,
+      });
       const nextCharges = Math.max(0, supplier.chargesRemaining - 1);
       const nextSupplier = {
         ...supplier,
         chargesRemaining: nextCharges,
         cooldownEndsAt: nextCharges === 0 ? now + config.cooldownMs : supplier.cooldownEndsAt,
       };
+      const hitBaronCooldown =
+        supplierId === "baron" && supplier.chargesRemaining > 0 && nextCharges === 0;
+      const shouldShowCooldownHint =
+        hitBaronCooldown &&
+        state.tutorialComplete &&
+        !state.baronCooldownHintShown &&
+        state.suppliers.open.level <= 0 &&
+        state.suppliers.salvage.level <= 0;
+      const nextCooldownHintShown =
+        state.baronCooldownHintShown || shouldShowCooldownHint;
+      const nextCooldownHintId = shouldShowCooldownHint
+        ? state.lastCooldownHintId + 1
+        : state.lastCooldownHintId;
 
       const nextSpawnCount =
         !state.tutorialComplete && state.tutorialStep === 0 && rollResult.baseItems.length > 0
@@ -2230,6 +2260,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           baronBonusSource !== null
             ? state.lastBaronShipmentId + 1
             : state.lastBaronShipmentId,
+        lastCooldownHintId: nextCooldownHintId,
+        baronCooldownHintShown: nextCooldownHintShown,
         maxTierCrafted: nextMaxTierCrafted,
         firstSessionForcedDrops: nextFirstSessionForcedDrops,
         tier5ShowcaseSeen: nextTier5ShowcaseSeen,
@@ -2814,10 +2846,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           "open",
           state.suppliers.open,
           now,
-          speedLevel
+          speedLevel,
+          false
         );
         if (openSupplier.level > 0) {
-          const config = getSupplierConfig("open", openSupplier.level, speedLevel);
+          const config = getEffectiveSupplierConfig("open", openSupplier.level, speedLevel);
           if (reward.openCharge && openSupplier.chargesRemaining < config.maxCharges) {
             appliedOpenCharge = 1;
             nextSuppliers = {
@@ -3158,7 +3191,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           if (nextLevel === state.suppliers.open.level) {
             nextUpgradeMaterials += 2;
           } else {
-            const config = getSupplierConfig("open", nextLevel, speedLevel);
+            const config = getEffectiveSupplierConfig("open", nextLevel, speedLevel);
             nextSuppliers = {
               ...state.suppliers,
               open: { level: nextLevel, chargesRemaining: config.maxCharges, cooldownEndsAt: 0 },
@@ -3494,7 +3527,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       
       if (upgrade.effect === "unlock_salvage") {
         const speedLevel = newState.upgrades["workbench_speed_1"] || 0;
-        const config = getSupplierConfig("salvage", 1, speedLevel);
+        const config = getEffectiveSupplierConfig("salvage", 1, speedLevel);
         newState.suppliers = {
           ...newState.suppliers,
           salvage: { level: 1, chargesRemaining: config.maxCharges, cooldownEndsAt: 0 },
@@ -3506,7 +3539,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const currentLevel = newState.suppliers.salvage.level || 0;
         const nextLevel = Math.min(3, currentLevel + increase);
         const speedLevel = newState.upgrades["workbench_speed_1"] || 0;
-        const config = getSupplierConfig("salvage", nextLevel, speedLevel);
+        const config = getEffectiveSupplierConfig("salvage", nextLevel, speedLevel);
         newState.suppliers = {
           ...newState.suppliers,
           salvage: { level: nextLevel, chargesRemaining: config.maxCharges, cooldownEndsAt: 0 },
@@ -3605,7 +3638,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (node.id.startsWith("open_workshop_")) {
         const level = Number(node.id.split("_").pop() || 1);
         const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-        const config = getSupplierConfig("open", level, speedLevel);
+        const config = getEffectiveSupplierConfig("open", level, speedLevel);
         nextState = {
           ...nextState,
           suppliers: {
@@ -4601,6 +4634,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastRecycleRewardId: 0,
         lastRecycleReward: null,
         lastBaronShipmentId: 0,
+        lastCooldownHintId: 0,
+        baronCooldownHintShown: false,
         firstSessionComplete: false,
         firstSessionOrderIndex: 0,
         firstSessionOrdersCompleted: 0,
@@ -4866,23 +4901,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.mergeMomentumPending) return state;
       const now = Date.now();
       const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+      const baronEarlyRelief =
+        state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
       const openSupplier = normalizeSupplierState(
         "open",
         state.suppliers.open,
         now,
-        speedLevel
+        speedLevel,
+        baronEarlyRelief
       );
       const baronSupplier = normalizeSupplierState(
         "baron",
         state.suppliers.baron,
         now,
-        speedLevel
+        speedLevel,
+        baronEarlyRelief
       );
       const salvageSupplier = normalizeSupplierState(
         "salvage",
         state.suppliers.salvage,
         now,
-        speedLevel
+        speedLevel,
+        baronEarlyRelief
       );
 
       const levelIndex = Math.max(
@@ -4905,7 +4945,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const target = candidates[0];
         if (!target) return;
         const current = target === "open" ? openSupplier : target === "baron" ? baronSupplier : salvageSupplier;
-        const config = getSupplierConfig(target, current.level, speedLevel);
+        const config = getEffectiveSupplierConfig(target, current.level, speedLevel, {
+          baronEarlyRelief,
+        });
         if (current.chargesRemaining >= config.maxCharges) return;
         nextSuppliers = {
           ...nextSuppliers,
@@ -4931,7 +4973,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const remaining = current.cooldownEndsAt - now;
         const reductionRate = 0.3 + 0.15 * levelIndex;
         const reducedRemaining = Math.max(0, Math.floor(remaining * (1 - reductionRate)));
-        const config = getSupplierConfig(target, current.level, speedLevel);
+        const config = getEffectiveSupplierConfig(target, current.level, speedLevel, {
+          baronEarlyRelief,
+        });
         nextSuppliers = {
           ...nextSuppliers,
           [target]: reducedRemaining === 0
@@ -5166,6 +5210,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         action.state.baronOfferType === "rush"
           ? action.state.baronOfferType
           : base.baronOfferType;
+      const baronCooldownHintShown =
+        typeof action.state.baronCooldownHintShown === "boolean"
+          ? action.state.baronCooldownHintShown
+          : base.baronCooldownHintShown;
       const baronContractOrdersRemaining =
         typeof action.state.baronContractOrdersRemaining === "number"
           ? action.state.baronContractOrdersRemaining
@@ -5473,6 +5521,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastRecycleRewardId: 0,
         lastRecycleReward: null,
         lastBaronShipmentId: 0,
+        lastCooldownHintId: 0,
+        baronCooldownHintShown,
         baronChoice,
         baronOfferType:
           action.state.baronOfferAvailable && !baronOfferType ? "crate" : baronOfferType,
@@ -5665,6 +5715,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       lastRecycleRewardId: 0,
       lastRecycleReward: null,
       lastBaronShipmentId: 0,
+      lastCooldownHintId: 0,
       lastMissionRewardId: 0,
       lastMissionReward: null,
       orderSpawnCooldownUntil: 0,
@@ -5926,7 +5977,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         supplierId,
         state.suppliers[supplierId],
         Date.now(),
-        state.upgrades["workbench_speed_1"] || 0
+        state.upgrades["workbench_speed_1"] || 0,
+        state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0
       );
       if (supplier.level <= 0) return false;
       if (supplier.chargesRemaining <= 0) return false;

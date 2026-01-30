@@ -27,6 +27,7 @@ export const SUPPLIER_CONFIG: Record<SupplierId, Record<number, SupplierConfig>>
 
 export const SUPPLIER_COOLDOWN_REDUCTION_MS_PER_LEVEL = 2000;
 export const SUPPLIER_COOLDOWN_MIN_MS = 15000;
+export const BARON_EARLY_COOLDOWN_MS = 35000;
 
 export function getSupplierConfig(
   supplierId: SupplierId,
@@ -46,4 +47,24 @@ export function getSupplierConfig(
     ...base,
     cooldownMs: Math.max(SUPPLIER_COOLDOWN_MIN_MS, base.cooldownMs - reduction),
   };
+}
+
+export function getEffectiveSupplierConfig(
+  supplierId: SupplierId,
+  level: number,
+  speedLevel = 0,
+  options?: { baronEarlyRelief?: boolean }
+) {
+  const base = getSupplierConfig(supplierId, level, speedLevel);
+  if (
+    options?.baronEarlyRelief &&
+    supplierId === "baron" &&
+    level === 1
+  ) {
+    return {
+      ...base,
+      cooldownMs: Math.min(base.cooldownMs, BARON_EARLY_COOLDOWN_MS),
+    };
+  }
+  return base;
 }

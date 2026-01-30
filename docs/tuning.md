@@ -11,6 +11,7 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Baron / Open: fixed tier distributions per supplier level.
 - Salvage: top-roll (refurb/scrap/material), then refurb tier table.
 - Bonus channels are independent rolls (waste, upgrade materials, compatibility components).
+- Early relief: while Open + Salvage are locked, Baron L1 cooldown is shortened to 35s.
 
 **Tier bonuses**
 - Workbench Quality: `+1 tier` chance per level (`0.10 * level`) on supplier drops.

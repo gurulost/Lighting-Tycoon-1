@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { View, StyleSheet, Modal, Pressable } from "react-native";
+import { View, StyleSheet, Modal, Pressable, AppState } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -228,8 +228,10 @@ export default function GameScreen() {
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
   const baronShipmentRef = useRef(state.lastBaronShipmentId);
+  const cooldownHintRef = useRef(state.lastCooldownHintId);
   const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const momentLockExpiresAtRef = useRef(0);
   const draggingRef = useRef(false);
   const tutorialStepRef = useRef(state.tutorialStep);
   const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
@@ -389,6 +391,36 @@ export default function GameScreen() {
   }, []);
 
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") return;
+      if (
+        momentLockExpiresAtRef.current > 0 &&
+        Date.now() >= momentLockExpiresAtRef.current
+      ) {
+        momentLockExpiresAtRef.current = 0;
+        setMomentLockActive(false);
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!momentLockActive) return;
+    const interval = setInterval(() => {
+      if (
+        momentLockExpiresAtRef.current > 0 &&
+        Date.now() >= momentLockExpiresAtRef.current
+      ) {
+        momentLockExpiresAtRef.current = 0;
+        setMomentLockActive(false);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [momentLockActive]);
+
+  useEffect(() => {
     SoundManager.init();
     return () => {
       SoundManager.unload();
@@ -462,6 +494,13 @@ export default function GameScreen() {
   }, [state.lastBaronShipmentId, showToast]);
 
   useEffect(() => {
+    if (state.lastCooldownHintId !== cooldownHintRef.current) {
+      cooldownHintRef.current = state.lastCooldownHintId;
+      showToast("Unlock Salvage to find materials for the Open Workshop.", 2600);
+    }
+  }, [state.lastCooldownHintId, showToast]);
+
+  useEffect(() => {
     if (
       state.tutorialComplete &&
       state.highlightedOrderId &&
@@ -520,6 +559,7 @@ export default function GameScreen() {
   useEffect(() => {
     if (!state.activeStoryBeatId) {
       setMomentLockActive(false);
+      momentLockExpiresAtRef.current = 0;
       if (momentLockTimeout.current) {
         clearTimeout(momentLockTimeout.current);
         momentLockTimeout.current = null;
@@ -529,14 +569,17 @@ export default function GameScreen() {
     const beat = STORY_BEATS[state.activeStoryBeatId];
     if (!beat?.momentLockMs) {
       setMomentLockActive(false);
+      momentLockExpiresAtRef.current = 0;
       return;
     }
     setMomentLockActive(true);
+    momentLockExpiresAtRef.current = Date.now() + beat.momentLockMs;
     if (momentLockTimeout.current) {
       clearTimeout(momentLockTimeout.current);
     }
     momentLockTimeout.current = setTimeout(() => {
       setMomentLockActive(false);
+      momentLockExpiresAtRef.current = 0;
     }, beat.momentLockMs);
   }, [state.activeStoryBeatId]);
 

@@ -118,6 +118,13 @@ export function PartItem({
 
   const isOpen = part.family === "open";
   const isWaste = part.family === "waste";
+  const wasteLabel = isWaste
+    ? part.tier === 1
+      ? "W1"
+      : part.tier === 2
+      ? "W2"
+      : "W3"
+    : null;
   const primaryColor = isWaste
     ? GameColors.ui.warning
     : isOpen
@@ -313,7 +320,7 @@ export function PartItem({
           />
         ) : (
           <View style={styles.wasteBadge}>
-            <ThemedText style={styles.wasteText}>Waste</ThemedText>
+            <ThemedText style={styles.wasteText}>{wasteLabel}</ThemedText>
           </View>
         )}
         {showPremiumLights ? (
