@@ -16,6 +16,7 @@ interface StoryBeatCardProps {
   variant?: CardVariant;
   onPress?: () => void;
   onOpenLog?: () => void;
+  onDismiss?: () => void;
 }
 
 const SPEAKER_LABEL: Record<StorySpeaker, string> = {
@@ -70,44 +71,61 @@ export function StoryBeatCard({
   variant = "expanded",
   onPress,
   onOpenLog,
+  onDismiss,
 }: StoryBeatCardProps) {
   const color = SPEAKER_COLOR[beat.speaker];
   const tagText = getTagText(beat);
   const isChip = variant === "chip";
   const isLog = variant === "log";
-  const portraitSize = isChip ? 28 : isLog ? 56 : 96;
+  const portraitSize = isChip ? 72 : isLog ? 56 : 96;
   const portraitSource = getPortraitForBeat(beat, isChip ? "sm" : isLog ? "md" : "lg");
   const hasPortrait = Boolean(portraitSource);
 
   if (isChip) {
-    const Container = onPress ? Pressable : View;
     return (
-      <Container style={styles.chip} {...(onPress ? { onPress } : {})}>
-        {hasPortrait ? (
-          <Image
-            source={portraitSource}
-            style={[styles.chipPortrait, { width: portraitSize, height: portraitSize }]}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View
-            style={[
-              styles.chipFallback,
-              { width: portraitSize, height: portraitSize, borderColor: `${color}55` },
-            ]}
-          >
-            <Feather name={SPEAKER_ICON[beat.speaker]} size={14} color={color} />
-          </View>
-        )}
-        <View style={styles.chipText}>
-          <ThemedText style={[styles.chipLabel, { color }]}>{SPEAKER_LABEL[beat.speaker]}</ThemedText>
-          <ThemedText style={styles.chipLine} numberOfLines={1}>
+      <View style={styles.chip}>
+        <Pressable
+          style={styles.chipBody}
+          onPress={onPress}
+          disabled={!onPress}
+        >
+          {hasPortrait ? (
+            <Image
+              source={portraitSource}
+              style={[styles.chipPortrait, { width: portraitSize, height: portraitSize }]}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View
+              style={[
+                styles.chipFallback,
+                { width: portraitSize, height: portraitSize, borderColor: `${color}55` },
+              ]}
+            >
+              <Feather name={SPEAKER_ICON[beat.speaker]} size={14} color={color} />
+            </View>
+          )}
+          <View style={styles.chipText}>
+            <ThemedText style={[styles.chipLabel, { color }]}>{SPEAKER_LABEL[beat.speaker]}</ThemedText>
+          <ThemedText style={styles.chipLine} numberOfLines={2}>
             {beat.line1}
           </ThemedText>
-        </View>
-        <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
-      </Container>
+          </View>
+          {onPress ? (
+            <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
+          ) : null}
+        </Pressable>
+        {onDismiss ? (
+          <Pressable
+            onPress={onDismiss}
+            hitSlop={8}
+            style={styles.chipDismiss}
+          >
+            <Feather name="x" size={14} color={GameColors.text.secondary} />
+          </Pressable>
+        ) : null}
+      </View>
     );
   }
 
@@ -250,12 +268,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: "#2A2A4A",
     backgroundColor: "#141426",
+  },
+  chipBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    flex: 1,
   },
   chipPortrait: {
     borderRadius: BorderRadius.full,
@@ -272,13 +296,19 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   chipLabel: {
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 14,
     fontWeight: "800",
     letterSpacing: 0.6,
   },
   chipLine: {
-    fontSize: 11,
+    fontSize: 15,
+    lineHeight: 20,
     color: GameColors.text.secondary,
+  },
+  chipDismiss: {
+    paddingLeft: 4,
+    paddingVertical: 2,
   },
   portraitFallback: {
     alignItems: "center",

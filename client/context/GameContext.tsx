@@ -53,6 +53,7 @@ import { getEffectiveSupplierConfig } from "@/constants/suppliers";
 type GameAction =
   | { type: "TAP_SUPPLIER"; supplierId: SupplierId }
   | { type: "TICK_SUPPLIERS" }
+  | { type: "QUEUE_STORY_BEAT"; beatId: string }
   | { type: "MERGE_PARTS"; fromIndex: number; toIndex: number }
   | { type: "MOVE_PART"; fromIndex: number; toIndex: number }
   | { type: "STORE_IN_BACKPACK"; fromIndex: number; backpackIndex: number }
@@ -1884,6 +1885,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!suppliersChanged) return state;
       return { ...state, suppliers: nextSuppliers };
     }
+
+    case "QUEUE_STORY_BEAT": {
+      return queueStoryBeat(state, action.beatId);
+    }
     case "TAP_SUPPLIER": {
       const now = Date.now();
       const supplierId = action.supplierId;
@@ -1930,6 +1935,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           compatibilityComponentsDelta: 0,
         };
       }
+      const gainedUpgradeMaterial = rollResult.upgradeMaterialsDelta > 0;
+      const gainedCompatibilityComponent = rollResult.compatibilityComponentsDelta > 0;
 
       if (scoutActive && rollResult.baseItems.length > 0) {
         const baseItem = rollResult.baseItems[0];
@@ -2305,6 +2312,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (placedWaste) {
         nextState = queueStoryBeat(nextState, "mentor_waste_tip");
       }
+      if (state.tutorialComplete && gainedUpgradeMaterial) {
+        nextState = queueStoryBeat(nextState, "tina_upgrade_material");
+      }
+      if (state.tutorialComplete && gainedCompatibilityComponent) {
+        nextState = queueStoryBeat(nextState, "tina_compat_component");
+      }
       if (discoveryBeats.length > 0) {
         discoveryBeats.forEach((beatId) => {
           nextState = queueStoryBeat(nextState, beatId);
@@ -2596,6 +2609,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
       
+      const gainedMomentumTip =
+        state.tutorialComplete && !state.mergeMomentumPending && !!nextMergeMomentumPending;
+
       let nextState: GameState = {
         ...state,
         board: tutorialBoard,
@@ -2660,6 +2676,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextState = queueStoryBeat(nextState, dependencyStory);
       }
       nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
+      if (gainedMomentumTip) {
+        nextState = queueStoryBeat(nextState, "tina_momentum_tip");
+      }
       if (tutorialStoryBeat) {
         nextState = queueStoryBeat(nextState, tutorialStoryBeat);
       }
@@ -3086,11 +3105,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         pressureDelta
       );
       const dependencyStory = getDependencyStoryBeat(state.dependency, dependencyOutcome.dependency);
+      let phase2PenaltyActive = false;
       if (state.gamePhase === 2) {
         const rewardMultiplier = getPhase2RewardMultiplier(dependencyOutcome.baronPressure);
         if (rewardMultiplier !== 1) {
           cashReward = Math.floor(cashReward * rewardMultiplier);
           researchReward = Math.floor(researchReward * rewardMultiplier);
+          phase2PenaltyActive = true;
         }
       }
       const firstSessionActive = state.tutorialComplete && !state.firstSessionComplete;
@@ -3419,6 +3440,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextState = queueStoryBeat(nextState, dependencyStory);
       }
       nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
+      if (phase2PenaltyActive) {
+        nextState = queueStoryBeat(nextState, "mentor_phase2_pressure");
+      }
       if (dependencyOutcome.lockoutActive && !state.lockoutActive) {
         nextState = beginLockout(nextState);
       }
@@ -3660,6 +3684,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             },
           },
         };
+        if (level === 1) {
+          nextState = queueStoryBeat(nextState, "baron_open_unlocked");
+        }
       }
       if (node.id === "freedom_blueprint") {
         nextState = queueStoryBeat(nextState, "rd_blueprint");
@@ -3835,7 +3862,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.supplierScoutSpawnsRemaining + routeSpawns
       );
       if (nextRemaining === state.supplierScoutSpawnsRemaining) return state;
-      return {
+      let nextState: GameState = {
         ...state,
         cash: state.cash - cost,
         supplierScoutRoute: action.route,
@@ -3843,6 +3870,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      if (action.route === "locked") {
+        nextState = queueStoryBeat(nextState, "mentor_scout_locked");
+      }
+      return nextState;
     }
 
     case "START_MENTOR_CLINIC": {

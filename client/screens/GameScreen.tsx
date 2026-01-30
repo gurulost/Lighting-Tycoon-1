@@ -229,10 +229,8 @@ export default function GameScreen() {
   const missionRewardRef = useRef(state.lastMissionRewardId);
   const baronShipmentRef = useRef(state.lastBaronShipmentId);
   const cooldownHintRef = useRef(state.lastCooldownHintId);
-  const storyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockExpiresAtRef = useRef(0);
-  const draggingRef = useRef(false);
   const tutorialStepRef = useRef(state.tutorialStep);
   const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
   const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
@@ -380,9 +378,6 @@ export default function GameScreen() {
     return () => {
       if (toastTimeout.current) {
         clearTimeout(toastTimeout.current);
-      }
-      if (storyTimeout.current) {
-        clearTimeout(storyTimeout.current);
       }
       if (momentLockTimeout.current) {
         clearTimeout(momentLockTimeout.current);
@@ -676,52 +671,6 @@ export default function GameScreen() {
     dispatch,
   ]);
 
-  useEffect(() => {
-    if (
-      state.activeStoryBeatId &&
-      (activeModal || state.baronOfferAvailable || showLockoutModal || selectedPartIndex !== null)
-    ) {
-      dispatch({ type: "DISMISS_STORY_BEAT" });
-    }
-  }, [
-    state.activeStoryBeatId,
-    activeModal,
-    state.baronOfferAvailable,
-    showLockoutModal,
-    selectedPartIndex,
-    dispatch,
-  ]);
-
-  useEffect(() => {
-    if (!state.activeStoryBeatId) return;
-    if (storyTimeout.current) {
-      clearTimeout(storyTimeout.current);
-    }
-    storyTimeout.current = setTimeout(() => {
-      dispatch({ type: "DISMISS_STORY_BEAT" });
-    }, 8000);
-  }, [state.activeStoryBeatId, dispatch]);
-
-  useEffect(() => {
-    if (!state.activeStoryBeatId) {
-      draggingRef.current = isDragging;
-      return;
-    }
-    if (draggingRef.current === isDragging) return;
-    draggingRef.current = isDragging;
-    if (isDragging) {
-      if (storyTimeout.current) {
-        clearTimeout(storyTimeout.current);
-      }
-    } else {
-      if (storyTimeout.current) {
-        clearTimeout(storyTimeout.current);
-      }
-      storyTimeout.current = setTimeout(() => {
-        dispatch({ type: "DISMISS_STORY_BEAT" });
-      }, 8000);
-    }
-  }, [isDragging, state.activeStoryBeatId, dispatch]);
 
   useEffect(() => {
     if (state.tutorialComplete) return;
@@ -947,13 +896,15 @@ export default function GameScreen() {
         ) : null}
 
         {state.activeStoryBeatId && !isDragging && !activeModal && !topCondensed ? (
-          <Pressable style={styles.storyToastContainer} onPress={handleStoryPress}>
+          <View style={styles.storyToastContainer}>
             <StoryToast
               beatId={state.activeStoryBeatId}
               reducedMotion={state.settings.reducedMotion}
               expanded={false}
+              onPress={handleStoryPress}
+              onDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
             />
-          </Pressable>
+          </View>
         ) : null}
       </View>
 

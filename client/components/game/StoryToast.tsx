@@ -8,9 +8,17 @@ interface StoryToastProps {
   beatId: string;
   reducedMotion?: boolean;
   expanded?: boolean;
+  onPress?: () => void;
+  onDismiss?: () => void;
 }
 
-export function StoryToast({ beatId, reducedMotion = false, expanded = false }: StoryToastProps) {
+export function StoryToast({
+  beatId,
+  reducedMotion = false,
+  expanded = false,
+  onPress,
+  onDismiss,
+}: StoryToastProps) {
   const beat = STORY_BEATS[beatId];
   if (!beat) return null;
 
@@ -19,7 +27,12 @@ export function StoryToast({ beatId, reducedMotion = false, expanded = false }: 
 
   return (
     <Animated.View entering={enterAnim} exiting={exitAnim}>
-      <StoryBeatCard beat={beat} variant={expanded ? "expanded" : "chip"} />
+      <StoryBeatCard
+        beat={beat}
+        variant={expanded ? "expanded" : "chip"}
+        onPress={onPress}
+        onDismiss={onDismiss}
+      />
     </Animated.View>
   );
 }

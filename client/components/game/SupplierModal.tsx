@@ -41,7 +41,7 @@ const SUPPLIER_META: Record<
 };
 
 export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps) {
-  const { state, tapSupplier } = useGame();
+  const { state, tapSupplier, dispatch } = useGame();
   const [now, setNow] = useState(() => Date.now());
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
@@ -53,6 +53,14 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
     }, 1000);
     return () => clearInterval(timer);
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (!state.tutorialComplete) return;
+    if (state.suppliers.open.level > 0) return;
+    if (state.storySeen["tina_open_locked"]) return;
+    dispatch({ type: "QUEUE_STORY_BEAT", beatId: "tina_open_locked" });
+  }, [visible, state.tutorialComplete, state.suppliers.open.level, state.storySeen, dispatch]);
 
   const handleTap = (supplierId: SupplierId) => {
     const success = tapSupplier(supplierId);
