@@ -80,11 +80,16 @@ export function OrdersModal({
     animationMode: TrimLightAnimation;
   } | null>(null);
   const orderLegend = [
-    { key: "C", label: "Clip" },
-    { key: "T", label: "Track" },
-    { key: "S", label: "Segment" },
-    { key: "K", label: "Kit" },
-    { key: "P", label: "System" },
+    { key: "CL", label: "Clip" },
+    { key: "TR", label: "Track" },
+    { key: "SG", label: "Segment" },
+    { key: "KT", label: "Kit" },
+    { key: "PR", label: "System" },
+    { key: "AR", label: "Array" },
+    { key: "SP", label: "Spine" },
+    { key: "ST", label: "Stack" },
+    { key: "GR", label: "Grid" },
+    { key: "KI", label: "Kingdom" },
   ];
   const badgeLegend = [
     { key: "O", label: "Open" },
@@ -98,6 +103,7 @@ export function OrdersModal({
     !(state.lockoutActive && order.type === "lab_request") &&
     !order.modifierIds?.includes("first_session") &&
     !order.modifierIds?.includes("tier5_showcase") &&
+    !order.modifierIds?.includes("tier10_showcase") &&
     !order.modifierIds?.includes("threshold_story");
 
   const refreshTarget =
@@ -513,7 +519,7 @@ export function OrdersModal({
                   </View>
                 ) : (
                   <ThemedText style={styles.boostHint}>
-                    Next {scoutSpawns} spawns: choose Open, Locked, or Tier route.
+                    Next {scoutSpawns} spawns: force Open, Locked, or +1 tier drops.
                   </ThemedText>
                 )}
                 {showScoutOptions ? (
@@ -527,7 +533,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("open") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Open Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>More open spawns</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Force Open parts</ThemedText>
                     </Pressable>
                     <Pressable
                       style={[
@@ -538,7 +544,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("locked") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Locked Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>More locked spawns</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>Force Locked parts</ThemedText>
                     </Pressable>
                     <Pressable
                       style={[
@@ -549,7 +555,7 @@ export function OrdersModal({
                       onPress={canStartScout ? () => handleStartScout("tier") : undefined}
                     >
                       <ThemedText style={styles.boostOptionLabel}>Tier Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>Better tier odds</ThemedText>
+                      <ThemedText style={styles.boostOptionSub}>+1 tier on base drop</ThemedText>
                     </Pressable>
                   </View>
                 ) : null}
@@ -672,8 +678,8 @@ export function OrdersModal({
         <View style={styles.legendGroup}>
           <ThemedText style={styles.legendGroupLabel}>Order letters</ThemedText>
           <View style={styles.legendRow}>
-            {orderLegend.map((item) => (
-              <View key={item.key} style={styles.legendChip}>
+            {orderLegend.map((item, index) => (
+              <View key={`${item.key}-${index}`} style={styles.legendChip}>
                 <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
                 <ThemedText style={styles.legendLabel}>{item.label}</ThemedText>
               </View>
@@ -709,6 +715,7 @@ export function OrdersModal({
                 !(state.lockoutActive && order.type === "lab_request") &&
                 !order.modifierIds?.includes("first_session") &&
                 !order.modifierIds?.includes("tier5_showcase") &&
+                !order.modifierIds?.includes("tier10_showcase") &&
                 !order.modifierIds?.includes("threshold_story")
               }
             />

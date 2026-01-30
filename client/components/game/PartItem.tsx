@@ -34,12 +34,17 @@ const partPremiumLocked = require("../../../assets/images/part-premium-locked.we
 const mergeParticleOpen = require("../../../assets/images/particle-merge-open.png");
 const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.png");
 
-const PART_SPRITES: Record<PartTier, Record<PartFamily, ImageSourcePropType>> = {
+const PART_SPRITES: Record<PartTier, Record<Exclude<PartFamily, "waste">, ImageSourcePropType>> = {
   1: { open: partClipOpen, locked: partClipLocked },
   2: { open: partTrackOpen, locked: partTrackLocked },
   3: { open: partSegmentOpen, locked: partSegmentLocked },
   4: { open: partSmartkitOpen, locked: partSmartkitLocked },
   5: { open: partPremiumOpen, locked: partPremiumLocked },
+  6: { open: partPremiumOpen, locked: partPremiumLocked },
+  7: { open: partPremiumOpen, locked: partPremiumLocked },
+  8: { open: partPremiumOpen, locked: partPremiumLocked },
+  9: { open: partPremiumOpen, locked: partPremiumLocked },
+  10: { open: partPremiumOpen, locked: partPremiumLocked },
 };
 
 const TIER_NAMES: Record<PartTier, string> = {
@@ -48,6 +53,11 @@ const TIER_NAMES: Record<PartTier, string> = {
   3: "Segment",
   4: "Kit",
   5: "Premium",
+  6: "Array",
+  7: "Spine",
+  8: "Stack",
+  9: "Grid",
+  10: "Kingdom",
 };
 
 interface PartItemProps {
@@ -97,9 +107,24 @@ export function PartItem({
   const hasSpawned = React.useRef(false);
 
   const isOpen = part.family === "open";
-  const primaryColor = isOpen ? GameColors.openStandard.primary : GameColors.locked.primary;
-  const glowColor = isOpen ? GameColors.openStandard.glow : GameColors.locked.accent;
-  const gradientColors = isOpen
+  const isWaste = part.family === "waste";
+  const primaryColor = isWaste
+    ? GameColors.ui.warning
+    : isOpen
+    ? GameColors.openStandard.primary
+    : GameColors.locked.primary;
+  const glowColor = isWaste
+    ? GameColors.ui.warning
+    : isOpen
+    ? GameColors.openStandard.glow
+    : GameColors.locked.accent;
+  const tierAccent =
+    !isWaste && part.tier >= 6 ? GameColors.tiers[part.tier] : undefined;
+  const gradientColors = isWaste
+    ? ["#3A3A45", "#4A4A5A", "#3A3A45"]
+    : tierAccent
+    ? [`${primaryColor}15`, `${tierAccent}55`, `${primaryColor}15`]
+    : isOpen
     ? ["#4A9EFF20", "#00D9FF40", "#4A9EFF20"]
     : ["#FFB84D20", "#A855F740", "#FFB84D20"];
 
@@ -238,8 +263,8 @@ export function PartItem({
     };
   });
 
-  const sprite = PART_SPRITES[part.tier][part.family];
-  const showPremiumLights = part.tier === 5;
+  const sprite = part.family === "waste" ? null : PART_SPRITES[part.tier][part.family];
+  const showPremiumLights = part.tier >= 5 && !isWaste;
 
   const content = (
     <Animated.View
@@ -268,12 +293,18 @@ export function PartItem({
             style={styles.openPattern}
           />
         ) : null}
-        <Image
-          source={sprite}
-          style={[styles.sprite, { width: size * 0.75, height: size * 0.75 }]}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-        />
+        {sprite ? (
+          <Image
+            source={sprite}
+            style={[styles.sprite, { width: size * 0.75, height: size * 0.75 }]}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
+        ) : (
+          <View style={styles.wasteBadge}>
+            <ThemedText style={styles.wasteText}>Waste</ThemedText>
+          </View>
+        )}
         {showPremiumLights ? (
           <View style={[styles.premiumLights, { pointerEvents: "none" }]}>
             <TrimLightStrip
@@ -307,20 +338,26 @@ export function PartItem({
           styles.familyIndicator,
           part.family === "locked"
             ? { backgroundColor: GameColors.locked.accent + "80" }
+            : part.family === "waste"
+            ? { backgroundColor: GameColors.ui.warning + "80" }
             : styles.familyIndicatorOpen,
         ]}
       >
         <ThemedText
           style={[
             styles.familyText,
-            part.family === "locked" ? styles.familyTextLocked : styles.familyTextOpen,
+            part.family === "locked"
+              ? styles.familyTextLocked
+              : part.family === "waste"
+              ? styles.familyTextWaste
+              : styles.familyTextOpen,
           ]}
         >
-          {part.family === "locked" ? "L" : "O"}
+          {part.family === "locked" ? "L" : part.family === "waste" ? "W" : "O"}
         </ThemedText>
       </View>
 
-      {part.compatible ? (
+      {part.compatible && !isWaste ? (
         <View style={[styles.compatibleIndicator, { backgroundColor: GameColors.ui.success }]}>
           <ThemedText style={styles.compatibleText}>C</ThemedText>
         </View>
@@ -345,7 +382,7 @@ export function MergeAnimation({
 }: {
   onComplete: () => void;
   tier: PartTier;
-  family: "open" | "locked";
+  family: PartFamily;
   size?: number;
 }) {
   const scale = useSharedValue(0);
@@ -353,8 +390,17 @@ export function MergeAnimation({
   const rotation = useSharedValue(0);
 
   const isOpen = family === "open";
-  const primaryColor = isOpen ? GameColors.openStandard.primary : GameColors.locked.primary;
-  const glowColor = isOpen ? GameColors.openStandard.glow : GameColors.locked.accent;
+  const isWaste = family === "waste";
+  const primaryColor = isWaste
+    ? GameColors.ui.warning
+    : isOpen
+    ? GameColors.openStandard.primary
+    : GameColors.locked.primary;
+  const glowColor = isWaste
+    ? GameColors.ui.warning
+    : isOpen
+    ? GameColors.openStandard.glow
+    : GameColors.locked.accent;
 
   React.useEffect(() => {
     scale.value = withSequence(
@@ -376,7 +422,8 @@ export function MergeAnimation({
     opacity: localOpacity.value,
   }));
 
-  const sprite = PART_SPRITES[tier][family];
+  const sprite =
+    family === "waste" ? partPremiumOpen : PART_SPRITES[tier][family];
   const particle = isOpen ? mergeParticleOpen : mergeParticleLocked;
 
   return (
@@ -501,6 +548,9 @@ const styles = StyleSheet.create({
   familyTextOpen: {
     color: GameColors.openStandard.primary,
   },
+  familyTextWaste: {
+    color: "#1A1A2E",
+  },
   compatibleIndicator: {
     position: "absolute",
     bottom: -2,
@@ -536,5 +586,20 @@ const styles = StyleSheet.create({
   mergeSprite: {
     width: "80%",
     height: "80%",
+  },
+  wasteBadge: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "70%",
+    height: "70%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#6B6B7A",
+    backgroundColor: "rgba(30,30,40,0.7)",
+  },
+  wasteText: {
+    color: "#D1A33A",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

@@ -27,6 +27,7 @@ import {
   WORKBENCH_SLOT,
   ORDER_INBOX_SLOT,
   RD_BENCH_SLOT,
+  PartFamily,
   PartTier,
   Part,
 } from "@/types/game";
@@ -46,15 +47,20 @@ interface LayoutRect {
 }
 
 const GHOST_LABELS: Record<PartTier, string> = {
-  1: "C",
-  2: "T",
-  3: "S",
-  4: "K",
-  5: "P",
+  1: "CL",
+  2: "TR",
+  3: "SG",
+  4: "KT",
+  5: "PR",
+  6: "AR",
+  7: "SP",
+  8: "ST",
+  9: "GR",
+  10: "KI",
 };
 
 interface MergeBoardProps {
-  onWorkbenchPress: (result: "spawned" | "blocked" | "cooldown") => void;
+  onWorkbenchPress: () => void;
   onOrderInboxPress: () => void;
   onRDBenchPress: () => void;
   onStationLongPress?: (station: "workbench" | "orders" | "rd") => void;
@@ -143,7 +149,7 @@ export function MergeBoard({
   onStationLayout,
   maxHeight,
 }: MergeBoardProps) {
-  const { state, mergeParts, movePart, canMerge, spawnPart, dispatch } = useGame();
+  const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const reducedMotion = state.settings.reducedMotion;
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
@@ -154,19 +160,17 @@ export function MergeBoard({
   const [highlightedSlots, setHighlightedSlots] = useState<number[]>([]);
   const [mergeEffect, setMergeEffect] = useState<{
     index: number;
-    tier: number;
-    family: "open" | "locked";
+    tier: PartTier;
+    family: PartFamily;
   } | null>(null);
   const [containerLayout, setContainerLayout] = useState<LayoutRect | null>(null);
   const [gridLayout, setGridLayout] = useState<LayoutRect | null>(null);
   const [backpackLayout, setBackpackLayout] = useState<LayoutRect | null>(null);
   const [recycleLayout, setRecycleLayout] = useState<LayoutRect | null>(null);
-  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const containerRef = useRef<View>(null);
   const gridRef = useRef<View>(null);
   const backpackRef = useRef<View>(null);
   const recycleRef = useRef<View>(null);
-  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const orderPulse = useSharedValue(0);
   const backpackGlow = useSharedValue(0);
   const recyclePulse = useSharedValue(0);
@@ -187,34 +191,6 @@ export function MergeBoard({
   useEffect(() => {
     onDragStateChange?.(isDragging);
   }, [isDragging, onDragStateChange]);
-
-  useEffect(() => {
-    if (cooldownIntervalRef.current) {
-      clearInterval(cooldownIntervalRef.current);
-      cooldownIntervalRef.current = null;
-    }
-    const cooldownUntil = state.workbenchCooldownUntil || 0;
-    const now = Date.now();
-    setCooldownNow(now);
-    if (!cooldownUntil || cooldownUntil <= now) {
-      return undefined;
-    }
-    cooldownIntervalRef.current = setInterval(() => {
-      const tickNow = Date.now();
-      setCooldownNow(tickNow);
-      if (cooldownIntervalRef.current && tickNow >= cooldownUntil) {
-        clearInterval(cooldownIntervalRef.current);
-        cooldownIntervalRef.current = null;
-      }
-    }, 250);
-
-    return () => {
-      if (cooldownIntervalRef.current) {
-        clearInterval(cooldownIntervalRef.current);
-        cooldownIntervalRef.current = null;
-      }
-    };
-  }, [state.workbenchCooldownUntil]);
 
   const screenWidth = Dimensions.get("window").width;
   const boardPadding = Spacing.lg * 2;
@@ -422,6 +398,7 @@ export function MergeBoard({
       part: Part,
       req: { tier: PartTier; family: "open" | "locked" | "any"; requiresCompatible?: boolean }
     ) => {
+      if (part.family === "waste") return false;
       if (part.tier !== req.tier) return false;
       if (req.requiresCompatible && !part.compatible) return false;
       if (req.family === "any") return true;
@@ -518,6 +495,10 @@ export function MergeBoard({
       onMeasured?.(layout);
     });
   }, []);
+
+  const handleContainerLayout = useCallback(() => {
+    measureContainer();
+  }, [measureContainer]);
 
   const measureGrid = useCallback(() => {
     gridRef.current?.measureInWindow((x, y, width, height) => {
@@ -719,12 +700,14 @@ export function MergeBoard({
                       }
                       if (merged && fromPart && toPart && !reducedMotion) {
                         const mergedFamily =
-                          fromPart.family === "locked" || toPart.family === "locked"
+                          fromPart.family === "waste" || toPart.family === "waste"
+                            ? "waste"
+                            : fromPart.family === "locked" || toPart.family === "locked"
                             ? "locked"
                             : "open";
                         setMergeEffect({
                           index: toIndex,
-                          tier: fromPart.tier + 1,
+                          tier: (fromPart.tier + 1) as PartTier,
                           family: mergedFamily,
                         });
                       }
@@ -791,10 +774,14 @@ export function MergeBoard({
             }
             if (merged && fromPart && toPart && !reducedMotion) {
               const mergedFamily =
-                fromPart.family === "locked" || toPart.family === "locked" ? "locked" : "open";
+                fromPart.family === "waste" || toPart.family === "waste"
+                  ? "waste"
+                  : fromPart.family === "locked" || toPart.family === "locked"
+                  ? "locked"
+                  : "open";
               setMergeEffect({
                 index: toIndex,
-                tier: fromPart.tier + 1,
+                tier: (fromPart.tier + 1) as PartTier,
                 family: mergedFamily,
               });
             }
@@ -965,41 +952,16 @@ export function MergeBoard({
 
   const renderStation = (index: number) => {
     if (index === WORKBENCH_SLOT) {
-      const cooldownUntil = state.workbenchCooldownUntil || 0;
-      const workbenchReady = !cooldownUntil || cooldownNow >= cooldownUntil;
-      const cooldownRemaining = Math.max(0, cooldownUntil - cooldownNow);
-      const cooldownProgress = workbenchReady
-        ? 1
-        : 1 - cooldownRemaining / Math.max(1, state.workbenchMaxCooldown);
-
       return (
         <AnimatedStation
           key={index}
-          isActive={workbenchReady}
+          isActive
           forcePulse={tutorialFocus === "workbench"}
           onPress={() => {
-            if (workbenchReady) {
-              const didSpawn = spawnPart();
-              if (didSpawn) {
-                SoundManager.play("spawn");
-                if (hapticsEnabled) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                }
-                onWorkbenchPress("spawned");
-              } else {
-                SoundManager.play("error");
-                if (hapticsEnabled) {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                }
-                onWorkbenchPress("blocked");
-              }
-            } else {
-              SoundManager.play("error");
-              if (hapticsEnabled) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              }
-              onWorkbenchPress("cooldown");
+            if (hapticsEnabled) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }
+            onWorkbenchPress();
           }}
           onLongPress={() => onStationLongPress?.("workbench")}
           reducedMotion={reducedMotion}
@@ -1012,22 +974,10 @@ export function MergeBoard({
           >
             <Image
               source={stationWorkbench}
-              style={[styles.stationIcon, { opacity: workbenchReady ? 1 : 0.5 }]}
+              style={styles.stationIcon}
               contentFit="contain"
               cachePolicy="memory-disk"
             />
-            {!workbenchReady ? (
-              <View style={styles.cooldownStrip}>
-                <TrimLightStrip
-                  progress={cooldownProgress}
-                  bulbs={6}
-                  height={10}
-                  pattern="classic"
-                  animated={false}
-                  reducedMotion
-                />
-              </View>
-            ) : null}
           </LinearGradient>
         </AnimatedStation>
       );
@@ -1107,7 +1057,7 @@ export function MergeBoard({
   }
 
   return (
-    <View style={styles.container} ref={containerRef} onLayout={() => measureContainer()}>
+      <View style={styles.container} ref={containerRef} onLayout={handleContainerLayout}>
       <LinearGradient
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}
@@ -1177,7 +1127,7 @@ export function MergeBoard({
               ]}
             >
               <MergeAnimation
-                tier={mergeEffect.tier as 1 | 2 | 3 | 4 | 5}
+                tier={mergeEffect.tier}
                 family={mergeEffect.family}
                 size={tileSize}
                 onComplete={() => setMergeEffect(null)}
@@ -1439,7 +1389,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A2A4A60",
   },
   ghostBadge: {
-    width: 22,
+    width: 26,
     height: 22,
     borderRadius: 11,
     borderWidth: 1,
@@ -1448,7 +1398,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   ghostText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
   },
   orderHighlightOverlay: {

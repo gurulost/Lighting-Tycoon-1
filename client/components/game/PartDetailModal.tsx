@@ -27,8 +27,11 @@ export function PartDetailModal({
   const hapticsEnabled = state.settings.hapticsEnabled;
   const isLocked = part.family === "locked";
   const isCompatible = !!part.compatible;
+  const isWaste = part.family === "waste";
   const familyColor = isLocked
     ? GameColors.locked.primary
+    : isWaste
+    ? GameColors.ui.warning
     : isCompatible
     ? GameColors.ui.success
     : GameColors.openStandard.primary;
@@ -40,7 +43,11 @@ export function PartDetailModal({
         { backgroundColor: familyColor + "25", borderColor: familyColor + "40" },
       ]}
     >
-      <Feather name={isLocked ? "lock" : "shield"} size={22} color={familyColor} />
+      <Feather
+        name={isLocked ? "lock" : isWaste ? "trash-2" : "shield"}
+        size={22}
+        color={familyColor}
+      />
     </View>
   );
 
@@ -63,6 +70,8 @@ export function PartDetailModal({
           subtitle={
             isLocked
               ? "Locked Component"
+              : isWaste
+              ? "Waste Material"
               : isCompatible
               ? "Open-Compatible Component"
               : "Open-Standard Component"
@@ -81,6 +90,8 @@ export function PartDetailModal({
               <ThemedText style={styles.detailText}>
                 {isLocked
                   ? "+Dependency on merge"
+                  : isWaste
+                  ? "Recycle or merge to reclaim space"
                   : isCompatible
                   ? "Counts for locked + compatible installs"
                   : "Generates Research on merge"}

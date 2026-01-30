@@ -74,6 +74,11 @@ function RDNodeCard({
   }));
 
   const isFreedomBuild = node.id === "freedom_build";
+  const materialCost = node.materialCost || 0;
+  const compatibilityCost = node.compatibilityCost || 0;
+  const costLabelParts = [`${node.cost} Research`];
+  if (materialCost > 0) costLabelParts.push(`${materialCost} Materials`);
+  if (compatibilityCost > 0) costLabelParts.push(`${compatibilityCost} Compat`);
 
   return (
     <Animated.View
@@ -144,7 +149,7 @@ function RDNodeCard({
               { color: canUnlock ? "#0F0F1F" : GameColors.text.disabled },
             ]}
           >
-            {node.cost} Research
+            {costLabelParts.join(" • ")}
           </ThemedText>
         </Pressable>
       )}
@@ -160,6 +165,10 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
   const canUnlockNode = (node: RDNode): boolean => {
     if (state.rdNodes[node.id]) return false;
     if (state.research < node.cost) return false;
+    if (node.materialCost && state.upgradeMaterials < node.materialCost) return false;
+    if (node.compatibilityCost && state.compatibilityComponents < node.compatibilityCost) {
+      return false;
+    }
     return node.prerequisites.every((p) => state.rdNodes[p]);
   };
 
@@ -179,6 +188,16 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           <Feather name="zap" size={20} color={GameColors.currency.research} />
           <ThemedText style={styles.researchValue}>{state.research}</ThemedText>
           <ThemedText style={styles.researchLabel}>Research</ThemedText>
+        </View>
+        <View style={styles.materialDisplay}>
+          <Feather name="clipboard" size={18} color={GameColors.text.secondary} />
+          <ThemedText style={styles.materialValue}>{state.upgradeMaterials}</ThemedText>
+          <ThemedText style={styles.materialLabel}>Materials</ThemedText>
+        </View>
+        <View style={styles.materialDisplay}>
+          <Feather name="shield" size={18} color={GameColors.text.secondary} />
+          <ThemedText style={styles.materialValue}>{state.compatibilityComponents}</ThemedText>
+          <ThemedText style={styles.materialLabel}>Compat</ThemedText>
         </View>
       </View>
 
@@ -267,6 +286,7 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: Spacing.xl,
+    gap: Spacing.sm,
   },
   researchDisplay: {
     flexDirection: "row",
@@ -277,6 +297,25 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignSelf: "flex-start",
+  },
+  materialDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: GameColors.ui.surface,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignSelf: "flex-start",
+  },
+  materialValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  materialLabel: {
+    fontSize: 13,
+    color: GameColors.text.secondary,
   },
   researchValue: {
     fontSize: 24,

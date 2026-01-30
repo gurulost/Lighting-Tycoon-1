@@ -4,27 +4,30 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 
 ---
 
-## Drop Rates (Open vs Locked)
-**Family roll** (`getRandomFamily`):
-- Phase 1 locked chance curve: `0.05 + 0.88 * pow(dependency/100, 1.2)`
-- Phase 2 base locked chance: `0.08`
-- Open Standardization II reduces locked chance by `0.12`
-- Scout route shift: `±0.20` (clamped 0.02–0.98)
-- Baron modifiers:
-  - Contract active: `+0.03`
-  - Crate bonus: `+0.05` for next 12 successful spawns
-  - Rush bonus: `+0.02` for next 6 successful spawns
+## Supplier Drops
+Drop tables are defined in `client/constants/dropTables.ts` and summarized in `docs/drop_tables.md`.
 
-**Tier roll** (`getRandomTier`):
-- Base tier thresholds:
-  - Tier 1 threshold: `max(25, 60 - qualityBonus - lockedBoost)`
-  - Tier 2 threshold: `max(tier1 + 10, 85 - qualityBonus/2 - lockedBoost/2)`
-  - Tier 3: up to 95
-  - Tier 4: 95–100
+**Supplier tables**
+- Baron / Open: fixed tier distributions per supplier level.
+- Salvage: top-roll (refurb/scrap/material), then refurb tier table.
+- Bonus channels are independent rolls (waste, upgrade materials, compatibility components).
 
-**Modifiers**
-- `qualityBonus = workbench_quality_1 * 10`
-- `lockedBoost` for locked parts: `min(6, floor(max(0, dependency-10)/5))`
+**Tier bonuses**
+- Workbench Quality: `+1 tier` chance per level (`0.10 * level`) on supplier drops.
+- Open Standardization II: additional `+1 tier` chance on **open-family** drops (`0.12`).
+- Merge Momentum: applies a temporary minimum tier floor to supplier drops.
+
+**Baron modifiers (extra locked roll)**
+- Contract active: `+0.03` bonus locked roll while active.
+- Crate bonus: `+0.05` bonus locked roll for next 12 **non‑forced** spawns.
+- Rush bonus: `+0.02` bonus locked roll for next 6 **non‑forced** spawns.
+
+**Supplier Scout**
+- Routes:
+  - Open Route: force base drop to Open.
+  - Locked Route: force base drop to Locked.
+  - Tier Route: `+1 tier` on base drop.
+- Consumption: only on non-forced spawns.
 
 ---
 
@@ -79,9 +82,9 @@ Unlocked after tutorial (Supplier Scout) and after first session completion (oth
 - Cost: `90 + reputationTier * 30`
 - Duration: 6 spawns (stack to 12)
 - Routes:
-  - Open Route: locked chance `-0.20` (clamped 0–0.85)
-  - Locked Route: locked chance `+0.20` (clamped 0–0.85)
-  - Tier Route: `+15` quality bonus to tier roll
+  - Open Route: force base drop to Open
+  - Locked Route: force base drop to Locked
+  - Tier Route: `+1 tier` on base drop
 - Consumption: only on non-forced spawns
 
 **Mentor Workshop Clinic**

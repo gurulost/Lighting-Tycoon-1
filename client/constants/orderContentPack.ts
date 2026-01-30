@@ -1,4 +1,4 @@
-import { PartFamily, PartTier, OrderType, OrderRequirement, Order } from "@/types/game";
+import { PartTier, OrderType, OrderRequirement, Order, OrderFamilyPreference } from "@/types/game";
 
 export interface BaseRecipe {
   id: string;
@@ -22,8 +22,8 @@ export interface OrderModifier {
     | "compatibility";
   minNeighborhoodId: string;
   maxNeighborhoodId?: string;
-  styleMatchFamily?: PartFamily;
-  clientPreference?: PartFamily;
+  styleMatchFamily?: OrderFamilyPreference;
+  clientPreference?: OrderFamilyPreference;
   rushDeadlineSec?: number;
   noSubstitutions?: boolean;
   ecoAuditBonusResearch?: number;
@@ -235,6 +235,91 @@ export const BASE_RECIPES: BaseRecipe[] = [
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
+  {
+    id: "base_array_1",
+    name: "Routing Array",
+    requirements: [{ tier: 6 as PartTier, family: "any", count: 1 }],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_array_segment",
+    name: "Corner Mapping",
+    requirements: [
+      { tier: 6 as PartTier, family: "any", count: 1 },
+      { tier: 3 as PartTier, family: "any", count: 2 },
+    ],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_spine_1",
+    name: "Network Spine",
+    requirements: [{ tier: 7 as PartTier, family: "any", count: 1 }],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_spine_array",
+    name: "Long Run Backbone",
+    requirements: [
+      { tier: 7 as PartTier, family: "any", count: 1 },
+      { tier: 6 as PartTier, family: "any", count: 1 },
+    ],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_stack_1",
+    name: "Control Stack",
+    requirements: [{ tier: 8 as PartTier, family: "any", count: 1 }],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_stack_smart",
+    name: "Controller Sync",
+    requirements: [
+      { tier: 8 as PartTier, family: "any", count: 1 },
+      { tier: 4 as PartTier, family: "any", count: 1 },
+    ],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_grid_1",
+    name: "Signature Grid",
+    requirements: [{ tier: 9 as PartTier, family: "any", count: 1 }],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_grid_array",
+    name: "Facade Rhythm",
+    requirements: [
+      { tier: 9 as PartTier, family: "any", count: 1 },
+      { tier: 6 as PartTier, family: "any", count: 1 },
+    ],
+    minNeighborhoodId: "liberation",
+    tags: ["act2"],
+  },
+  {
+    id: "base_kingdom_1",
+    name: "Kingdom Install",
+    requirements: [{ tier: 10 as PartTier, family: "any", count: 1 }],
+    minNeighborhoodId: "liberation",
+    tags: ["act2", "signature"],
+  },
+  {
+    id: "base_kingdom_spine",
+    name: "Legacy Linework",
+    requirements: [
+      { tier: 10 as PartTier, family: "any", count: 1 },
+      { tier: 7 as PartTier, family: "any", count: 1 },
+    ],
+    minNeighborhoodId: "liberation",
+    tags: ["act2", "signature"],
+  },
 ];
 
 export const ORDER_MODIFIERS: OrderModifier[] = [
@@ -243,7 +328,7 @@ export const ORDER_MODIFIERS: OrderModifier[] = [
     name: "Style Match Open",
     type: "style_match",
     minNeighborhoodId: "hoa",
-    styleMatchFamily: "open" as PartFamily,
+    styleMatchFamily: "open",
     lockedRequired: false,
     rewardMult: { cash: 1.0, rep: 1.0, research: 1.1 },
   },
@@ -252,7 +337,7 @@ export const ORDER_MODIFIERS: OrderModifier[] = [
     name: "Style Match Locked",
     type: "style_match",
     minNeighborhoodId: "hoa",
-    styleMatchFamily: "locked" as PartFamily,
+    styleMatchFamily: "locked",
     lockedRequired: false,
     rewardMult: { cash: 1.1, rep: 1.0, research: 1.0 },
   },
@@ -272,7 +357,7 @@ export const ORDER_MODIFIERS: OrderModifier[] = [
     name: "Client Prefers Open",
     type: "client_preference",
     minNeighborhoodId: "certified",
-    clientPreference: "open" as PartFamily,
+    clientPreference: "open",
     noSubstitutions: false,
     ecoAuditBonusResearch: 0,
     lockedRequired: false,
@@ -283,7 +368,7 @@ export const ORDER_MODIFIERS: OrderModifier[] = [
     name: "Client Prefers Locked",
     type: "client_preference",
     minNeighborhoodId: "certified",
-    clientPreference: "locked" as PartFamily,
+    clientPreference: "locked",
     noSubstitutions: false,
     ecoAuditBonusResearch: 0,
     lockedRequired: false,
@@ -1495,11 +1580,123 @@ export const ORDER_OVERRIDES: OrderOverride[] = [
     titleOverride: "Liberation Standards",
     flavorOverride: "Open‑compatible compliance required.",
   },
+  {
+    id: "ord_200",
+    baseId: "base_array_1",
+    archetypeId: "cozy_minimalist",
+    neighborhoodId: "liberation",
+    weight: 0.6,
+    titleOverride: "Roofline Array",
+    flavorOverride: "Clean lines, no glare.",
+  },
+  {
+    id: "ord_201",
+    baseId: "base_array_segment",
+    archetypeId: "hoa_enforcer",
+    neighborhoodId: "liberation",
+    weight: 0.5,
+    titleOverride: "Corner Mapping",
+    flavorOverride: "Precise routing at every edge.",
+  },
+  {
+    id: "ord_202",
+    baseId: "base_spine_1",
+    archetypeId: "neighbor_rival",
+    neighborhoodId: "liberation",
+    weight: 0.45,
+    titleOverride: "Network Spine",
+    flavorOverride: "Go brighter than the block.",
+  },
+  {
+    id: "ord_203",
+    baseId: "base_spine_array",
+    archetypeId: "boutique_owner",
+    neighborhoodId: "liberation",
+    weight: 0.4,
+    titleOverride: "Backbone Run",
+    flavorOverride: "Elegant, structured, no slack.",
+  },
+  {
+    id: "ord_204",
+    baseId: "base_stack_1",
+    archetypeId: "party_planner",
+    neighborhoodId: "liberation",
+    weight: 0.4,
+    titleOverride: "Controller Stack",
+    flavorOverride: "Multiple scenes, quick swap.",
+  },
+  {
+    id: "ord_205",
+    baseId: "base_stack_smart",
+    archetypeId: "sports_superfan",
+    neighborhoodId: "liberation",
+    weight: 0.35,
+    titleOverride: "Sync Pass",
+    flavorOverride: "Colors hit together, no lag.",
+  },
+  {
+    id: "ord_206",
+    baseId: "base_grid_1",
+    archetypeId: "subscription_skeptic",
+    neighborhoodId: "liberation",
+    weight: 0.3,
+    titleOverride: "Signature Grid",
+    flavorOverride: "Minimal control, maximum impact.",
+  },
+  {
+    id: "ord_207",
+    baseId: "base_grid_array",
+    archetypeId: "cozy_minimalist",
+    neighborhoodId: "liberation",
+    weight: 0.3,
+    titleOverride: "Facade Rhythm",
+    flavorOverride: "Even cadence, soft glow.",
+  },
+  {
+    id: "ord_208",
+    baseId: "base_kingdom_1",
+    archetypeId: "boutique_owner",
+    neighborhoodId: "liberation",
+    weight: 0.2,
+    titleOverride: "Kingdom Install",
+    flavorOverride: "A flagship build, flawless finish.",
+  },
+  {
+    id: "ord_209",
+    baseId: "base_kingdom_spine",
+    archetypeId: "neighbor_rival",
+    neighborhoodId: "liberation",
+    weight: 0.18,
+    titleOverride: "Legacy Linework",
+    flavorOverride: "Make the whole street stare.",
+  },
 ];
 
-const TIER_CASH = { 1: 10, 2: 30, 3: 50, 4: 200, 5: 500 } as const;
+const TIER_CASH = {
+  1: 10,
+  2: 30,
+  3: 50,
+  4: 200,
+  5: 500,
+  6: 900,
+  7: 1400,
+  8: 2000,
+  9: 2800,
+  10: 3800,
+} as const;
 
-const TIER_RESEARCH = { 1: 0, 2: 0, 3: 3, 4: 6, 5: 15 } as const;
+const TIER_RESEARCH = {
+  1: 0,
+  2: 0,
+  3: 3,
+  4: 6,
+  5: 15,
+  6: 24,
+  7: 34,
+  8: 46,
+  9: 60,
+  10: 75,
+} as const;
 
 const PREMIUM_MULT = 1.2;
 
@@ -1550,7 +1747,7 @@ export const ORDER_LIBRARY: OrderTemplate[] = (() => {
 
     let type: OrderType = base.requirements.some((r) => r.tier >= 5) ? "premium" : "basic";
     let rushDeadline: number | undefined;
-    let familyPreference: PartFamily | undefined;
+    let familyPreference: OrderFamilyPreference | undefined;
     let penaltyIfWrongFamily: boolean | undefined;
     let ecoAuditBonusResearch: number | undefined;
     let noSubstitutions: boolean | undefined;

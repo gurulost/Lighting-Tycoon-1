@@ -42,6 +42,11 @@ export const GameColors = {
     3: "#00D9FF",
     4: "#4DFF88",
     5: "#FFD700",
+    6: "#FFB84D",
+    7: "#FF8A65",
+    8: "#FF6FB3",
+    9: "#C77DFF",
+    10: "#7B2CBF",
   },
 };
 

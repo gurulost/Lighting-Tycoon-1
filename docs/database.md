@@ -29,7 +29,6 @@ The database is configured via `DATABASE_URL`.
 - `rd_nodes` (jsonb)
 - `freedom_controller_count` (integer)
 - `max_orders` (integer)
-- `workbench_max_cooldown` (integer)
 - `tutorial_complete` (boolean)
 - `created_at` (timestamp)
 - `updated_at` (timestamp)

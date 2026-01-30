@@ -12,7 +12,7 @@ Date: 2026-01-26
 ## 1) How the Game Works (Actual Behavior)
 
 ### Core Loop
-1. Workbench spawns parts with cooldown.
+1. Workbench opens Suppliers (charges + cooldowns).
 2. Drag-to-merge same-tier parts to climb the chain.
 3. Fulfill orders by consuming parts.
 4. Earn cash, reputation, and research.
