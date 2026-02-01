@@ -6,7 +6,6 @@ import Animated, {
   withSpring,
   withDelay,
   withSequence,
-  runOnJS,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -71,15 +70,12 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
 
   const handlePress = () => {
     if (canPurchase) {
+      handlePurchase();
       scale.value = withSequence(
         withSpring(0.95, { damping: 15 }),
         withDelay(
           100,
-          withSpring(1, { damping: 15 }, (finished) => {
-            if (finished) {
-              runOnJS(handlePurchase)();
-            }
-          })
+          withSpring(1, { damping: 15 })
         )
       );
     } else {
