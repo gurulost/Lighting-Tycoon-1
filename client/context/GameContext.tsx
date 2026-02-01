@@ -49,10 +49,15 @@ import {
   SALVAGE_REFURB_TABLES,
 } from "@/constants/dropTables";
 import { getEffectiveSupplierConfig } from "@/constants/suppliers";
+import { OverlayItem, OVERLAY_QUEUE_MAX, OVERLAY_PRIORITY } from "@/types/overlay";
 
 type GameAction =
   | { type: "TAP_SUPPLIER"; supplierId: SupplierId }
   | { type: "TICK_SUPPLIERS" }
+  | { type: "ENQUEUE_OVERLAY"; item: OverlayItem }
+  | { type: "DISMISS_OVERLAY"; id: string }
+  | { type: "CLEAR_OVERLAYS" }
+  | { type: "UPDATE_OVERLAY_TELEMETRY"; maxWaitMs: number }
   | { type: "QUEUE_STORY_BEAT"; beatId: string }
   | { type: "MERGE_PARTS"; fromIndex: number; toIndex: number }
   | { type: "MOVE_PART"; fromIndex: number; toIndex: number }
@@ -1692,6 +1697,8 @@ function getInitialState(): GameState {
     storySeen: {},
     activeStoryBeatId: undefined,
     lastStoryShownAt: 0,
+    overlayQueue: [],
+    overlayTelemetry: { maxWaitMs: 0, lastShownAt: undefined },
 
     reputationTier: 0,
     currentNeighborhoodId: startingNeighborhood.id,
@@ -1888,6 +1895,63 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "QUEUE_STORY_BEAT": {
       return queueStoryBeat(state, action.beatId);
+    }
+    case "ENQUEUE_OVERLAY": {
+      const now = Date.now();
+      const item = {
+        ...action.item,
+        createdAt:
+          typeof action.item.createdAt === "number" ? action.item.createdAt : now,
+      } as OverlayItem;
+      if (!Object.prototype.hasOwnProperty.call(OVERLAY_PRIORITY, item.type)) {
+        return state;
+      }
+      if (item.dedupeKey && state.overlayQueue.some((entry) => entry.dedupeKey === item.dedupeKey)) {
+        return state;
+      }
+      if (state.overlayQueue.some((entry) => entry.id === item.id)) {
+        return state;
+      }
+      const nextQueue = [...state.overlayQueue, item];
+      if (nextQueue.length <= OVERLAY_QUEUE_MAX) {
+        return { ...state, overlayQueue: nextQueue };
+      }
+      const nonSticky = nextQueue.filter((entry) => !entry.sticky);
+      if (nonSticky.length > 0) {
+        const oldest = nonSticky.reduce((oldestItem, entry) =>
+          entry.createdAt < oldestItem.createdAt ? entry : oldestItem
+        );
+        return {
+          ...state,
+          overlayQueue: nextQueue.filter((entry) => entry.id !== oldest.id),
+        };
+      }
+      return { ...state, overlayQueue: nextQueue.slice(1) };
+    }
+    case "DISMISS_OVERLAY": {
+      if (state.overlayQueue.length === 0) return state;
+      return {
+        ...state,
+        overlayQueue: state.overlayQueue.filter((entry) => entry.id !== action.id),
+      };
+    }
+    case "CLEAR_OVERLAYS": {
+      if (state.overlayQueue.length === 0) return state;
+      return {
+        ...state,
+        overlayQueue: [],
+      };
+    }
+    case "UPDATE_OVERLAY_TELEMETRY": {
+      const currentMax = state.overlayTelemetry?.maxWaitMs ?? 0;
+      if (action.maxWaitMs <= currentMax) return state;
+      return {
+        ...state,
+        overlayTelemetry: {
+          maxWaitMs: action.maxWaitMs,
+          lastShownAt: Date.now(),
+        },
+      };
     }
     case "TAP_SUPPLIER": {
       const now = Date.now();
@@ -5260,6 +5324,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.lastCriticalEventId === "number"
           ? action.state.lastCriticalEventId
           : 0;
+      const overlayQueue = base.overlayQueue;
+      const overlayTelemetry = base.overlayTelemetry;
       const baronChoice =
         action.state.baronChoice === "accepted" || action.state.baronChoice === "declined"
           ? action.state.baronChoice
@@ -5625,6 +5691,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? action.state.reputationTier
             : NEIGHBORHOODS.findIndex((n) => n.id === computedNeighborhood.id),
         lastCriticalEventId,
+        overlayQueue,
+        overlayTelemetry,
       };
 
       if (restoredState.lockoutActive && restoredState.dependency < CRACKDOWN_THRESHOLD) {

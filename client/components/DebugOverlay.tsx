@@ -12,6 +12,8 @@ type DebugOverlayProps = {
   selectedPartIndex?: number | null;
   isDragging?: boolean;
   showLockoutModal?: boolean;
+  overlayQueueLength?: number;
+  overlayTop?: string | null;
 };
 
 export function DebugOverlay({
@@ -21,6 +23,8 @@ export function DebugOverlay({
   selectedPartIndex,
   isDragging,
   showLockoutModal,
+  overlayQueueLength,
+  overlayTop,
 }: DebugOverlayProps) {
   const { state } = useGame();
   const [jsFps, setJsFps] = useState(0);
@@ -39,6 +43,8 @@ export function DebugOverlay({
     tutorialComplete: false,
     baronOffer: false,
     lockoutActive: false,
+    overlayQueue: 0,
+    overlayTop: "",
   });
 
   renderCountRef.current += 1;
@@ -66,6 +72,8 @@ export function DebugOverlay({
       tutorialComplete: state.tutorialComplete,
       baronOffer: state.baronOfferAvailable,
       lockoutActive: state.lockoutActive,
+      overlayQueue: overlayQueueLength ?? 0,
+      overlayTop: overlayTop ?? "",
     };
   }, [
     state.orders.length,
@@ -80,6 +88,8 @@ export function DebugOverlay({
     state.tutorialComplete,
     state.baronOfferAvailable,
     state.lockoutActive,
+    overlayQueueLength,
+    overlayTop,
   ]);
 
   useEffect(() => {
@@ -177,6 +187,22 @@ export function DebugOverlay({
         <View style={styles.row}>
           <ThemedText style={styles.label}>Story Seen</ThemedText>
           <ThemedText style={styles.value}>{storySeen}</ThemedText>
+        </View>
+        <View style={styles.row}>
+          <ThemedText style={styles.label}>Overlay Queue</ThemedText>
+          <ThemedText style={styles.value}>
+            {overlayQueueLength ?? state.overlayQueue.length}
+          </ThemedText>
+        </View>
+        <View style={styles.row}>
+          <ThemedText style={styles.label}>Overlay Top</ThemedText>
+          <ThemedText style={styles.value}>{overlayTop || "none"}</ThemedText>
+        </View>
+        <View style={styles.row}>
+          <ThemedText style={styles.label}>Overlay Max Wait</ThemedText>
+          <ThemedText style={styles.value}>
+            {state.overlayTelemetry?.maxWaitMs ?? 0}ms
+          </ThemedText>
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Order Mods</ThemedText>
