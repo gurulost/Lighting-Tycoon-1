@@ -186,7 +186,7 @@ export function OrderCard({
       return () => clearInterval(interval);
     }
     setTimeRemaining(null);
-  }, [order]);
+  }, [order.rushStartTime, order.rushDeadline]);
 
   const getOrderTypeColor = () => {
     if (order.type === "locked_required") return GameColors.locked.primary;

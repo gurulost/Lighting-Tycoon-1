@@ -6381,12 +6381,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         action.state.baronChoice === "declined"
           ? action.state.baronChoice
           : base.baronChoice;
-      const baronOfferType =
-        action.state.baronOfferType === "crate" ||
-        action.state.baronOfferType === "contract" ||
-        action.state.baronOfferType === "rush"
-          ? action.state.baronOfferType
-          : base.baronOfferType;
+      const baronOfferSeen =
+        typeof action.state.baronOfferSeen === "boolean"
+          ? action.state.baronOfferSeen
+          : base.baronOfferSeen;
+      const baronOfferCooldownUntil =
+        typeof action.state.baronOfferCooldownUntil === "number"
+          ? action.state.baronOfferCooldownUntil
+          : base.baronOfferCooldownUntil;
       const baronCooldownHintShown =
         typeof action.state.baronCooldownHintShown === "boolean"
           ? action.state.baronCooldownHintShown
@@ -6724,10 +6726,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCooldownHintId: 0,
         baronCooldownHintShown,
         baronChoice,
-        baronOfferType:
-          action.state.baronOfferAvailable && !baronOfferType
-            ? "crate"
-            : baronOfferType,
+        baronOfferAvailable: false,
+        baronOfferSeen,
+        baronOfferCooldownUntil,
+        baronOfferType: undefined,
         baronContractOrdersRemaining,
         lockoutLabOrdersTarget,
         tier5ShowcaseSeen,
@@ -6892,6 +6894,7 @@ interface GameContextValue {
 const GameContext = createContext<GameContextValue | null>(null);
 const STORAGE_KEY = "lighting_tycoon_state_v1";
 const FIRST_OPEN_KEY = "lighting_tycoon_first_open_v1";
+const FINAL_TUTORIAL_STEP = 7;
 const tuning = getTuning();
 const fallbackFeatureFlagClient = {
   getFeatureFlag: () => undefined,
@@ -7573,6 +7576,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!status.needsLocked && !status.needsOpen) return;
     dispatch({ type: "ENSURE_TUTORIAL_LOCKED_SAMPLE" });
   }, [state.tutorialComplete, state.tutorialStep, state.board, state.backpack]);
+
+  useEffect(() => {
+    if (state.tutorialComplete) return;
+    if (state.tutorialStep < FINAL_TUTORIAL_STEP) return;
+    const timeout = setTimeout(() => {
+      dispatch({ type: "COMPLETE_TUTORIAL" });
+    }, 2500);
+    return () => clearTimeout(timeout);
+  }, [state.tutorialComplete, state.tutorialStep, dispatch]);
 
   const tapSupplier = useCallback(
     (supplierId: SupplierId): boolean => {

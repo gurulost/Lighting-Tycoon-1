@@ -43,6 +43,7 @@ export function NeighborhoodBadge({
       : "warmWhite";
   const bulbCount = compact ? 10 : 12;
   const stripHeight = compact ? 14 : 18;
+  const iconSize = compact ? 22 : 28;
 
   return (
     <LinearGradient
@@ -50,8 +51,18 @@ export function NeighborhoodBadge({
       style={[styles.container, compact && styles.containerCompact]}
     >
       <View style={[styles.header, compact && styles.headerCompact]}>
-        <View style={styles.iconWrap}>
-          <Feather name="map" size={14} color={GameColors.currency.reputation} />
+        <View
+          style={[
+            styles.iconWrap,
+            compact && styles.iconWrapCompact,
+            { width: iconSize, height: iconSize, borderRadius: iconSize / 2 },
+          ]}
+        >
+          <Feather
+            name="map"
+            size={compact ? 12 : 14}
+            color={GameColors.currency.reputation}
+          />
         </View>
         <ThemedText style={[styles.title, compact && styles.titleCompact]}>
           {current.name}
@@ -64,7 +75,7 @@ export function NeighborhoodBadge({
       </View>
 
       <View style={[styles.progressRow, compact && styles.progressRowCompact]}>
-        <View style={styles.progressStrip}>
+        <View style={[styles.progressStrip, compact && styles.progressStripCompact]}>
           <TrimLightStrip
             progress={progress}
             bulbs={bulbCount}
@@ -94,7 +105,9 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginHorizontal: 0,
     marginTop: 0,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
   },
   header: {
     flexDirection: "row",
@@ -102,17 +115,17 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   headerCompact: {
-    marginBottom: 2,
+    marginBottom: Spacing.xs,
   },
   iconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     backgroundColor: `${GameColors.currency.reputation}20`,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: `${GameColors.currency.reputation}40`,
+  },
+  iconWrapCompact: {
+    borderWidth: 1,
   },
   title: {
     fontSize: 14,
@@ -131,10 +144,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   progressRowCompact: {
-    marginTop: Spacing.xs,
+    marginTop: 2,
   },
   progressStrip: {
     marginTop: Spacing.xs,
+  },
+  progressStripCompact: {
+    marginTop: 0,
   },
   progressText: {
     marginTop: Spacing.xs,
@@ -142,6 +158,7 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
   },
   progressTextCompact: {
+    marginTop: 0,
     fontSize: 10,
   },
 });

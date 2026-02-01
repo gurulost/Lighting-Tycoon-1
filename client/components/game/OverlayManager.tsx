@@ -20,6 +20,7 @@ type OverlayManagerProps = {
   queue: OverlayItem[];
   onDismiss: (id: string) => void;
   topOffset: number;
+  storyTopOffset?: number;
   bottomInset: number;
   reducedMotion?: boolean;
   onStoryPress?: () => void;
@@ -32,6 +33,7 @@ export function OverlayManager({
   queue,
   onDismiss,
   topOffset,
+  storyTopOffset,
   bottomInset,
   reducedMotion = false,
   onStoryPress,
@@ -78,6 +80,9 @@ export function OverlayManager({
 
   const milestoneEnter = reducedMotion ? FadeIn.duration(120) : FadeIn.duration(200);
   const milestoneExit = reducedMotion ? FadeOut.duration(150) : FadeOut.duration(400);
+  const hasStory =
+    primary?.type === "story" || secondary?.type === "story";
+  const shouldBlockInput = Boolean(momentLockActive && hasStory);
 
   useEffect(() => {
     if (!primary) return undefined;
@@ -101,21 +106,23 @@ export function OverlayManager({
     if (item.type === "story") {
       const beatId = item.payload?.beatId as string | undefined;
       if (!beatId) return null;
+      const storyTop = storyTopOffset ?? topOffset;
       return (
         <View
           key={item.id}
-          style={[styles.storySlot, { top: topOffset }]}
+          style={[styles.storySlot, { top: storyTop }]}
           pointerEvents="box-none"
         >
           <StoryToast
             beatId={beatId}
             reducedMotion={reducedMotion}
-            expanded={false}
+            expanded
             onPress={onStoryPress}
             onDismiss={() => {
               onStoryDismiss?.();
               onDismiss(item.id);
             }}
+            style={styles.storyToast}
           />
         </View>
       );
@@ -188,7 +195,7 @@ export function OverlayManager({
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {momentLockActive ? (
+      {shouldBlockInput ? (
         <View style={styles.momentLockBlocker} pointerEvents="auto" />
       ) : null}
       {primary ? renderOverlay(primary, "primary") : null}
@@ -209,9 +216,14 @@ const styles = StyleSheet.create({
   },
   storySlot: {
     position: "absolute",
-    left: "4%",
-    right: "4%",
-    alignItems: "flex-start",
+    left: Spacing.lg,
+    right: Spacing.lg,
+    alignItems: "flex-end",
+  },
+  storyToast: {
+    width: "92%",
+    maxWidth: 360,
+    minWidth: 240,
   },
   milestoneSlot: {
     position: "absolute",

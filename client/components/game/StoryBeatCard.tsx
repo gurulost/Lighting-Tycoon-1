@@ -141,11 +141,18 @@ export function StoryBeatCard({
             <Feather name={SPEAKER_ICON[beat.speaker]} size={12} color={color} />
             <ThemedText style={[styles.speakerLabel, { color }]}>{SPEAKER_LABEL[beat.speaker]}</ThemedText>
           </View>
-          {tagText ? (
-            <View style={styles.tag}>
-              <ThemedText style={styles.tagText}>{tagText}</ThemedText>
-            </View>
-          ) : null}
+          <View style={styles.headerRight}>
+            {tagText ? (
+              <View style={styles.tag}>
+                <ThemedText style={styles.tagText}>{tagText}</ThemedText>
+              </View>
+            ) : null}
+            {onDismiss ? (
+              <Pressable onPress={onDismiss} hitSlop={8} style={styles.cardDismiss}>
+                <Feather name="x" size={14} color={GameColors.text.secondary} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
         <View style={styles.bodyRow}>
           <View style={[styles.portraitWrapper, { borderColor: `${color}66` }]}>
@@ -205,6 +212,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
   speakerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -230,6 +242,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     color: GameColors.text.secondary,
   },
+  cardDismiss: {
+    padding: 4,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1F1F2E",
+  },
   bodyRow: {
     flexDirection: "row",
     gap: Spacing.md,
@@ -243,16 +262,19 @@ const styles = StyleSheet.create({
   copy: {
     flex: 1,
     gap: 4,
+    minWidth: 0,
   },
   line1: {
     fontSize: 14,
     fontWeight: "700",
     color: GameColors.text.primary,
+    flexShrink: 1,
   },
   line2: {
     fontSize: 12,
     fontWeight: "600",
     color: GameColors.text.secondary,
+    flexShrink: 1,
   },
   logHint: {
     flexDirection: "row",
@@ -294,6 +316,7 @@ const styles = StyleSheet.create({
   chipText: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   chipLabel: {
     fontSize: 14,
@@ -305,6 +328,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 22,
     color: GameColors.text.secondary,
+    flexShrink: 1,
   },
   chipDismiss: {
     paddingLeft: 4,

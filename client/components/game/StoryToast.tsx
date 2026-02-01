@@ -1,4 +1,5 @@
 import React from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import Animated, { FadeInDown, FadeOutUp, FadeIn, FadeOut } from "react-native-reanimated";
 
 import { STORY_BEATS } from "@/constants/story";
@@ -10,6 +11,7 @@ interface StoryToastProps {
   expanded?: boolean;
   onPress?: () => void;
   onDismiss?: () => void;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function StoryToast({
@@ -18,6 +20,7 @@ export function StoryToast({
   expanded = false,
   onPress,
   onDismiss,
+  style,
 }: StoryToastProps) {
   const beat = STORY_BEATS[beatId];
   if (!beat) return null;
@@ -26,7 +29,7 @@ export function StoryToast({
   const exitAnim = reducedMotion ? FadeOut.duration(150) : FadeOutUp.duration(200);
 
   return (
-    <Animated.View entering={enterAnim} exiting={exitAnim}>
+    <Animated.View entering={enterAnim} exiting={exitAnim} style={style}>
       <StoryBeatCard
         beat={beat}
         variant={expanded ? "expanded" : "chip"}

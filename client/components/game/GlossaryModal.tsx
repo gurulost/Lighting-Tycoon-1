@@ -8,6 +8,7 @@ import {
   ImageSourcePropType,
   TextInput,
   Pressable,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -98,6 +99,7 @@ const getSectionSortIndex = (tier: GlossaryTier, id: string) => {
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 };
 const PIN_STORAGE_KEY = "lighting_tycoon_glossary_pins_v1";
+const CONTROLS_COLLAPSE_KEY = "lighting_tycoon_glossary_controls_collapsed_v1";
 
 const makePart = (tier: PartTier, family: PartFamily): Part => ({
   id: `glossary-${family}-${tier}`,
@@ -863,11 +865,15 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
   const { state } = useGame();
   const reducedMotion = state.settings.reducedMotion;
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const isCompactHeight = windowHeight < 720;
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<GlossaryFilter>("all");
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [controlsCollapsed, setControlsCollapsed] = useState(true);
+  const [collapseLoaded, setCollapseLoaded] = useState(false);
   const listRef = useRef<SectionList<GlossaryRow, GlossarySectionHeader>>(null);
 
   const pinnedSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
@@ -900,6 +906,37 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(CONTROLS_COLLAPSE_KEY)
+      .then((raw) => {
+        if (!mounted) return;
+        if (raw === "true" || raw === "false") {
+          setControlsCollapsed(raw === "true");
+        } else {
+          setControlsCollapsed(isCompactHeight);
+        }
+        setCollapseLoaded(true);
+      })
+      .catch(() => {
+        if (mounted) {
+          setControlsCollapsed(isCompactHeight);
+          setCollapseLoaded(true);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [isCompactHeight]);
+
+  useEffect(() => {
+    if (!collapseLoaded) return;
+    AsyncStorage.setItem(
+      CONTROLS_COLLAPSE_KEY,
+      controlsCollapsed ? "true" : "false",
+    ).catch(() => undefined);
+  }, [controlsCollapsed, collapseLoaded]);
 
   useEffect(() => {
     if (!pinsLoaded) return;
@@ -985,6 +1022,7 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
       animated: true,
       viewOffset: Spacing.md,
     });
+    setControlsCollapsed(true);
   };
 
   const togglePin = (id: string) => {
@@ -1022,82 +1060,98 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
       onClose={onClose}
     >
       <View style={styles.searchSection}>
-        <View style={styles.searchBar}>
-          <Feather name="search" size={16} color={GameColors.text.secondary} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search glossary"
-            placeholderTextColor={GameColors.text.disabled}
-            style={styles.searchInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {query.length > 0 ? (
-            <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
-              <Feather name="x" size={14} color={GameColors.text.secondary} />
-            </Pressable>
-          ) : null}
+        <View style={styles.searchHeaderRow}>
+          <View style={styles.searchBar}>
+            <Feather name="search" size={16} color={GameColors.text.secondary} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search glossary"
+              placeholderTextColor={GameColors.text.disabled}
+              style={styles.searchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {query.length > 0 ? (
+              <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
+                <Feather name="x" size={14} color={GameColors.text.secondary} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => setControlsCollapsed((prev) => !prev)}
+            style={styles.collapseButton}
+          >
+            <Feather
+              name={controlsCollapsed ? "chevrons-down" : "chevrons-up"}
+              size={18}
+              color={GameColors.text.secondary}
+            />
+          </Pressable>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersRow}
-        >
-          {[
-            { key: "all", label: "All" },
-            { key: "pinned", label: "Pinned" },
-            { key: "basics", label: TIER_LABELS.basics },
-            { key: "core", label: TIER_LABELS.core },
-            { key: "advanced", label: TIER_LABELS.advanced },
-            { key: "endgame", label: TIER_LABELS.endgame },
-          ].map((filter) => {
-            const active = activeFilter === filter.key;
-            return (
-              <Pressable
-                key={filter.key}
-                onPress={() => setActiveFilter(filter.key as GlossaryFilter)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-              >
-                <ThemedText
-                  style={[
-                    styles.filterChipText,
-                    active && styles.filterChipTextActive,
-                  ]}
-                >
-                  {filter.label}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {showIndex ? (
-          <View style={styles.indexGroup}>
-            <ThemedText style={styles.indexTitle}>Jump to</ThemedText>
-            {groupedSections.map((group) => (
-              <View key={group.tier} style={styles.indexGroupBlock}>
-                <ThemedText style={styles.indexGroupTitle}>
-                  {group.title}
-                </ThemedText>
-                <View style={styles.indexChipRow}>
-                  {group.sections.map((section) => (
-                    <Pressable
-                      key={section.id}
-                      onPress={() => handleJumpTo(section.id)}
-                      style={styles.indexChip}
+        {!controlsCollapsed ? (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filtersRow}
+            >
+              {[
+                { key: "all", label: "All" },
+                { key: "pinned", label: "Pinned" },
+                { key: "basics", label: TIER_LABELS.basics },
+                { key: "core", label: TIER_LABELS.core },
+                { key: "advanced", label: TIER_LABELS.advanced },
+                { key: "endgame", label: TIER_LABELS.endgame },
+              ].map((filter) => {
+                const active = activeFilter === filter.key;
+                return (
+                  <Pressable
+                    key={filter.key}
+                    onPress={() => setActiveFilter(filter.key as GlossaryFilter)}
+                    style={[styles.filterChip, active && styles.filterChipActive]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.filterChipText,
+                        active && styles.filterChipTextActive,
+                      ]}
                     >
-                      <ThemedText style={styles.indexChipText}>
-                        {section.title}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-                </View>
+                      {filter.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {showIndex ? (
+              <View style={styles.indexGroup}>
+                <ThemedText style={styles.indexTitle}>Jump to</ThemedText>
+                {groupedSections.map((group) => (
+                  <View key={group.tier} style={styles.indexGroupBlock}>
+                    <ThemedText style={styles.indexGroupTitle}>
+                      {group.title}
+                    </ThemedText>
+                    <View style={styles.indexChipRow}>
+                      {group.sections.map((section) => (
+                        <Pressable
+                          key={section.id}
+                          onPress={() => handleJumpTo(section.id)}
+                          style={styles.indexChip}
+                        >
+                          <ThemedText style={styles.indexChipText}>
+                            {section.title}
+                          </ThemedText>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            ) : null}
+          </>
         ) : null}
       </View>
 
@@ -1105,6 +1159,7 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
         ref={listRef}
         sections={listSections}
         keyExtractor={(item) => item.section.id}
+        style={styles.list}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Spacing["4xl"] + insets.bottom },
@@ -1242,6 +1297,9 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
 }
 
 const styles = StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   content: {
     padding: Spacing.lg,
     paddingBottom: Spacing["4xl"],
@@ -1253,7 +1311,13 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     gap: Spacing.md,
   },
+  searchHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
   searchBar: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
@@ -1263,6 +1327,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2A2A4A",
     backgroundColor: "#141426",
+  },
+  collapseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1A1A2E",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   searchInput: {
     flex: 1,

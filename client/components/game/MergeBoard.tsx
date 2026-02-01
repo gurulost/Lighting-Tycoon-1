@@ -1690,6 +1690,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#FFF",
+    lineHeight: 12,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   lockOverlay: {
     position: "absolute",

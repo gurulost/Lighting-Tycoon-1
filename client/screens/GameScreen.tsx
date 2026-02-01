@@ -972,6 +972,7 @@ export default function GameScreen() {
         <MergeBoard
           layoutVersion={storyLayoutTick}
           boardContainerLayout={boardContainerLayout}
+          maxHeight={boardContainerLayout?.height}
           onWorkbenchPress={() => {
             setActiveModal("suppliers");
           }}
@@ -1112,6 +1113,7 @@ export default function GameScreen() {
         queue={overlayQueue}
         onDismiss={dismissOverlay}
         topOffset={(topStackLayout?.height ?? 0) + Spacing.xs}
+        storyTopOffset={insets.top + (topBarLayout?.height ?? 0) + Spacing.xs}
         bottomInset={insets.bottom}
         reducedMotion={state.settings.reducedMotion}
         onStoryPress={handleStoryPress}

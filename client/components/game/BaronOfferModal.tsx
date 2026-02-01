@@ -160,12 +160,16 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     backgroundColor: GameColors.locked.primary,
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
   },
   acceptText: {
     fontSize: 14,
     fontWeight: "700",
     color: "#0F0F1F",
+    flexShrink: 1,
+    flexWrap: "wrap",
+    textAlign: "center",
   },
   declineButton: {
     flexDirection: "row",
@@ -174,6 +178,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     backgroundColor: GameColors.ui.surface,
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: GameColors.ui.success + "40",
@@ -182,5 +187,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: GameColors.ui.success,
+    flexShrink: 1,
+    flexWrap: "wrap",
+    textAlign: "center",
   },
 });

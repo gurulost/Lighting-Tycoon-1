@@ -16,6 +16,7 @@ import { Upgrade } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
+import { getTuning } from "@/lib/tuning";
 
 interface UpgradeCardProps {
   upgrade: Upgrade;
@@ -42,10 +43,18 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const scale = useSharedValue(1);
+  const tuning = getTuning();
 
   const currentLevel = state.upgrades[upgrade.id] || 0;
   const isMaxed = currentLevel >= upgrade.maxLevel;
-  const cost = upgrade.cost * (currentLevel + 1);
+  const cost = Math.max(
+    0,
+    Math.round(
+      upgrade.cost *
+        (currentLevel + 1) *
+        tuning.economy.upgradeCostMultiplier,
+    ),
+  );
   const canAfford = state.cash >= cost;
   const canPurchase = !isMaxed && canAfford;
 

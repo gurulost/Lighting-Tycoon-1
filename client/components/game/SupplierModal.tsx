@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -53,6 +53,7 @@ export function SupplierModal({
 }: SupplierModalProps) {
   const { state, tapSupplier, dispatch } = useGame();
   const insets = useSafeAreaInsets();
+  const screenHeight = Dimensions.get("window").height;
   const [now, setNow] = useState(() => Date.now());
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
@@ -96,9 +97,11 @@ export function SupplierModal({
   );
 
   if (!visible) return null;
+  const maxHeight =
+    screenHeight - insets.top - insets.bottom - Spacing["4xl"];
 
   return (
-    <Pressable
+    <View
       style={[
         styles.overlay,
         {
@@ -108,142 +111,144 @@ export function SupplierModal({
           paddingRight: insets.right + Spacing.lg,
         },
       ]}
-      onPress={onClose}
     >
-      <Pressable
-        style={styles.container}
-        onPress={(event) => event.stopPropagation()}
-      >
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      <View style={[styles.container, { maxHeight }]}>
         <ModalShell
           variant="card"
           title="Suppliers"
           subtitle="Choose a supply source. Charges refill over time."
           onClose={onClose}
         >
-          <View style={styles.resourceRow}>
-            <View style={styles.resourcePill}>
-              <Feather
-                name="clipboard"
-                size={12}
-                color={GameColors.text.secondary}
-              />
-              <ThemedText style={styles.resourceText}>
-                {materialLabel}
-              </ThemedText>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.resourceRow}>
+              <View style={styles.resourcePill}>
+                <Feather
+                  name="clipboard"
+                  size={12}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.resourceText}>
+                  {materialLabel}
+                </ThemedText>
+              </View>
+              <View style={styles.resourcePill}>
+                <Feather
+                  name="shield"
+                  size={12}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.resourceText}>{compatLabel}</ThemedText>
+              </View>
             </View>
-            <View style={styles.resourcePill}>
-              <Feather
-                name="shield"
-                size={12}
-                color={GameColors.text.secondary}
-              />
-              <ThemedText style={styles.resourceText}>{compatLabel}</ThemedText>
-            </View>
-          </View>
 
-          {(["baron", "open", "salvage"] as SupplierId[]).map((supplierId) => {
-            const meta = SUPPLIER_META[supplierId];
-            const supplier = state.suppliers[supplierId];
-            const locked = supplier.level <= 0;
-            const lockedHint =
-              supplierId === "open"
-                ? "Requires R&D Access + Open Workshop I (1 Upgrade Material). Upgrade Materials come from Salvage (unlock in Upgrades)."
-                : supplierId === "salvage"
-                  ? "Unlock via Upgrades: Salvage Corner (350 cash)."
+            {(["baron", "open", "salvage"] as SupplierId[]).map((supplierId) => {
+              const meta = SUPPLIER_META[supplierId];
+              const supplier = state.suppliers[supplierId];
+              const locked = supplier.level <= 0;
+              const lockedHint =
+                supplierId === "open"
+                  ? "Requires R&D Access + Open Workshop I (1 Upgrade Material). Upgrade Materials come from Salvage (unlock in Upgrades)."
+                  : supplierId === "salvage"
+                    ? "Unlock via Upgrades: Salvage Corner (350 cash)."
+                    : undefined;
+              const mentorTip =
+                supplierId === "baron"
+                  ? "Mentor tip: Baron shipments include waste — merge or recycle it for value."
                   : undefined;
-            const mentorTip =
-              supplierId === "baron"
-                ? "Mentor tip: Baron shipments include waste — merge or recycle it for value."
-                : undefined;
-            const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-            const config = getEffectiveSupplierConfig(
-              supplierId,
-              Math.max(1, supplier.level),
-              speedLevel,
-              { baronEarlyRelief },
-            );
-            const cooldownRemaining = Math.max(
-              0,
-              supplier.cooldownEndsAt - now,
-            );
-            const charges = supplier.chargesRemaining;
-            const chargesDisplay = locked
-              ? "Locked"
-              : `${charges}/${config.maxCharges}`;
-            const isCooling = !locked && charges <= 0 && cooldownRemaining > 0;
-            const buttonLabel = locked
-              ? "Locked"
-              : isCooling
-                ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
-                : "Tap";
-            return (
-              <LinearGradient
-                key={supplierId}
-                colors={["#1F1F2E", "#26263A", "#1F1F2E"]}
-                style={[styles.card, { borderColor: meta.accent + "40" }]}
-              >
-                <View style={styles.cardHeader}>
-                  <View
-                    style={[
-                      styles.iconWrap,
-                      { backgroundColor: meta.accent + "20" },
-                    ]}
-                  >
-                    <Feather name={meta.icon} size={18} color={meta.accent} />
-                  </View>
-                  <View style={styles.cardTitleWrap}>
-                    <ThemedText style={styles.cardTitle}>
-                      {meta.name}
-                    </ThemedText>
-                    <ThemedText style={styles.cardSubtitle}>
-                      {meta.description}
-                    </ThemedText>
-                    {locked && lockedHint ? (
-                      <ThemedText style={styles.lockedHint}>
-                        {lockedHint}
+              const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+              const config = getEffectiveSupplierConfig(
+                supplierId,
+                Math.max(1, supplier.level),
+                speedLevel,
+                { baronEarlyRelief },
+              );
+              const cooldownRemaining = Math.max(
+                0,
+                supplier.cooldownEndsAt - now,
+              );
+              const charges = supplier.chargesRemaining;
+              const chargesDisplay = locked
+                ? "Locked"
+                : `${charges}/${config.maxCharges}`;
+              const isCooling = !locked && charges <= 0 && cooldownRemaining > 0;
+              const buttonLabel = locked
+                ? "Locked"
+                : isCooling
+                  ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
+                  : "Tap";
+              return (
+                <LinearGradient
+                  key={supplierId}
+                  colors={["#1F1F2E", "#26263A", "#1F1F2E"]}
+                  style={[styles.card, { borderColor: meta.accent + "40" }]}
+                >
+                  <View style={styles.cardHeader}>
+                    <View
+                      style={[
+                        styles.iconWrap,
+                        { backgroundColor: meta.accent + "20" },
+                      ]}
+                    >
+                      <Feather name={meta.icon} size={18} color={meta.accent} />
+                    </View>
+                    <View style={styles.cardTitleWrap}>
+                      <ThemedText style={styles.cardTitle}>
+                        {meta.name}
                       </ThemedText>
-                    ) : null}
-                    {mentorTip ? (
-                      <ThemedText style={styles.mentorTip}>
-                        {mentorTip}
+                      <ThemedText style={styles.cardSubtitle}>
+                        {meta.description}
                       </ThemedText>
-                    ) : null}
+                      {locked && lockedHint ? (
+                        <ThemedText style={styles.lockedHint}>
+                          {lockedHint}
+                        </ThemedText>
+                      ) : null}
+                      {mentorTip ? (
+                        <ThemedText style={styles.mentorTip}>
+                          {mentorTip}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                    <View style={styles.levelPill}>
+                      <ThemedText style={styles.levelText}>
+                        {locked ? "L0" : `L${supplier.level}`}
+                      </ThemedText>
+                    </View>
                   </View>
-                  <View style={styles.levelPill}>
-                    <ThemedText style={styles.levelText}>
-                      {locked ? "L0" : `L${supplier.level}`}
-                    </ThemedText>
-                  </View>
-                </View>
 
-                <View style={styles.cardFooter}>
-                  <ThemedText style={styles.chargeText}>
-                    Charges: {chargesDisplay}
-                  </ThemedText>
-                  <Pressable
-                    onPress={() => handleTap(supplierId)}
-                    disabled={locked || isCooling}
-                    style={[
-                      styles.tapButton,
-                      {
-                        backgroundColor:
-                          locked || isCooling
-                            ? GameColors.ui.surface
-                            : meta.accent,
-                      },
-                    ]}
-                  >
-                    <ThemedText style={styles.tapButtonText}>
-                      {buttonLabel}
+                  <View style={styles.cardFooter}>
+                    <ThemedText style={styles.chargeText}>
+                      Charges: {chargesDisplay}
                     </ThemedText>
-                  </Pressable>
-                </View>
-              </LinearGradient>
-            );
-          })}
+                    <Pressable
+                      onPress={() => handleTap(supplierId)}
+                      disabled={locked || isCooling}
+                      style={[
+                        styles.tapButton,
+                        {
+                          backgroundColor:
+                            locked || isCooling
+                              ? GameColors.ui.surface
+                              : meta.accent,
+                        },
+                      ]}
+                    >
+                      <ThemedText style={styles.tapButtonText}>
+                        {buttonLabel}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </LinearGradient>
+              );
+            })}
+          </ScrollView>
         </ModalShell>
-      </Pressable>
-    </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -258,6 +263,10 @@ const styles = StyleSheet.create({
     backgroundColor: GameColors.ui.surface,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
+    width: "100%",
+  },
+  scrollContent: {
+    paddingBottom: Spacing.lg,
   },
   resourceRow: {
     flexDirection: "row",
