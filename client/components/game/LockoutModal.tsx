@@ -6,6 +6,7 @@ import Animated, {
   withSequence,
   withTiming,
   FadeIn,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -26,9 +27,15 @@ interface LockoutModalProps {
 export function LockoutModal({ onClose }: LockoutModalProps) {
   const { state, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
+  const reducedMotion = state.settings.reducedMotion;
   const pulseScale = useSharedValue(1);
 
   React.useEffect(() => {
+    if (reducedMotion) {
+      cancelAnimation(pulseScale);
+      pulseScale.value = 1;
+      return;
+    }
     pulseScale.value = withRepeat(
       withSequence(
         withTiming(1.02, { duration: 800 }),
@@ -37,6 +44,13 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
       -1,
       true
     );
+    return () => {
+      cancelAnimation(pulseScale);
+      pulseScale.value = 1;
+    };
+  }, [reducedMotion, pulseScale]);
+
+  React.useEffect(() => {
     SoundManager.play("lockout");
     if (hapticsEnabled) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -78,6 +92,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
   }));
+  const enterAnim = reducedMotion ? FadeIn.duration(150) : FadeIn.duration(300);
 
   const canUseFreedom = state.freedomControllerCount > 0;
   const isPhase1 = state.lockoutPhase === 1;
@@ -91,7 +106,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
   return (
     <View style={styles.overlay}>
       <Animated.View
-        entering={FadeIn.duration(300)}
+        entering={enterAnim}
         style={[styles.container, containerStyle]}
       >
         <ModalShell

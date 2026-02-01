@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
   interpolate,
   Extrapolation,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -48,16 +49,19 @@ export function DependencyMeter({
       (t) => prevValue.value > t && value <= t
     );
 
-    if (crossedThreshold) {
+    if (crossedThreshold && !reducedMotion) {
       pulseScale.value = withSequence(
         withTiming(1.03, { duration: 100 }),
         withTiming(1, { duration: 100 }),
         withTiming(1.03, { duration: 100 }),
         withTiming(1, { duration: 100 })
       );
+    } else if (reducedMotion) {
+      cancelAnimation(pulseScale);
+      pulseScale.value = 1;
     }
 
-    if (value >= 60) {
+    if (value >= 60 && !reducedMotion) {
       warningPulse.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 1000 }),
@@ -70,12 +74,17 @@ export function DependencyMeter({
         duration: 500,
       });
     } else {
+      cancelAnimation(warningPulse);
       warningPulse.value = 0;
       baronOpacity.value = withTiming(0, { duration: 300 });
     }
 
     prevValue.value = value;
-  }, [value]);
+    return () => {
+      cancelAnimation(warningPulse);
+      cancelAnimation(pulseScale);
+    };
+  }, [value, reducedMotion, warningPulse, pulseScale]);
 
   useEffect(() => {
     progressRef.current = smoothProgress;

@@ -6,11 +6,11 @@ import Animated, {
   FadeIn,
   FadeOut,
   SlideInDown,
-  SlideOutDown,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withTiming,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -146,6 +146,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
 
   React.useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(pulse);
       pulse.value = 0;
       return;
     }
@@ -154,7 +155,11 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
       -1,
       true
     );
-  }, [reducedMotion]);
+    return () => {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+    };
+  }, [reducedMotion, pulse]);
 
   React.useEffect(() => {
     setConfirmSkip(false);
@@ -221,10 +226,13 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
   const cutoutGlowStyle = useAnimatedStyle(() => ({
     opacity: 0.35 + pulse.value * 0.45,
   }));
+  const overlayEnter = reducedMotion ? FadeIn.duration(150) : FadeIn.duration(300);
+  const overlayExit = reducedMotion ? FadeOut.duration(150) : FadeOut.duration(200);
+  const cardEnter = reducedMotion ? FadeIn.duration(150) : SlideInDown.duration(400).springify();
   return (
     <Animated.View
-      entering={FadeIn.duration(300)}
-      exiting={FadeOut.duration(200)}
+      entering={overlayEnter}
+      exiting={overlayExit}
       style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom, pointerEvents: "box-none" }]}
     >
       <View style={[styles.backdropLayer, { pointerEvents: "none" }]}>
@@ -234,7 +242,10 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
       </View>
 
       <Pressable
-        style={styles.skipButton}
+        style={[
+          styles.skipButton,
+          { top: insets.top + Spacing.md, right: insets.right + Spacing.lg },
+        ]}
         onPress={handleSkip}
         onLongPress={handleSkipImmediate}
         delayLongPress={450}
@@ -286,7 +297,7 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
       <View style={[styles.content, cardPositionStyle, { pointerEvents: cardPointerEvents }]}>
         <Animated.View
           key={currentStep.id}
-          entering={SlideInDown.duration(400).springify()}
+          entering={cardEnter}
           style={[
             styles.card,
             clampHeight ? { maxHeight: clampHeight } : null,

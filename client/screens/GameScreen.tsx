@@ -9,13 +9,11 @@ import Animated, {
   useSharedValue,
   withSequence,
   withTiming,
-  FadeIn,
-  FadeOut,
+  cancelAnimation,
 } from "react-native-reanimated";
 
 import { MergeBoard } from "@/components/game/MergeBoard";
 import { CurrencyDisplay } from "@/components/game/CurrencyDisplay";
-import { TrimLightStrip } from "@/components/game/TrimLightStrip";
 import { DependencyMeter } from "@/components/game/DependencyMeter";
 import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
@@ -32,7 +30,7 @@ import { MergeMomentumModal } from "@/components/game/MergeMomentumModal";
 import { MissionStrip } from "@/components/game/MissionStrip";
 import { MissionDetailModal } from "@/components/game/MissionDetailModal";
 import { DebugOverlay } from "@/components/DebugOverlay";
-import { StoryToast } from "@/components/game/StoryToast";
+import { OverlayManager } from "@/components/game/OverlayManager";
 import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
@@ -42,6 +40,10 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
 import { LOCKOUT_LAB_REQUESTS_BASE } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
+import {
+  OverlayItem,
+  OVERLAY_PRIORITY,
+} from "@/types/overlay";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
 const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
@@ -110,6 +112,7 @@ interface BottomButtonProps {
   onDisabledPress?: () => void;
   onLayout?: (event: any) => void;
   compact?: boolean;
+  reducedMotion?: boolean;
 }
 
 function BottomButton({
@@ -123,10 +126,16 @@ function BottomButton({
   onDisabledPress,
   onLayout,
   compact = false,
+  reducedMotion = false,
 }: BottomButtonProps) {
   const pulseAnim = useSharedValue(0);
 
   React.useEffect(() => {
+    if (reducedMotion) {
+      cancelAnimation(pulseAnim);
+      pulseAnim.value = 0;
+      return;
+    }
     if (badge && badge > 0) {
       pulseAnim.value = withRepeat(
         withSequence(
@@ -137,9 +146,14 @@ function BottomButton({
         true
       );
     } else {
+      cancelAnimation(pulseAnim);
       pulseAnim.value = 0;
     }
-  }, [badge]);
+    return () => {
+      cancelAnimation(pulseAnim);
+      pulseAnim.value = 0;
+    };
+  }, [badge, reducedMotion, pulseAnim]);
 
   const glowStyle = useAnimatedStyle(() => ({
     shadowOpacity: pulseAnim.value * 0.6,
@@ -206,7 +220,8 @@ export default function GameScreen() {
   const { state, dispatch, undoLastMove, getFulfillmentIndices, claimMergeMomentum } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const overlayQueue = state.overlayQueue || [];
+  const [storyLayoutTick, setStoryLayoutTick] = useState(0);
   const [undoTick, setUndoTick] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [debugOverlayVisible, setDebugOverlayVisible] = useState(false);
@@ -222,8 +237,10 @@ export default function GameScreen() {
   >({});
   const [topBarLayout, setTopBarLayout] = useState<LayoutRect | null>(null);
   const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(null);
+  const [topStackLayout, setTopStackLayout] = useState<LayoutRect | null>(null);
+  const [boardContainerLayout, setBoardContainerLayout] = useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
-  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const boardContainerRef = useRef<View>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
@@ -238,9 +255,7 @@ export default function GameScreen() {
   const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
   const [momentLockActive, setMomentLockActive] = useState(false);
-  const [milestoneCelebration, setMilestoneCelebration] = useState(false);
   const reputationTierRef = useRef(state.reputationTier);
-  const milestoneTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
@@ -251,6 +266,17 @@ export default function GameScreen() {
     state.orders.length < state.maxOrders &&
     boardPressureBand === "red";
   const tutorialSkipped = state.tutorialComplete && state.tutorialMetrics.skipped;
+  const overlayDebugTop = useMemo(() => {
+    if (overlayQueue.length === 0) return null;
+    return overlayQueue.reduce((best, entry) => {
+      const bestPriority = OVERLAY_PRIORITY[best.type];
+      const entryPriority = OVERLAY_PRIORITY[entry.type];
+      if (entryPriority !== bestPriority) {
+        return entryPriority > bestPriority ? entry : best;
+      }
+      return entry.createdAt < best.createdAt ? entry : best;
+    }).type;
+  }, [overlayQueue]);
   const fulfillableOrderCount = useMemo(() => {
     if (state.orders.length === 0) return 0;
     let count = 0;
@@ -278,8 +304,10 @@ export default function GameScreen() {
   };
   const setTarget =
     (key: TutorialTarget) =>
-    (event: { nativeEvent: { layout: LayoutRect } }) => {
-      const { x, y, width, height } = event.nativeEvent.layout;
+    (event?: { nativeEvent?: { layout?: LayoutRect } }) => {
+      const layout = event?.nativeEvent?.layout;
+      if (!layout) return;
+      const { x, y, width, height } = layout;
       setRelativeTargets((prev) => ({
         ...prev,
         [key]: { x, y, width, height },
@@ -337,14 +365,45 @@ export default function GameScreen() {
 
     setTutorialTargets({ ...nextTargets, ...absoluteTargets });
   }, [relativeTargets, topBarLayout, bottomBarLayout, absoluteTargets]);
-  const showToast = useCallback((message: string, durationMs = 1800) => {
-    setToastMessage(message);
-    if (toastTimeout.current) {
-      clearTimeout(toastTimeout.current);
-    }
-    toastTimeout.current = setTimeout(() => {
-      setToastMessage(null);
-    }, durationMs);
+  const enqueueOverlay = useCallback(
+    (item: OverlayItem) => {
+      dispatch({ type: "ENQUEUE_OVERLAY", item });
+    },
+    [dispatch]
+  );
+
+  const dismissOverlay = useCallback(
+    (id: string) => {
+      dispatch({ type: "DISMISS_OVERLAY", id });
+    },
+    [dispatch]
+  );
+
+  const dismissOverlaysByType = useCallback(
+    (type: OverlayItem["type"]) => {
+      const ids = overlayQueue.filter((entry) => entry.type === type).map((entry) => entry.id);
+      if (ids.length === 0) return;
+      ids.forEach((id) => dispatch({ type: "DISMISS_OVERLAY", id }));
+    },
+    [dispatch, overlayQueue]
+  );
+
+  const showToast = useCallback(
+    (message: string, durationMs = 1800) => {
+      enqueueOverlay({
+        id: `toast:${Date.now()}`,
+        type: "toast",
+        createdAt: Date.now(),
+        payload: { message, durationMs },
+      });
+    },
+    [enqueueOverlay]
+  );
+
+  const measureBoardContainer = useCallback(() => {
+    boardContainerRef.current?.measureInWindow((x, y, width, height) => {
+      setBoardContainerLayout({ x, y, width, height });
+    });
   }, []);
 
 
@@ -376,9 +435,6 @@ export default function GameScreen() {
 
   useEffect(() => {
     return () => {
-      if (toastTimeout.current) {
-        clearTimeout(toastTimeout.current);
-      }
       if (momentLockTimeout.current) {
         clearTimeout(momentLockTimeout.current);
       }
@@ -671,6 +727,25 @@ export default function GameScreen() {
     dispatch,
   ]);
 
+  useEffect(() => {
+    setStoryLayoutTick((prev) => prev + 1);
+  }, [state.activeStoryBeatId]);
+
+  useEffect(() => {
+    if (!state.activeStoryBeatId) {
+      dismissOverlaysByType("story");
+      return;
+    }
+    dismissOverlaysByType("story");
+    enqueueOverlay({
+      id: `story:${state.activeStoryBeatId}`,
+      type: "story",
+      createdAt: Date.now(),
+      sticky: true,
+      payload: { beatId: state.activeStoryBeatId },
+    });
+  }, [state.activeStoryBeatId, dismissOverlaysByType, enqueueOverlay]);
+
 
   useEffect(() => {
     if (state.tutorialComplete) return;
@@ -687,32 +762,24 @@ export default function GameScreen() {
   useEffect(() => {
     if (state.reputationTier > reputationTierRef.current && state.tutorialComplete) {
       if (!state.settings.reducedMotion) {
-        setMilestoneCelebration(true);
-        if (milestoneTimeout.current) {
-          clearTimeout(milestoneTimeout.current);
-        }
-        milestoneTimeout.current = setTimeout(() => {
-          setMilestoneCelebration(false);
-        }, 1800);
+        enqueueOverlay({
+          id: `milestone:${Date.now()}`,
+          type: "milestone",
+          createdAt: Date.now(),
+        });
       }
     }
     reputationTierRef.current = state.reputationTier;
-  }, [state.reputationTier, state.tutorialComplete, state.settings.reducedMotion]);
-
-  useEffect(() => {
-    return () => {
-      if (milestoneTimeout.current) {
-        clearTimeout(milestoneTimeout.current);
-      }
-    };
-  }, []);
+  }, [state.reputationTier, state.tutorialComplete, state.settings.reducedMotion, enqueueOverlay]);
 
   return (
     <LinearGradient
       colors={["#0A0A14", "#0F0F1F", "#0A0A14"]}
       style={[styles.container, { paddingTop: insets.top }]}
       onLayout={(event) => {
-        const { height } = event.nativeEvent.layout;
+        const layout = event?.nativeEvent?.layout;
+        if (!layout) return;
+        const { height } = layout;
         setScreenHeight((prev) => (prev === height ? prev : height));
       }}
     >
@@ -724,30 +791,27 @@ export default function GameScreen() {
           selectedPartIndex={selectedPartIndex}
           isDragging={isDragging}
           showLockoutModal={showLockoutModal}
+          overlayQueueLength={overlayQueue.length}
+          overlayTop={overlayDebugTop}
         />
       ) : null}
 
-      {/* Milestone celebration for tier-ups */}
-      {milestoneCelebration ? (
-        <Animated.View
-          style={[styles.milestoneCelebration, { pointerEvents: "none" }]}
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(400)}
+      <View
+        style={styles.topStack}
+        onLayout={(event) => {
+          const layout = event?.nativeEvent?.layout;
+          if (!layout) return;
+          setTopStackLayout(layout);
+        }}
+      >
+        <View
+          style={styles.topBar}
+          onLayout={(event) => {
+            const layout = event?.nativeEvent?.layout;
+            if (!layout) return;
+            setTopBarLayout(layout);
+          }}
         >
-          <TrimLightStrip
-            progress={1}
-            bulbs={24}
-            height={20}
-            pattern="rainbow"
-            animationMode="meteor"
-            animated
-            reducedMotion={state.settings.reducedMotion}
-          />
-        </Animated.View>
-      ) : null}
-
-      <View>
-        <View style={styles.topBar} onLayout={(event) => setTopBarLayout(event.nativeEvent.layout)}>
           <View onLayout={setTarget("currency")}>
             <CurrencyDisplay
               cash={state.cash}
@@ -895,30 +959,19 @@ export default function GameScreen() {
           </Pressable>
         ) : null}
 
-        {state.activeStoryBeatId && !isDragging && !activeModal ? (
-          <View style={styles.storyToastContainer}>
-            <StoryToast
-              beatId={state.activeStoryBeatId}
-              reducedMotion={state.settings.reducedMotion}
-              expanded={false}
-              onPress={handleStoryPress}
-              onDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
-            />
-          </View>
-        ) : null}
       </View>
 
-      {momentLockActive ? (
-        <View style={[styles.momentLockBlocker, { pointerEvents: "auto" }]} />
-      ) : null}
-
       <View
+        ref={boardContainerRef}
         style={styles.boardContainer}
         onLayout={(event) => {
+          measureBoardContainer();
           setTarget("board")(event);
         }}
       >
         <MergeBoard
+          layoutVersion={storyLayoutTick}
+          boardContainerLayout={boardContainerLayout}
           onWorkbenchPress={() => {
             setActiveModal("suppliers");
           }}
@@ -972,7 +1025,11 @@ export default function GameScreen() {
           isCompactLayout && styles.bottomBarCompact,
           { paddingBottom: insets.bottom + (isCompactLayout ? Spacing.sm : Spacing.md) },
         ]}
-        onLayout={(event) => setBottomBarLayout(event.nativeEvent.layout)}
+        onLayout={(event) => {
+          const layout = event?.nativeEvent?.layout;
+          if (!layout) return;
+          setBottomBarLayout(layout);
+        }}
       >
         <BottomButton
           icon="inbox"
@@ -987,6 +1044,7 @@ export default function GameScreen() {
           disabled={!state.tutorialComplete && state.tutorialStep < 3}
           onLayout={setTarget("orders")}
           compact={isCompactLayout}
+          reducedMotion={state.settings.reducedMotion}
         />
 
         <BottomButton
@@ -1000,6 +1058,7 @@ export default function GameScreen() {
           disabled={!state.tutorialComplete && state.tutorialStep < 4}
           onLayout={setTarget("upgrades")}
           compact={isCompactLayout}
+          reducedMotion={state.settings.reducedMotion}
         />
 
         <BottomButton
@@ -1012,6 +1071,7 @@ export default function GameScreen() {
           }
           disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
           compact={isCompactLayout}
+          reducedMotion={state.settings.reducedMotion}
         />
 
         {state.freedomControllerCount > 0 ? (
@@ -1048,16 +1108,19 @@ export default function GameScreen() {
         </Pressable>
       </View>
 
-      {toastMessage ? (
-        <View style={[styles.toastContainer, { bottom: insets.bottom + 110 }]}>
-          <LinearGradient
-            colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-            style={styles.toast}
-          >
-            <ThemedText style={styles.toastText}>{toastMessage}</ThemedText>
-          </LinearGradient>
-        </View>
-      ) : null}
+      <OverlayManager
+        queue={overlayQueue}
+        onDismiss={dismissOverlay}
+        topOffset={(topStackLayout?.height ?? 0) + Spacing.xs}
+        bottomInset={insets.bottom}
+        reducedMotion={state.settings.reducedMotion}
+        onStoryPress={handleStoryPress}
+        onStoryDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
+        momentLockActive={momentLockActive}
+        onTelemetry={(maxWaitMs) =>
+          dispatch({ type: "UPDATE_OVERLAY_TELEMETRY", maxWaitMs })
+        }
+      />
 
       <Modal
         visible={activeModal === "orders"}
@@ -1203,14 +1266,9 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: "visible",
   },
-  milestoneCelebration: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
+  topStack: {
+    position: "relative",
+    zIndex: 5,
   },
   topBar: {
     flexDirection: "row",
@@ -1303,20 +1361,6 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     fontWeight: "600",
   },
-  storyToastContainer: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xs,
-    alignSelf: "flex-start",
-    maxWidth: "92%",
-  },
-  momentLockBlocker: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 20,
-  },
   bottomBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -1370,8 +1414,8 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: "absolute",
-    top: -4,
-    right: -4,
+    top: -8,
+    right: -8,
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -1441,23 +1485,5 @@ const styles = StyleSheet.create({
   undoText: {
     fontSize: 12,
     fontWeight: "600",
-  },
-  toastContainer: {
-    position: "absolute",
-    left: Spacing.lg,
-    right: Spacing.lg,
-    alignItems: "center",
-  },
-  toast: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-  },
-  toastText: {
-    fontSize: 13,
-    color: GameColors.text.secondary,
-    textAlign: "center",
   },
 });

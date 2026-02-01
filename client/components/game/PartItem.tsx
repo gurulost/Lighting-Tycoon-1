@@ -7,7 +7,9 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
+  withDelay,
   runOnJS,
+  cancelAnimation,
   interpolate,
   Extrapolation,
 } from "react-native-reanimated";
@@ -79,6 +81,7 @@ interface PartItemProps {
     absoluteX: number,
     absoluteY: number
   ) => void;
+  onTap?: () => void;
   onLongPress?: () => void;
   size?: number;
   disabled?: boolean;
@@ -90,12 +93,14 @@ interface PartItemProps {
   dragLift?: SharedValue<number>;
   dragOffsetX?: SharedValue<number>;
   dragOffsetY?: SharedValue<number>;
+  lightPhase?: SharedValue<number>;
 }
 
 export function PartItem({
   part,
   onDragStart,
   onDragEnd,
+  onTap,
   onLongPress,
   size = Spacing.partSize,
   disabled = false,
@@ -107,6 +112,7 @@ export function PartItem({
   dragLift,
   dragOffsetX,
   dragOffsetY,
+  lightPhase,
 }: PartItemProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -172,6 +178,7 @@ export function PartItem({
   // Ambient glow pulse
   React.useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(glowPulse);
       glowPulse.value = 0;
       return;
     }
@@ -184,9 +191,10 @@ export function PartItem({
       true
     );
     return () => {
+      cancelAnimation(glowPulse);
       glowPulse.value = 0;
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, glowPulse]);
 
   const handleDragStart = (absoluteX: number, absoluteY: number) => {
     onDragStart?.(absoluteX, absoluteY);
@@ -198,6 +206,10 @@ export function PartItem({
 
   const handleLongPress = () => {
     onLongPress?.();
+  };
+
+  const handleTap = () => {
+    onTap?.();
   };
 
   const panGesture = Gesture.Pan()
@@ -251,7 +263,18 @@ export function PartItem({
       runOnJS(handleLongPress)();
     });
 
-  const composedGesture = Gesture.Race(panGesture, longPressGesture);
+  let composedGesture = Gesture.Race(panGesture, longPressGesture);
+  if (onTap) {
+    const tapGesture = Gesture.Tap()
+      .enabled(!disabled)
+      .maxDuration(250)
+      .maxDistance(10)
+      .onEnd(() => {
+        "worklet";
+        runOnJS(handleTap)();
+      });
+    composedGesture = Gesture.Race(panGesture, longPressGesture, tapGesture);
+  }
 
   const animatedStyle = useAnimatedStyle(() => {
     const baseGlow = interpolate(glowPulse.value, [0, 1], [0.4, 0.8], Extrapolation.CLAMP);
@@ -331,6 +354,7 @@ export function PartItem({
               height={12}
               pattern={isOpen ? "rainbow" : "baron"}
               animationMode={isOpen ? "wave" : "chase"}
+              phase={lightPhase}
               animated={!reducedMotion}
               reducedMotion={reducedMotion}
             />
@@ -436,12 +460,14 @@ export function MergeAnimation({
     );
     rotation.value = withTiming(360, { duration: 300 });
 
-    const timeout = setTimeout(() => {
-      localOpacity.value = withTiming(0, { duration: 200 });
-      setTimeout(onComplete, 200);
-    }, 400);
-
-    return () => clearTimeout(timeout);
+    localOpacity.value = withDelay(
+      400,
+      withTiming(0, { duration: 200 }, (finished) => {
+        if (finished) {
+          runOnJS(onComplete)();
+        }
+      })
+    );
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -543,8 +569,8 @@ const styles = StyleSheet.create({
   },
   tierBadge: {
     position: "absolute",
-    top: -4,
-    right: -4,
+    top: -6,
+    right: -6,
     width: 20,
     height: 20,
     borderRadius: 10,

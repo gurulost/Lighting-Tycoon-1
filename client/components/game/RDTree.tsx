@@ -7,6 +7,9 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
+  withDelay,
+  runOnJS,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -35,10 +38,16 @@ function RDNodeCard({
 }) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
+  const reducedMotion = state.settings.reducedMotion;
   const scale = useSharedValue(1);
   const glow = useSharedValue(0);
 
   React.useEffect(() => {
+    if (reducedMotion) {
+      cancelAnimation(glow);
+      glow.value = 0;
+      return;
+    }
     if (node.id === "freedom_build" && isUnlocked) {
       glow.value = withRepeat(
         withSequence(
@@ -48,19 +57,36 @@ function RDNodeCard({
         -1,
         true
       );
+    } else {
+      cancelAnimation(glow);
+      glow.value = 0;
     }
-  }, [isUnlocked, node.id]);
+    return () => {
+      cancelAnimation(glow);
+      glow.value = 0;
+    };
+  }, [isUnlocked, node.id, reducedMotion, glow]);
+
+  const handleUnlock = React.useCallback(() => {
+    if (hapticsEnabled) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    onUnlock();
+  }, [hapticsEnabled, onUnlock]);
 
   const handlePress = () => {
     if (canUnlock && !isUnlocked) {
-      scale.value = withSpring(0.95, { damping: 15 });
-      setTimeout(() => {
-        scale.value = withSpring(1, { damping: 15 });
-        if (hapticsEnabled) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-        onUnlock();
-      }, 100);
+      scale.value = withSequence(
+        withSpring(0.95, { damping: 15 }),
+        withDelay(
+          100,
+          withSpring(1, { damping: 15 }, (finished) => {
+            if (finished) {
+              runOnJS(handleUnlock)();
+            }
+          })
+        )
+      );
     }
   };
 

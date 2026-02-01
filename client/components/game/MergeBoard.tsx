@@ -9,6 +9,7 @@ import Animated, {
   FadeIn,
   interpolate,
   Extrapolation,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,7 +23,8 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import type { SfxId } from "@/audio/sounds";
 import { withRepeat } from "@/lib/reanimated";
-import { TrimLightStrip } from "@/components/game/TrimLightStrip";
+import { useSharedPhase } from "@/hooks/useSharedPhase";
+import { TrimLightStrip, TRIM_LIGHT_ANIMATION_DURATIONS } from "@/components/game/TrimLightStrip";
 import {
   WORKBENCH_SLOT,
   ORDER_INBOX_SLOT,
@@ -70,6 +72,8 @@ interface MergeBoardProps {
   onDragStateChange?: (isDragging: boolean) => void;
   onStationLayout?: (stationLayouts: Partial<Record<"workbench", LayoutRect>>) => void;
   maxHeight?: number;
+  layoutVersion?: number;
+  boardContainerLayout?: LayoutRect | null;
 }
 
 function AnimatedStation({
@@ -95,6 +99,7 @@ function AnimatedStation({
 
   React.useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(pulseAnim);
       pulseAnim.value = 0;
       return;
     }
@@ -108,9 +113,14 @@ function AnimatedStation({
         true
       );
     } else {
+      cancelAnimation(pulseAnim);
       pulseAnim.value = 0;
     }
-  }, [isActive, forcePulse, reducedMotion]);
+    return () => {
+      cancelAnimation(pulseAnim);
+      pulseAnim.value = 0;
+    };
+  }, [isActive, forcePulse, reducedMotion, pulseAnim]);
 
   const animatedGlow = useAnimatedStyle(() => {
     const glowOpacity = interpolate(pulseAnim.value, [0, 1], [0.3, 0.8], Extrapolation.CLAMP);
@@ -148,6 +158,8 @@ export function MergeBoard({
   onDragStateChange,
   onStationLayout,
   maxHeight,
+  layoutVersion,
+  boardContainerLayout,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -164,7 +176,9 @@ export function MergeBoard({
     family: PartFamily;
   } | null>(null);
   const [containerLayout, setContainerLayout] = useState<LayoutRect | null>(null);
+  const [boardLayout, setBoardLayout] = useState<LayoutRect | null>(null);
   const [gridLayout, setGridLayout] = useState<LayoutRect | null>(null);
+  const [gridLayoutRelative, setGridLayoutRelative] = useState<LayoutRect | null>(null);
   const [backpackLayout, setBackpackLayout] = useState<LayoutRect | null>(null);
   const [recycleLayout, setRecycleLayout] = useState<LayoutRect | null>(null);
   const containerRef = useRef<View>(null);
@@ -181,6 +195,37 @@ export function MergeBoard({
   const dragOffsetX = useSharedValue(0);
   const dragOffsetY = useSharedValue(0);
   const isDragging = dragSource !== null;
+  const hasPremiumOpen = useMemo(
+    () =>
+      [...state.board, ...state.backpack].some(
+        (part) => part && part.family === "open" && part.tier >= 5
+      ),
+    [state.board, state.backpack]
+  );
+  const hasPremiumLocked = useMemo(
+    () =>
+      [...state.board, ...state.backpack].some(
+        (part) => part && part.family === "locked" && part.tier >= 5
+      ),
+    [state.board, state.backpack]
+  );
+  const premiumWavePhase = useSharedPhase({
+    active: hasPremiumOpen,
+    duration: TRIM_LIGHT_ANIMATION_DURATIONS.wave,
+    reducedMotion,
+  });
+  const premiumChasePhase = useSharedPhase({
+    active: hasPremiumLocked,
+    duration: TRIM_LIGHT_ANIMATION_DURATIONS.chase,
+    reducedMotion,
+  });
+  const tileEnter = reducedMotion ? undefined : FadeIn.duration(200);
+
+  useEffect(() => {
+    if (boardContainerLayout) {
+      setContainerLayout(boardContainerLayout);
+    }
+  }, [boardContainerLayout]);
 
   const playMergeSound = useCallback((tier: number) => {
     const clamped = Math.max(1, Math.min(5, tier));
@@ -303,6 +348,7 @@ export function MergeBoard({
 
   useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(orderPulse);
       orderPulse.value = 0;
       return;
     }
@@ -316,9 +362,14 @@ export function MergeBoard({
         true
       );
     } else {
+      cancelAnimation(orderPulse);
       orderPulse.value = 0;
     }
-  }, [highlightedOrder, reducedMotion]);
+    return () => {
+      cancelAnimation(orderPulse);
+      orderPulse.value = 0;
+    };
+  }, [highlightedOrder, reducedMotion, orderPulse]);
 
   const orderPulseStyle = useAnimatedStyle(() => ({
     opacity: 0.3 + orderPulse.value * 0.4,
@@ -326,6 +377,7 @@ export function MergeBoard({
 
   useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(backpackGlow);
       backpackGlow.value = 0;
       return;
     }
@@ -339,12 +391,18 @@ export function MergeBoard({
         true
       );
     } else {
+      cancelAnimation(backpackGlow);
       backpackGlow.value = 0;
     }
-  }, [state.backpackUnlocked, reducedMotion]);
+    return () => {
+      cancelAnimation(backpackGlow);
+      backpackGlow.value = 0;
+    };
+  }, [state.backpackUnlocked, reducedMotion, backpackGlow]);
 
   useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(recyclePulse);
       recyclePulse.value = 0;
       return;
     }
@@ -358,9 +416,14 @@ export function MergeBoard({
         true
       );
     } else {
+      cancelAnimation(recyclePulse);
       recyclePulse.value = 0;
     }
-  }, [isDragging, reducedMotion]);
+    return () => {
+      cancelAnimation(recyclePulse);
+      recyclePulse.value = 0;
+    };
+  }, [isDragging, reducedMotion, recyclePulse]);
 
   const backpackGlowStyle = useAnimatedStyle(() => ({
     shadowOpacity: state.backpackUnlocked ? 0.2 + backpackGlow.value * 0.3 : 0,
@@ -506,6 +569,20 @@ export function MergeBoard({
     });
   }, []);
 
+  const handleBoardLayout = useCallback((event: any) => {
+    const { x, y, width, height } = event.nativeEvent.layout;
+    setBoardLayout({ x, y, width, height });
+  }, []);
+
+  const handleGridLayout = useCallback(
+    (event: any) => {
+      const { x, y, width, height } = event.nativeEvent.layout;
+      setGridLayoutRelative({ x, y, width, height });
+      measureGrid();
+    },
+    [measureGrid]
+  );
+
   useEffect(() => {
     if (!onStationLayout || !gridLayout) return;
     const row = Math.floor(WORKBENCH_SLOT / GRID_COLS);
@@ -527,6 +604,14 @@ export function MergeBoard({
     });
   }, []);
 
+  useEffect(() => {
+    if (layoutVersion === undefined) return;
+    measureContainer();
+    measureGrid();
+    measureBackpack();
+    measureRecycle();
+  }, [layoutVersion, measureBackpack, measureContainer, measureGrid, measureRecycle]);
+
   const backpackSlotRects = useMemo(() => {
     if (!backpackLayout) return [] as LayoutRect[];
     return state.backpack.map((_, index) => ({
@@ -537,6 +622,38 @@ export function MergeBoard({
     }));
   }, [backpackLayout, backpackSlotSize, backpackGap, state.backpack]);
 
+  const findFirstEmptyBoardSlot = useCallback(() => {
+    for (let i = 0; i < state.boardSize; i += 1) {
+      if (isStationSlot(i) || isSlotBlocked(i)) continue;
+      if (state.board[i] === null) return i;
+    }
+    return -1;
+  }, [state.board, state.boardSize, isSlotBlocked, isStationSlot]);
+
+  const handleBackpackTap = useCallback(
+    (index: number) => {
+      if (!state.backpackUnlocked) return;
+      const toIndex = findFirstEmptyBoardSlot();
+      if (toIndex === -1) {
+        SoundManager.play("error");
+        if (hapticsEnabled) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+        return;
+      }
+      dispatch({
+        type: "MOVE_FROM_BACKPACK",
+        backpackIndex: index,
+        toIndex,
+      });
+      SoundManager.play("backpack");
+      if (hapticsEnabled) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    },
+    [dispatch, findFirstEmptyBoardSlot, hapticsEnabled, state.backpackUnlocked]
+  );
+
   const handleDragStart = useCallback(
     (source: "board" | "backpack", index: number, absoluteX: number, absoluteY: number) => {
       measureGrid();
@@ -545,13 +662,24 @@ export function MergeBoard({
       const dragSize = source === "board" ? tileSize - 10 : backpackSlotSize - 8;
       let originX = absoluteX - dragSize / 2;
       let originY = absoluteY - dragSize / 2;
-      if (source === "board" && gridLayout) {
+      const containerBase = boardContainerLayout ?? containerLayout;
+      const resolvedGridLayout =
+        gridLayout ??
+        (containerBase && boardLayout && gridLayoutRelative
+          ? {
+              x: containerBase.x + boardLayout.x + gridLayoutRelative.x,
+              y: containerBase.y + boardLayout.y + gridLayoutRelative.y,
+              width: gridLayoutRelative.width,
+              height: gridLayoutRelative.height,
+            }
+          : null);
+      if (source === "board" && resolvedGridLayout) {
         const cellWidth = tileSize + Spacing.tileGap;
         const cellHeight = tileSize + Spacing.tileGap;
         const col = index % GRID_COLS;
         const row = Math.floor(index / GRID_COLS);
-        const tileX = gridLayout.x + col * cellWidth;
-        const tileY = gridLayout.y + row * cellHeight;
+        const tileX = resolvedGridLayout.x + col * cellWidth;
+        const tileY = resolvedGridLayout.y + row * cellHeight;
         const inset = (tileSize - dragSize) / 2;
         originX = tileX + inset;
         originY = tileY + inset;
@@ -569,10 +697,11 @@ export function MergeBoard({
         dragPreviewX.value = originX - containerX;
         dragPreviewY.value = originY - containerY;
       };
-      if (containerLayout) {
-        applyContainerOffset(containerLayout);
+      if (containerBase) {
+        applyContainerOffset(containerBase);
+      } else {
+        measureContainer((layout) => applyContainerOffset(layout));
       }
-      measureContainer((layout) => applyContainerOffset(layout));
       setDragFromIndex(index);
       setDragSource({ source, index });
       if (hapticsEnabled) {
@@ -606,6 +735,9 @@ export function MergeBoard({
       gridLayout,
       backpackSlotRects,
       containerLayout,
+      boardContainerLayout,
+      boardLayout,
+      gridLayoutRelative,
       dragOffsetX,
       dragOffsetY,
       dragPreviewX,
@@ -666,75 +798,128 @@ export function MergeBoard({
               }
             }
             handled = true;
-          } else if (gridLayout) {
-            const localX = absoluteX - gridLayout.x;
-            const localY = absoluteY - gridLayout.y;
-            const cellWidth = tileSize + Spacing.tileGap;
-            const cellHeight = tileSize + Spacing.tileGap;
-            const col = Math.floor(localX / cellWidth);
-            const row = Math.floor(localY / cellHeight);
-            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
-              const toIndex = row * GRID_COLS + col;
-              if (!isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
-                if (source === "board") {
-                  if (toIndex !== fromIndex) {
-                    if (state.board[toIndex] !== null) {
-                      const fromPart = state.board[fromIndex];
-                      const toPart = state.board[toIndex];
-                      const merged = mergeParts(fromIndex, toIndex);
-                      if (merged && fromPart) {
-                        playMergeSound(fromPart.tier + 1);
-                      } else if (!merged) {
-                        SoundManager.play("error");
+          } else {
+            const containerBase = boardContainerLayout ?? containerLayout;
+            let resolvedGridLayout =
+              gridLayout ??
+              (containerBase && boardLayout && gridLayoutRelative
+                ? {
+                    x: containerBase.x + boardLayout.x + gridLayoutRelative.x,
+                    y: containerBase.y + boardLayout.y + gridLayoutRelative.y,
+                    width: gridLayoutRelative.width,
+                    height: gridLayoutRelative.height,
+                  }
+                : null);
+            if (!resolvedGridLayout) {
+              // fallback: attempt to resolve based on drag translation if possible
+              if (source === "backpack" && backpackSlotRects[fromIndex]) {
+                const origin = backpackSlotRects[fromIndex];
+                const targetX = origin.x + translationX + origin.width / 2;
+                const targetY = origin.y + translationY + origin.height / 2;
+                if (containerBase && boardLayout && gridLayoutRelative) {
+                  resolvedGridLayout = {
+                    x: containerBase.x + boardLayout.x + gridLayoutRelative.x,
+                    y: containerBase.y + boardLayout.y + gridLayoutRelative.y,
+                    width: gridLayoutRelative.width,
+                    height: gridLayoutRelative.height,
+                  };
+                }
+                if (resolvedGridLayout) {
+                  const localX = targetX - resolvedGridLayout.x;
+                  const localY = targetY - resolvedGridLayout.y;
+                  const cellWidth = tileSize + Spacing.tileGap;
+                  const cellHeight = tileSize + Spacing.tileGap;
+                  const col = Math.floor(localX / cellWidth);
+                  const row = Math.floor(localY / cellHeight);
+                  if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+                    const toIndex = row * GRID_COLS + col;
+                    if (!isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
+                      if (state.board[toIndex] === null) {
+                        dispatch({
+                          type: "MOVE_FROM_BACKPACK",
+                          backpackIndex: fromIndex,
+                          toIndex,
+                        });
+                        SoundManager.play("backpack");
+                        if (hapticsEnabled) {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }
+                        handled = true;
                       }
-                      if (hapticsEnabled) {
-                        if (merged) {
-                          Haptics.notificationAsync(
-                            Haptics.NotificationFeedbackType.Success
-                          );
-                        } else {
-                          Haptics.notificationAsync(
-                            Haptics.NotificationFeedbackType.Error
-                          );
+                    }
+                  }
+                }
+              }
+            } else {
+              const localX = absoluteX - resolvedGridLayout.x;
+              const localY = absoluteY - resolvedGridLayout.y;
+              const cellWidth = tileSize + Spacing.tileGap;
+              const cellHeight = tileSize + Spacing.tileGap;
+              const col = Math.floor(localX / cellWidth);
+              const row = Math.floor(localY / cellHeight);
+              if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+                const toIndex = row * GRID_COLS + col;
+                if (!isStationSlot(toIndex) && !isSlotBlocked(toIndex)) {
+                  if (source === "board") {
+                    if (toIndex !== fromIndex) {
+                      if (state.board[toIndex] !== null) {
+                        const fromPart = state.board[fromIndex];
+                        const toPart = state.board[toIndex];
+                        const merged = mergeParts(fromIndex, toIndex);
+                        if (merged && fromPart) {
+                          playMergeSound(fromPart.tier + 1);
+                        } else if (!merged) {
+                          SoundManager.play("error");
+                        }
+                        if (hapticsEnabled) {
+                          if (merged) {
+                            Haptics.notificationAsync(
+                              Haptics.NotificationFeedbackType.Success
+                            );
+                          } else {
+                            Haptics.notificationAsync(
+                              Haptics.NotificationFeedbackType.Error
+                            );
+                          }
+                        }
+                        if (merged && fromPart && toPart && !reducedMotion) {
+                          const mergedFamily =
+                            fromPart.family === "waste" || toPart.family === "waste"
+                              ? "waste"
+                              : fromPart.family === "locked" || toPart.family === "locked"
+                              ? "locked"
+                              : "open";
+                          setMergeEffect({
+                            index: toIndex,
+                            tier: (fromPart.tier + 1) as PartTier,
+                            family: mergedFamily,
+                          });
+                        }
+                      } else {
+                        movePart(fromIndex, toIndex);
+                        if (hapticsEnabled) {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }
                       }
-                      if (merged && fromPart && toPart && !reducedMotion) {
-                        const mergedFamily =
-                          fromPart.family === "waste" || toPart.family === "waste"
-                            ? "waste"
-                            : fromPart.family === "locked" || toPart.family === "locked"
-                            ? "locked"
-                            : "open";
-                        setMergeEffect({
-                          index: toIndex,
-                          tier: (fromPart.tier + 1) as PartTier,
-                          family: mergedFamily,
-                        });
-                      }
-                    } else {
-                      movePart(fromIndex, toIndex);
+                    }
+                  } else if (source === "backpack") {
+                    if (state.board[toIndex] === null) {
+                      dispatch({
+                        type: "MOVE_FROM_BACKPACK",
+                        backpackIndex: fromIndex,
+                        toIndex,
+                      });
+                      SoundManager.play("backpack");
                       if (hapticsEnabled) {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }
+                    } else if (hapticsEnabled) {
+                      SoundManager.play("error");
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                     }
                   }
-                } else if (source === "backpack") {
-                  if (state.board[toIndex] === null) {
-                    dispatch({
-                      type: "MOVE_FROM_BACKPACK",
-                      backpackIndex: fromIndex,
-                      toIndex,
-                    });
-                    SoundManager.play("backpack");
-                    if (hapticsEnabled) {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }
-                  } else if (hapticsEnabled) {
-                    SoundManager.play("error");
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                  }
+                  handled = true;
                 }
-                handled = true;
               }
             }
           }
@@ -816,6 +1001,10 @@ export function MergeBoard({
       recycleLayout,
       backpackSlotRects,
       gridLayout,
+      containerLayout,
+      boardContainerLayout,
+      boardLayout,
+      gridLayoutRelative,
       dispatch,
       dragOffsetX,
       dragOffsetY,
@@ -871,7 +1060,7 @@ export function MergeBoard({
     return (
       <Animated.View
         key={index}
-        entering={FadeIn.duration(200)}
+        entering={tileEnter}
         style={[
           styles.tile,
           {
@@ -905,6 +1094,13 @@ export function MergeBoard({
                 onDragEnd={(tx, ty, ax, ay) => handleDragEnd("board", index, tx, ty, ax, ay)}
                 onLongPress={() => onPartLongPress?.(index)}
                 reducedMotion={reducedMotion}
+                lightPhase={
+                  part.family === "open"
+                    ? premiumWavePhase
+                    : part.family === "locked"
+                    ? premiumChasePhase
+                    : undefined
+                }
                 dragPreviewX={dragPreviewX}
                 dragPreviewY={dragPreviewY}
                 dragPreviewScale={dragPreviewScale}
@@ -1056,11 +1252,25 @@ export function MergeBoard({
     tiles.push(renderTile(i));
   }
 
+  const dragPreviewPart =
+    dragSource?.source === "board"
+      ? state.board[dragSource.index]
+      : dragSource?.source === "backpack"
+      ? state.backpack[dragSource.index]
+      : null;
+  const dragPreviewPhase =
+    dragPreviewPart?.family === "open"
+      ? premiumWavePhase
+      : dragPreviewPart?.family === "locked"
+      ? premiumChasePhase
+      : undefined;
+
   return (
     <View style={styles.container} ref={containerRef} onLayout={handleContainerLayout}>
       <LinearGradient
         colors={["#0F0F1F", "#1A1A2E", "#0F0F1F"]}
         style={styles.boardBackground}
+        onLayout={handleBoardLayout}
       >
         <View style={[styles.boardTrim, { pointerEvents: "none" }]}>
           <TrimLightStrip
@@ -1106,7 +1316,7 @@ export function MergeBoard({
             },
           ]}
           ref={gridRef}
-          onLayout={measureGrid}
+          onLayout={handleGridLayout}
         >
           {tiles}
         </View>
@@ -1211,11 +1421,21 @@ export function MergeBoard({
                         part={part}
                         size={backpackSlotSize - 8}
                         disabled={!state.backpackUnlocked}
+                        onTap={
+                          state.backpackUnlocked ? () => handleBackpackTap(index) : undefined
+                        }
                         onDragStart={(ax, ay) => handleDragStart("backpack", index, ax, ay)}
                         onDragEnd={(tx, ty, ax, ay) =>
                           handleDragEnd("backpack", index, tx, ty, ax, ay)
                         }
                         reducedMotion={reducedMotion}
+                        lightPhase={
+                          part.family === "open"
+                            ? premiumWavePhase
+                            : part.family === "locked"
+                            ? premiumChasePhase
+                            : undefined
+                        }
                         dragPreviewX={dragPreviewX}
                         dragPreviewY={dragPreviewY}
                         dragPreviewScale={dragPreviewScale}
@@ -1276,15 +1496,16 @@ export function MergeBoard({
               style={styles.recycleGradient}
             >
               <Feather name="trash-2" size={18} color={GameColors.ui.danger} />
-              <ThemedText style={styles.recycleHint}>cash + research</ThemedText>
+              <View style={styles.recycleHintRow}>
+                <Feather name="dollar-sign" size={10} color={GameColors.currency.cash} />
+                <ThemedText style={styles.recycleHintPlus}>+</ThemedText>
+                <Feather name="zap" size={10} color={GameColors.currency.research} />
+              </View>
             </LinearGradient>
           </Animated.View>
         </View>
       </View>
-      {dragSource &&
-      (dragSource.source === "board"
-        ? state.board[dragSource.index]
-        : state.backpack[dragSource.index]) ? (
+      {dragSource && dragPreviewPart ? (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -1299,14 +1520,11 @@ export function MergeBoard({
           ]}
         >
           <PartItem
-            part={
-              dragSource.source === "board"
-                ? (state.board[dragSource.index] as Part)
-                : (state.backpack[dragSource.index] as Part)
-            }
+            part={dragPreviewPart as Part}
             size={dragSource.source === "board" ? tileSize - 10 : backpackSlotSize - 8}
             disabled
             reducedMotion={reducedMotion}
+            lightPhase={dragPreviewPhase}
             dragPreview
           />
         </Animated.View>
@@ -1566,9 +1784,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
   },
-  recycleHint: {
-    fontSize: 10,
+  recycleHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  recycleHintPlus: {
+    fontSize: 9,
     color: GameColors.text.secondary,
+    marginHorizontal: 1,
   },
   dragPreviewItem: {
     position: "absolute",

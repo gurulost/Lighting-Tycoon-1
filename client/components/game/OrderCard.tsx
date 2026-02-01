@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import Animated, {
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withTiming,
+  FadeIn,
   FadeInDown,
+  FadeOut,
   FadeOutUp,
+  Layout,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -29,6 +34,7 @@ interface OrderCardProps {
   dismissible?: boolean;
   selected?: boolean;
   onSelect?: () => void;
+  trimPhase?: SharedValue<number>;
 }
 
 const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
@@ -51,6 +57,7 @@ export function OrderCard({
   dismissible = true,
   selected = false,
   onSelect,
+  trimPhase,
 }: OrderCardProps) {
   const { state, getFulfillmentIndices } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -117,6 +124,7 @@ export function OrderCard({
 
   useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(glowPulse);
       glowPulse.value = 0;
       return;
     }
@@ -130,12 +138,18 @@ export function OrderCard({
         true
       );
     } else {
+      cancelAnimation(glowPulse);
       glowPulse.value = 0;
     }
-  }, [canFulfill, reducedMotion]);
+    return () => {
+      cancelAnimation(glowPulse);
+      glowPulse.value = 0;
+    };
+  }, [canFulfill, reducedMotion, glowPulse]);
 
   useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(urgentPulse);
       urgentPulse.value = 0;
       return;
     }
@@ -149,9 +163,14 @@ export function OrderCard({
         true
       );
     } else {
+      cancelAnimation(urgentPulse);
       urgentPulse.value = 0;
     }
-  }, [order.rushDeadline, reducedMotion]);
+    return () => {
+      cancelAnimation(urgentPulse);
+      urgentPulse.value = 0;
+    };
+  }, [order.rushDeadline, reducedMotion, urgentPulse]);
 
   useEffect(() => {
     if (order.rushStartTime && order.rushDeadline) {
@@ -357,12 +376,18 @@ export function OrderCard({
   const showFlavor = selected || order.isLockout || order.isTutorial;
   const showRewardsLabel = selected;
   const showBadges = selected || (!priorityBadge && modifierBadges.length > 0);
+  const layoutAnimation = reducedMotion
+    ? undefined
+    : Layout.springify().damping(18);
+  const enterAnim = reducedMotion ? FadeIn.duration(150) : FadeInDown.duration(300);
+  const exitAnim = reducedMotion ? FadeOut.duration(150) : FadeOutUp.duration(200);
 
   return (
     <Pressable onPress={onSelect} disabled={!onSelect}>
       <Animated.View
-        entering={FadeInDown.duration(300)}
-        exiting={FadeOutUp.duration(200)}
+        entering={enterAnim}
+        exiting={exitAnim}
+        layout={layoutAnimation}
         style={[
           styles.container,
           glowStyle,
@@ -433,6 +458,7 @@ export function OrderCard({
             height={22}
             pattern={trimPattern}
             animated={canFulfill && !reducedMotion}
+            phase={trimPhase}
             reducedMotion={reducedMotion}
           />
         </View>

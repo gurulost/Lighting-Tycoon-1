@@ -6,6 +6,7 @@ import Animated, {
   useSharedValue,
   withTiming,
   SharedValue,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { withRepeat } from "@/lib/reanimated";
 
@@ -169,7 +170,7 @@ function Bulb({
 }
 
 // Animation durations per mode (ms)
-const ANIMATION_DURATIONS: Record<TrimLightAnimation, number> = {
+export const TRIM_LIGHT_ANIMATION_DURATIONS: Record<TrimLightAnimation, number> = {
   twinkle: 2200,
   chase: 1200,
   wave: 1800,
@@ -187,6 +188,7 @@ export function TrimLightStrip({
   reducedMotion = false,
   width = "100%",
   animationMode = "twinkle",
+  phase,
 }: {
   progress: number;
   bulbs?: number;
@@ -197,6 +199,7 @@ export function TrimLightStrip({
   reducedMotion?: boolean;
   width?: number | string;
   animationMode?: TrimLightAnimation;
+  phase?: SharedValue<number>;
 }) {
   const viewW = 100;
   const viewH = 20;
@@ -206,23 +209,30 @@ export function TrimLightStrip({
     return Math.round(clamped * bulbs);
   }, [progress, bulbs]);
 
-  const t = useSharedValue(0);
+  const internalPhase = useSharedValue(0);
+  const t = phase ?? internalPhase;
 
   useEffect(() => {
-    if (reducedMotion || !animated) {
-      t.value = 0;
+    if (phase) {
+      cancelAnimation(internalPhase);
+      internalPhase.value = 0;
       return;
     }
-    const duration = ANIMATION_DURATIONS[animationMode] || 2200;
-    t.value = withRepeat(
+    if (reducedMotion || !animated) {
+      internalPhase.value = 0;
+      return;
+    }
+    const duration = TRIM_LIGHT_ANIMATION_DURATIONS[animationMode] || 2200;
+    internalPhase.value = withRepeat(
       withTiming(1, { duration, easing: Easing.linear }),
       -1,
       false
     );
     return () => {
-      t.value = 0;
+      cancelAnimation(internalPhase);
+      internalPhase.value = 0;
     };
-  }, [reducedMotion, animated, animationMode, t]);
+  }, [phase, reducedMotion, animated, animationMode, internalPhase]);
 
   const startX = 6;
   const endX = 94;

@@ -4,6 +4,9 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withDelay,
+  withSequence,
+  runOnJS,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -49,17 +52,27 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   const categoryColor = CATEGORY_COLORS[upgrade.category] || GameColors.text.secondary;
   const categoryIcon = CATEGORY_ICONS[upgrade.category] || "circle";
 
+  const handlePurchase = React.useCallback(() => {
+    SoundManager.play("upgrade");
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    onPurchase();
+  }, [hapticsEnabled, onPurchase]);
+
   const handlePress = () => {
     if (canPurchase) {
-      scale.value = withSpring(0.95, { damping: 15 });
-      setTimeout(() => {
-        scale.value = withSpring(1, { damping: 15 });
-        SoundManager.play("upgrade");
-        if (hapticsEnabled) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        }
-        onPurchase();
-      }, 100);
+      scale.value = withSequence(
+        withSpring(0.95, { damping: 15 }),
+        withDelay(
+          100,
+          withSpring(1, { damping: 15 }, (finished) => {
+            if (finished) {
+              runOnJS(handlePurchase)();
+            }
+          })
+        )
+      );
     } else {
       SoundManager.play("error");
       if (hapticsEnabled) {

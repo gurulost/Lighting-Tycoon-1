@@ -4,16 +4,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
   FadeIn,
-  FadeOut,
-  SlideInUp,
-  ZoomIn,
   useSharedValue,
   useAnimatedStyle,
   withSequence,
   withTiming,
-  withSpring,
-  interpolate,
-  Extrapolation,
+  withDelay,
+  cancelAnimation,
   runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
@@ -24,7 +20,216 @@ import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
-import { TrimLightStrip, TrimLightPattern, TrimLightAnimation } from "@/components/game/TrimLightStrip";
+import {
+  TrimLightStrip,
+  TrimLightPattern,
+  TrimLightAnimation,
+  TRIM_LIGHT_ANIMATION_DURATIONS,
+} from "@/components/game/TrimLightStrip";
+import { withRepeat } from "@/lib/reanimated";
+import { useSharedPhase } from "@/hooks/useSharedPhase";
+
+type InstallMoment = {
+  key: number;
+  pattern: TrimLightPattern;
+  animationMode: TrimLightAnimation;
+};
+
+function InstallMomentCelebration({
+  moment,
+  reducedMotion,
+  onComplete,
+}: {
+  moment: InstallMoment | null;
+  reducedMotion: boolean;
+  onComplete: (key: number) => void;
+}) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(12);
+  const scale = useSharedValue(0.98);
+  const phase = useSharedValue(0);
+  const latestKey = React.useRef<number>(0);
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  const panelStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
+
+  React.useEffect(() => {
+    const reset = () => {
+      cancelAnimation(opacity);
+      cancelAnimation(translateY);
+      cancelAnimation(scale);
+      opacity.value = 0;
+      translateY.value = 12;
+      scale.value = 0.98;
+    };
+
+    if (!moment) {
+      reset();
+      return;
+    }
+
+    latestKey.current = moment.key;
+    reset();
+    translateY.value = 14;
+
+    if (reducedMotion) {
+      onComplete(moment.key);
+      return;
+    }
+
+    const inDuration = 180;
+    const holdDuration = 700;
+    const outDuration = 260;
+
+    opacity.value = withSequence(
+      withTiming(1, { duration: inDuration }),
+      withDelay(
+        holdDuration,
+        withTiming(0, { duration: outDuration }, (finished) => {
+          if (finished && latestKey.current === moment.key) {
+            runOnJS(onComplete)(moment.key);
+          }
+        })
+      )
+    );
+    translateY.value = withSequence(
+      withTiming(0, { duration: inDuration + 40 }),
+      withDelay(holdDuration, withTiming(-6, { duration: outDuration }))
+    );
+    scale.value = withSequence(
+      withTiming(1, { duration: inDuration + 40 }),
+      withDelay(holdDuration, withTiming(0.98, { duration: outDuration }))
+    );
+  }, [moment?.key, reducedMotion, onComplete, opacity, translateY, scale]);
+
+  React.useEffect(() => {
+    if (!moment || reducedMotion) {
+      cancelAnimation(phase);
+      phase.value = 0;
+      return;
+    }
+    const duration =
+      TRIM_LIGHT_ANIMATION_DURATIONS[moment.animationMode] ?? 2000;
+    phase.value = withRepeat(withTiming(1, { duration }), -1, false);
+    return () => {
+      cancelAnimation(phase);
+      phase.value = 0;
+    };
+  }, [moment?.key, moment?.animationMode, reducedMotion, phase]);
+
+  if (!moment) return null;
+
+  return (
+    <Animated.View
+      style={[styles.installMomentOverlay, overlayStyle, { pointerEvents: "none" }]}
+    >
+      {/* Radial glow burst behind panel */}
+      <Animated.View style={styles.installGlowBurst}>
+        <LinearGradient
+          colors={[
+            moment.pattern === "baron" ? "#A855F780" :
+            moment.pattern === "rainbow" ? "#FF6B6B80" :
+            "#00D9FF80",
+            "transparent"
+          ]}
+          style={styles.glowBurstGradient}
+          start={{ x: 0.5, y: 0.5 }}
+          end={{ x: 0.5, y: 0 }}
+        />
+      </Animated.View>
+
+      {/* Main celebration panel */}
+      <Animated.View style={[styles.installMomentPanel, panelStyle]}>
+        {/* Success icon */}
+        <View style={styles.successIconContainer}>
+          <Feather
+            name="zap"
+            size={24}
+            color={
+              moment.pattern === "baron" ? GameColors.locked.accent :
+              moment.pattern === "rainbow" ? "#FFD700" :
+              GameColors.openStandard.primary
+            }
+          />
+        </View>
+
+        {/* Top light strip - main */}
+        <TrimLightStrip
+          progress={1}
+          bulbs={20}
+          height={26}
+          pattern={moment.pattern}
+          animationMode={moment.animationMode}
+          phase={phase}
+          animated
+          reducedMotion={reducedMotion}
+        />
+        <View style={styles.installMomentSpacer} />
+
+        {/* Middle light strip */}
+        <TrimLightStrip
+          progress={1}
+          bulbs={16}
+          height={22}
+          pattern={moment.pattern}
+          animationMode={moment.animationMode}
+          phase={phase}
+          animated
+          reducedMotion={reducedMotion}
+        />
+        <View style={styles.installMomentSpacer} />
+
+        {/* Bottom light strip - accent */}
+        <TrimLightStrip
+          progress={1}
+          bulbs={12}
+          height={18}
+          pattern={moment.pattern}
+          animationMode={moment.animationMode}
+          phase={phase}
+          animated
+          reducedMotion={reducedMotion}
+        />
+
+        {/* Success text */}
+        <View style={styles.successTextContainer}>
+          <ThemedText style={styles.successText}>Installation Complete!</ThemedText>
+        </View>
+      </Animated.View>
+
+      {/* Side accent strips */}
+      <Animated.View style={styles.sideStripLeft}>
+        <TrimLightStrip
+          progress={1}
+          bulbs={6}
+          height={14}
+          pattern={moment.pattern}
+          animationMode={moment.animationMode}
+          phase={phase}
+          animated
+          reducedMotion={reducedMotion}
+        />
+      </Animated.View>
+      <Animated.View style={styles.sideStripRight}>
+        <TrimLightStrip
+          progress={1}
+          bulbs={6}
+          height={14}
+          pattern={moment.pattern}
+          animationMode={moment.animationMode}
+          phase={phase}
+          animated
+          reducedMotion={reducedMotion}
+        />
+      </Animated.View>
+    </Animated.View>
+  );
+}
 
 interface OrdersModalProps {
   onClose: () => void;
@@ -73,13 +278,9 @@ export function OrdersModal({
   const [showOrdersHint, setShowOrdersHint] = React.useState(
     () => !state.ordersHelpNudgeSeen
   );
-  const installMomentTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = React.useRef(true);
   const installMomentKey = React.useRef(0);
-  const [installMoment, setInstallMoment] = React.useState<{
-    key: number;
-    pattern: TrimLightPattern;
-    animationMode: TrimLightAnimation;
-  } | null>(null);
+  const [installMoment, setInstallMoment] = React.useState<InstallMoment | null>(null);
   const orderLegend = [
     { key: "CL", label: "Clip" },
     { key: "TR", label: "Track" },
@@ -122,6 +323,18 @@ export function OrdersModal({
   const canStartWarranty = canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
+  const hasFulfillableOrder = React.useMemo(
+    () => state.orders.some((order) => Boolean(getFulfillmentIndices(order))),
+    [state.orders, getFulfillmentIndices]
+  );
+  const orderTrimPhase = useSharedPhase({
+    active: hasFulfillableOrder,
+    duration: TRIM_LIGHT_ANIMATION_DURATIONS.twinkle,
+    reducedMotion: state.settings.reducedMotion,
+  });
+  const emptyEnterAnim = state.settings.reducedMotion
+    ? FadeIn.duration(150)
+    : FadeIn.duration(300);
 
   const scoutRouteLabel =
     state.supplierScoutRoute === "open"
@@ -159,9 +372,7 @@ export function OrdersModal({
 
   React.useEffect(() => {
     return () => {
-      if (installMomentTimeout.current) {
-        clearTimeout(installMomentTimeout.current);
-      }
+      isMountedRef.current = false;
     };
   }, []);
 
@@ -195,15 +406,14 @@ export function OrdersModal({
         pattern,
         animationMode,
       });
-      if (installMomentTimeout.current) {
-        clearTimeout(installMomentTimeout.current);
-      }
-      installMomentTimeout.current = setTimeout(() => {
-        setInstallMoment(null);
-      }, 1200);
     },
     [state.settings.reducedMotion]
   );
+
+  const handleInstallMomentComplete = React.useCallback((key: number) => {
+    if (!isMountedRef.current) return;
+    setInstallMoment((current) => (current && current.key === key ? null : current));
+  }, []);
 
   const handleFulfillOrder = (orderId: string) => {
     const order = state.orders.find((o) => o.id === orderId);
@@ -266,127 +476,11 @@ export function OrdersModal({
       closeDisabled={closeDisabled}
       contentStyle={styles.modalContent}
     >
-      {installMoment ? (
-        <Animated.View
-          key={`install-${installMoment.key}`}
-          entering={FadeIn.duration(100)}
-          exiting={FadeOut.duration(250)}
-          style={[styles.installMomentOverlay, { pointerEvents: "none" }]}
-        >
-          {/* Radial glow burst behind panel */}
-          <Animated.View
-            entering={ZoomIn.duration(300).springify()}
-            style={styles.installGlowBurst}
-          >
-            <LinearGradient
-              colors={[
-                installMoment.pattern === "baron" ? "#A855F780" :
-                installMoment.pattern === "rainbow" ? "#FF6B6B80" :
-                "#00D9FF80",
-                "transparent"
-              ]}
-              style={styles.glowBurstGradient}
-              start={{ x: 0.5, y: 0.5 }}
-              end={{ x: 0.5, y: 0 }}
-            />
-          </Animated.View>
-
-          {/* Main celebration panel */}
-          <Animated.View
-            entering={SlideInUp.duration(350).springify().damping(12)}
-            style={styles.installMomentPanel}
-          >
-            {/* Success icon */}
-            <Animated.View
-              entering={ZoomIn.delay(100).duration(200).springify()}
-              style={styles.successIconContainer}
-            >
-              <Feather
-                name="zap"
-                size={24}
-                color={
-                  installMoment.pattern === "baron" ? GameColors.locked.accent :
-                  installMoment.pattern === "rainbow" ? "#FFD700" :
-                  GameColors.openStandard.primary
-                }
-              />
-            </Animated.View>
-
-            {/* Top light strip - main */}
-            <TrimLightStrip
-              progress={1}
-              bulbs={20}
-              height={26}
-              pattern={installMoment.pattern}
-              animationMode={installMoment.animationMode}
-              animated
-              reducedMotion={state.settings.reducedMotion}
-            />
-            <View style={styles.installMomentSpacer} />
-
-            {/* Middle light strip */}
-            <TrimLightStrip
-              progress={1}
-              bulbs={16}
-              height={22}
-              pattern={installMoment.pattern}
-              animationMode={installMoment.animationMode}
-              animated
-              reducedMotion={state.settings.reducedMotion}
-            />
-            <View style={styles.installMomentSpacer} />
-
-            {/* Bottom light strip - accent */}
-            <TrimLightStrip
-              progress={1}
-              bulbs={12}
-              height={18}
-              pattern={installMoment.pattern}
-              animationMode={installMoment.animationMode}
-              animated
-              reducedMotion={state.settings.reducedMotion}
-            />
-
-            {/* Success text */}
-            <Animated.View
-              entering={FadeIn.delay(150).duration(200)}
-              style={styles.successTextContainer}
-            >
-              <ThemedText style={styles.successText}>Installation Complete!</ThemedText>
-            </Animated.View>
-          </Animated.View>
-
-          {/* Side accent strips */}
-          <Animated.View
-            entering={FadeIn.delay(200).duration(300)}
-            style={styles.sideStripLeft}
-          >
-            <TrimLightStrip
-              progress={1}
-              bulbs={6}
-              height={14}
-              pattern={installMoment.pattern}
-              animationMode={installMoment.animationMode}
-              animated
-              reducedMotion={state.settings.reducedMotion}
-            />
-          </Animated.View>
-          <Animated.View
-            entering={FadeIn.delay(250).duration(300)}
-            style={styles.sideStripRight}
-          >
-            <TrimLightStrip
-              progress={1}
-              bulbs={6}
-              height={14}
-              pattern={installMoment.pattern}
-              animationMode={installMoment.animationMode}
-              animated
-              reducedMotion={state.settings.reducedMotion}
-            />
-          </Animated.View>
-        </Animated.View>
-      ) : null}
+      <InstallMomentCelebration
+        moment={installMoment}
+        reducedMotion={state.settings.reducedMotion}
+        onComplete={handleInstallMomentComplete}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -710,6 +804,7 @@ export function OrdersModal({
               onDismiss={() => handleDismissOrder(order.id)}
               onSelect={() => dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })}
               selected={state.highlightedOrderId === order.id}
+              trimPhase={orderTrimPhase}
               dismissible={
                 !order.isTutorial &&
                 !order.isLockout &&
@@ -722,7 +817,7 @@ export function OrdersModal({
             />
           ))
         ) : (
-          <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
+          <Animated.View entering={emptyEnterAnim} style={styles.emptyState}>
             <View style={styles.emptyIconContainer}>
               <Feather name="inbox" size={48} color={GameColors.text.disabled} />
             </View>
