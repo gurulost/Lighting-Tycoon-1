@@ -47,9 +47,11 @@ import {
   getAppInfo,
   getOrCreatePlayerId,
   identifyUser,
+  posthog,
 } from "@/lib/telemetry";
 import { applyTuningFromPayload, getTuning, TUNING_FLAG_KEY } from "@/lib/tuning";
 import { useFeatureFlagWithPayload } from "posthog-react-native";
+import type { PostHog as PostHogClient } from "posthog-react-native";
 import {
   BARON_TABLES,
   OPEN_TABLES,
@@ -6891,11 +6893,17 @@ const GameContext = createContext<GameContextValue | null>(null);
 const STORAGE_KEY = "lighting_tycoon_state_v1";
 const FIRST_OPEN_KEY = "lighting_tycoon_first_open_v1";
 const tuning = getTuning();
+const fallbackFeatureFlagClient = {
+  getFeatureFlag: () => undefined,
+  getFeatureFlagPayload: () => undefined,
+  onFeatureFlags: () => () => {},
+} as unknown as PostHogClient;
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, getInitialState());
+  const featureFlagClient = posthog ?? fallbackFeatureFlagClient;
   const [tuningVariant, tuningPayload] =
-    useFeatureFlagWithPayload(TUNING_FLAG_KEY);
+    useFeatureFlagWithPayload(TUNING_FLAG_KEY, featureFlagClient);
   const orderRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const supplierTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
