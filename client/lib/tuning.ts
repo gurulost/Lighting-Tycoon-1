@@ -358,6 +358,7 @@ function buildTuning(defaults: unknown, incoming: unknown): unknown {
   }
   if (Array.isArray(defaults)) {
     if (!Array.isArray(incoming)) return defaults;
+    if (incoming.length === 0) return [];
     const numbers = incoming.filter(
       (item) => typeof item === "number" && Number.isFinite(item),
     );

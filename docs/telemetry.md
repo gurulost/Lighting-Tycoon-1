@@ -68,7 +68,7 @@ Status: PostHog wired; core loop, tutorial, economy, and lockout events instrume
 
 ## Configuration / Experiments
 
-- `tuning_applied` (variant, payload)
+- `tuning_applied` (variant, payload, payloadSignature)
 
 ---
 

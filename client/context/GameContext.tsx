@@ -6960,7 +6960,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     applyTuningFromPayload(tuningPayload);
-    const signature = JSON.stringify(tuningPayload ?? {});
+    const payload = tuningPayload ?? null;
+    const signature = JSON.stringify(payload ?? {});
     tuningSignatureRef.current = signature;
     if (
       telemetryReadyRef.current &&
@@ -6968,7 +6969,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     ) {
       captureEvent("tuning_applied", {
         variant: tuningVariant,
-        payload: signature,
+        payload,
+        payloadSignature: signature,
       });
       tuningCapturedRef.current = signature;
     }
@@ -7054,7 +7056,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       ) {
         captureEvent("tuning_applied", {
           variant: tuningVariant,
-          payload: tuningSignatureRef.current,
+          payload: tuningPayload ?? null,
+          payloadSignature: tuningSignatureRef.current,
         });
         tuningCapturedRef.current = tuningSignatureRef.current;
       }
