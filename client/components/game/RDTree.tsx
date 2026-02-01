@@ -8,7 +8,6 @@ import Animated, {
   withSequence,
   withTiming,
   withDelay,
-  runOnJS,
   cancelAnimation,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
@@ -76,15 +75,12 @@ function RDNodeCard({
 
   const handlePress = () => {
     if (canUnlock && !isUnlocked) {
+      handleUnlock();
       scale.value = withSequence(
         withSpring(0.95, { damping: 15 }),
         withDelay(
           100,
-          withSpring(1, { damping: 15 }, (finished) => {
-            if (finished) {
-              runOnJS(handleUnlock)();
-            }
-          })
+          withSpring(1, { damping: 15 })
         )
       );
     }

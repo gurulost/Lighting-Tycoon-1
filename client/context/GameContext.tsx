@@ -3566,6 +3566,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const { orderId, partIndices } = action;
       const order = state.orders.find((o) => o.id === orderId);
       if (!order) return state;
+      if (order.rushStartTime && order.rushDeadline) {
+        const elapsed = Date.now() - order.rushStartTime;
+        if (elapsed > order.rushDeadline) {
+          return state;
+        }
+      }
 
       const newBoard = [...state.board];
       partIndices.forEach((idx) => {

@@ -69,7 +69,8 @@ export function OrderCard({
   const urgentPulse = useSharedValue(0);
 
   const fulfillmentIndices = getFulfillmentIndices(order);
-  const canFulfill = fulfillmentIndices !== null;
+  const rushExpired = Boolean(order.rushDeadline && timeRemaining !== null && timeRemaining <= 0);
+  const canFulfill = fulfillmentIndices !== null && !rushExpired;
 
   const isPartValidForRequirement = (
     part: Part,
@@ -155,7 +156,7 @@ export function OrderCard({
       urgentPulse.value = 0;
       return;
     }
-    if (order.rushDeadline) {
+    if (order.rushDeadline && !rushExpired) {
       urgentPulse.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 500 }),
@@ -172,7 +173,7 @@ export function OrderCard({
       cancelAnimation(urgentPulse);
       urgentPulse.value = 0;
     };
-  }, [order.rushDeadline, reducedMotion, urgentPulse]);
+  }, [order.rushDeadline, rushExpired, reducedMotion, urgentPulse]);
 
   useEffect(() => {
     if (order.rushStartTime && order.rushDeadline) {
@@ -274,12 +275,13 @@ export function OrderCard({
       return { label: "LOCKOUT", color: GameColors.ui.danger, icon: "alert-triangle" as const };
     }
     if (order.rushDeadline) {
-      const label =
-        timeRemaining !== null
-          ? selected
-            ? `${formatTime(timeRemaining)} +${rushBonus}%`
-            : `${formatTime(timeRemaining)}`
-          : "RUSH";
+      const label = rushExpired
+        ? "EXPIRED"
+        : timeRemaining !== null
+        ? selected
+          ? `${formatTime(timeRemaining)} +${rushBonus}%`
+          : `${formatTime(timeRemaining)}`
+        : "RUSH";
       return { label, color: GameColors.ui.danger, icon: "clock" as const };
     }
     if (order.type === "locked_required" || order.type === "baron_certified") {
@@ -647,7 +649,9 @@ export function OrderCard({
           </LinearGradient>
         </Pressable>
         {!canFulfill ? (
-          <ThemedText style={styles.ctaHint}>Missing parts</ThemedText>
+          <ThemedText style={styles.ctaHint}>
+            {rushExpired ? "Rush expired" : "Missing parts"}
+          </ThemedText>
         ) : null}
       </LinearGradient>
     </Animated.View>
