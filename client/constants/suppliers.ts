@@ -1,4 +1,7 @@
 import type { SupplierId } from "@/types/game";
+import { getTuning } from "@/lib/tuning";
+
+const tuning = getTuning();
 
 export interface SupplierConfig {
   maxCharges: number;
@@ -25,27 +28,38 @@ export const SUPPLIER_CONFIG: Record<SupplierId, Record<number, SupplierConfig>>
   },
 };
 
-export const SUPPLIER_COOLDOWN_REDUCTION_MS_PER_LEVEL = 2000;
-export const SUPPLIER_COOLDOWN_MIN_MS = 15000;
-export const BARON_EARLY_COOLDOWN_MS = 35000;
-
 export function getSupplierConfig(
   supplierId: SupplierId,
   level: number,
   speedLevel = 0
 ) {
   const config = SUPPLIER_CONFIG[supplierId] || {};
-  if (config[level]) return config[level];
   const levels = Object.keys(config)
     .map((entry) => Number(entry))
     .filter((value) => Number.isFinite(value));
   const fallbackLevel = levels.length > 0 ? Math.max(...levels) : 1;
-  const base = config[fallbackLevel] || { maxCharges: 0, cooldownMs: 60000 };
-  if (!speedLevel) return base;
-  const reduction = speedLevel * SUPPLIER_COOLDOWN_REDUCTION_MS_PER_LEVEL;
+  const base =
+    config[level] ||
+    config[fallbackLevel] ||
+    { maxCharges: 0, cooldownMs: 60000 };
+  const supplierTuning = tuning.suppliers[supplierId];
+  const cooldownMultiplier = Math.max(0, supplierTuning.cooldownMultiplier);
+  const tunedCharges = Math.max(
+    0,
+    Math.round(base.maxCharges + supplierTuning.chargeBonus),
+  );
+  let cooldownMs = base.cooldownMs * cooldownMultiplier;
+  if (!speedLevel) {
+    return {
+      maxCharges: tunedCharges,
+      cooldownMs: Math.max(tuning.suppliers.cooldownMinMs, cooldownMs),
+    };
+  }
+  const reduction =
+    speedLevel * tuning.suppliers.cooldownReductionPerLevelMs;
   return {
-    ...base,
-    cooldownMs: Math.max(SUPPLIER_COOLDOWN_MIN_MS, base.cooldownMs - reduction),
+    maxCharges: tunedCharges,
+    cooldownMs: Math.max(tuning.suppliers.cooldownMinMs, cooldownMs - reduction),
   };
 }
 
@@ -63,7 +77,10 @@ export function getEffectiveSupplierConfig(
   ) {
     return {
       ...base,
-      cooldownMs: Math.min(base.cooldownMs, BARON_EARLY_COOLDOWN_MS),
+      cooldownMs: Math.min(
+        base.cooldownMs,
+        tuning.suppliers.baronEarlyCooldownMs,
+      ),
     };
   }
   return base;

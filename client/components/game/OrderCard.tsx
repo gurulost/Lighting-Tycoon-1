@@ -35,6 +35,7 @@ interface OrderCardProps {
   selected?: boolean;
   onSelect?: () => void;
   trimPhase?: SharedValue<number>;
+  fulfillTestID?: string;
 }
 
 const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
@@ -58,6 +59,7 @@ export function OrderCard({
   selected = false,
   onSelect,
   trimPhase,
+  fulfillTestID,
 }: OrderCardProps) {
   const { state, getFulfillmentIndices } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -612,6 +614,7 @@ export function OrderCard({
             }
           }}
           style={styles.fulfillButtonContainer}
+          testID={fulfillTestID}
         >
           <LinearGradient
             colors={

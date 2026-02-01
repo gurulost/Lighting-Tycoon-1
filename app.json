@@ -38,7 +38,16 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-localization",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "lighting_tycoon",
+          "organization": "dave-dixon"
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true

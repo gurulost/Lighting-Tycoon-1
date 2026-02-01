@@ -38,7 +38,7 @@ import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
-import { LOCKOUT_LAB_REQUESTS_BASE } from "@/constants/lockout";
+import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
 import {
   OverlayItem,
@@ -289,7 +289,7 @@ export default function GameScreen() {
   const isCompactScreen = screenHeight > 0 && screenHeight < 800;
   const topCondensed = hudCollapsed || isCompactScreen;
   const lockoutLabTarget =
-    state.lockoutLabOrdersTarget || LOCKOUT_LAB_REQUESTS_BASE;
+    state.lockoutLabOrdersTarget || getLockoutLabRequestsBase();
   const lockoutProgressLabel =
     state.lockoutChoice === "lab"
       ? `Audit: ${Math.max(0, state.lockoutLabOrdersRemaining)}/${lockoutLabTarget} lab requests`

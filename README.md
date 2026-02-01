@@ -12,6 +12,7 @@ npm run expo:dev
 ```
 
 If you are not on Replit, set `EXPO_PUBLIC_DOMAIN=localhost:5000` before starting the Expo client.
+Use `.env.example` and `docs/configuration.md` as references for required environment variables.
 
 ## Scripts
 
@@ -20,6 +21,8 @@ If you are not on Replit, set `EXPO_PUBLIC_DOMAIN=localhost:5000` before startin
 - `npm run check:types` - TypeScript typecheck
 - `npm run lint` - lint
 - `npm run format` - format code
+- `npm test` - run unit/component tests
+- `npm run test:e2e` - run Playwright web E2E tests
 
 ## Repo Structure
 

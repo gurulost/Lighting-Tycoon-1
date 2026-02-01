@@ -1,8 +1,10 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
+  SectionList,
+  SectionListData,
   ImageSourcePropType,
   TextInput,
   Pressable,
@@ -11,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AvatarImage } from "./AvatarImage";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -32,10 +35,14 @@ interface GlossaryModalProps {
   onClose: () => void;
 }
 
+type GlossaryTier = "basics" | "core" | "advanced" | "endgame";
+type GlossaryFilter = "all" | "pinned" | GlossaryTier;
+
 interface GlossaryItem {
   id: string;
   title: string;
-  description: string;
+  summary: string;
+  detail?: string;
   icon?: keyof typeof Feather.glyphMap;
   color?: string;
   image?: ImageSourcePropType;
@@ -46,8 +53,51 @@ interface GlossaryItem {
 interface GlossarySection {
   id: string;
   title: string;
+  tier: GlossaryTier;
   items: GlossaryItem[];
 }
+
+type GlossaryRow = { type: "section"; section: GlossarySection };
+type GlossarySectionHeader = { title: string; tier: GlossaryTier };
+type GlossarySectionList = SectionListData<GlossaryRow, GlossarySectionHeader>;
+
+const TIER_LABELS: Record<GlossaryTier, string> = {
+  basics: "Basics",
+  core: "Core Systems",
+  advanced: "Advanced",
+  endgame: "Endgame",
+};
+
+const TIER_ORDER: GlossaryTier[] = ["basics", "core", "advanced", "endgame"];
+const SECTION_ORDER: Record<GlossaryTier, string[]> = {
+  basics: [
+    "start-here",
+    "parts-open",
+    "parts-locked",
+    "parts-waste",
+    "stations",
+    "utilities",
+    "letter-legend",
+    "characters",
+  ],
+  core: [
+    "suppliers",
+    "currencies",
+    "dependency",
+    "orders-campaigns",
+    "order-types",
+    "baron-offers",
+    "order-badges",
+  ],
+  advanced: ["merge-momentum", "boosts", "freedom-tech"],
+  endgame: ["compliance"],
+};
+const getSectionSortIndex = (tier: GlossaryTier, id: string) => {
+  const list = SECTION_ORDER[tier] ?? [];
+  const index = list.indexOf(id);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+};
+const PIN_STORAGE_KEY = "lighting_tycoon_glossary_pins_v1";
 
 const makePart = (tier: PartTier, family: PartFamily): Part => ({
   id: `glossary-${family}-${tier}`,
@@ -58,67 +108,102 @@ const makePart = (tier: PartTier, family: PartFamily): Part => ({
 
 const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
+    id: "start-here",
+    title: "Start Here: The Point of the Game",
+    tier: "basics",
+    items: [
+      {
+        id: "start-goal",
+        title: "The Goal",
+        summary: "Grow a lighting workshop and deliver installs.",
+        detail:
+          "Success looks like steady cash, higher-tier orders, and low Dependency and Baron pressure.",
+        icon: "target",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "start-loop",
+        title: "The Loop",
+        summary: "Supply -> Merge -> Fulfill -> Upgrade.",
+        detail:
+          "Tap suppliers for parts, merge to tier up, fulfill orders, and reinvest in R&D.",
+        icon: "repeat",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "start-story",
+        title: "The Story",
+        summary: "Locked speed vs open freedom.",
+        detail:
+          "The Baron tempts you with certified parts; open standards lead to liberation.",
+        icon: "book-open",
+        color: GameColors.ui.primary,
+      },
+    ],
+  },
+  {
     id: "parts-open",
     title: "Parts (Open Standard)",
+    tier: "basics",
     items: [
       {
         id: "part-open-1",
         title: "Clip (Open)",
-        description: "Starter part for open-standard builds.",
+        summary: "Tier 1 open-standard part.",
         part: { tier: 1, family: "open" },
       },
       {
         id: "part-open-2",
         title: "Track (Open)",
-        description: "Tier 2 run for open-standard installs.",
+        summary: "Tier 2 open-standard part.",
         part: { tier: 2, family: "open" },
       },
       {
         id: "part-open-3",
         title: "Segment (Open)",
-        description: "Tier 3 segment for larger installs.",
+        summary: "Tier 3 open-standard part.",
         part: { tier: 3, family: "open" },
       },
       {
         id: "part-open-4",
         title: "Smart Kit (Open)",
-        description: "Tier 4 smart kit for advanced jobs.",
+        summary: "Tier 4 open-standard part.",
         part: { tier: 4, family: "open" },
       },
       {
         id: "part-open-5",
         title: "Premium System (Open)",
-        description: "Top-tier open system.",
+        summary: "Tier 5 open-standard part.",
         part: { tier: 5, family: "open" },
       },
       {
         id: "part-open-6",
         title: "Routing Array (Open)",
-        description: "Tier 6 routing array for major runs.",
+        summary: "Tier 6 open-standard part.",
         part: { tier: 6, family: "open" },
       },
       {
         id: "part-open-7",
         title: "Network Spine (Open)",
-        description: "Tier 7 backbone for large installs.",
+        summary: "Tier 7 open-standard part.",
         part: { tier: 7, family: "open" },
       },
       {
         id: "part-open-8",
         title: "Control Stack (Open)",
-        description: "Tier 8 controller stack for synchronized installs.",
+        summary: "Tier 8 open-standard part.",
         part: { tier: 8, family: "open" },
       },
       {
         id: "part-open-9",
         title: "Signature Grid (Open)",
-        description: "Tier 9 signature grid for flagship builds.",
+        summary: "Tier 9 open-standard part.",
         part: { tier: 9, family: "open" },
       },
       {
         id: "part-open-10",
         title: "Kingdom Install (Open)",
-        description: "Tier 10 legacy install for true mastery.",
+        summary: "Tier 10 open-standard part.",
         part: { tier: 10, family: "open" },
       },
     ],
@@ -126,65 +211,66 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
     id: "parts-locked",
     title: "Parts (Locked Certified)",
+    tier: "basics",
     items: [
       {
         id: "part-locked-1",
         title: "Clip (Locked)",
-        description: "Certified part; faster early gains, reinforces Dependency.",
+        summary: "Tier 1 certified locked part.",
         part: { tier: 1, family: "locked" },
       },
       {
         id: "part-locked-2",
         title: "Track (Locked)",
-        description: "Tier 2 locked track.",
+        summary: "Tier 2 certified locked part.",
         part: { tier: 2, family: "locked" },
       },
       {
         id: "part-locked-3",
         title: "Segment (Locked)",
-        description: "Tier 3 locked segment.",
+        summary: "Tier 3 certified locked part.",
         part: { tier: 3, family: "locked" },
       },
       {
         id: "part-locked-4",
         title: "Smart Kit (Locked)",
-        description: "Tier 4 locked smart kit.",
+        summary: "Tier 4 certified locked part.",
         part: { tier: 4, family: "locked" },
       },
       {
         id: "part-locked-5",
         title: "Premium System (Locked)",
-        description: "Top-tier locked system.",
+        summary: "Tier 5 certified locked part.",
         part: { tier: 5, family: "locked" },
       },
       {
         id: "part-locked-6",
         title: "Routing Array (Locked)",
-        description: "Tier 6 certified routing array.",
+        summary: "Tier 6 certified locked part.",
         part: { tier: 6, family: "locked" },
       },
       {
         id: "part-locked-7",
         title: "Network Spine (Locked)",
-        description: "Tier 7 certified backbone installs.",
+        summary: "Tier 7 certified locked part.",
         part: { tier: 7, family: "locked" },
       },
       {
         id: "part-locked-8",
         title: "Control Stack (Locked)",
-        description: "Tier 8 certified controller stack.",
+        summary: "Tier 8 certified locked part.",
         part: { tier: 8, family: "locked" },
       },
       {
         id: "part-locked-9",
         title: "Signature Grid (Locked)",
-        description: "Tier 9 certified signature grid.",
+        summary: "Tier 9 certified locked part.",
         part: { tier: 9, family: "locked" },
       },
       {
         id: "part-locked-10",
         title: "Kingdom Install (Locked)",
-        description: "Tier 10 certified legacy install.",
+        summary: "Tier 10 certified locked part.",
         part: { tier: 10, family: "locked" },
       },
     ],
@@ -192,23 +278,30 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
     id: "parts-waste",
     title: "Waste & Salvage",
+    tier: "basics",
     items: [
       {
         id: "waste-1",
         title: "Packaging Waste",
-        description: "Clutter from certified shipments. Merge or recycle to recover value.",
+        summary: "W1 waste part.",
+        detail:
+          "Merge two to upgrade, or recycle for cash + a small Open Workshop cooldown cut + pressure relief.",
         part: { tier: 1, family: "waste" },
       },
       {
         id: "waste-2",
         title: "Cardboard Stack",
-        description: "Consolidated waste. Recycle to speed up the Open Workshop.",
+        summary: "W2 waste part.",
+        detail:
+          "Merge to W3 or recycle for a bigger cooldown cut and more pressure relief.",
         part: { tier: 2, family: "waste" },
       },
       {
         id: "waste-3",
         title: "Salvage Bale",
-        description: "Compressed salvage. Cash it out for a workshop boost.",
+        summary: "W3 waste part.",
+        detail:
+          "Recycle to grant an Open Workshop charge plus the largest pressure relief.",
         part: { tier: 3, family: "waste" },
       },
     ],
@@ -216,50 +309,89 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
     id: "stations",
     title: "Stations",
+    tier: "basics",
     items: [
       {
         id: "station-workbench",
         title: "Workbench",
-        description: "Tap to open suppliers. Each source has charges and cooldowns.",
+        summary: "Open suppliers.",
+        detail: "Each source has charges and cooldowns.",
         image: stationWorkbench,
       },
       {
         id: "station-orders",
         title: "Order Inbox",
-        description: "Open orders. Fulfill to earn rewards.",
+        summary: "View and fulfill orders.",
+        detail: "Completing orders pays cash, reputation, and research.",
         image: stationInbox,
       },
       {
         id: "station-rd",
         title: "R&D Bench",
-        description: "Spend research to unlock Freedom tech.",
+        summary: "Unlock Open Workshop and Freedom tech.",
+        detail: "Costs research and upgrade materials.",
         image: stationRd,
+      },
+    ],
+  },
+  {
+    id: "suppliers",
+    title: "Suppliers",
+    tier: "core",
+    items: [
+      {
+        id: "supplier-baron",
+        title: "Baron Supply Depot",
+        summary: "Fast locked supply.",
+        detail: "Raises Dependency; shipments can include waste.",
+        icon: "package",
+        color: GameColors.locked.primary,
+      },
+      {
+        id: "supplier-open",
+        title: "Open Workshop",
+        summary: "Open-standard supply.",
+        detail:
+          "Unlocked via R&D; scales with upgrades; can drop materials and compatibility components.",
+        icon: "tool",
+        color: GameColors.openStandard.primary,
+      },
+      {
+        id: "supplier-salvage",
+        title: "Salvage Corner",
+        summary: "Refurb supply source.",
+        detail: "Drops open parts, waste, or upgrade materials.",
+        icon: "refresh-cw",
+        color: GameColors.ui.warning,
       },
     ],
   },
   {
     id: "characters",
     title: "Characters",
+    tier: "basics",
     items: [
       {
         id: "character-tina",
         title: "Tina",
-        description:
-          "You. Owner of the Glow Workshop—confident, clever, and always in control of the glow.",
+        summary: "Owner of the Glow Workshop.",
+        detail: "Leads the shop and drives the push for open standards.",
         image: tinaPortrait,
         isPortrait: true,
       },
       {
         id: "character-mentor",
         title: "Mentor",
-        description: "Retired installer who teaches the craft and keeps you grounded.",
+        summary: "Retired installer who teaches the craft.",
+        detail: "Provides guidance and boosts to help you break free.",
         image: mentorPortrait,
         isPortrait: true,
       },
       {
         id: "character-baron",
         title: "Bulb Baron",
-        description: "Corporate supplier with tempting locked offers and strict terms.",
+        summary: "Corporate supplier with strict terms.",
+        detail: "Tempting locked offers that increase Dependency and pressure.",
         image: baronPortrait,
         isPortrait: true,
       },
@@ -268,113 +400,363 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
     id: "utilities",
     title: "Utilities",
+    tier: "basics",
     items: [
       {
         id: "utility-backpack",
         title: "Backpack",
-        description: "Temporary storage. Drag items in and out.",
+        summary: "Temporary storage slots.",
+        detail: "Drag items in and out.",
         icon: "archive",
         color: GameColors.ui.primary,
       },
       {
         id: "utility-recycle",
         title: "Recycle Bin",
-        description: "Delete parts for a small cash/research refund.",
+        summary: "Recycle parts for cash and research.",
+        detail:
+          "Recycling waste can cut Open Workshop cooldowns, add charges, and reduce Baron pressure.",
         icon: "trash-2",
         color: GameColors.ui.danger,
       },
     ],
   },
   {
-    id: "boosts",
-    title: "Tactical Boosts",
+    id: "orders-campaigns",
+    title: "Orders & Campaigns",
+    tier: "core",
     items: [
       {
-        id: "boost-scout",
-        title: "Supplier Scout",
-        description: "Spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.",
-        icon: "compass",
+        id: "orders-refresh",
+        title: "Order Refresh",
+        summary: "Replace one order for cash.",
+        detail: "Cost scales with reputation.",
+        icon: "refresh-cw",
         color: GameColors.ui.primary,
       },
       {
-        id: "boost-clinic",
-        title: "Mentor Workshop Clinic",
-        description: "Spend cash to boost the next merges with extra research and lower dependency.",
-        icon: "activity",
-        color: GameColors.currency.research,
-      },
-      {
-        id: "boost-warranty",
-        title: "Baron Warranty Stamp",
-        description: "Spend cash to soften wrong-family penalties or boost Baron contract payouts.",
-        icon: "shield",
-        color: GameColors.currency.cash,
+        id: "orders-marketing",
+        title: "Marketing Campaign",
+        summary: "Boost higher-tier orders for a short run.",
+        detail: "Stacks up to a cap.",
+        icon: "trending-up",
+        color: GameColors.currency.reputation,
       },
     ],
   },
   {
-    id: "currencies",
-    title: "Currencies",
+    id: "order-types",
+    title: "Order Types",
+    tier: "core",
     items: [
       {
-        id: "currency-cash",
-        title: "Cash",
-        description: "Buy upgrades and expand your workshop.",
-        icon: "dollar-sign",
-        color: GameColors.currency.cash,
+        id: "order-type-standard",
+        title: "Standard Orders",
+        summary: "Regular installs with tier requirements.",
+        detail: "Any family allowed unless noted.",
+        icon: "file-text",
+        color: GameColors.ui.primary,
       },
       {
-        id: "currency-rep",
-        title: "Reputation",
-        description: "Unlocks neighborhoods and better orders.",
-        icon: "star",
-        color: GameColors.currency.reputation,
+        id: "order-type-certified",
+        title: "Certified Orders",
+        summary: "Locked parts preferred or required.",
+        detail: "Usually higher cash but adds Dependency pressure.",
+        icon: "lock",
+        color: GameColors.locked.primary,
       },
       {
-        id: "currency-research",
-        title: "Research",
-        description: "Unlocks R&D nodes and the Freedom Controller.",
+        id: "order-type-compat",
+        title: "Compatibility Orders",
+        summary: "Require compatible open parts.",
+        detail: "Unlocked after Freedom tech is available.",
+        icon: "shield",
+        color: GameColors.ui.success,
+      },
+      {
+        id: "order-type-style",
+        title: "Style Match",
+        summary: "All parts must be one family.",
+        detail: "Open-only or locked-only.",
+        icon: "layers",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "order-type-rush",
+        title: "Rush Orders",
+        summary: "Timed bonus orders.",
+        detail: "Finish sooner for extra cash; no hard fail.",
+        icon: "clock",
+        color: GameColors.ui.danger,
+      },
+      {
+        id: "order-type-lab",
+        title: "Lab Requests",
+        summary: "Audit lab jobs during crackdowns.",
+        detail: "Open-only and research-heavy rewards.",
         icon: "zap",
         color: GameColors.currency.research,
       },
     ],
   },
   {
+    id: "baron-offers",
+    title: "Baron Offers",
+    tier: "core",
+    items: [
+      {
+        id: "baron-offer-crate",
+        title: "Certified Crate",
+        summary: "Instant locked parts plus a payout.",
+        detail: "Adds Dependency and tilts spawns toward locked parts.",
+        icon: "package",
+        color: GameColors.locked.primary,
+      },
+      {
+        id: "baron-offer-contract",
+        title: "Territory Contract",
+        summary: "Boosts cash for the next orders.",
+        detail: "Each completion nudges Dependency; locked spawns lean in.",
+        icon: "trending-up",
+        color: GameColors.locked.primary,
+      },
+      {
+        id: "baron-offer-rush",
+        title: "Emergency Rush Kit",
+        summary: "Instant locked kit with rush spawns.",
+        detail: "Adds Dependency and tilts spawns locked.",
+        icon: "zap",
+        color: GameColors.locked.primary,
+      },
+    ],
+  },
+  {
+    id: "boosts",
+    title: "Tactical Boosts",
+    tier: "advanced",
+    items: [
+      {
+        id: "boost-scout",
+        title: "Supplier Scout",
+        summary: "Force the next supplier spawns.",
+        detail: "Choose Open, Locked (adds Baron pressure), or +1 tier.",
+        icon: "compass",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "boost-clinic",
+        title: "Mentor Workshop Clinic",
+        summary: "Boost the next open merges.",
+        detail: "Grants extra research and reduces Dependency.",
+        icon: "activity",
+        color: GameColors.currency.research,
+      },
+      {
+        id: "boost-warranty",
+        title: "Baron Warranty Stamp",
+        summary: "Modify order payouts.",
+        detail: "Reduce wrong-family penalties or boost Baron contract cash.",
+        icon: "shield",
+        color: GameColors.currency.cash,
+      },
+    ],
+  },
+  {
+    id: "merge-momentum",
+    title: "Merge Momentum",
+    tier: "advanced",
+    items: [
+      {
+        id: "merge-chain",
+        title: "Merge Chain",
+        summary: "Chain merges quickly to trigger Momentum.",
+        detail: "Hits x3/x6/x10 thresholds.",
+        icon: "link",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "merge-refill",
+        title: "Refill Charge",
+        summary: "+1 supplier charge.",
+        detail: "Targets Open Workshop or Baron Depot if Open is locked.",
+        icon: "battery-charging",
+        color: GameColors.openStandard.primary,
+      },
+      {
+        id: "merge-cooldown",
+        title: "Cooldown Cut",
+        summary: "Reduce an active supplier cooldown.",
+        detail: "30/45/60% based on chain level.",
+        icon: "clock",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "merge-quality",
+        title: "Quality Boost",
+        summary: "Next drop has a tier floor.",
+        detail: "Tier 2/3/4 based on chain level.",
+        icon: "trending-up",
+        color: GameColors.ui.success,
+      },
+    ],
+  },
+  {
+    id: "freedom-tech",
+    title: "Freedom Tech",
+    tier: "advanced",
+    items: [
+      {
+        id: "freedom-controller",
+        title: "Freedom Controller",
+        summary: "R&D tool that liberates locked parts.",
+        detail:
+          "Converts locked to compatible open parts and reduces Dependency.",
+        image: freedomControllerImage,
+      },
+      {
+        id: "compatible-parts",
+        title: "Compatible Parts",
+        summary: "Open parts marked with C.",
+        detail:
+          "Used for compatibility orders; some locked orders accept them.",
+        icon: "shield",
+        color: GameColors.ui.success,
+      },
+      {
+        id: "compatibility-orders",
+        title: "Compatibility Orders",
+        summary: "Orders that require compatible open parts.",
+        detail: "Unlocked after Freedom tech is available.",
+        icon: "check-circle",
+        color: GameColors.ui.success,
+      },
+    ],
+  },
+  {
+    id: "currencies",
+    title: "Currencies & Materials",
+    tier: "core",
+    items: [
+      {
+        id: "currency-cash",
+        title: "Cash",
+        summary: "Spend on upgrades and boosts.",
+        detail: "Earn from orders and recycling.",
+        icon: "dollar-sign",
+        color: GameColors.currency.cash,
+      },
+      {
+        id: "currency-rep",
+        title: "Reputation",
+        summary: "Unlocks neighborhoods and better orders.",
+        detail: "Earned from orders.",
+        icon: "star",
+        color: GameColors.currency.reputation,
+      },
+      {
+        id: "currency-research",
+        title: "Research",
+        summary: "Unlocks R&D nodes and Freedom Controller.",
+        detail: "Earned from orders and open merges.",
+        icon: "zap",
+        color: GameColors.currency.research,
+      },
+      {
+        id: "currency-materials",
+        title: "Upgrade Materials",
+        summary: "Used for Open Workshop tiers.",
+        detail: "Drops from Salvage and Open Workshop bonus rolls.",
+        icon: "clipboard",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "currency-compat",
+        title: "Compatibility Components",
+        summary: "Used for Open Workshop IV/V upgrades.",
+        detail: "Rare Open Workshop bonus drop.",
+        icon: "shield",
+        color: GameColors.ui.success,
+      },
+    ],
+  },
+  {
     id: "dependency",
-    title: "Dependency + Villain",
+    title: "Dependency",
+    tier: "core",
     items: [
       {
         id: "dependency-meter",
         title: "Dependency Meter",
-        description: "Starts at 100. Open work lowers it; locked work reinforces it.",
+        summary: "Tracks reliance on locked supply.",
+        detail:
+          "Locked work raises it; open-only orders can reduce it. At 20, Compliance Audit triggers.",
         icon: "activity",
         color: GameColors.ui.warning,
       },
       {
-        id: "freedom-controller",
-        title: "Freedom Controller",
-        description: "Converts locked kits into open-compatible builds for special orders.",
-        image: freedomControllerImage,
+        id: "baron-pressure",
+        title: "Baron Pressure",
+        summary: "Hidden squeeze meter.",
+        detail:
+          "Builds from locked scout and overflow; high pressure lowers Phase 2 rewards. Open-only orders and waste recycling relieve it.",
+        icon: "alert-circle",
+        color: GameColors.ui.warning,
+      },
+    ],
+  },
+  {
+    id: "compliance",
+    title: "Compliance & Liberation",
+    tier: "endgame",
+    items: [
+      {
+        id: "compliance-audit",
+        title: "Compliance Audit",
+        summary: "Crackdown triggered at Dependency 20.",
+        detail: "A compliance order appears and must be resolved.",
+        icon: "alert-triangle",
+        color: GameColors.ui.danger,
+      },
+      {
+        id: "audit-paths",
+        title: "Audit Choices",
+        summary: "Choose how to resolve the audit.",
+        detail:
+          "Take Baron help for fast compliance or complete lab requests and craft Freedom Controller.",
+        icon: "compass",
+        color: GameColors.locked.primary,
+      },
+      {
+        id: "phase-two",
+        title: "Phase 2",
+        summary: "Liberation phase after Freedom.",
+        detail:
+          "Dependency resets and harder orders arrive; Baron pressure can cut payouts.",
+        icon: "flag",
+        color: GameColors.ui.primary,
       },
     ],
   },
   {
     id: "letter-legend",
     title: "Letters + Badges",
+    tier: "basics",
     items: [
       {
         id: "legend-order-letters",
-        title: "Order Letters (C/T/S/K/P)",
-        description:
-          "Order hints use letters for part tiers: C=Clip, T=Track, S=Segment, K=Smart Kit, P=Premium System.",
+        title: "Order Letters (CL/TR/SG/KT/PR/AR/SP/ST/GR/KI)",
+        summary: "Tier code legend for order hints.",
+        detail:
+          "CL=Clip, TR=Track, SG=Segment, KT=Kit, PR=System, AR=Array, SP=Spine, ST=Stack, GR=Grid, KI=Kingdom.",
         icon: "type",
         color: GameColors.ui.primary,
       },
       {
         id: "legend-tile-badges",
-        title: "Tile Badges (O/L/C)",
-        description:
-          "O=open-standard, L=locked certified, C=compatible (counts for locked + compatible orders).",
+        title: "Tile Badges (O/L/W/C)",
+        summary: "Tile family indicators.",
+        detail:
+          "O=open-standard, L=locked, W=waste (W1/W2/W3), C=compatible open part.",
         icon: "tag",
         color: GameColors.text.secondary,
       },
@@ -383,60 +765,93 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
     id: "order-badges",
     title: "Order Badges",
+    tier: "core",
     items: [
       {
         id: "badge-certified",
         title: "Certified",
-        description: "Locked preferred or required for full rewards.",
+        summary: "Locked preferred or required.",
+        detail: "Often higher payouts with locked parts.",
         icon: "lock",
         color: GameColors.locked.primary,
       },
       {
         id: "badge-compatible",
         title: "Compatible",
-        description: "Requires open-compatible parts (liberated tech).",
+        summary: "Requires compatible open parts.",
+        detail: "Parts must be marked with C.",
         icon: "shield",
         color: GameColors.ui.success,
       },
       {
+        id: "badge-mentor",
+        title: "Mentor Job",
+        summary: "Mentor-guided training order.",
+        detail: "Usually tied to story or tutorial beats.",
+        icon: "compass",
+        color: GameColors.openStandard.primary,
+      },
+      {
+        id: "badge-baron-contract",
+        title: "Baron Contract",
+        summary: "Contract order pays extra cash.",
+        detail: "Raises Dependency.",
+        icon: "briefcase",
+        color: GameColors.locked.primary,
+      },
+      {
+        id: "badge-story",
+        title: "Story",
+        summary: "Narrative order tied to story beats.",
+        detail: "Completing it advances the narrative.",
+        icon: "book-open",
+        color: GameColors.ui.primary,
+      },
+      {
         id: "badge-rush",
         title: "Rush",
-        description: "Bonus decays over time. No hard fail.",
+        summary: "Bonus decays over time.",
+        detail: "No hard fail.",
         icon: "clock",
         color: GameColors.ui.danger,
       },
       {
         id: "badge-style",
         title: "Style Match",
-        description: "All items must be Open or all Locked.",
+        summary: "All Open only or Locked only.",
+        detail: "No mixing families.",
         icon: "layers",
         color: GameColors.ui.primary,
       },
       {
         id: "badge-preference",
         title: "Preference",
-        description: "Prefers Open or Locked. Wrong family reduces payout.",
+        summary: "Prefers Open or Locked.",
+        detail: "Wrong family reduces payout.",
         icon: "heart",
         color: GameColors.currency.reputation,
       },
       {
         id: "badge-exact",
         title: "Exact Tiers",
-        description: "Exact tier required. No substitutions.",
+        summary: "Exact tier required.",
+        detail: "No substitutions allowed.",
         icon: "check-circle",
         color: GameColors.text.secondary,
       },
       {
         id: "badge-eco",
         title: "Eco Audit",
-        description: "Open kits grant bonus research.",
+        summary: "Open kits grant bonus research.",
+        detail: "Bonus applies only if no locked parts are used.",
         icon: "feather",
         color: GameColors.currency.research,
       },
       {
         id: "badge-lockout",
         title: "Lockout",
-        description: "Firmware lock. Use locked or compatible kits.",
+        summary: "Compliance Audit order.",
+        detail: "Locked or compatible kits only.",
         icon: "alert-triangle",
         color: GameColors.ui.danger,
       },
@@ -449,26 +864,155 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
   const reducedMotion = state.settings.reducedMotion;
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
-  const scrollRef = useRef<ScrollView>(null);
-  const [sectionOffsets, setSectionOffsets] = useState<Record<string, number>>({});
+  const [activeFilter, setActiveFilter] = useState<GlossaryFilter>("all");
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [pinsLoaded, setPinsLoaded] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const listRef = useRef<SectionList<GlossaryRow, GlossarySectionHeader>>(null);
+
+  const pinnedSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(PIN_STORAGE_KEY)
+      .then((raw) => {
+        if (!mounted) return;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const validIds = new Set(
+              GLOSSARY_SECTIONS.flatMap((section) =>
+                section.items.map((item) => item.id),
+              ),
+            );
+            const filtered = parsed.filter(
+              (id) => typeof id === "string" && validIds.has(id),
+            );
+            setPinnedIds(filtered);
+          }
+        }
+        setPinsLoaded(true);
+      })
+      .catch(() => {
+        if (mounted) setPinsLoaded(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pinsLoaded) return;
+    AsyncStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(pinnedIds)).catch(
+      () => undefined,
+    );
+  }, [pinnedIds, pinsLoaded]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredSections = useMemo(() => {
-    if (!normalizedQuery) return GLOSSARY_SECTIONS;
-    return GLOSSARY_SECTIONS.map((section) => {
-      const items = section.items.filter((item) => {
-        const haystack = `${item.title} ${item.description}`.toLowerCase();
-        return haystack.includes(normalizedQuery);
+    const tierFilter =
+      activeFilter !== "all" && activeFilter !== "pinned" ? activeFilter : null;
+    const pinnedOnly = activeFilter === "pinned";
+
+    return GLOSSARY_SECTIONS.filter((section) =>
+      tierFilter ? section.tier === tierFilter : true,
+    )
+      .map((section) => {
+        const items = section.items
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => {
+            if (pinnedOnly && !pinnedSet.has(item.id)) return false;
+            if (!normalizedQuery) return true;
+            const haystack =
+              `${item.title} ${item.summary} ${item.detail ?? ""}`.toLowerCase();
+            return haystack.includes(normalizedQuery);
+          })
+          .sort((a, b) => {
+            const pinDelta =
+              Number(pinnedSet.has(b.item.id)) -
+              Number(pinnedSet.has(a.item.id));
+            return pinDelta !== 0 ? pinDelta : a.index - b.index;
+          })
+          .map(({ item }) => item);
+        return { ...section, items };
+      })
+      .filter((section) => section.items.length > 0);
+  }, [activeFilter, normalizedQuery, pinnedSet]);
+
+  const groupedSections = useMemo(
+    () =>
+      TIER_ORDER.map((tier) => ({
+        tier,
+        title: TIER_LABELS[tier],
+        sections: filteredSections
+          .filter((section) => section.tier === tier)
+          .sort(
+            (a, b) =>
+              getSectionSortIndex(tier, a.id) - getSectionSortIndex(tier, b.id),
+          ),
+      })).filter((group) => group.sections.length > 0),
+    [filteredSections],
+  );
+
+  const listSections = useMemo<GlossarySectionList[]>(
+    () =>
+      groupedSections.map((group) => ({
+        title: group.title,
+        tier: group.tier,
+        data: group.sections.map(
+          (section): GlossaryRow => ({ type: "section", section }),
+        ),
+      })),
+    [groupedSections],
+  );
+
+  const sectionIndexMap = useMemo(() => {
+    const map: Record<string, { sectionIndex: number; itemIndex: number }> = {};
+    listSections.forEach((group, sectionIndex) => {
+      group.data.forEach((row, itemIndex) => {
+        map[row.section.id] = { sectionIndex, itemIndex };
       });
-      return { ...section, items };
-    }).filter((section) => section.items.length > 0);
-  }, [normalizedQuery]);
+    });
+    return map;
+  }, [listSections]);
 
   const handleJumpTo = (sectionId: string) => {
-    const offset = sectionOffsets[sectionId];
-    if (offset === undefined) return;
-    scrollRef.current?.scrollTo({ y: Math.max(0, offset - Spacing.md), animated: true });
+    const target = sectionIndexMap[sectionId];
+    if (!target) return;
+    listRef.current?.scrollToLocation({
+      sectionIndex: target.sectionIndex,
+      itemIndex: target.itemIndex,
+      animated: true,
+      viewOffset: Spacing.md,
+    });
   };
+
+  const togglePin = (id: string) => {
+    setPinnedIds((prev) =>
+      prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id],
+    );
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const pinnedEmpty = activeFilter === "pinned" && pinnedIds.length === 0;
+  const emptyTitle = pinnedEmpty ? "No pinned items" : "No matches";
+  const emptyDescription = pinnedEmpty
+    ? "Tap the bookmark on any entry to pin it here."
+    : "Try a different keyword or clear the search.";
+
+  const showIndex = normalizedQuery.length === 0 && groupedSections.length > 0;
+
   return (
     <ModalShell
       title="Glossary"
@@ -500,95 +1044,199 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.indexRow}
+          contentContainerStyle={styles.filtersRow}
         >
-          {filteredSections.map((section) => (
-            <Pressable
-              key={section.id}
-              onPress={() => handleJumpTo(section.id)}
-              style={styles.indexChip}
-            >
-              <ThemedText style={styles.indexChipText}>{section.title}</ThemedText>
-            </Pressable>
-          ))}
+          {[
+            { key: "all", label: "All" },
+            { key: "pinned", label: "Pinned" },
+            { key: "basics", label: TIER_LABELS.basics },
+            { key: "core", label: TIER_LABELS.core },
+            { key: "advanced", label: TIER_LABELS.advanced },
+            { key: "endgame", label: TIER_LABELS.endgame },
+          ].map((filter) => {
+            const active = activeFilter === filter.key;
+            return (
+              <Pressable
+                key={filter.key}
+                onPress={() => setActiveFilter(filter.key as GlossaryFilter)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+              >
+                <ThemedText
+                  style={[
+                    styles.filterChipText,
+                    active && styles.filterChipTextActive,
+                  ]}
+                >
+                  {filter.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
         </ScrollView>
+
+        {showIndex ? (
+          <View style={styles.indexGroup}>
+            <ThemedText style={styles.indexTitle}>Jump to</ThemedText>
+            {groupedSections.map((group) => (
+              <View key={group.tier} style={styles.indexGroupBlock}>
+                <ThemedText style={styles.indexGroupTitle}>
+                  {group.title}
+                </ThemedText>
+                <View style={styles.indexChipRow}>
+                  {group.sections.map((section) => (
+                    <Pressable
+                      key={section.id}
+                      onPress={() => handleJumpTo(section.id)}
+                      style={styles.indexChip}
+                    >
+                      <ThemedText style={styles.indexChipText}>
+                        {section.title}
+                      </ThemedText>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
-      <ScrollView
-        ref={scrollRef}
+
+      <SectionList
+        ref={listRef}
+        sections={listSections}
+        keyExtractor={(item) => item.section.id}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Spacing["4xl"] + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
-      >
-        {filteredSections.length === 0 ? (
+        stickySectionHeadersEnabled
+        ListEmptyComponent={() => (
           <View style={styles.emptyState}>
             <Feather name="search" size={28} color={GameColors.text.disabled} />
-            <ThemedText style={styles.emptyTitle}>No matches</ThemedText>
+            <ThemedText style={styles.emptyTitle}>{emptyTitle}</ThemedText>
             <ThemedText style={styles.emptyDescription}>
-              Try a different keyword or clear the search.
+              {emptyDescription}
             </ThemedText>
           </View>
-        ) : (
-          filteredSections.map((section) => (
-            <View
-              key={section.id}
-              style={styles.section}
-              onLayout={(event) =>
-                setSectionOffsets((prev) => ({
-                  ...prev,
-                  [section.id]: event.nativeEvent.layout.y,
-                }))
-              }
-            >
-              <ThemedText style={styles.sectionTitle}>{section.title}</ThemedText>
-              <View style={styles.sectionCard}>
-                {section.items.map((item) => (
-                  <View key={item.id} style={styles.itemRow}>
+        )}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.groupHeader}>
+            <ThemedText style={styles.groupHeaderText}>
+              {section.title}
+            </ThemedText>
+          </View>
+        )}
+        renderItem={({ item }) => (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>
+              {item.section.title}
+            </ThemedText>
+            <View style={styles.sectionCard}>
+              {item.section.items.map((entry) => {
+                const isPinned = pinnedSet.has(entry.id);
+                const hasDetail = Boolean(entry.detail);
+                const isExpanded = hasDetail && expandedItems.has(entry.id);
+                return (
+                  <Pressable
+                    key={entry.id}
+                    onPress={() => {
+                      if (!hasDetail) return;
+                      toggleExpanded(entry.id);
+                    }}
+                    style={({ pressed }) => [
+                      styles.itemRow,
+                      pressed && hasDetail && styles.itemRowPressed,
+                    ]}
+                  >
                     <View style={styles.itemIcon}>
-                      {item.part ? (
+                      {entry.part ? (
                         <PartItem
-                          part={makePart(item.part.tier, item.part.family)}
+                          part={makePart(entry.part.tier, entry.part.family)}
                           size={42}
                           disabled
                           reducedMotion={reducedMotion}
                         />
-                      ) : item.image && item.isPortrait ? (
+                      ) : entry.image && entry.isPortrait ? (
                         <AvatarImage
-                          source={item.image}
+                          source={entry.image}
                           size={40}
                           borderColor="#2A2A4A"
                           backgroundColor="rgba(255,255,255,0.08)"
                           icon="user"
                           iconColor={GameColors.text.secondary}
                         />
-                      ) : item.image ? (
+                      ) : entry.image ? (
                         <Image
-                          source={item.image}
+                          source={entry.image}
                           style={styles.imageIcon}
                           contentFit="contain"
                           cachePolicy="memory-disk"
                         />
-                      ) : item.icon ? (
+                      ) : entry.icon ? (
                         <LinearGradient
-                          colors={[`${item.color ?? GameColors.ui.primary}30`, `${item.color ?? GameColors.ui.primary}10`]}
+                          colors={[
+                            `${entry.color ?? GameColors.ui.primary}30`,
+                            `${entry.color ?? GameColors.ui.primary}10`,
+                          ]}
                           style={styles.iconContainer}
                         >
-                          <Feather name={item.icon} size={18} color={item.color ?? GameColors.ui.primary} />
+                          <Feather
+                            name={entry.icon}
+                            size={18}
+                            color={entry.color ?? GameColors.ui.primary}
+                          />
                         </LinearGradient>
                       ) : null}
                     </View>
                     <View style={styles.itemText}>
-                      <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
-                      <ThemedText style={styles.itemDescription}>{item.description}</ThemedText>
+                      <View style={styles.itemTitleRow}>
+                        <ThemedText style={styles.itemTitle}>
+                          {entry.title}
+                        </ThemedText>
+                        <View style={styles.itemActions}>
+                          <Pressable
+                            onPress={(event) => {
+                              event.stopPropagation?.();
+                              togglePin(entry.id);
+                            }}
+                            style={styles.pinButton}
+                          >
+                            <Feather
+                              name="bookmark"
+                              size={14}
+                              color={
+                                isPinned
+                                  ? GameColors.ui.primary
+                                  : GameColors.text.disabled
+                              }
+                            />
+                          </Pressable>
+                          {hasDetail ? (
+                            <Feather
+                              name={isExpanded ? "chevron-up" : "chevron-down"}
+                              size={16}
+                              color={GameColors.text.secondary}
+                            />
+                          ) : null}
+                        </View>
+                      </View>
+                      <ThemedText style={styles.itemSummary} numberOfLines={2}>
+                        {entry.summary}
+                      </ThemedText>
+                      {isExpanded && entry.detail ? (
+                        <ThemedText style={styles.itemDetail}>
+                          {entry.detail}
+                        </ThemedText>
+                      ) : null}
                     </View>
-                  </View>
-                ))}
-              </View>
+                  </Pressable>
+                );
+              })}
             </View>
-          ))
+          </View>
         )}
-      </ScrollView>
+      />
     </ModalShell>
   );
 }
@@ -603,7 +1251,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   searchBar: {
     flexDirection: "row",
@@ -631,9 +1279,52 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2A2A4A",
   },
-  indexRow: {
+  filtersRow: {
     gap: Spacing.sm,
     paddingRight: Spacing.lg,
+    paddingVertical: Spacing.xs,
+  },
+  filterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  filterChipActive: {
+    borderColor: GameColors.ui.primary + "60",
+    backgroundColor: GameColors.ui.primary + "15",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  filterChipTextActive: {
+    color: GameColors.ui.primary,
+  },
+  indexGroup: {
+    gap: Spacing.sm,
+  },
+  indexTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+    letterSpacing: 0.4,
+  },
+  indexGroupBlock: {
+    gap: Spacing.xs,
+  },
+  indexGroupTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  indexChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
   },
   indexChip: {
     paddingHorizontal: Spacing.md,
@@ -648,11 +1339,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: GameColors.text.secondary,
   },
+  groupHeader: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    backgroundColor: GameColors.ui.background,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1A1A2E",
+  },
+  groupHeaderText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+  },
   section: {
     gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: GameColors.text.primary,
   },
@@ -662,12 +1366,17 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
     backgroundColor: "#141426",
     padding: Spacing.md,
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   itemRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  itemRowPressed: {
+    backgroundColor: "#1A1A2E",
   },
   itemIcon: {
     width: 52,
@@ -691,15 +1400,41 @@ const styles = StyleSheet.create({
   itemText: {
     flex: 1,
   },
+  itemTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+  itemActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  pinButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1A1A2E",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+  },
   itemTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: GameColors.text.primary,
   },
-  itemDescription: {
+  itemSummary: {
     fontSize: 13,
     color: GameColors.text.secondary,
     marginTop: 2,
+  },
+  itemDetail: {
+    fontSize: 12,
+    color: GameColors.text.disabled,
+    marginTop: 4,
   },
   emptyState: {
     alignItems: "center",

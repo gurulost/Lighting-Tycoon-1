@@ -249,6 +249,8 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         onPress={handleSkip}
         onLongPress={handleSkipImmediate}
         delayLongPress={450}
+        testID="tutorial-skip"
+        accessibilityLabel="tutorial-skip"
       >
         <ThemedText style={styles.skipText}>
           {confirmSkip ? "Tap again to skip" : "Skip Tutorial"}

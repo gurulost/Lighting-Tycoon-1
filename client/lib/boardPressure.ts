@@ -1,11 +1,7 @@
 import type { GameState } from "@/types/game";
+import { getTuning } from "@/lib/tuning";
 
 export type BoardPressureBand = "green" | "yellow" | "red";
-
-export const BOARD_PRESSURE_THRESHOLDS = {
-  green: 5,
-  yellow: 2,
-} as const;
 
 type BoardPressureState = Pick<
   GameState,
@@ -23,7 +19,8 @@ export function countFreeSlots(state: BoardPressureState): number {
 }
 
 export function getBoardPressureBand(freeSlots: number): BoardPressureBand {
-  if (freeSlots >= BOARD_PRESSURE_THRESHOLDS.green) return "green";
-  if (freeSlots >= BOARD_PRESSURE_THRESHOLDS.yellow) return "yellow";
+  const tuning = getTuning();
+  if (freeSlots >= tuning.boardPressure.green) return "green";
+  if (freeSlots >= tuning.boardPressure.yellow) return "yellow";
   return "red";
 }

@@ -32,6 +32,13 @@ If you are not on Replit, set `EXPO_PUBLIC_DOMAIN=localhost:5000` before running
 npm run lint
 npm run check:types
 npm run check:format
+npm test
+```
+
+Optional (requires Playwright browsers installed):
+
+```bash
+npm run test:e2e
 ```
 
 ## Code Style

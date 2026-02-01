@@ -1,0 +1,15 @@
+appId: com.lightingtycoon.app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    id: "tutorial-skip"
+    optional: true
+- tapOn:
+    id: "tutorial-skip"
+    optional: true
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "settings-modal"

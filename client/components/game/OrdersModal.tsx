@@ -488,6 +488,7 @@ export function OrdersModal({
           { paddingBottom: insets.bottom + Spacing["4xl"] },
         ]}
         showsVerticalScrollIndicator={false}
+        testID="orders-modal"
       >
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
@@ -796,7 +797,7 @@ export function OrdersModal({
 
       <View style={styles.ordersList}>
         {state.orders.length > 0 ? (
-          state.orders.map((order) => (
+          state.orders.map((order, index) => (
             <OrderCard
               key={order.id}
               order={order}
@@ -805,6 +806,7 @@ export function OrdersModal({
               onSelect={() => dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })}
               selected={state.highlightedOrderId === order.id}
               trimPhase={orderTrimPhase}
+              fulfillTestID={`order-fulfill-${index}`}
               dismissible={
                 !order.isTutorial &&
                 !order.isLockout &&

@@ -4,6 +4,30 @@ This document is the balance sheet for pacing, drops, rewards, and save behavior
 
 ---
 
+## Live Tuning (PostHog)
+Use the `tuning_config` feature flag payload to override balance values at runtime.
+Payloads are merged with defaults in `client/lib/tuning.ts`; missing keys keep defaults.
+
+Example payload (partial):
+```json
+{
+  "orderSpawn": { "baseMs": 6500, "stepMs": 900, "minMs": 2500, "yellowMultiplier": 1.6 },
+  "economy": { "orderRefreshBase": 40, "orderRefreshStep": 20, "upgradeCostMultiplier": 1 },
+  "orders": { "openOnlyResearchBonus": 2, "rushBonusMax": 0.5 },
+  "boosts": { "scoutSpawnsOpen": 6, "scoutTierBonus": 1 },
+  "baron": { "offerChance": 0.25, "offerCooldownMs": 60000 },
+  "merge": { "chainWindowMs": 10000, "chainBonusThreshold": 3 },
+  "missions": { "maxActive": 2, "repeatWindowMs": 720000 },
+  "rewards": { "orderCashMultiplier": 1, "mergeCashMultiplier": 1 },
+  "suppliers": { "baronEarlyCooldownMs": 35000, "open": { "cooldownMultiplier": 1, "chargeBonus": 0 } }
+}
+```
+
+Notes:
+- Order rewards are tuned at creation time (new orders pick up new values; existing orders keep their rewards).
+- Mission rewards are tuned when missions are assigned.
+- All values below map to keys in `tuning_config`.
+
 ## Supplier Drops
 Drop tables are defined in `client/constants/dropTables.ts` and summarized in `docs/drop_tables.md`.
 
@@ -11,7 +35,8 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Baron / Open: fixed tier distributions per supplier level.
 - Salvage: top-roll (refurb/scrap/material), then refurb tier table.
 - Bonus channels are independent rolls (waste, upgrade materials, compatibility components).
-- Early relief: while Open + Salvage are locked, Baron L1 cooldown is shortened to 35s.
+- Early relief: while Open + Salvage are locked, Baron L1 cooldown is shortened (`suppliers.baronEarlyCooldownMs`).
+- Cooldowns/charges can be tuned via `suppliers.*` multipliers and bonuses.
 
 **Tier bonuses**
 - Workbench Quality: `+1 tier` chance per level (`0.10 * level`) on supplier drops.
@@ -22,6 +47,10 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Contract active: `+0.03` bonus locked roll while active.
 - Crate bonus: `+0.05` bonus locked roll for next 12 **non‑forced** spawns.
 - Rush bonus: `+0.02` bonus locked roll for next 6 **non‑forced** spawns.
+
+**Baron offers**
+- Offer chance and mix: `baron.offerChance`, `baron.offerCrateChance`, `baron.offerContractThreshold`
+- Offer cooldown: `baron.offerCooldownMs`
 
 **Supplier Scout**
 - Routes:
@@ -44,6 +73,9 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Compatible open for locked_required avoids penalty but does **not** apply open bonus
 - Open-only installs attempt a bonus open drop (tier 1–2); if no space, convert to +10 cash / +1 research
 - Baron pressure: overflow at dependency cap converts to pressure (`overflow * 2`), and open-only installs reduce pressure by `1`
+- Tunables: `orders.openOnlyResearchBonus`, `orders.openOnlyDropTier2Chance`,
+  `orders.openOnlyNoSpaceCashBonus`, `orders.openOnlyNoSpaceResearchBonus`,
+  `orders.penaltyLockedRate`, `orders.penaltyOpenRate`, `orders.rushBonusMax`
 
 **Freedom Controller**
 - On use: `-5 dependency`
@@ -52,12 +84,15 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Base requests: `5`
 - +1 if Baron Pressure >= 40
 - +2 if Baron Pressure >= 70
+- Tunables: `lockout.labRequestsBase`, `lockout.pressureBonusLow`, `lockout.pressureBonusHigh`,
+  `lockout.pressureThresholdLow`, `lockout.pressureThresholdHigh`
 
 ---
 
 ## Recycle Rewards
 - Open parts: research `max(0, tier-2)` (tier 5 gives 12)
 - Locked parts: research 0 (tier 5 gives 1)
+- `rewards.recycleCashMultiplier` and `rewards.recycleResearchMultiplier` scale recycle payouts.
 
 ---
 
@@ -77,6 +112,11 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Locked merge bonus drop:
   - 25% chance for cash chip (`10 + newTier*5`)
   - 10% chance for +1 research
+- Tunables:
+  - `merge.chainWindowMs`, `merge.chainBonusThreshold`, `merge.chainBonusCashPerMerge`
+  - `merge.lockedBonusCashChance`, `merge.lockedBonusResearchChance`, `merge.lockedBonusCashBase`, `merge.lockedBonusCashPerTier`, `merge.lockedBonusResearchAmount`
+  - `merge.openResearchBonus`, `merge.qualityCashBonusPerLevel`
+  - `rewards.mergeCashMultiplier`, `rewards.mergeResearchMultiplier`, `rewards.mergeReputationMultiplier`
 
 ---
 
@@ -89,7 +129,7 @@ Unlocked after tutorial (Supplier Scout) and after first session completion (oth
 - Routes:
   - Open Route: force base drop to Open
   - Locked Route: force base drop to Locked (+1 Baron pressure per spawn)
-  - Tier Route: `+1 tier` on base drop
+  - Tier Route: `+1 tier` on base drop (tunable via `boosts.scoutTierBonus`)
 - Consumption: only on non-forced spawns
 
 **Mentor Workshop Clinic**
@@ -107,6 +147,12 @@ Unlocked after tutorial (Supplier Scout) and after first session completion (oth
 
 ---
 
+## Economy Multipliers
+- Upgrade costs: `economy.upgradeCostMultiplier`
+- R&D costs: `economy.rdCostMultiplier`, `economy.rdMaterialCostMultiplier`, `economy.rdCompatibilityCostMultiplier`
+
+---
+
 ## Reward Curves by Neighborhood
 Rewards are computed from tier weights, then modified by archetypes + modifiers,
 then scaled by neighborhood multipliers:
@@ -119,6 +165,11 @@ then scaled by neighborhood multipliers:
 - lockout: cash 1.35, rep 1.25, research 1.1
 - liberation: cash 1.3, rep 1.2, research 1.35
 
+Global reward multipliers (applied at order creation):
+- `rewards.orderCashMultiplier`
+- `rewards.orderReputationMultiplier`
+- `rewards.orderResearchMultiplier`
+
 ---
 
 ## Order Spawn Pressure
@@ -127,6 +178,7 @@ then scaled by neighborhood multipliers:
   - Green: 5+ free slots (normal)
   - Yellow: 2–4 free slots (slower)
   - Red: 0–1 free slots (paused)
+- Tunables: `orderSpawn.*` and `boardPressure.*`
 
 ---
 
@@ -138,19 +190,22 @@ These rules prevent long streaks of low-interest orders in late progression.
 - Rep tier >= 4: minimum difficulty 7
 - Rep tier >= 5: minimum difficulty 8
 - Difficulty = sum of (tier * count) across requirements.
+- Tunables: `lateGame.difficultyFloorTier3/4/5`
 
 **Tier quota (by max tier crafted)**
 - If `maxTierCrafted >= 4`, ensure at least one active order requires Tier 4+.
 - If `maxTierCrafted >= 5`, ensure at least one active order requires Tier 5.
 - Applied during order generation (spawn + refresh). If no templates meet the floor,
   the generator falls back to the full pool to avoid deadlocks.
+- Tunable thresholds: `lateGame.tierFloorThresholds`
 
 ---
 
 ## Goals / Missions
-- Max active goals: `MAX_ACTIVE_MISSIONS = 2`
-- Repeat cooldown: `MISSION_REPEAT_WINDOW_MS = 12 minutes`
-- History cap: `MISSION_HISTORY_LIMIT = 60`
+- Max active goals: `missions.maxActive`
+- Repeat cooldown: `missions.repeatWindowMs`
+- History cap: `missions.historyLimit`
+- Reward multipliers: `rewards.missionCashMultiplier`, `rewards.missionReputationMultiplier`, `rewards.missionResearchMultiplier`
 - Phase 1 (pre-first-session-complete): mentor/customer goals only, no chains
 - Phase 2 (post-first-session-complete): chains can appear and auto-advance
 

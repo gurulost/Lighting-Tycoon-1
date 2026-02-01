@@ -15,7 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { TinaChip } from "./TinaChip";
 import { useGame } from "@/context/GameContext";
-import { LOCKOUT_LAB_REQUESTS_BASE } from "@/constants/lockout";
+import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
@@ -99,7 +99,7 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
   const isPhase2 = state.lockoutPhase === 2;
   const isPhase3 = state.lockoutPhase === 3;
   const labRemaining = Math.max(0, state.lockoutLabOrdersRemaining);
-  const labTarget = state.lockoutLabOrdersTarget || LOCKOUT_LAB_REQUESTS_BASE;
+  const labTarget = state.lockoutLabOrdersTarget || getLockoutLabRequestsBase();
   const labRemainingLabel = `${labRemaining} Request${labRemaining === 1 ? "" : "s"}`;
   const labTargetLabel = `${labTarget} Request${labTarget === 1 ? "" : "s"}`;
 

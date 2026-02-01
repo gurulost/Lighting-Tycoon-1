@@ -85,6 +85,7 @@ function AnimatedStation({
   reducedMotion = false,
   tileSize,
   accentColor,
+  testID,
 }: {
   children: React.ReactNode;
   isActive: boolean;
@@ -94,6 +95,7 @@ function AnimatedStation({
   reducedMotion?: boolean;
   tileSize: number;
   accentColor: string;
+  testID?: string;
 }) {
   const pulseAnim = useSharedValue(0);
 
@@ -128,7 +130,12 @@ function AnimatedStation({
   });
 
   return (
-    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      testID={testID}
+    >
       <Animated.View
         style={[
           styles.stationTile,
@@ -1153,6 +1160,7 @@ export function MergeBoard({
           key={index}
           isActive
           forcePulse={tutorialFocus === "workbench"}
+          testID="workbench-station"
           onPress={() => {
             if (hapticsEnabled) {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1185,6 +1193,7 @@ export function MergeBoard({
           key={index}
           isActive={state.orders.length > 0}
           forcePulse={tutorialFocus === "orders"}
+          testID="orders-station"
           onPress={onOrderInboxPress}
           onLongPress={() => onStationLongPress?.("orders")}
           reducedMotion={reducedMotion}

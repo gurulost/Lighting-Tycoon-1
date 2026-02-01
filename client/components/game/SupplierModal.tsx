@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useState } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -18,7 +19,12 @@ interface SupplierModalProps {
 
 const SUPPLIER_META: Record<
   SupplierId,
-  { name: string; description: string; icon: keyof typeof Feather.glyphMap; accent: string }
+  {
+    name: string;
+    description: string;
+    icon: keyof typeof Feather.glyphMap;
+    accent: string;
+  }
 > = {
   baron: {
     name: "Baron Supply Depot",
@@ -40,8 +46,13 @@ const SUPPLIER_META: Record<
   },
 };
 
-export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps) {
+export function SupplierModal({
+  visible,
+  onClose,
+  onToast,
+}: SupplierModalProps) {
   const { state, tapSupplier, dispatch } = useGame();
+  const insets = useSafeAreaInsets();
   const [now, setNow] = useState(() => Date.now());
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
@@ -60,7 +71,13 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
     if (state.suppliers.open.level > 0) return;
     if (state.storySeen["tina_open_locked"]) return;
     dispatch({ type: "QUEUE_STORY_BEAT", beatId: "tina_open_locked" });
-  }, [visible, state.tutorialComplete, state.suppliers.open.level, state.storySeen, dispatch]);
+  }, [
+    visible,
+    state.tutorialComplete,
+    state.suppliers.open.level,
+    state.storySeen,
+    dispatch,
+  ]);
 
   const handleTap = (supplierId: SupplierId) => {
     const success = tapSupplier(supplierId);
@@ -71,18 +88,32 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
 
   const materialLabel = useMemo(
     () => `Upgrade Materials: ${state.upgradeMaterials}`,
-    [state.upgradeMaterials]
+    [state.upgradeMaterials],
   );
   const compatLabel = useMemo(
     () => `Compatibility Components: ${state.compatibilityComponents}`,
-    [state.compatibilityComponents]
+    [state.compatibilityComponents],
   );
 
   if (!visible) return null;
 
   return (
-    <Pressable style={styles.overlay} onPress={onClose}>
-      <Pressable style={styles.container} onPress={(event) => event.stopPropagation()}>
+    <Pressable
+      style={[
+        styles.overlay,
+        {
+          paddingTop: insets.top + Spacing.lg,
+          paddingBottom: insets.bottom + Spacing.lg,
+          paddingLeft: insets.left + Spacing.lg,
+          paddingRight: insets.right + Spacing.lg,
+        },
+      ]}
+      onPress={onClose}
+    >
+      <Pressable
+        style={styles.container}
+        onPress={(event) => event.stopPropagation()}
+      >
         <ModalShell
           variant="card"
           title="Suppliers"
@@ -91,11 +122,21 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
         >
           <View style={styles.resourceRow}>
             <View style={styles.resourcePill}>
-              <Feather name="clipboard" size={12} color={GameColors.text.secondary} />
-              <ThemedText style={styles.resourceText}>{materialLabel}</ThemedText>
+              <Feather
+                name="clipboard"
+                size={12}
+                color={GameColors.text.secondary}
+              />
+              <ThemedText style={styles.resourceText}>
+                {materialLabel}
+              </ThemedText>
             </View>
             <View style={styles.resourcePill}>
-              <Feather name="shield" size={12} color={GameColors.text.secondary} />
+              <Feather
+                name="shield"
+                size={12}
+                color={GameColors.text.secondary}
+              />
               <ThemedText style={styles.resourceText}>{compatLabel}</ThemedText>
             </View>
           </View>
@@ -108,8 +149,8 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
               supplierId === "open"
                 ? "Requires R&D Access + Open Workshop I (1 Upgrade Material). Upgrade Materials come from Salvage (unlock in Upgrades)."
                 : supplierId === "salvage"
-                ? "Unlock via Upgrades: Salvage Corner (350 cash)."
-                : undefined;
+                  ? "Unlock via Upgrades: Salvage Corner (350 cash)."
+                  : undefined;
             const mentorTip =
               supplierId === "baron"
                 ? "Mentor tip: Baron shipments include waste — merge or recycle it for value."
@@ -119,17 +160,22 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
               supplierId,
               Math.max(1, supplier.level),
               speedLevel,
-              { baronEarlyRelief }
+              { baronEarlyRelief },
             );
-            const cooldownRemaining = Math.max(0, supplier.cooldownEndsAt - now);
+            const cooldownRemaining = Math.max(
+              0,
+              supplier.cooldownEndsAt - now,
+            );
             const charges = supplier.chargesRemaining;
-            const chargesDisplay = locked ? "Locked" : `${charges}/${config.maxCharges}`;
+            const chargesDisplay = locked
+              ? "Locked"
+              : `${charges}/${config.maxCharges}`;
             const isCooling = !locked && charges <= 0 && cooldownRemaining > 0;
             const buttonLabel = locked
               ? "Locked"
               : isCooling
-              ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
-              : "Tap";
+                ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
+                : "Tap";
             return (
               <LinearGradient
                 key={supplierId}
@@ -137,27 +183,43 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
                 style={[styles.card, { borderColor: meta.accent + "40" }]}
               >
                 <View style={styles.cardHeader}>
-                  <View style={[styles.iconWrap, { backgroundColor: meta.accent + "20" }]}
-                    >
+                  <View
+                    style={[
+                      styles.iconWrap,
+                      { backgroundColor: meta.accent + "20" },
+                    ]}
+                  >
                     <Feather name={meta.icon} size={18} color={meta.accent} />
                   </View>
                   <View style={styles.cardTitleWrap}>
-                    <ThemedText style={styles.cardTitle}>{meta.name}</ThemedText>
-                    <ThemedText style={styles.cardSubtitle}>{meta.description}</ThemedText>
+                    <ThemedText style={styles.cardTitle}>
+                      {meta.name}
+                    </ThemedText>
+                    <ThemedText style={styles.cardSubtitle}>
+                      {meta.description}
+                    </ThemedText>
                     {locked && lockedHint ? (
-                      <ThemedText style={styles.lockedHint}>{lockedHint}</ThemedText>
+                      <ThemedText style={styles.lockedHint}>
+                        {lockedHint}
+                      </ThemedText>
                     ) : null}
                     {mentorTip ? (
-                      <ThemedText style={styles.mentorTip}>{mentorTip}</ThemedText>
+                      <ThemedText style={styles.mentorTip}>
+                        {mentorTip}
+                      </ThemedText>
                     ) : null}
                   </View>
                   <View style={styles.levelPill}>
-                    <ThemedText style={styles.levelText}>{locked ? "L0" : `L${supplier.level}`}</ThemedText>
+                    <ThemedText style={styles.levelText}>
+                      {locked ? "L0" : `L${supplier.level}`}
+                    </ThemedText>
                   </View>
                 </View>
 
                 <View style={styles.cardFooter}>
-                  <ThemedText style={styles.chargeText}>Charges: {chargesDisplay}</ThemedText>
+                  <ThemedText style={styles.chargeText}>
+                    Charges: {chargesDisplay}
+                  </ThemedText>
                   <Pressable
                     onPress={() => handleTap(supplierId)}
                     disabled={locked || isCooling}
@@ -165,11 +227,15 @@ export function SupplierModal({ visible, onClose, onToast }: SupplierModalProps)
                       styles.tapButton,
                       {
                         backgroundColor:
-                          locked || isCooling ? GameColors.ui.surface : meta.accent,
+                          locked || isCooling
+                            ? GameColors.ui.surface
+                            : meta.accent,
                       },
                     ]}
                   >
-                    <ThemedText style={styles.tapButtonText}>{buttonLabel}</ThemedText>
+                    <ThemedText style={styles.tapButtonText}>
+                      {buttonLabel}
+                    </ThemedText>
                   </Pressable>
                 </View>
               </LinearGradient>

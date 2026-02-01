@@ -8,6 +8,8 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+playwright-report/
+test-results/
 
 # Native
 .kotlin/
@@ -31,6 +33,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -41,3 +44,5 @@ app-example
 # generated native folders
 /ios
 /android
+
+.env.local
