@@ -58,13 +58,19 @@ manually if your install lives elsewhere.
 npm run ios
 ```
 
-2. Boot a simulator (or open the Simulator app):
+2. Start Metro for the dev client:
+
+```bash
+npx expo start --dev-client --port 8081
+```
+
+3. Boot a simulator (or open the Simulator app):
 
 ```bash
 xcrun simctl boot "iPhone 17"
 ```
 
-3. Run the smoke flow:
+4. Run the smoke flow:
 
 ```bash
 npm run test:maestro
