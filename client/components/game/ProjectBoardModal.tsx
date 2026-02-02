@@ -64,7 +64,7 @@ const getStageTags = (stage: ProjectStageDefinition): StageTag[] => {
   if (stage.orderSpec.ecoAudit) {
     tags.push({
       label: "Eco",
-      icon: "leaf",
+      icon: "wind",
       color: GameColors.currency.research,
     });
   }

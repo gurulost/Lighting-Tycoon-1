@@ -1,5 +1,11 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  type DimensionValue,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -102,7 +108,8 @@ function LobbyPressureMeter({
           style={[styles.pressureMeterFill, { width: `${progress * 100}%` }]}
         />
         {thresholds.map((threshold) => {
-          const left = Math.min(100, Math.max(0, threshold)) + "%";
+          const left =
+            `${Math.min(100, Math.max(0, threshold))}%` as DimensionValue;
           return (
             <View key={threshold} style={[styles.pressureTick, { left }]}>
               <View style={styles.pressureTickLine} />
@@ -745,7 +752,7 @@ export function CouncilModal({ onClose }: CouncilModalProps) {
               {selectedCampaign.ratifyOrder.requiresEcoAudit ? (
                 <View style={styles.ratifyTag}>
                   <Feather
-                    name="leaf"
+                    name="wind"
                     size={12}
                     color={GameColors.currency.research}
                   />

@@ -21,6 +21,7 @@ import {
   SupplierScoutRoute,
   WarrantyStampMode,
   Mission,
+  CouncilCampaignStatus,
   CouncilCampaignProgress,
   ProjectDefinition,
   ProjectStageDefinition,
@@ -4765,10 +4766,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         order.type === "compatibility_required" ||
         order.requirements.some((req) => req.requiresCompatible);
       const isEcoAuditInstall = !!order.ecoAuditBonusResearch && !hasLockedPart;
-      const isRushOrder =
-        !!order.rushDeadline ||
-        order.modifierIds?.includes("project_rush") ||
-        order.modifierIds?.includes("council_rush");
+      const isRushOrder = Boolean(
+        order.rushDeadline ||
+          order.modifierIds?.includes("project_rush") ||
+          order.modifierIds?.includes("council_rush"),
+      );
 
       if (hasLockedPart) {
         const lockedPenalty =
@@ -4988,22 +4990,27 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       repReward = Math.floor(repReward * repMultiplier);
       researchReward = Math.floor(researchReward * researchMultiplier);
 
-      if (projectCompletionReward) {
+      if (projectCompletionReward !== null) {
+        const completionReward = projectCompletionReward as {
+          cash: number;
+          reputation: number;
+          research: number;
+        };
         const completionPerkMult = councilPerks.projectCompletionRewardMult;
         const completionCash = Math.floor(
-          projectCompletionReward.cash *
+          completionReward.cash *
             phase2RewardMultiplier *
             globalRewardMult.cash *
             (completionPerkMult.cash ?? 1),
         );
         const completionResearch = Math.floor(
-          projectCompletionReward.research *
+          completionReward.research *
             phase2RewardMultiplier *
             globalRewardMult.research *
             (completionPerkMult.research ?? 1),
         );
         const completionRep = Math.floor(
-          projectCompletionReward.reputation *
+          completionReward.reputation *
             globalRewardMult.reputation *
             (completionPerkMult.reputation ?? 1),
         );
@@ -5548,7 +5555,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           );
 
           let ratifyOrderId = activeProgress.ratifyOrderId;
-          let status = activeProgress.status;
+          let status: CouncilCampaignStatus = activeProgress.status;
           if (pilotComplete) {
             status = "RATIFY";
             councilPilotCompletedId = activeCampaign.id;
@@ -7223,7 +7230,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         progress.draftResearchInvested + spendResearch;
       const draftComplete =
         nextCashInvested >= cashCost && nextResearchInvested >= researchCost;
-      const nextStatus = draftComplete ? "PILOT" : "DRAFTING";
+      const nextStatus: CouncilCampaignStatus = draftComplete
+        ? "PILOT"
+        : "DRAFTING";
 
       const lobbyGain =
         tuning.council.lobbyPressureGainPerDraftInvest +
