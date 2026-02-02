@@ -21,6 +21,7 @@ import {
   SupplierScoutRoute,
   WarrantyStampMode,
   Mission,
+  CouncilCampaignProgress,
   ProjectDefinition,
   ProjectStageDefinition,
   ProjectOffer,
@@ -52,8 +53,18 @@ import {
   computeCustomOrderRewards,
 } from "@/constants/orderContentPack";
 import { PROJECT_DEFINITIONS } from "@/constants/projects";
+import {
+  COUNCIL_CAMPAIGNS,
+  COUNCIL_CAMPAIGN_BY_ID,
+} from "@/constants/councilCampaigns";
+import { COUNCIL_PERKS } from "@/constants/councilPerks";
+import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { getProjectDepositCost, getProjectOfferRefreshCost } from "@/lib/projects";
+import {
+  getCouncilPerkEffects,
+  getCouncilHearingPenalty,
+} from "@/lib/council";
 import {
   captureEvent,
   getAppInfo,
@@ -124,6 +135,10 @@ type GameAction =
       addon: "permit_expeditor" | "site_logistics" | "overtime_crew";
     }
   | { type: "PROJECT_CHANGE_ORDER" }
+  | { type: "COUNCIL_SET_ACTIVE_CAMPAIGN"; campaignId?: string }
+  | { type: "COUNCIL_INVEST_DRAFT"; campaignId: string }
+  | { type: "COUNCIL_SPAWN_RATIFY"; campaignId: string }
+  | { type: "COUNCIL_PAY_CLEAR_HEARING" }
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
@@ -181,6 +196,7 @@ function generateId(): string {
 }
 
 function normalizeSupplierState(
+  state: GameState,
   supplierId: SupplierId,
   supplier: GameState["suppliers"][SupplierId],
   now: number,
@@ -192,7 +208,8 @@ function normalizeSupplierState(
     return resetOverdraw(supplier);
   }
   if (supplier.cooldownEndsAt && supplier.cooldownEndsAt > now) return supplier;
-  const config = getEffectiveSupplierConfig(
+  const config = getSupplierConfigWithPerks(
+    state,
     supplierId,
     supplier.level,
     speedLevel,
@@ -359,6 +376,7 @@ function getTapStatus(
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
   const supplier = normalizeSupplierState(
+    state,
     supplierId,
     state.suppliers[supplierId],
     now,
@@ -493,9 +511,13 @@ function applyBaronSupplierUpgrade(state: GameState): GameState {
   const speedLevel = state.upgrades["workbench_speed_1"] || 0;
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
-  const config = getEffectiveSupplierConfig("baron", nextLevel, speedLevel, {
-    baronEarlyRelief,
-  });
+  const config = getSupplierConfigWithPerks(
+    state,
+    "baron",
+    nextLevel,
+    speedLevel,
+    { baronEarlyRelief },
+  );
   return {
     ...state,
     suppliers: {
@@ -691,11 +713,13 @@ function getOrderIntervalMs(reputationTier: number) {
   return Math.max(tuning.orderSpawn.minMs, base - reputationTier * step);
 }
 
-function getOrderRefreshCost(reputationTier: number) {
-  return (
+function getOrderRefreshCost(reputationTier: number, state?: GameState) {
+  const base =
     tuning.economy.orderRefreshBase +
-    reputationTier * tuning.economy.orderRefreshStep
-  );
+    reputationTier * tuning.economy.orderRefreshStep;
+  if (!state) return Math.round(base);
+  const hearingPenalty = getCouncilHearingPenalty(state).refreshCostMult;
+  return Math.max(0, Math.round(base * hearingPenalty));
 }
 
 function getMarketingCampaignCost(reputationTier: number) {
@@ -737,6 +761,183 @@ function getProjectStageDeadline(
   const fallback = tuning.projects.deadlineInstallsByStage[stageIndex];
   if (typeof fallback === "number") return Math.max(1, Math.floor(fallback));
   return undefined;
+}
+
+function buildInitialCouncilState(): GameState["council"] {
+  const campaigns: GameState["council"]["campaigns"] = {};
+  COUNCIL_CAMPAIGNS.forEach((campaign) => {
+    const pilotObjectiveProgress: Record<string, number> = {};
+    campaign.pilotObjectives.forEach((objective) => {
+      pilotObjectiveProgress[objective.id] = 0;
+    });
+    campaigns[campaign.id] = {
+      status: "LOCKED",
+      draftCashInvested: 0,
+      draftResearchInvested: 0,
+      pilotObjectiveProgress,
+      ratifyOrderId: undefined,
+      completedAt: undefined,
+    };
+  });
+  return {
+    unlocked: false,
+    lobbyPressure: 0,
+    activeCampaignId: undefined,
+    campaigns,
+    activeHearing: undefined,
+    installsSinceLastHearingCheck: 0,
+    refreshCount: 0,
+    perksUnlocked: [],
+  };
+}
+
+function canUnlockCouncil(state: GameState) {
+  if (state.gamePhase !== 2) return false;
+  const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
+  const capstoneComplete =
+    capstoneId && state.projectsCompleted.includes(capstoneId);
+  if (capstoneComplete) return true;
+  return (
+    state.projectsCompleted.length >= tuning.council.unlockMinProjectsCompleted &&
+    state.reputationTier >= tuning.council.unlockMinRepTier
+  );
+}
+
+function canStartCouncilCampaign(
+  state: GameState,
+  campaignId: string,
+): boolean {
+  if (!state.council.unlocked) return false;
+  const campaign = COUNCIL_CAMPAIGN_BY_ID[campaignId];
+  if (!campaign) return false;
+  const unlock = campaign.unlock;
+  if (typeof unlock.minRepTier === "number" && state.reputationTier < unlock.minRepTier) {
+    return false;
+  }
+  if (
+    typeof unlock.minProjectsCompleted === "number" &&
+    state.projectsCompleted.length < unlock.minProjectsCompleted
+  ) {
+    return false;
+  }
+  if (unlock.requiredProjectIds) {
+    const missingProject = unlock.requiredProjectIds.some(
+      (id) => !state.projectsCompleted.includes(id),
+    );
+    if (missingProject) return false;
+  }
+  if (unlock.requiredCampaignIds) {
+    const missingCampaign = unlock.requiredCampaignIds.some((id) => {
+      const progress = state.council.campaigns[id];
+      return !progress || progress.status !== "COMPLETED";
+    });
+    if (missingCampaign) return false;
+  }
+  return true;
+}
+
+function getCouncilCampaignIdFromOrder(order: Order) {
+  const tag = order.modifierIds?.find((id) => id.startsWith("council:"));
+  if (!tag) return null;
+  const [, campaignId] = tag.split(":");
+  return campaignId || null;
+}
+
+function buildCouncilRatifyOrder(
+  state: GameState,
+  campaignId: string,
+): Order | null {
+  const campaign = COUNCIL_CAMPAIGN_BY_ID[campaignId];
+  if (!campaign) return null;
+  const spec = campaign.ratifyOrder;
+  const stageStub: ProjectStageDefinition = {
+    stageIndex: 0,
+    stageTitle: spec.title,
+    orderSpec: {
+      targetTierRange: [spec.tierMin, spec.tierMax],
+      requiresOpenOnly: spec.requiresOpenOnly,
+      requiresCompatibility: spec.requiresCompatibility,
+      ecoAudit: spec.requiresEcoAudit,
+      rush: spec.requiresRush,
+    },
+    stageRewards: { rewardMultiplier: spec.rewardMultiplier },
+    failPenalty: { type: "pressure", pressureIncrease: 0 },
+  };
+  const baseRecipe = getProjectBaseRecipe(stageStub, Math.random);
+  const derived = applyProjectStageRequirements(
+    baseRecipe.requirements,
+    stageStub,
+  );
+
+  const rewardModifierIds: string[] = [];
+  if (spec.requiresOpenOnly) rewardModifierIds.push("mod_style_open");
+  if (spec.requiresCompatibility) rewardModifierIds.push("mod_compatible");
+  if (spec.requiresEcoAudit) rewardModifierIds.push("mod_eco_audit");
+  if (spec.requiresRush) rewardModifierIds.push("mod_rush_60");
+
+  const baseRewards = computeCustomOrderRewards({
+    requirements: derived.requirements,
+    neighborhoodId: state.currentNeighborhoodId,
+    modifierIds: rewardModifierIds,
+  });
+
+  const rewardMultiplier =
+    Math.max(0, spec.rewardMultiplier) *
+    Math.max(0, tuning.council.ratifyRewardMultiplierGlobal);
+
+  const rewards = {
+    cash: Math.round(baseRewards.cash * rewardMultiplier),
+    reputation: Math.round(baseRewards.reputation * rewardMultiplier),
+    research: Math.round(baseRewards.research * rewardMultiplier),
+  };
+
+  const modifierIds = ["council_ratify", `council:${campaignId}`];
+  if (spec.requiresOpenOnly) modifierIds.push("council_open_only");
+  if (spec.requiresCompatibility) modifierIds.push("council_compatibility");
+  if (spec.requiresEcoAudit) modifierIds.push("council_eco_audit");
+  if (spec.requiresRush) modifierIds.push("council_rush");
+
+  const ecoAuditBonus = spec.requiresEcoAudit ? 15 : undefined;
+
+  return withTunedRewards({
+    id: generateId(),
+    title: spec.title,
+    type: derived.type,
+    requirements: derived.requirements,
+    rewards,
+    flavorText: campaign.tagline,
+    templateId: `council:${campaignId}`,
+    modifierIds,
+    ecoAuditBonusResearch: ecoAuditBonus,
+    rushDeadline: undefined,
+    rushStartTime: undefined,
+  });
+}
+
+function getSupplierConfigWithPerks(
+  state: GameState,
+  supplierId: SupplierId,
+  level: number,
+  speedLevel = 0,
+  options?: { baronEarlyRelief?: boolean },
+) {
+  const base = getEffectiveSupplierConfig(
+    supplierId,
+    level,
+    speedLevel,
+    options,
+  );
+  if (supplierId !== "open") return base;
+  const perks = getCouncilPerkEffects(state);
+  const bonusCharges = perks.openSupplierChargeCapAdd ?? 0;
+  const cooldownMult = perks.openSupplierCooldownMult ?? 1;
+  return {
+    maxCharges: Math.max(0, base.maxCharges + bonusCharges),
+    cooldownMs: Math.max(
+      tuning.suppliers.cooldownMinMs,
+      base.cooldownMs * cooldownMult,
+    ),
+  };
 }
 
 function canOfferProject(project: ProjectDefinition, state: GameState) {
@@ -1752,7 +1953,12 @@ function removeProjectSiteLogisticsCharges(
     openSupplier.cooldownEndsAt <= Date.now()
   ) {
     const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-    const config = getEffectiveSupplierConfig("open", openSupplier.level, speedLevel);
+    const config = getSupplierConfigWithPerks(
+      state,
+      "open",
+      openSupplier.level,
+      speedLevel,
+    );
     nextCooldownEndsAt = Date.now() + config.cooldownMs;
   }
   return {
@@ -1964,6 +2170,7 @@ function isProtectedOrder(state: GameState, order: Order) {
   if (order.modifierIds?.includes("tier10_showcase")) return true;
   if (order.modifierIds?.includes("threshold_story")) return true;
   if (order.modifierIds?.includes("project_stage")) return true;
+  if (order.modifierIds?.includes("council_ratify")) return true;
   return false;
 }
 
@@ -2263,6 +2470,7 @@ function generateOrder(
   marketingBoostOrdersRemaining: number,
   gamePhase: 1 | 2,
   requiredMinTier?: PartTier,
+  compatOrderWeightMultiplier = 1,
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
   const currentNeighborhood =
@@ -2339,7 +2547,7 @@ function generateOrder(
     const difficultyWeight = Math.pow(0.75, difficultyDelta);
     const phaseWeight =
       gamePhase === 2 && template.type === "compatibility_required"
-        ? tuning.phase2.compatibilityOrderWeight
+        ? tuning.phase2.compatibilityOrderWeight * compatOrderWeightMultiplier
         : 1;
     return {
       ...template,
@@ -2587,6 +2795,7 @@ function getInitialState(): GameState {
     projectMilestones: {},
     projectDebuff: undefined,
     baronPressure: 0,
+    council: buildInitialCouncilState(),
     baronSupplySpawnsRemaining: 0,
     baronRushSpawnsRemaining: 0,
     suppliers: {
@@ -2862,6 +3071,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       (Object.keys(state.suppliers) as SupplierId[]).forEach((supplierId) => {
         const current = state.suppliers[supplierId];
         const normalized = normalizeSupplierState(
+          state,
           supplierId,
           current,
           now,
@@ -2954,6 +3164,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const baronEarlyRelief =
         state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
       const supplier = normalizeSupplierState(
+        state,
         supplierId,
         state.suppliers[supplierId],
         now,
@@ -3257,7 +3468,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         );
       }
 
-      const config = getEffectiveSupplierConfig(
+      const config = getSupplierConfigWithPerks(
+        state,
         supplierId,
         supplier.level,
         speedLevel,
@@ -4259,7 +4471,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tier: part.tier,
         family: part.family,
       });
-      const reward = getRecycleReward(part);
+      const baseReward = getRecycleReward(part);
+      const councilPerks = getCouncilPerkEffects(state);
+      const reward = {
+        ...baseReward,
+        cash: Math.round(baseReward.cash * councilPerks.recycleRewardMult.cash),
+        research: Math.round(
+          baseReward.research * councilPerks.recycleRewardMult.research,
+        ),
+      };
       const newBoard = [...state.board];
       const newBackpack = [...state.backpack];
       if (source === "board") {
@@ -4277,6 +4497,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const now = Date.now();
         const speedLevel = state.upgrades["workbench_speed_1"] || 0;
         const openSupplier = normalizeSupplierState(
+          state,
           "open",
           state.suppliers.open,
           now,
@@ -4284,7 +4505,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           false,
         );
         if (openSupplier.level > 0) {
-          const config = getEffectiveSupplierConfig(
+          const config = getSupplierConfigWithPerks(
+            state,
             "open",
             openSupplier.level,
             speedLevel,
@@ -4417,6 +4639,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? parseProjectStageTag(order)
           : null;
       const isProjectStageOrder = !!projectStageInfo;
+      const councilCampaignId = order.modifierIds?.includes("council_ratify")
+        ? getCouncilCampaignIdFromOrder(order)
+        : null;
+      const isCouncilRatifyOrder = !!councilCampaignId;
       const completedPhase2Goal = order.modifierIds?.includes("phase2_goal");
       if (order.rushStartTime && order.rushDeadline) {
         const elapsed = Date.now() - order.rushStartTime;
@@ -4433,6 +4659,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let cashReward = order.rewards.cash;
       let repReward = order.rewards.reputation;
       let researchReward = order.rewards.research;
+      const councilPerks = getCouncilPerkEffects(state);
+      const councilHearing = getCouncilHearingPenalty(state);
       let dependencyChange = 0;
       let nextBoard = newBoard;
       let nextBackpack = state.backpack;
@@ -4456,6 +4684,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let projectOfferBeatId: string | null = null;
       let projectOfferRefreshMode: "none" | "if_empty" | "force" = "none";
       let projectStageFailed = false;
+      let completedProjectId: string | null = null;
+      let nextCouncil = state.council;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
       const warrantyMode = warrantyActive ? state.warrantyStampMode : undefined;
@@ -4470,6 +4700,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         order.type === "locked_required" && hasCompatiblePart;
       const openOnly =
         hasOpenPart && !hasLockedPart && !usingCompatibleForLockedRequired;
+      const isCompatOrder =
+        order.type === "compatibility_required" ||
+        order.requirements.some((req) => req.requiresCompatible);
+      const isEcoAuditInstall = !!order.ecoAuditBonusResearch && !hasLockedPart;
+      const isRushOrder =
+        !!order.rushDeadline ||
+        order.modifierIds?.includes("project_rush") ||
+        order.modifierIds?.includes("council_rush");
 
       if (hasLockedPart) {
         const lockedPenalty =
@@ -4484,28 +4722,46 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? tuning.dependency.orderOpenReductionHigh
             : tuning.dependency.orderOpenReductionLow;
         dependencyChange += openReduction;
-        researchReward += Math.round(tuning.orders.openOnlyResearchBonus);
+        const openResearchBonus =
+          tuning.orders.openOnlyResearchBonus +
+          (councilPerks.openOnlyResearchBonusAdd ?? 0);
+        researchReward += Math.round(openResearchBonus);
       }
       const qualifiesOpenDrop = openOnly;
       if (qualifiesOpenDrop) {
-        const tier2Chance = Math.min(
+        const baseTier2Chance = Math.min(
           1,
           Math.max(0, tuning.orders.openOnlyDropTier2Chance),
         );
-        const dropTier: PartTier = Math.random() < tier2Chance ? 2 : 1;
+        const tier2Chance = Math.max(
+          baseTier2Chance,
+          councilPerks.openOnlyDropTier2ChanceMin ?? 0,
+        );
+        let dropTier = Math.random() < tier2Chance ? 2 : 1;
+        if (typeof councilPerks.openOnlyDropMinTier === "number") {
+          dropTier = Math.max(dropTier, councilPerks.openOnlyDropMinTier);
+        }
+        const resolvedTier = Math.max(
+          1,
+          Math.min(MAX_PART_TIER, Math.floor(dropTier)),
+        ) as PartTier;
         const emptySlot = findEmptySlot(state, nextBoard);
         if (emptySlot !== -1) {
           const updatedBoard = [...nextBoard];
-          updatedBoard[emptySlot] = createPart(emptySlot, "open", dropTier);
+          updatedBoard[emptySlot] = createPart(emptySlot, "open", resolvedTier);
           nextBoard = updatedBoard;
-          nextMaxTierCrafted = Math.max(nextMaxTierCrafted, dropTier);
+          nextMaxTierCrafted = Math.max(nextMaxTierCrafted, resolvedTier);
         } else if (state.backpackUnlocked) {
           const emptyBackpack = findEmptyBackpackSlot(state, nextBackpack);
           if (emptyBackpack !== -1) {
             const updatedBackpack = [...nextBackpack];
-            updatedBackpack[emptyBackpack] = createPart(-1, "open", dropTier);
+            updatedBackpack[emptyBackpack] = createPart(
+              -1,
+              "open",
+              resolvedTier,
+            );
             nextBackpack = updatedBackpack;
-            nextMaxTierCrafted = Math.max(nextMaxTierCrafted, dropTier);
+            nextMaxTierCrafted = Math.max(nextMaxTierCrafted, resolvedTier);
           } else {
             cashReward += Math.round(tuning.orders.openOnlyNoSpaceCashBonus);
             researchReward += Math.round(
@@ -4550,7 +4806,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (order.ecoAuditBonusResearch && !hasLockedPart) {
-        researchReward += order.ecoAuditBonusResearch;
+        const ecoMult =
+          councilPerks.ecoAuditResearchBonusMult *
+          councilHearing.ecoAuditResearchBonusMult;
+        researchReward += Math.round(order.ecoAuditBonusResearch * ecoMult);
       }
 
       if (contractActive) {
@@ -4613,16 +4872,84 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         phase2RewardMultiplier = rewardMultiplier;
       }
+
+      const globalRewardMult = {
+        cash:
+          councilPerks.globalRewardMult.cash *
+          councilHearing.globalRewardMult.cash,
+        reputation:
+          councilPerks.globalRewardMult.reputation *
+          councilHearing.globalRewardMult.reputation,
+        research:
+          councilPerks.globalRewardMult.research *
+          councilHearing.globalRewardMult.research,
+      };
+      const compatRewardMult = {
+        cash:
+          councilPerks.compatRewardMult.cash *
+          councilHearing.compatRewardMult.cash,
+        reputation:
+          councilPerks.compatRewardMult.reputation *
+          councilHearing.compatRewardMult.reputation,
+        research:
+          councilPerks.compatRewardMult.research *
+          councilHearing.compatRewardMult.research,
+      };
+      const rushRewardMult = {
+        cash:
+          councilPerks.rushRewardMult.cash *
+          councilHearing.rushRewardMult.cash,
+        reputation:
+          councilPerks.rushRewardMult.reputation *
+          councilHearing.rushRewardMult.reputation,
+        research:
+          councilPerks.rushRewardMult.research *
+          councilHearing.rushRewardMult.research,
+      };
+      const ecoRewardMult = councilPerks.ecoAuditRewardMult;
+
+      const cashMultiplier =
+        globalRewardMult.cash *
+        (isCompatOrder ? compatRewardMult.cash : 1) *
+        (isRushOrder ? rushRewardMult.cash : 1) *
+        (isEcoAuditInstall ? ecoRewardMult.cash : 1);
+      const repMultiplier =
+        globalRewardMult.reputation *
+        (isCompatOrder ? compatRewardMult.reputation : 1) *
+        (isRushOrder ? rushRewardMult.reputation : 1) *
+        (isEcoAuditInstall ? ecoRewardMult.reputation : 1);
+      const researchMultiplier =
+        globalRewardMult.research *
+        (isCompatOrder ? compatRewardMult.research : 1) *
+        (isRushOrder ? rushRewardMult.research : 1) *
+        (isEcoAuditInstall ? ecoRewardMult.research : 1);
+
+      cashReward = Math.floor(cashReward * cashMultiplier);
+      repReward = Math.floor(repReward * repMultiplier);
+      researchReward = Math.floor(researchReward * researchMultiplier);
+
       if (projectCompletionReward) {
+        const completionPerkMult = councilPerks.projectCompletionRewardMult;
         const completionCash = Math.floor(
-          projectCompletionReward.cash * phase2RewardMultiplier,
+          projectCompletionReward.cash *
+            phase2RewardMultiplier *
+            globalRewardMult.cash *
+            (completionPerkMult.cash ?? 1),
         );
         const completionResearch = Math.floor(
-          projectCompletionReward.research * phase2RewardMultiplier,
+          projectCompletionReward.research *
+            phase2RewardMultiplier *
+            globalRewardMult.research *
+            (completionPerkMult.research ?? 1),
+        );
+        const completionRep = Math.floor(
+          projectCompletionReward.reputation *
+            globalRewardMult.reputation *
+            (completionPerkMult.reputation ?? 1),
         );
         cashReward += completionCash;
         researchReward += completionResearch;
-        repReward += projectCompletionReward.reputation;
+        repReward += completionRep;
       }
       if (nextProjectDebuff && nextProjectDebuff.remainingOrders > 0) {
         repReward = Math.floor(repReward * nextProjectDebuff.multiplier);
@@ -4755,7 +5082,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           if (nextLevel === state.suppliers.open.level) {
             nextUpgradeMaterials += 2;
           } else {
-            const config = getEffectiveSupplierConfig(
+            const config = getSupplierConfigWithPerks(
+              state,
               "open",
               nextLevel,
               speedLevel,
@@ -4924,6 +5252,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           if (!nextProjectsCompleted.includes(project.id)) {
             nextProjectsCompleted = [...nextProjectsCompleted, project.id];
           }
+          completedProjectId = project.id;
 
           const milestoneThresholds = [3, 6, 9];
           milestoneThresholds.forEach((threshold) => {
@@ -5004,6 +5333,308 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextActiveProject = {
           ...nextActiveProject,
           stageDeadlineRemaining: remaining,
+        };
+      }
+
+      if (!nextCouncil.unlocked) {
+        const repAfterRewards = state.reputation + repReward;
+        const neighborhoodAfterRewards = getNeighborhoodByRep(repAfterRewards);
+        const unlockState: GameState = {
+          ...state,
+          projectsCompleted: nextProjectsCompleted,
+          reputation: repAfterRewards,
+          reputationTier: getNeighborhoodIndex(neighborhoodAfterRewards.id),
+        };
+        if (canUnlockCouncil(unlockState)) {
+          nextCouncil = {
+            ...nextCouncil,
+            unlocked: true,
+          };
+        }
+      }
+
+      if (nextCouncil.unlocked) {
+        let councilLobbyPressure = nextCouncil.lobbyPressure;
+        const pressureBefore = councilLobbyPressure;
+        let councilCampaigns = nextCouncil.campaigns;
+        let councilPerksUnlocked = nextCouncil.perksUnlocked;
+        let councilActiveCampaignId = nextCouncil.activeCampaignId;
+        let councilActiveHearing = nextCouncil.activeHearing;
+        let installsSinceHearing = nextCouncil.installsSinceLastHearingCheck + 1;
+        const refreshCount = nextCouncil.refreshCount;
+        let hearingClearedThisOrder = false;
+
+        if (openOnly) {
+          const decay = Math.max(
+            0,
+            tuning.council.lobbyPressureDecayOnOpenOnlyInstall,
+          );
+          const bonus = councilPerks.openOnlyPressureDecayBonus ?? 0;
+          councilLobbyPressure += -decay + bonus;
+        }
+
+        if (isCouncilRatifyOrder && councilCampaignId) {
+          const campaign = COUNCIL_CAMPAIGN_BY_ID[councilCampaignId];
+          const progress = campaign
+            ? councilCampaigns[councilCampaignId]
+            : undefined;
+          if (campaign && progress && progress.status !== "COMPLETED") {
+            councilCampaigns = {
+              ...councilCampaigns,
+              [councilCampaignId]: {
+                ...progress,
+                status: "COMPLETED",
+                completedAt: Date.now(),
+                ratifyOrderId: undefined,
+              },
+            };
+            if (!councilPerksUnlocked.includes(campaign.perkId)) {
+              councilPerksUnlocked = [...councilPerksUnlocked, campaign.perkId];
+            }
+            councilLobbyPressure +=
+              campaign.pressure.onRatifyComplete +
+              tuning.council.lobbyPressureGainOnRatify;
+          }
+        }
+
+        const activeCampaign =
+          councilActiveCampaignId &&
+          COUNCIL_CAMPAIGN_BY_ID[councilActiveCampaignId];
+        const activeProgress =
+          councilActiveCampaignId &&
+          councilCampaigns[councilActiveCampaignId];
+
+        if (
+          activeCampaign &&
+          activeProgress &&
+          activeProgress.status === "PILOT"
+        ) {
+          const pilotProgress = {
+            ...activeProgress.pilotObjectiveProgress,
+          };
+          let milestonesCompleted = 0;
+
+          activeCampaign.pilotObjectives.forEach((objective) => {
+            const current = pilotProgress[objective.id] ?? 0;
+            if (current >= objective.target) return;
+            let nextValue = current;
+            const consecutive = !!objective.params?.consecutive;
+
+            const bump = () => {
+              nextValue = Math.min(objective.target, current + 1);
+            };
+
+            switch (objective.type) {
+              case "FULFILL_OPEN_ONLY":
+                if (openOnly) bump();
+                else if (consecutive) nextValue = 0;
+                break;
+              case "FULFILL_COMPAT_REQUIRED":
+                if (isCompatOrder) bump();
+                else if (consecutive) nextValue = 0;
+                break;
+              case "FULFILL_ECO_AUDIT":
+                if (isEcoAuditInstall) bump();
+                else if (consecutive) nextValue = 0;
+                break;
+              case "FULFILL_RUSH":
+                if (isRushOrder) bump();
+                else if (consecutive) nextValue = 0;
+                break;
+              case "REACH_INSTALL_STREAK": {
+                const target =
+                  objective.params?.minStreak ?? objective.target;
+                if (nextInstallStreakCurrent >= target) {
+                  nextValue = objective.target;
+                }
+                break;
+              }
+              case "COMPLETE_PROJECT":
+                if (
+                  completedProjectId &&
+                  (!objective.params?.projectId ||
+                    objective.params.projectId === completedProjectId)
+                ) {
+                  nextValue = objective.target;
+                } else if (consecutive) {
+                  nextValue = 0;
+                }
+                break;
+              default:
+                break;
+            }
+
+            if (nextValue !== current) {
+              pilotProgress[objective.id] = nextValue;
+              if (current < objective.target && nextValue >= objective.target) {
+                milestonesCompleted += 1;
+              }
+            }
+          });
+
+          if (milestonesCompleted > 0) {
+            const milestoneGain =
+              activeCampaign.pressure.onPilotMilestone +
+              tuning.council.lobbyPressureGainPerPilotMilestone;
+            councilLobbyPressure += milestonesCompleted * milestoneGain;
+          }
+
+          const pilotComplete = activeCampaign.pilotObjectives.every(
+            (objective) =>
+              (pilotProgress[objective.id] ?? 0) >= objective.target,
+          );
+
+          let ratifyOrderId = activeProgress.ratifyOrderId;
+          let status = activeProgress.status;
+          if (pilotComplete) {
+            status = "RATIFY";
+            const existingRatify = updatedOrders.some((orderItem) =>
+              orderItem.modifierIds?.includes(`council:${activeCampaign.id}`),
+            );
+            if (!existingRatify) {
+              const ratifyOrder = buildCouncilRatifyOrder(
+                state,
+                activeCampaign.id,
+              );
+              if (ratifyOrder) {
+                const insertResult = insertStoryOrder(
+                  state,
+                  updatedOrders,
+                  ratifyOrder,
+                );
+                if (insertResult.inserted) {
+                  updatedOrders = insertResult.orders;
+                  nextOrderMetrics = updateOrderMetrics(
+                    { ...state, orderMetrics: nextOrderMetrics },
+                    ratifyOrder,
+                  );
+                  ratifyOrderId = ratifyOrder.id;
+                }
+              }
+            }
+          }
+
+          councilCampaigns = {
+            ...councilCampaigns,
+            [activeCampaign.id]: {
+              ...activeProgress,
+              pilotObjectiveProgress: pilotProgress,
+              status,
+              ratifyOrderId,
+            },
+          };
+        }
+
+        if (councilActiveHearing) {
+          const hearingDef =
+            COUNCIL_HEARING_BY_ID[councilActiveHearing.hearingId];
+          if (hearingDef) {
+            const refreshBlocked =
+              hearingDef.constraints?.disallowRefresh &&
+              refreshCount > (councilActiveHearing.refreshCountAtStart ?? 0);
+            if (!refreshBlocked) {
+              const remainingObjectives = {
+                ...councilActiveHearing.remainingObjectives,
+              };
+              hearingDef.clearObjectives.forEach((objective) => {
+                const current = remainingObjectives[objective.id] ?? 0;
+                if (current <= 0) return;
+                let qualifies = false;
+                switch (objective.type) {
+                  case "FULFILL_OPEN_ONLY":
+                    qualifies = openOnly;
+                    break;
+                  case "FULFILL_COMPAT_REQUIRED":
+                    qualifies = isCompatOrder;
+                    break;
+                  case "FULFILL_ECO_AUDIT":
+                    qualifies = isEcoAuditInstall;
+                    break;
+                  case "FULFILL_RUSH":
+                    qualifies = isRushOrder;
+                    break;
+                  case "REACH_INSTALL_STREAK": {
+                    const target =
+                      objective.params?.minStreak ?? objective.target;
+                    qualifies = nextInstallStreakCurrent >= target;
+                    break;
+                  }
+                  case "COMPLETE_PROJECT":
+                    qualifies = Boolean(
+                      completedProjectId &&
+                        (!objective.params?.projectId ||
+                          objective.params.projectId === completedProjectId),
+                    );
+                    break;
+                  default:
+                    break;
+                }
+                if (qualifies) {
+                  remainingObjectives[objective.id] = Math.max(0, current - 1);
+                }
+              });
+              const cleared = Object.values(remainingObjectives).every(
+                (value) => value <= 0,
+              );
+              if (cleared) {
+                councilActiveHearing = undefined;
+                hearingClearedThisOrder = true;
+                councilLobbyPressure -= hearingDef.onClear.lobbyPressureDrop;
+                const bonus = hearingDef.onClear.bonus;
+                if (bonus?.cash) cashReward += Math.floor(bonus.cash);
+                if (bonus?.research)
+                  researchReward += Math.floor(bonus.research);
+                if (bonus?.reputation)
+                  repReward += Math.floor(bonus.reputation);
+              } else {
+                councilActiveHearing = {
+                  ...councilActiveHearing,
+                  remainingObjectives,
+                };
+              }
+            }
+          }
+        }
+
+        councilLobbyPressure = clampNumber(councilLobbyPressure, 0, 100);
+
+        if (!councilActiveHearing && !hearingClearedThisOrder) {
+          const thresholdShift = councilPerks.lobbyPressureThresholdShift ?? 0;
+          const thresholds = (tuning.council.hearingThresholds || [])
+            .map((value) => value + thresholdShift)
+            .filter((value) => Number.isFinite(value))
+            .sort((a, b) => a - b);
+          const crossed = thresholds.find(
+            (threshold) =>
+              pressureBefore < threshold && councilLobbyPressure >= threshold,
+          );
+          if (crossed !== undefined && installsSinceHearing >= 1) {
+            const hearings = Object.values(COUNCIL_HEARING_BY_ID);
+            const pick = hearings[Math.floor(Math.random() * hearings.length)];
+            if (pick) {
+              const remainingObjectives: Record<string, number> = {};
+              pick.clearObjectives.forEach((objective) => {
+                remainingObjectives[objective.id] = objective.target;
+              });
+              councilActiveHearing = {
+                hearingId: pick.id,
+                remainingObjectives,
+                appliedAt: Date.now(),
+                refreshCountAtStart: refreshCount,
+              };
+              installsSinceHearing = 0;
+            }
+          }
+        }
+
+        nextCouncil = {
+          ...nextCouncil,
+          lobbyPressure: councilLobbyPressure,
+          activeCampaignId: councilActiveCampaignId,
+          campaigns: councilCampaigns,
+          perksUnlocked: councilPerksUnlocked,
+          activeHearing: councilActiveHearing,
+          installsSinceLastHearingCheck: installsSinceHearing,
         };
       }
 
@@ -5176,6 +5807,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectsCompleted: nextProjectsCompleted,
         projectMilestones: nextProjectMilestones,
         projectDebuff: nextProjectDebuff,
+        council: nextCouncil,
         lockoutActive: lockoutActiveValue,
         lockoutPhase: lockoutPhaseValue,
         lockoutOrderId: lockoutResolution ? undefined : nextLockoutOrderId,
@@ -5444,7 +6076,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (upgrade.effect === "unlock_salvage") {
         const speedLevel = newState.upgrades["workbench_speed_1"] || 0;
-        const config = getEffectiveSupplierConfig("salvage", 1, speedLevel);
+        const config = getSupplierConfigWithPerks(
+          newState,
+          "salvage",
+          1,
+          speedLevel,
+        );
         newState.suppliers = {
           ...newState.suppliers,
           salvage: {
@@ -5461,7 +6098,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const currentLevel = newState.suppliers.salvage.level || 0;
         const nextLevel = Math.min(3, currentLevel + increase);
         const speedLevel = newState.upgrades["workbench_speed_1"] || 0;
-        const config = getEffectiveSupplierConfig(
+        const config = getSupplierConfigWithPerks(
+          newState,
           "salvage",
           nextLevel,
           speedLevel,
@@ -5620,7 +6258,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (node.id.startsWith("open_workshop_")) {
         const level = Number(node.id.split("_").pop() || 1);
         const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-        const config = getEffectiveSupplierConfig("open", level, speedLevel);
+        const config = getSupplierConfigWithPerks(
+          nextState,
+          "open",
+          level,
+          speedLevel,
+        );
         nextState = {
           ...nextState,
           suppliers: {
@@ -5777,7 +6420,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const order = state.orders.find((o) => o.id === action.orderId);
       if (!order) return state;
       if (isProtectedOrder(state, order)) return state;
-      const refreshCost = getOrderRefreshCost(state.reputationTier);
+      const refreshCost = getOrderRefreshCost(state.reputationTier, state);
       if (state.cash < refreshCost) return state;
 
       const remainingOrders = state.orders.filter(
@@ -5788,6 +6431,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.compatibleDiscoverySeen ||
         state.rdNodes["freedom_build"] ||
         state.freedomControllerCount > 0;
+      const councilPerks = getCouncilPerkEffects(state);
+      const councilHearing = getCouncilHearingPenalty(state);
+      const compatOrderWeightMultiplier =
+        councilPerks.compatOrderWeightMult *
+        councilHearing.compatOrderWeightMult;
       const requiredMinTier = getOrderTierFloor(state, remainingOrders);
       const newOrder = generateOrder(
         state.dependency,
@@ -5801,6 +6449,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.marketingBoostOrdersRemaining,
         state.gamePhase,
         requiredMinTier,
+        compatOrderWeightMultiplier,
       );
       if (!newOrder) return state;
       const nextMarketingBoostOrdersRemaining = Math.max(
@@ -5836,6 +6485,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orderMetrics: updateOrderMetrics(state, newOrder),
         marketingBoostOrdersRemaining: nextMarketingBoostOrdersRemaining,
         installStreakCurrent: 0,
+        council: {
+          ...state.council,
+          refreshCount: state.council.refreshCount + 1,
+        },
         highlightedOrderId:
           state.highlightedOrderId === action.orderId
             ? undefined
@@ -6033,10 +6686,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         (entry) => entry.projectId === action.projectId,
       );
       if (!offer) return state;
+      const councilPerks = getCouncilPerkEffects(state);
+      const councilHearing = getCouncilHearingPenalty(state);
+      const depositMultiplier =
+        councilPerks.projectDepositMult * councilHearing.projectDepositMult;
       const depositCost = getProjectDepositCost(
         project,
         state.reputationTier,
         state.maxTierCrafted,
+        depositMultiplier,
       );
       const addon = action.addons || {};
       const addonCost =
@@ -6396,6 +7054,229 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         activeProject: {
           ...activeProject,
           rerolledStages: Array.from(usedStages),
+        },
+        undoSnapshot: undefined,
+      };
+    }
+
+    case "COUNCIL_SET_ACTIVE_CAMPAIGN": {
+      if (!state.council.unlocked) return state;
+      const campaignId = action.campaignId;
+      if (!campaignId) {
+        return {
+          ...state,
+          council: { ...state.council, activeCampaignId: undefined },
+        };
+      }
+      const progress = state.council.campaigns[campaignId];
+      if (!progress) return state;
+      const canSelect =
+        progress.status !== "LOCKED" || canStartCouncilCampaign(state, campaignId);
+      if (!canSelect) return state;
+      return {
+        ...state,
+        council: { ...state.council, activeCampaignId: campaignId },
+      };
+    }
+
+    case "COUNCIL_INVEST_DRAFT": {
+      if (!state.council.unlocked) return state;
+      const campaign = COUNCIL_CAMPAIGN_BY_ID[action.campaignId];
+      if (!campaign) return state;
+      if (!canStartCouncilCampaign(state, campaign.id)) return state;
+      const progress = state.council.campaigns[campaign.id];
+      if (!progress) return state;
+      if (progress.status === "PILOT" || progress.status === "RATIFY")
+        return state;
+      if (progress.status === "COMPLETED") return state;
+
+      const cashCost = Math.max(
+        0,
+        Math.round(
+          campaign.draftCost.cash * tuning.council.draftCostCashMultiplier,
+        ),
+      );
+      const researchCost = Math.max(
+        0,
+        Math.round(
+          campaign.draftCost.research *
+            tuning.council.draftCostResearchMultiplier,
+        ),
+      );
+      const remainingCash = Math.max(0, cashCost - progress.draftCashInvested);
+      const remainingResearch = Math.max(
+        0,
+        researchCost - progress.draftResearchInvested,
+      );
+      if (!campaign.draftCost.allowPartial) {
+        if (state.cash < remainingCash || state.research < remainingResearch) {
+          return state;
+        }
+      }
+      const spendCash = Math.min(state.cash, remainingCash);
+      const spendResearch = Math.min(state.research, remainingResearch);
+      if (spendCash <= 0 && spendResearch <= 0) return state;
+
+      const nextCashInvested = progress.draftCashInvested + spendCash;
+      const nextResearchInvested =
+        progress.draftResearchInvested + spendResearch;
+      const draftComplete =
+        nextCashInvested >= cashCost && nextResearchInvested >= researchCost;
+      const nextStatus = draftComplete ? "PILOT" : "DRAFTING";
+
+      const lobbyGain =
+        tuning.council.lobbyPressureGainPerDraftInvest +
+        (draftComplete ? campaign.pressure.onDraftComplete : 0);
+      let nextLobbyPressure = clampNumber(
+        state.council.lobbyPressure + lobbyGain,
+        0,
+        100,
+      );
+
+      let activeHearing = state.council.activeHearing;
+      let installsSinceHearing = state.council.installsSinceLastHearingCheck;
+      const perks = getCouncilPerkEffects(state);
+      if (!activeHearing) {
+        const thresholdShift = perks.lobbyPressureThresholdShift ?? 0;
+        const thresholds = (tuning.council.hearingThresholds || [])
+          .map((value) => value + thresholdShift)
+          .filter((value) => Number.isFinite(value))
+          .sort((a, b) => a - b);
+        const crossed = thresholds.find(
+          (threshold) =>
+            state.council.lobbyPressure < threshold &&
+            nextLobbyPressure >= threshold,
+        );
+        if (crossed !== undefined) {
+          const hearings = Object.values(COUNCIL_HEARING_BY_ID);
+          const pick = hearings[Math.floor(Math.random() * hearings.length)];
+          if (pick) {
+            const remainingObjectives: Record<string, number> = {};
+            pick.clearObjectives.forEach((objective) => {
+              remainingObjectives[objective.id] = objective.target;
+            });
+            activeHearing = {
+              hearingId: pick.id,
+              remainingObjectives,
+              appliedAt: Date.now(),
+              refreshCountAtStart: state.council.refreshCount,
+            };
+            installsSinceHearing = 0;
+          }
+        }
+      }
+
+      const nextCouncil = {
+        ...state.council,
+        lobbyPressure: nextLobbyPressure,
+        activeCampaignId: action.campaignId,
+        campaigns: {
+          ...state.council.campaigns,
+          [campaign.id]: {
+            ...progress,
+            status: nextStatus,
+            draftCashInvested: nextCashInvested,
+            draftResearchInvested: nextResearchInvested,
+          },
+        },
+        activeHearing,
+        installsSinceLastHearingCheck: installsSinceHearing,
+      };
+
+      captureEvent("cash_spent", {
+        amount: spendCash,
+        reason: "council_draft",
+        campaignId: campaign.id,
+      });
+      captureEvent("research_spent", {
+        amount: spendResearch,
+        reason: "council_draft",
+        campaignId: campaign.id,
+      });
+
+      return {
+        ...state,
+        cash: state.cash - spendCash,
+        research: state.research - spendResearch,
+        council: nextCouncil,
+        undoSnapshot: undefined,
+      };
+    }
+
+    case "COUNCIL_SPAWN_RATIFY": {
+      if (!state.council.unlocked) return state;
+      const campaign = COUNCIL_CAMPAIGN_BY_ID[action.campaignId];
+      if (!campaign) return state;
+      const progress = state.council.campaigns[campaign.id];
+      if (!progress || progress.status !== "RATIFY") return state;
+      const existing = state.orders.some((order) =>
+        order.modifierIds?.includes(`council:${campaign.id}`),
+      );
+      if (existing) return state;
+      const ratifyOrder = buildCouncilRatifyOrder(state, campaign.id);
+      if (!ratifyOrder) return state;
+      const insertResult = insertStoryOrder(state, state.orders, ratifyOrder);
+      if (!insertResult.inserted) return state;
+      return {
+        ...state,
+        orders: insertResult.orders,
+        highlightedOrderId: insertResult.highlightedOrderId,
+        orderMetrics: updateOrderMetrics(state, ratifyOrder),
+        council: {
+          ...state.council,
+          campaigns: {
+            ...state.council.campaigns,
+            [campaign.id]: {
+              ...progress,
+              ratifyOrderId: ratifyOrder.id,
+            },
+          },
+        },
+        undoSnapshot: undefined,
+      };
+    }
+
+    case "COUNCIL_PAY_CLEAR_HEARING": {
+      if (!state.council.activeHearing) return state;
+      const hearing = COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId];
+      if (!hearing) return state;
+      const perks = getCouncilPerkEffects(state);
+      const costMultiplier =
+        tuning.council.payToClearCostMultiplier *
+        perks.hearingPayToClearCostMult;
+      const cashCost = Math.max(
+        0,
+        Math.round(hearing.payToClear.cash * costMultiplier),
+      );
+      const researchCost = Math.max(
+        0,
+        Math.round(hearing.payToClear.research * costMultiplier),
+      );
+      if (state.cash < cashCost || state.research < researchCost) return state;
+      const nextLobbyPressure = clampNumber(
+        state.council.lobbyPressure - hearing.onClear.lobbyPressureDrop,
+        0,
+        100,
+      );
+      captureEvent("cash_spent", {
+        amount: cashCost,
+        reason: "council_hearing_clear",
+        hearingId: hearing.id,
+      });
+      captureEvent("research_spent", {
+        amount: researchCost,
+        reason: "council_hearing_clear",
+        hearingId: hearing.id,
+      });
+      return {
+        ...state,
+        cash: state.cash - cashCost,
+        research: state.research - researchCost,
+        council: {
+          ...state.council,
+          activeHearing: undefined,
+          lobbyPressure: nextLobbyPressure,
+          installsSinceLastHearingCheck: 0,
         },
         undoSnapshot: undefined,
       };
@@ -6964,6 +7845,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.compatibleDiscoverySeen ||
         workingState.rdNodes["freedom_build"] ||
         workingState.freedomControllerCount > 0;
+      const councilPerks = getCouncilPerkEffects(workingState);
+      const councilHearing = getCouncilHearingPenalty(workingState);
+      const compatOrderWeightMultiplier =
+        councilPerks.compatOrderWeightMult *
+        councilHearing.compatOrderWeightMult;
       const requiredMinTier = getOrderTierFloor(
         workingState,
         workingState.orders,
@@ -6980,6 +7866,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.marketingBoostOrdersRemaining,
         workingState.gamePhase,
         requiredMinTier,
+        compatOrderWeightMultiplier,
       );
       if (!newOrder) return workingState;
       const nextMarketingBoostOrdersRemaining = Math.max(
@@ -7594,6 +8481,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const baronEarlyRelief =
         state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
       const openSupplier = normalizeSupplierState(
+        state,
         "open",
         state.suppliers.open,
         now,
@@ -7601,6 +8489,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronEarlyRelief,
       );
       const baronSupplier = normalizeSupplierState(
+        state,
         "baron",
         state.suppliers.baron,
         now,
@@ -7608,6 +8497,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronEarlyRelief,
       );
       const salvageSupplier = normalizeSupplierState(
+        state,
         "salvage",
         state.suppliers.salvage,
         now,
@@ -7640,7 +8530,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : target === "baron"
               ? baronSupplier
               : salvageSupplier;
-        const config = getEffectiveSupplierConfig(
+        const config = getSupplierConfigWithPerks(
+          state,
           target,
           current.level,
           speedLevel,
@@ -7686,7 +8577,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           0,
           Math.floor(remaining * (1 - reductionRate)),
         );
-        const config = getEffectiveSupplierConfig(
+        const config = getSupplierConfigWithPerks(
+          state,
           target,
           current.level,
           speedLevel,
@@ -8150,6 +9042,130 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         action.state.projectDebuff && typeof action.state.projectDebuff === "object"
           ? (action.state.projectDebuff as ProjectDebuff)
           : base.projectDebuff;
+      const baseCouncil = base.council ?? buildInitialCouncilState();
+      const rawCouncil =
+        action.state.council && typeof action.state.council === "object"
+          ? (action.state.council as GameState["council"])
+          : undefined;
+      const rawCampaigns =
+        rawCouncil?.campaigns && typeof rawCouncil.campaigns === "object"
+          ? (rawCouncil.campaigns as Record<string, CouncilCampaignProgress>)
+          : {};
+      const campaigns: GameState["council"]["campaigns"] = {};
+      COUNCIL_CAMPAIGNS.forEach((campaign) => {
+        const rawProgress = rawCampaigns[campaign.id];
+        const baseProgress = baseCouncil.campaigns[campaign.id] ?? {
+          status: "LOCKED",
+          draftCashInvested: 0,
+          draftResearchInvested: 0,
+          pilotObjectiveProgress: {},
+          ratifyOrderId: undefined,
+          completedAt: undefined,
+        };
+        const rawStatus = rawProgress?.status;
+        const status: CouncilCampaignProgress["status"] =
+          rawStatus === "LOCKED" ||
+          rawStatus === "DRAFTING" ||
+          rawStatus === "PILOT" ||
+          rawStatus === "RATIFY" ||
+          rawStatus === "COMPLETED"
+            ? rawStatus
+            : baseProgress.status;
+        const pilotObjectiveProgress: Record<string, number> = {};
+        campaign.pilotObjectives.forEach((objective) => {
+          const rawValue =
+            rawProgress?.pilotObjectiveProgress?.[objective.id];
+          pilotObjectiveProgress[objective.id] =
+            typeof rawValue === "number" && Number.isFinite(rawValue)
+              ? Math.max(0, rawValue)
+              : baseProgress.pilotObjectiveProgress?.[objective.id] ?? 0;
+        });
+        campaigns[campaign.id] = {
+          status,
+          draftCashInvested:
+            typeof rawProgress?.draftCashInvested === "number"
+              ? Math.max(0, rawProgress.draftCashInvested)
+              : baseProgress.draftCashInvested,
+          draftResearchInvested:
+            typeof rawProgress?.draftResearchInvested === "number"
+              ? Math.max(0, rawProgress.draftResearchInvested)
+              : baseProgress.draftResearchInvested,
+          pilotObjectiveProgress,
+          ratifyOrderId:
+            typeof rawProgress?.ratifyOrderId === "string"
+              ? rawProgress.ratifyOrderId
+              : baseProgress.ratifyOrderId,
+          completedAt:
+            typeof rawProgress?.completedAt === "number"
+              ? rawProgress.completedAt
+              : baseProgress.completedAt,
+        };
+      });
+      const activeCampaignId =
+        typeof rawCouncil?.activeCampaignId === "string" &&
+        campaigns[rawCouncil.activeCampaignId]
+          ? rawCouncil.activeCampaignId
+          : baseCouncil.activeCampaignId;
+      const rawHearing = rawCouncil?.activeHearing;
+      const activeHearing =
+        rawHearing &&
+        typeof rawHearing === "object" &&
+        typeof rawHearing.hearingId === "string" &&
+        COUNCIL_HEARING_BY_ID[rawHearing.hearingId]
+          ? {
+              hearingId: rawHearing.hearingId,
+              remainingObjectives:
+                rawHearing.remainingObjectives &&
+                typeof rawHearing.remainingObjectives === "object"
+                  ? Object.fromEntries(
+                      Object.entries(rawHearing.remainingObjectives).map(
+                        ([key, value]) => [
+                          key,
+                          typeof value === "number" && Number.isFinite(value)
+                            ? Math.max(0, value)
+                            : 0,
+                        ],
+                      ),
+                    )
+                  : {},
+              appliedAt:
+                typeof rawHearing.appliedAt === "number"
+                  ? rawHearing.appliedAt
+                  : Date.now(),
+              refreshCountAtStart:
+                typeof rawHearing.refreshCountAtStart === "number"
+                  ? rawHearing.refreshCountAtStart
+                  : undefined,
+            }
+          : baseCouncil.activeHearing;
+      const perksUnlocked = Array.isArray(rawCouncil?.perksUnlocked)
+        ? rawCouncil!.perksUnlocked.filter(
+            (perkId) => typeof perkId === "string" && COUNCIL_PERKS[perkId],
+          )
+        : baseCouncil.perksUnlocked;
+      const councilUnlocked =
+        typeof rawCouncil?.unlocked === "boolean"
+          ? rawCouncil.unlocked
+          : baseCouncil.unlocked;
+      const council: GameState["council"] = {
+        unlocked: councilUnlocked,
+        lobbyPressure:
+          typeof rawCouncil?.lobbyPressure === "number"
+            ? Math.max(0, Math.min(100, rawCouncil.lobbyPressure))
+            : baseCouncil.lobbyPressure,
+        activeCampaignId,
+        campaigns,
+        activeHearing,
+        installsSinceLastHearingCheck:
+          typeof rawCouncil?.installsSinceLastHearingCheck === "number"
+            ? Math.max(0, rawCouncil.installsSinceLastHearingCheck)
+            : baseCouncil.installsSinceLastHearingCheck,
+        refreshCount:
+          typeof rawCouncil?.refreshCount === "number"
+            ? Math.max(0, rawCouncil.refreshCount)
+            : baseCouncil.refreshCount,
+        perksUnlocked,
+      };
       const lockoutLabOrdersTarget =
         typeof action.state.lockoutLabOrdersTarget === "number"
           ? action.state.lockoutLabOrdersTarget
@@ -8361,6 +9377,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectsCompleted,
         projectMilestones,
         projectDebuff,
+        council,
         backpackSlots: restoredBackpackSlots,
         backpack: sanitizedBackpack,
         backpackUnlocked:
@@ -8689,6 +9706,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (restoredState.tutorialComplete) {
         restoredState = ensureMissions(restoredState);
+      }
+
+      if (!restoredState.council.unlocked && canUnlockCouncil(restoredState)) {
+        restoredState = {
+          ...restoredState,
+          council: {
+            ...restoredState.council,
+            unlocked: true,
+          },
+        };
       }
 
       return restoredState;

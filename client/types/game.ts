@@ -234,6 +234,40 @@ export interface ProjectDebuff {
   multiplier: number;
 }
 
+export type CouncilCampaignStatus =
+  | "LOCKED"
+  | "DRAFTING"
+  | "PILOT"
+  | "RATIFY"
+  | "COMPLETED";
+
+export interface CouncilCampaignProgress {
+  status: CouncilCampaignStatus;
+  draftCashInvested: number;
+  draftResearchInvested: number;
+  pilotObjectiveProgress: Record<string, number>;
+  ratifyOrderId?: string;
+  completedAt?: number;
+}
+
+export interface CouncilHearingState {
+  hearingId: string;
+  remainingObjectives: Record<string, number>;
+  appliedAt: number;
+  refreshCountAtStart?: number;
+}
+
+export interface CouncilState {
+  unlocked: boolean;
+  lobbyPressure: number;
+  activeCampaignId?: string;
+  campaigns: Record<string, CouncilCampaignProgress>;
+  activeHearing?: CouncilHearingState;
+  installsSinceLastHearingCheck: number;
+  refreshCount: number;
+  perksUnlocked: string[];
+}
+
 export interface Upgrade {
   id: string;
   category: "space" | "workbench" | "quality" | "logistics" | "rd";
@@ -291,6 +325,7 @@ export interface GameState {
   projectMilestones: Record<string, boolean>;
   projectDebuff?: ProjectDebuff;
   baronPressure: number;
+  council: CouncilState;
   baronSupplySpawnsRemaining: number;
   baronRushSpawnsRemaining: number;
   suppliers: Record<SupplierId, SupplierState>;

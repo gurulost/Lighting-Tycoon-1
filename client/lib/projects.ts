@@ -22,6 +22,7 @@ export function getProjectDepositCost(
   project: ProjectDefinition,
   reputationTier: number,
   maxTierCrafted: number,
+  depositMultiplier = 1,
 ) {
   const tuning = getTuning();
   const base =
@@ -32,11 +33,11 @@ export function getProjectDepositCost(
     project.deposit.formulaKey === "early"
       ? 4
       : project.deposit.formulaKey === "mid"
-        ? 6
-        : project.deposit.formulaKey === "late"
-          ? 8
-          : 12;
-  return Math.max(0, Math.round(base * bandMult));
+      ? 6
+      : project.deposit.formulaKey === "late"
+        ? 8
+        : 12;
+  return Math.max(0, Math.round(base * bandMult * depositMultiplier));
 }
 
 export function getProjectOfferById(

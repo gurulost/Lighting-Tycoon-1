@@ -16,6 +16,7 @@ import {
 import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
 import { getProjectDepositCost, getProjectOfferRefreshCost } from "@/lib/projects";
 import { getTuning } from "@/lib/tuning";
+import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
 
 type TabKey = "offers" | "active";
 
@@ -253,6 +254,10 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
   const tuning = getTuning();
+  const councilPerks = getCouncilPerkEffects(state);
+  const councilHearing = getCouncilHearingPenalty(state);
+  const depositMultiplier =
+    councilPerks.projectDepositMult * councilHearing.projectDepositMult;
 
   const [activeTab, setActiveTab] = React.useState<TabKey>(
     state.activeProject ? "active" : "offers",
@@ -462,6 +467,7 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                     project,
                     state.reputationTier,
                     state.maxTierCrafted,
+                    depositMultiplier,
                   );
                   const selection = addonSelections[project.id] || {};
                   const addonCost =

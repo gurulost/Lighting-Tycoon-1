@@ -128,6 +128,21 @@ export type TuningConfig = {
     addonOvertimeCrewCost: number;
     addonChangeOrderCost: number;
   };
+  council: {
+    unlockMinProjectsCompleted: number;
+    unlockMinRepTier: number;
+    unlockAfterCapstoneProjectId: string;
+    draftCostCashMultiplier: number;
+    draftCostResearchMultiplier: number;
+    lobbyPressureGainPerDraftInvest: number;
+    lobbyPressureGainPerPilotMilestone: number;
+    lobbyPressureGainOnRatify: number;
+    lobbyPressureDecayOnOpenOnlyInstall: number;
+    hearingThresholds: number[];
+    hearingPenaltyMultiplier: number;
+    payToClearCostMultiplier: number;
+    ratifyRewardMultiplierGlobal: number;
+  };
   merge: {
     momentumThresholds: number[];
     chainWindowMs: number;
@@ -335,6 +350,21 @@ const DEFAULT_TUNING: TuningConfig = {
     addonSiteLogisticsCost: 260,
     addonOvertimeCrewCost: 320,
     addonChangeOrderCost: 220,
+  },
+  council: {
+    unlockMinProjectsCompleted: 6,
+    unlockMinRepTier: 9,
+    unlockAfterCapstoneProjectId: "proj_international_expo",
+    draftCostCashMultiplier: 1,
+    draftCostResearchMultiplier: 1,
+    lobbyPressureGainPerDraftInvest: 2,
+    lobbyPressureGainPerPilotMilestone: 2,
+    lobbyPressureGainOnRatify: 6,
+    lobbyPressureDecayOnOpenOnlyInstall: 1,
+    hearingThresholds: [30, 60, 90],
+    hearingPenaltyMultiplier: 1,
+    payToClearCostMultiplier: 1,
+    ratifyRewardMultiplierGlobal: 1,
   },
   merge: {
     momentumThresholds: [3, 6, 10],
