@@ -5886,6 +5886,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           open: {
             ...state.suppliers.open,
             chargesRemaining: state.suppliers.open.chargesRemaining + 2,
+            overdrawCount: 0,
           },
         };
       }
@@ -6070,6 +6071,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             open: {
               ...state.suppliers.open,
               chargesRemaining: state.suppliers.open.chargesRemaining + 2,
+              overdrawCount: 0,
             },
           },
           activeProject: {
