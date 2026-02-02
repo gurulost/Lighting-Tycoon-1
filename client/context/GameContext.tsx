@@ -1735,16 +1735,41 @@ function stripProjectOrders(orders: Order[]) {
   return orders.filter((order) => !order.modifierIds?.includes("project_stage"));
 }
 
+function removeProjectSiteLogisticsCharges(
+  suppliers: GameState["suppliers"],
+  activeProject?: ActiveProject,
+) {
+  const bonus = activeProject?.siteLogisticsBonusCharges ?? 0;
+  if (bonus <= 0) return suppliers;
+  const nextCharges = Math.max(0, suppliers.open.chargesRemaining - bonus);
+  const nextOverdrawCount = nextCharges > 0 ? 0 : suppliers.open.overdrawCount;
+  return {
+    ...suppliers,
+    open: {
+      ...suppliers.open,
+      chargesRemaining: nextCharges,
+      overdrawCount: nextOverdrawCount,
+    },
+  };
+}
+
+type ProjectFailPenaltyResult = {
+  refund: number;
+  baronPressure: number;
+  projectDebuff?: ProjectDebuff;
+};
+
 function applyProjectFailPenalty(
   state: GameState,
   stage: ProjectStageDefinition,
-): Pick<GameState, "cash" | "baronPressure" | "projectDebuff"> {
+): ProjectFailPenaltyResult {
   const penalty = stage.failPenalty;
+  const depositPaid = state.activeProject?.depositPaid ?? 0;
   if (penalty.type === "lose_deposit") {
-    const depositPaid = state.activeProject?.depositPaid ?? 0;
-    const loss = Math.floor(depositPaid * penalty.loseDepositPercent);
+    const refundRate = Math.max(0, Math.min(1, 1 - penalty.loseDepositPercent));
+    const refund = Math.max(0, Math.floor(depositPaid * refundRate));
     return {
-      cash: Math.max(0, state.cash - loss),
+      refund,
       baronPressure: state.baronPressure,
       projectDebuff: state.projectDebuff,
     };
@@ -1755,13 +1780,13 @@ function applyProjectFailPenalty(
       state.baronPressure + penalty.pressureIncrease,
     );
     return {
-      cash: state.cash,
+      refund: depositPaid,
       baronPressure: bumped,
       projectDebuff: state.projectDebuff,
     };
   }
   return {
-    cash: state.cash,
+    refund: depositPaid,
     baronPressure: state.baronPressure,
     projectDebuff: {
       type: "rep",
@@ -3242,6 +3267,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         cooldownEndsAt: nextCooldownEndsAt,
         overdrawCount: nextOverdrawCount,
       };
+      const consumedOpenCharge =
+        supplierId === "open" &&
+        !isOverdraw &&
+        supplier.chargesRemaining > 0 &&
+        nextCharges < supplier.chargesRemaining;
+      let nextActiveProject = state.activeProject;
+      if (
+        consumedOpenCharge &&
+        state.activeProject?.siteLogisticsBonusCharges &&
+        state.activeProject.siteLogisticsBonusCharges > 0
+      ) {
+        nextActiveProject = {
+          ...state.activeProject,
+          siteLogisticsBonusCharges: Math.max(
+            0,
+            state.activeProject.siteLogisticsBonusCharges - 1,
+          ),
+        };
+      }
       const hitBaronCooldown =
         supplierId === "baron" &&
         supplier.chargesRemaining > 0 &&
@@ -3424,6 +3468,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orders: nextOrders,
         highlightedOrderId: nextHighlightedOrderId,
         suppliers: { ...state.suppliers, [supplierId]: nextSupplier },
+        activeProject: nextActiveProject,
         cash: state.cash - overdrawCash,
         research: state.research - overdrawResearch,
         upgradeMaterials:
@@ -4876,6 +4921,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             }
           });
 
+          nextSuppliers = removeProjectSiteLogisticsCharges(
+            nextSuppliers,
+            state.activeProject,
+          );
           updatedOrders = stripProjectOrders(updatedOrders);
           nextActiveProject = undefined;
           nextProjectOffers = generateProjectOffers(
@@ -5155,12 +5204,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (active) {
           const penaltyResult = applyProjectFailPenalty(nextState, active.stage);
           const orders = stripProjectOrders(nextState.orders);
+          const nextHighlightedOrderId =
+            nextState.highlightedOrderId &&
+            orders.some((order) => order.id === nextState.highlightedOrderId)
+              ? nextState.highlightedOrderId
+              : undefined;
+          captureEvent("project_stage_fail", {
+            projectId: active.project.id,
+            stageIndex: active.stage.stageIndex,
+            penalty: active.stage.failPenalty.type,
+            source: "deadline",
+          });
           nextState = {
             ...nextState,
-            cash: penaltyResult.cash,
+            cash: Math.max(0, nextState.cash + penaltyResult.refund),
             baronPressure: penaltyResult.baronPressure,
             projectDebuff: penaltyResult.projectDebuff,
             orders,
+            highlightedOrderId: nextHighlightedOrderId,
+            suppliers: removeProjectSiteLogisticsCharges(
+              nextState.suppliers,
+              nextState.activeProject,
+            ),
             activeProject: undefined,
             projectOffers: generateProjectOffers(nextState, 3),
           };
@@ -5972,6 +6037,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           open: {
             ...state.suppliers.open,
             chargesRemaining: state.suppliers.open.chargesRemaining + 2,
+            overdrawCount: 0,
           },
         };
       }
@@ -5986,6 +6052,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         rerolledStages: [],
         expeditorUsedStages,
         siteLogisticsUsed: !!addon.siteLogistics,
+        siteLogisticsBonusCharges: addon.siteLogistics ? 2 : 0,
         overtimeCrew: !!addon.overtimeCrew,
       };
 
@@ -6037,10 +6104,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         Math.floor(activeProject.depositPaid * (1 - penaltyRate)),
       );
       const orders = stripProjectOrders(state.orders);
+      const nextHighlightedOrderId =
+        state.highlightedOrderId &&
+        orders.some((order) => order.id === state.highlightedOrderId)
+          ? state.highlightedOrderId
+          : undefined;
+      const nextSuppliers = removeProjectSiteLogisticsCharges(
+        state.suppliers,
+        activeProject,
+      );
       const nextStateBase: GameState = {
         ...state,
         cash: state.cash + refund,
         orders,
+        highlightedOrderId: nextHighlightedOrderId,
+        suppliers: nextSuppliers,
         activeProject: undefined,
         projectDebuff: state.projectDebuff,
         undoSnapshot: undefined,
@@ -6076,12 +6154,23 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!active) return state;
       const penaltyResult = applyProjectFailPenalty(state, active.stage);
       const orders = stripProjectOrders(state.orders);
+      const nextHighlightedOrderId =
+        state.highlightedOrderId &&
+        orders.some((order) => order.id === state.highlightedOrderId)
+          ? state.highlightedOrderId
+          : undefined;
+      const nextSuppliers = removeProjectSiteLogisticsCharges(
+        state.suppliers,
+        state.activeProject,
+      );
       const nextStateBase: GameState = {
         ...state,
-        cash: penaltyResult.cash,
+        cash: Math.max(0, state.cash + penaltyResult.refund),
         baronPressure: penaltyResult.baronPressure,
         projectDebuff: penaltyResult.projectDebuff,
         orders,
+        highlightedOrderId: nextHighlightedOrderId,
+        suppliers: nextSuppliers,
         activeProject: undefined,
         undoSnapshot: undefined,
       };
@@ -6174,6 +6263,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           activeProject: {
             ...activeProject,
             siteLogisticsUsed: true,
+            siteLogisticsBonusCharges:
+              (activeProject.siteLogisticsBonusCharges ?? 0) + 2,
           },
           undoSnapshot: undefined,
         };
@@ -8003,6 +8094,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   )
                 : [],
               siteLogisticsUsed: !!rawActiveProject.siteLogisticsUsed,
+              siteLogisticsBonusCharges:
+                typeof rawActiveProject.siteLogisticsBonusCharges === "number"
+                  ? Math.max(0, rawActiveProject.siteLogisticsBonusCharges)
+                  : undefined,
               overtimeCrew: !!rawActiveProject.overtimeCrew,
             }
           : undefined;
@@ -8357,7 +8452,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         restoredState = {
           ...restoredState,
           dependency: 0,
-          baronPressure: 0,
           lockoutActive: false,
           lockoutPhase: 0,
           lockoutOrderId: undefined,
@@ -8417,6 +8511,145 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           highlightedOrderId: highlightStillValid
             ? restoredState.highlightedOrderId
             : undefined,
+        };
+      }
+      if (restoredState.activeProject) {
+        const project = getProjectDefinitionById(restoredState.activeProject.projectId);
+        const stageIndex = restoredState.activeProject.stageIndex;
+        const stage = project?.stages[stageIndex];
+        if (!project || !stage) {
+          const orders = stripProjectOrders(restoredState.orders);
+          const trimmedOrders = trimOrdersToMax(
+            { ...restoredState, activeProject: undefined },
+            orders,
+          );
+          const nextHighlightedOrderId =
+            restoredState.highlightedOrderId &&
+            trimmedOrders.some(
+              (order) => order.id === restoredState.highlightedOrderId,
+            )
+              ? restoredState.highlightedOrderId
+              : undefined;
+          const nextSuppliers = removeProjectSiteLogisticsCharges(
+            restoredState.suppliers,
+            restoredState.activeProject,
+          );
+          restoredState = {
+            ...restoredState,
+            orders: trimmedOrders,
+            highlightedOrderId: nextHighlightedOrderId,
+            suppliers: nextSuppliers,
+            activeProject: undefined,
+          };
+        } else {
+          const stageTag = getProjectStageTag(project.id, stageIndex);
+          const hasStageOrder = restoredState.orders.some((order) =>
+            order.modifierIds?.includes(stageTag),
+          );
+          if (!hasStageOrder) {
+            const rerollCount =
+              restoredState.activeProject.rerolledStages?.filter(
+                (value) => value === stageIndex,
+              ).length ?? 0;
+            const stageOrder = buildProjectStageOrder(
+              restoredState,
+              project,
+              stage,
+              restoredState.activeProject.seed,
+              rerollCount,
+            );
+            const baseOrders = stripProjectOrders(restoredState.orders);
+            const insertResult = insertStoryOrder(
+              restoredState,
+              baseOrders,
+              stageOrder,
+            );
+            if (insertResult.inserted) {
+              const nextHighlightedOrderId =
+                insertResult.highlightedOrderId &&
+                insertResult.orders.some(
+                  (order) => order.id === insertResult.highlightedOrderId,
+                )
+                  ? insertResult.highlightedOrderId
+                  : undefined;
+              restoredState = {
+                ...restoredState,
+                orders: insertResult.orders,
+                highlightedOrderId: nextHighlightedOrderId,
+                orderMetrics: updateOrderMetrics(restoredState, stageOrder),
+              };
+            } else {
+              const trimmedOrders = trimOrdersToMax(
+                { ...restoredState, activeProject: undefined },
+                baseOrders,
+              );
+              const nextHighlightedOrderId =
+                restoredState.highlightedOrderId &&
+                trimmedOrders.some(
+                  (order) => order.id === restoredState.highlightedOrderId,
+                )
+                  ? restoredState.highlightedOrderId
+                  : undefined;
+              const nextSuppliers = removeProjectSiteLogisticsCharges(
+                restoredState.suppliers,
+                restoredState.activeProject,
+              );
+              restoredState = {
+                ...restoredState,
+                orders: trimmedOrders,
+                highlightedOrderId: nextHighlightedOrderId,
+                suppliers: nextSuppliers,
+                activeProject: undefined,
+              };
+            }
+          }
+          if (
+            restoredState.activeProject &&
+            typeof restoredState.activeProject.stageDeadlineRemaining !== "number"
+          ) {
+            const fallbackDeadline = getProjectStageDeadline(stage, stageIndex);
+            if (typeof fallbackDeadline === "number") {
+              restoredState = {
+                ...restoredState,
+                activeProject: {
+                  ...restoredState.activeProject,
+                  stageDeadlineRemaining: fallbackDeadline,
+                },
+              };
+            }
+          }
+        }
+      } else if (
+        restoredState.orders.some((order) =>
+          order.modifierIds?.includes("project_stage"),
+        )
+      ) {
+        const orders = stripProjectOrders(restoredState.orders);
+        const trimmedOrders = trimOrdersToMax(
+          { ...restoredState, activeProject: undefined },
+          orders,
+        );
+        const nextHighlightedOrderId =
+          restoredState.highlightedOrderId &&
+          trimmedOrders.some(
+            (order) => order.id === restoredState.highlightedOrderId,
+          )
+            ? restoredState.highlightedOrderId
+            : undefined;
+        restoredState = {
+          ...restoredState,
+          orders: trimmedOrders,
+          highlightedOrderId: nextHighlightedOrderId,
+        };
+      }
+      if (
+        restoredState.projectsUnlocked &&
+        !restoredState.activeProject &&
+        restoredState.projectOffers.length === 0
+      ) {
+        restoredState = {
+          ...restoredState,
+          projectOffers: generateProjectOffers(restoredState, 3),
         };
       }
       if (restoredState.tutorialComplete) {

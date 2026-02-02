@@ -77,9 +77,10 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Action deadline:
   - Fulfill non-project orders and confirm deadline decrements.
   - When deadline reaches 0, project fails and penalty applies (deposit loss/pressure/rep debuff).
+  - Failure refunds: pressure/rep penalties return the deposit; lose-deposit returns only the remainder.
 - Add-ons:
   - Permit Expeditor adds +2 installs to deadline once per stage.
-  - Site Logistics grants +2 Open supplier charges.
+  - Site Logistics grants +2 Open supplier charges and clears unused charges when the project ends.
   - Overtime Crew grants +1 order slot for the project duration.
   - Change Order swaps a stage constraint once.
 - Cancel project:

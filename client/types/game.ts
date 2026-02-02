@@ -177,6 +177,10 @@ export interface ProjectDefinition {
     tone: ProjectTone;
   };
   synopsis: string;
+  projectCardIcon?: string;
+  clientPortrait?: string;
+  trophyIcon?: string;
+  locationBackdrop?: string;
   unlock: {
     phaseMin: 2;
     minRepTier: number;
@@ -220,6 +224,7 @@ export interface ActiveProject {
   rerolledStages?: number[];
   expeditorUsedStages?: number[];
   siteLogisticsUsed?: boolean;
+  siteLogisticsBonusCharges?: number;
   overtimeCrew?: boolean;
 }
 

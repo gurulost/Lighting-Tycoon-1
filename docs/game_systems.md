@@ -37,9 +37,9 @@ This document is the single source of truth for the core gameplay systems.
 - Phase 2 inserts a one-time compatibility-focused goal order on liberation
 
 ## Phase 2 Mega-Projects (Empire Contracts)
-Mentor framing: You’re free, but scale has a new kind of pressure. Empire Contracts turn each install into a public signal — deposit-heavy, multi-stage work that rewards steady execution.
+Mentor framing: You’re free, but scale has a new kind of pressure. Empire Contracts are how the city measures you now—deposit-heavy, multi-stage work where every install is public, and every misstep compounds. Deliver the stages cleanly and the skyline follows; stumble and the market tightens.
 
-Tina intent: I’m not just keeping the shop alive; I’m building landmarks. Stage by stage, every contract proves we set the standard now.
+Tina intent: I’m not just keeping the shop alive; I’m building landmarks. These contracts are the proof—stage by stage, we set the standard, make the open way visible, and turn every big build into a permanent signal that we run this city now.
 
 - Unlocks after the Phase 2 goal order is completed (`gamePhase = 2` + goal cleared).
 - Project Board offers 3 contracts at a time; refreshable for cash.
@@ -47,7 +47,9 @@ Tina intent: I’m not just keeping the shop alive; I’m building landmarks. St
 - Each stage is a normal order tagged `project_stage` and cannot be refreshed/dismissed.
 - Action deadlines count down by non-project fulfillments (no real-time timers).
 - Failure penalties: lose deposit, add Baron pressure, or temporary rep debuff.
+- Failure refunds: pressure/rep penalties return the deposit; lose-deposit returns only the remainder.
 - Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (swap a stage constraint once).
+- Site Logistics charges are scoped to the active project and removed when the project ends.
 - Completion grants large cash/research/rep and advances Empire milestones.
 - Empire milestones: completing 3/6/9 projects grants +1 base order slot each time.
 

@@ -16,6 +16,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Mayor Marisol Vance", role: "Mayor", tone: "demanding" },
     synopsis:
       "Replace legacy street lighting with open-standard infrastructure. Public visibility is massive.",
+    projectCardIcon: "project_card_neon_city_grid",
+    clientPortrait: "portrait_mayor_vance",
+    trophyIcon: "trophy_city_grid",
+    locationBackdrop: "backdrop_neon_city_municipal",
     unlock: { phaseMin: 2, minRepTier: 4 },
     deposit: { formulaKey: "early" },
     stages: [
@@ -68,6 +72,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Aria Kale", role: "Festival Director", tone: "visionary" },
     synopsis:
       "A spectacle contract with high stakes and zero tolerance for failure.",
+    projectCardIcon: "project_card_festival_main_stage",
+    clientPortrait: "portrait_aria_kale",
+    trophyIcon: "trophy_backstage_pass",
+    locationBackdrop: "backdrop_riverfront_festival",
     unlock: { phaseMin: 2, minRepTier: 5 },
     deposit: { formulaKey: "early" },
     stages: [
@@ -108,6 +116,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Chief Rourke", role: "Port Authority", tone: "skeptical" },
     synopsis:
       "Reliability contract where weather, corrosion, and public safety matter more than flash.",
+    projectCardIcon: "project_card_harbor_beacon",
+    clientPortrait: "portrait_chief_rourke",
+    trophyIcon: "trophy_harbor_lantern",
+    locationBackdrop: "backdrop_old_harbor",
     unlock: { phaseMin: 2, minRepTier: 5 },
     deposit: { formulaKey: "early" },
     stages: [
@@ -156,6 +168,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Commissioner Han", role: "Transit Commissioner", tone: "demanding" },
     synopsis:
       "Systemwide footprint and repetitive installs that test scalable operations.",
+    projectCardIcon: "project_card_metro_wayfinding",
+    clientPortrait: "portrait_commissioner_han",
+    trophyIcon: "trophy_metro_badge",
+    locationBackdrop: "backdrop_underground_metro",
     unlock: { phaseMin: 2, minRepTier: 6 },
     deposit: { formulaKey: "mid" },
     stages: [
@@ -216,6 +232,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Liaison Sato", role: "Executive Liaison", tone: "demanding" },
     synopsis:
       "Prestige client with zero tolerance for public failure and huge visibility upside.",
+    projectCardIcon: "project_card_skyline_tower",
+    clientPortrait: "portrait_liaison_sato",
+    trophyIcon: "trophy_glassspire_plaque",
+    locationBackdrop: "backdrop_glassspire_tower",
     unlock: { phaseMin: 2, minRepTier: 6 },
     deposit: { formulaKey: "mid" },
     stages: [
@@ -264,6 +284,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Dr. Imani Reyes", role: "Chief Physician", tone: "warm" },
     synopsis:
       "Safety-first install with high scrutiny and high community stakes.",
+    projectCardIcon: "project_card_childrens_hospital",
+    clientPortrait: "portrait_dr_reyes",
+    trophyIcon: "trophy_nightlight_ribbon",
+    locationBackdrop: "backdrop_st_luma_hospital",
     unlock: { phaseMin: 2, minRepTier: 7 },
     deposit: { formulaKey: "mid" },
     stages: [
@@ -304,6 +328,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Curator Elowen Shaw", role: "Curator", tone: "visionary" },
     synopsis:
       "A creative contract that leans into compatibility sets and signature builds.",
+    projectCardIcon: "project_card_museum_exhibit",
+    clientPortrait: "portrait_curator_shaw",
+    trophyIcon: "trophy_curator_seal",
+    locationBackdrop: "backdrop_museum_of_light",
     unlock: { phaseMin: 2, minRepTier: 7 },
     deposit: { formulaKey: "mid" },
     stages: [
@@ -360,6 +388,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Jax Moreno", role: "Head of Events", tone: "demanding" },
     synopsis:
       "A pressure contract packed with rush installs and a high payout ceiling.",
+    projectCardIcon: "project_card_stadium_halftime",
+    clientPortrait: "portrait_jax_moreno",
+    trophyIcon: "trophy_halftime",
+    locationBackdrop: "backdrop_titan_field",
     unlock: { phaseMin: 2, minRepTier: 8 },
     deposit: { formulaKey: "late" },
     stages: [
@@ -400,6 +432,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Inspector Wren", role: "Safety Inspector", tone: "skeptical" },
     synopsis:
       "High scrutiny and procedural checks with a legitimacy payoff.",
+    projectCardIcon: "project_card_airport_runway",
+    clientPortrait: "portrait_inspector_wren",
+    trophyIcon: "trophy_clearance_badge",
+    locationBackdrop: "backdrop_neon_airport",
     unlock: { phaseMin: 2, minRepTier: 8 },
     deposit: { formulaKey: "late" },
     stages: [
@@ -448,6 +484,10 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Chair Solenne", role: "Expo Chair", tone: "visionary" },
     synopsis:
       "The capstone contract that crowns you as the industry standard-setter.",
+    projectCardIcon: "project_card_international_expo",
+    clientPortrait: "portrait_expo_chair_solenne",
+    trophyIcon: "trophy_expo_laurel",
+    locationBackdrop: "backdrop_world_expo",
     unlock: { phaseMin: 2, minRepTier: 9, minProjectsCompleted: 6 },
     deposit: { formulaKey: "capstone" },
     stages: [
