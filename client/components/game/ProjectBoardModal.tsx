@@ -193,7 +193,7 @@ function ProjectOfferCard({
           <ThemedText style={styles.costChipText}>Deposit {depositCost}</ThemedText>
         </View>
         <View style={styles.costChip}>
-          <Feather name="zap" size={12} color={GameColors.currency.reputation} />
+          <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
           <ThemedText style={styles.costChipText}>Total {totalCost}</ThemedText>
         </View>
       </View>
@@ -306,6 +306,14 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
   const activeStage = activeDefinition
     ? activeDefinition.stages[activeProject?.stageIndex ?? 0]
     : undefined;
+  const completionScale = Math.max(0, tuning.projects.completionRewardMultiplier);
+  const effectiveCompletionRewards = activeDefinition
+    ? {
+        cash: activeDefinition.completionRewards.cashMultiplier * completionScale,
+        reputation: activeDefinition.completionRewards.reputationMultiplier * completionScale,
+        research: activeDefinition.completionRewards.researchMultiplier * completionScale,
+      }
+    : null;
   const completedStages = new Set(
     activeProject?.stageHistory.map((entry) => entry.stageIndex) ?? [],
   );
@@ -720,19 +728,19 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                       <View style={styles.rewardChip}>
                         <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
                         <ThemedText style={styles.rewardText}>
-                          x{activeDefinition.completionRewards.cashMultiplier.toFixed(1)} cash
+                          x{(effectiveCompletionRewards?.cash ?? activeDefinition.completionRewards.cashMultiplier).toFixed(1)} cash
                         </ThemedText>
                       </View>
                       <View style={styles.rewardChip}>
                         <Feather name="star" size={12} color={GameColors.currency.reputation} />
                         <ThemedText style={styles.rewardText}>
-                          x{activeDefinition.completionRewards.reputationMultiplier.toFixed(1)} rep
+                          x{(effectiveCompletionRewards?.reputation ?? activeDefinition.completionRewards.reputationMultiplier).toFixed(1)} rep
                         </ThemedText>
                       </View>
                       <View style={styles.rewardChip}>
                         <Feather name="zap" size={12} color={GameColors.currency.research} />
                         <ThemedText style={styles.rewardText}>
-                          x{activeDefinition.completionRewards.researchMultiplier.toFixed(1)} research
+                          x{(effectiveCompletionRewards?.research ?? activeDefinition.completionRewards.researchMultiplier).toFixed(1)} research
                         </ThemedText>
                       </View>
                     </View>

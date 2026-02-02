@@ -4454,6 +4454,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let projectCompleteBeatId: string | null = null;
       let projectUnlockBeatId: string | null = null;
       let projectOfferBeatId: string | null = null;
+      let projectOfferRefreshMode: "none" | "if_empty" | "force" = "none";
       let projectStageFailed = false;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
@@ -4894,20 +4895,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           stage.stageIndex >= project.stages.length - 1;
 
         if (isFinalStage) {
+          const completionScale = Math.max(
+            0,
+            tuning.projects.completionRewardMultiplier,
+          );
           projectCompletionReward = {
             cash: Math.round(
               order.rewards.cash *
                 project.completionRewards.cashMultiplier *
-                tuning.projects.completionRewardMultiplier,
+                completionScale,
             ),
             reputation: Math.round(
               order.rewards.reputation *
-                project.completionRewards.reputationMultiplier,
+                project.completionRewards.reputationMultiplier *
+                completionScale,
             ),
             research: Math.round(
               order.rewards.research *
                 project.completionRewards.researchMultiplier *
-                tuning.projects.completionRewardMultiplier,
+                completionScale,
             ),
           };
           captureEvent("project_complete", {
@@ -4940,16 +4946,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           );
           updatedOrders = stripProjectOrders(updatedOrders);
           nextActiveProject = undefined;
-          nextProjectOffers = generateProjectOffers(
-            { ...state, projectsCompleted: nextProjectsCompleted },
-            3,
-          );
-          if (
-            nextProjectOffers.length > 0 &&
-            !state.storySeen["project_offer_generic"]
-          ) {
-            projectOfferBeatId = "project_offer_generic";
-          }
+          projectOfferRefreshMode = "force";
           projectCompleteBeatId = project.narrativeBeats?.complete || null;
         } else {
           const nextStageIndex = stage.stageIndex + 1;
@@ -5060,16 +5057,38 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (completedPhase2Goal && state.gamePhase === 2) {
         nextProjectsUnlocked = true;
-        if (nextProjectOffers.length === 0) {
-          nextProjectOffers = generateProjectOffers(state, 3);
-        }
-        if (
-          nextProjectOffers.length > 0 &&
-          !state.storySeen["project_offer_generic"]
-        ) {
-          projectOfferBeatId = "project_offer_generic";
+        if (projectOfferRefreshMode !== "force") {
+          projectOfferRefreshMode = "if_empty";
         }
         projectUnlockBeatId = "mentor_empire_contracts";
+      }
+      if (projectOfferRefreshMode !== "none") {
+        const shouldRefresh =
+          projectOfferRefreshMode === "force" ||
+          (projectOfferRefreshMode === "if_empty" &&
+            nextProjectOffers.length === 0);
+        if (shouldRefresh) {
+          const repAfterRewards = state.reputation + repReward;
+          const neighborhoodAfterRewards = getNeighborhoodByRep(repAfterRewards);
+          const offersState: GameState = {
+            ...state,
+            gamePhase: nextGamePhase,
+            reputation: repAfterRewards,
+            reputationTier: getNeighborhoodIndex(neighborhoodAfterRewards.id),
+            currentNeighborhoodId: neighborhoodAfterRewards.id,
+            projectsCompleted: nextProjectsCompleted,
+            projectsUnlocked: nextProjectsUnlocked,
+            activeProject: nextActiveProject,
+          };
+          nextProjectOffers = generateProjectOffers(offersState, 3);
+          if (
+            nextProjectOffers.length > 0 &&
+            !state.storySeen["project_offer_generic"] &&
+            !projectOfferBeatId
+          ) {
+            projectOfferBeatId = "project_offer_generic";
+          }
+        }
       }
       const nextBaronContractOrdersRemaining = contractActive
         ? Math.max(0, state.baronContractOrdersRemaining - 1)
