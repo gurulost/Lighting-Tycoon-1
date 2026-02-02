@@ -6470,6 +6470,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const order = state.orders.find((o) => o.id === action.orderId);
       if (!order) return state;
       if (isProtectedOrder(state, order)) return state;
+      const activeHearing = state.council.activeHearing
+        ? COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId]
+        : undefined;
+      if (activeHearing?.constraints?.disallowRefresh) return state;
       const refreshCost = getOrderRefreshCost(state.reputationTier, state);
       if (state.cash < refreshCost) return state;
 
