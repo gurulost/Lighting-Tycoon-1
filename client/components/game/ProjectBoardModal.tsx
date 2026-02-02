@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
@@ -13,7 +14,11 @@ import {
   ProjectOffer,
   ProjectStageDefinition,
 } from "@/types/game";
-import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
+import {
+  PROJECT_DEFINITIONS,
+  PROJECT_DEFINITION_BY_ID,
+} from "@/constants/projects";
+import { getProjectTrophyImage } from "@/constants/projectAssets";
 import {
   getProjectDepositCost,
   getProjectOfferRefreshCost,
@@ -21,7 +26,7 @@ import {
 import { getTuning } from "@/lib/tuning";
 import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
 
-type TabKey = "offers" | "active";
+type TabKey = "offers" | "active" | "trophies";
 
 type AddonSelection = {
   permitExpeditor?: boolean;
@@ -150,6 +155,8 @@ function ProjectOfferCard({
   disableAccept,
   totalCost,
   canAfford,
+  onViewDossier,
+  isNew,
 }: {
   project: ProjectDefinition;
   depositCost: number;
@@ -159,6 +166,8 @@ function ProjectOfferCard({
   disableAccept: boolean;
   totalCost: number;
   canAfford: boolean;
+  onViewDossier?: () => void;
+  isNew?: boolean;
 }) {
   const tone = TONE_META[project.client.tone];
   const tuning = getTuning();
@@ -186,11 +195,23 @@ function ProjectOfferCard({
             </ThemedText>
           </View>
         </View>
-        <View style={styles.stageCountChip}>
-          <Feather name="layers" size={12} color={GameColors.text.secondary} />
-          <ThemedText style={styles.stageCountText}>
-            {project.stages.length} stages
-          </ThemedText>
+        <View style={styles.offerHeaderRight}>
+          {isNew ? (
+            <View style={styles.newChip}>
+              <Feather name="star" size={11} color={GameColors.ui.warning} />
+              <ThemedText style={styles.newChipText}>New</ThemedText>
+            </View>
+          ) : null}
+          <View style={styles.stageCountChip}>
+            <Feather
+              name="layers"
+              size={12}
+              color={GameColors.text.secondary}
+            />
+            <ThemedText style={styles.stageCountText}>
+              {project.stages.length} stages
+            </ThemedText>
+          </View>
         </View>
       </View>
 
@@ -198,6 +219,15 @@ function ProjectOfferCard({
         {project.locationName}
       </ThemedText>
       <ThemedText style={styles.offerSynopsis}>{project.synopsis}</ThemedText>
+
+      {onViewDossier ? (
+        <Pressable style={styles.dossierButton} onPress={onViewDossier}>
+          <Feather name="book" size={12} color={GameColors.ui.primary} />
+          <ThemedText style={styles.dossierButtonText}>
+            View dossier
+          </ThemedText>
+        </Pressable>
+      ) : null}
 
       <View style={styles.offerCosts}>
         <View style={styles.costChip}>
@@ -264,7 +294,13 @@ function ProjectOfferCard({
   );
 }
 
-export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
+export function ProjectBoardModal({
+  onClose,
+  onOpenDossier,
+}: {
+  onClose: () => void;
+  onOpenDossier?: (projectId: string) => void;
+}) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
   const tuning = getTuning();
@@ -363,13 +399,17 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
   const completedProjects = state.projectsCompleted
     .map((id) => PROJECT_DEFINITION_BY_ID.get(id))
     .filter((project): project is ProjectDefinition => Boolean(project));
-  const completedPerks = Array.from(
-    new Set(
-      completedProjects
-        .map((project) => project.permanentPerk)
-        .filter((perk): perk is string => Boolean(perk)),
-    ),
-  );
+  const trophyProjects = PROJECT_DEFINITIONS;
+  const completedPerks = completedProjects
+    .map((project) =>
+      project.permanentPerk
+        ? {
+            name: project.permanentPerk,
+            description: project.perkDescription,
+          }
+        : null,
+    )
+    .filter(Boolean) as { name: string; description?: string }[];
   const milestoneThresholds = [3, 6, 9];
   const nextMilestone = milestoneThresholds.find(
     (value) => completedCount < value,
@@ -441,9 +481,10 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
         </View>
 
         <View style={styles.tabRow}>
-          {(["offers", "active"] as TabKey[]).map((tab) => {
+          {(["offers", "active", "trophies"] as TabKey[]).map((tab) => {
             const selected = activeTab === tab;
-            const label = tab === "offers" ? "Offers" : "Active";
+            const label =
+              tab === "offers" ? "Offers" : tab === "active" ? "Active" : "Trophies";
             const disabled = tab === "active" && !activeProject;
             return (
               <Pressable
@@ -574,6 +615,12 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                       disableAccept={!!state.activeProject}
                       totalCost={totalCost}
                       canAfford={canAfford}
+                      isNew={!state.projectRevealSeen?.[project.id]}
+                      onViewDossier={
+                        onOpenDossier
+                          ? () => onOpenDossier(project.id)
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -637,18 +684,115 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                 </ThemedText>
               ) : (
                 <View style={styles.perkList}>
-                  {completedPerks.map((perk, index) => (
-                    <View key={`${perk}-${index}`} style={styles.perkRow}>
-                      <Feather
-                        name="star"
-                        size={12}
-                        color={GameColors.currency.reputation}
-                      />
-                      <ThemedText style={styles.perkText}>{perk}</ThemedText>
+                {completedPerks.map((perk, index) => (
+                  <View
+                    key={`${perk.name}-${index}`}
+                    style={styles.perkRow}
+                  >
+                    <Feather
+                      name="star"
+                      size={12}
+                      color={GameColors.currency.reputation}
+                    />
+                    <View style={styles.perkTextBlock}>
+                      <ThemedText style={styles.perkText}>
+                        {perk.name}
+                      </ThemedText>
+                      {perk.description ? (
+                        <ThemedText style={styles.perkDescription}>
+                          {perk.description}
+                        </ThemedText>
+                      ) : null}
                     </View>
-                  ))}
-                </View>
-              )}
+                  </View>
+                ))}
+              </View>
+            )}
+            </View>
+          </View>
+        ) : activeTab === "trophies" ? (
+          <View style={styles.trophySection}>
+            <View style={styles.trophyHeaderRow}>
+              <ThemedText style={styles.sectionTitle}>
+                Trophy cabinet
+              </ThemedText>
+              <View style={styles.trophyCountChip}>
+                <Feather
+                  name="award"
+                  size={12}
+                  color={GameColors.ui.success}
+                />
+                <ThemedText style={styles.trophyCountText}>
+                  {completedCount}/{trophyProjects.length}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.trophyGrid}>
+              {trophyProjects.map((project) => {
+                const unlocked = state.projectsCompleted.includes(project.id);
+                const trophySource = getProjectTrophyImage(project.trophyIcon);
+                return (
+                  <Pressable
+                    key={`trophy-${project.id}`}
+                    style={[
+                      styles.trophyCard,
+                      !unlocked && styles.trophyCardLocked,
+                    ]}
+                    onPress={
+                      onOpenDossier
+                        ? () => onOpenDossier(project.id)
+                        : undefined
+                    }
+                  >
+                    <View style={styles.trophyFrame}>
+                      {trophySource ? (
+                        <Image
+                          source={trophySource}
+                          style={[
+                            styles.trophyImage,
+                            !unlocked && styles.trophyImageLocked,
+                          ]}
+                          contentFit="contain"
+                          cachePolicy="memory-disk"
+                          priority="normal"
+                          transition={150}
+                        />
+                      ) : (
+                        <Feather
+                          name="award"
+                          size={22}
+                          color={GameColors.text.secondary}
+                        />
+                      )}
+                      {!unlocked ? (
+                        <View style={styles.trophyLock}>
+                          <Feather
+                            name="lock"
+                            size={12}
+                            color={GameColors.text.secondary}
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                    <ThemedText
+                      style={[
+                        styles.trophyLabel,
+                        !unlocked && styles.trophyLabelLocked,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {project.trophyName ?? project.title}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.trophyHint}>
+              <ThemedText style={styles.emptySubtitle}>
+                Tap a trophy to view its project dossier and requirements.
+              </ThemedText>
             </View>
           </View>
         ) : (
@@ -689,15 +833,32 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                         </ThemedText>
                       </View>
                     </View>
-                    <View style={styles.stageCountChip}>
-                      <Feather
-                        name="layers"
-                        size={12}
-                        color={GameColors.text.secondary}
-                      />
-                      <ThemedText style={styles.stageCountText}>
-                        {stageProgressLabel}
-                      </ThemedText>
+                    <View style={styles.activeHeaderRight}>
+                      {onOpenDossier ? (
+                        <Pressable
+                          style={styles.dossierChip}
+                          onPress={() => onOpenDossier(activeDefinition.id)}
+                        >
+                          <Feather
+                            name="book"
+                            size={12}
+                            color={GameColors.ui.primary}
+                          />
+                          <ThemedText style={styles.dossierChipText}>
+                            Dossier
+                          </ThemedText>
+                        </Pressable>
+                      ) : null}
+                      <View style={styles.stageCountChip}>
+                        <Feather
+                          name="layers"
+                          size={12}
+                          color={GameColors.text.secondary}
+                        />
+                        <ThemedText style={styles.stageCountText}>
+                          {stageProgressLabel}
+                        </ThemedText>
+                      </View>
                     </View>
                   </View>
 
@@ -1120,6 +1281,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: Spacing.sm,
   },
+  offerHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
   offerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1163,6 +1329,22 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     fontWeight: "600",
   },
+  newChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.warning}70`,
+    backgroundColor: `${GameColors.ui.warning}18`,
+  },
+  newChipText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: GameColors.ui.warning,
+  },
   offerLocation: {
     fontSize: 12,
     color: GameColors.text.secondary,
@@ -1170,6 +1352,23 @@ const styles = StyleSheet.create({
   offerSynopsis: {
     fontSize: 13,
     color: GameColors.text.primary,
+  },
+  dossierButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}40`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  dossierButtonText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: GameColors.ui.primary,
   },
   offerCosts: {
     flexDirection: "row",
@@ -1284,9 +1483,17 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
     backgroundColor: "#151525",
   },
+  perkTextBlock: {
+    flex: 1,
+    gap: 2,
+  },
   perkText: {
     fontSize: 12,
     color: GameColors.text.primary,
+  },
+  perkDescription: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
   },
   activeSection: {
     gap: Spacing.lg,
@@ -1311,6 +1518,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.sm,
     flex: 1,
+  },
+  activeHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  dossierChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}40`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  dossierChipText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: GameColors.ui.primary,
   },
   activeTitle: {
     fontSize: 16,
@@ -1453,5 +1681,88 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: GameColors.ui.danger,
+  },
+  trophySection: {
+    gap: Spacing.lg,
+  },
+  trophyHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  trophyCountChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.success}50`,
+    backgroundColor: `${GameColors.ui.success}12`,
+  },
+  trophyCountText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.ui.success,
+  },
+  trophyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  trophyCard: {
+    width: "47%",
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#151525",
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  trophyCardLocked: {
+    opacity: 0.55,
+  },
+  trophyFrame: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#111120",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  trophyImage: {
+    width: "86%",
+    height: "86%",
+  },
+  trophyImageLocked: {
+    opacity: 0.4,
+  },
+  trophyLock: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#1A1A2E",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trophyLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GameColors.text.primary,
+  },
+  trophyLabelLocked: {
+    color: GameColors.text.secondary,
+  },
+  trophyHint: {
+    alignItems: "center",
   },
 });

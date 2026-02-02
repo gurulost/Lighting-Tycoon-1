@@ -53,7 +53,10 @@ import {
   BASE_RECIPES,
   computeCustomOrderRewards,
 } from "@/constants/orderContentPack";
-import { PROJECT_DEFINITIONS } from "@/constants/projects";
+import {
+  PROJECT_DEFINITIONS,
+  PROJECT_DEFINITION_BY_ID,
+} from "@/constants/projects";
 import {
   COUNCIL_CAMPAIGNS,
   COUNCIL_CAMPAIGN_BY_ID,
@@ -124,6 +127,7 @@ type GameAction =
   | { type: "START_WARRANTY_STAMP"; mode: WarrantyStampMode }
   | { type: "PROJECT_GENERATE_OFFERS" }
   | { type: "PROJECT_REFRESH_OFFERS" }
+  | { type: "PROJECT_REVEAL_DISMISS"; projectId: string }
   | {
       type: "PROJECT_ACCEPT";
       projectId: string;
@@ -1001,6 +1005,24 @@ function generateProjectOffers(state: GameState, count = 3): ProjectOffer[] {
     }
   }
   return offers;
+}
+
+function updateProjectRevealQueue(
+  queue: string[],
+  seen: Record<string, boolean>,
+  offers: ProjectOffer[],
+): string[] {
+  const nextQueue = queue.filter(
+    (projectId) =>
+      !seen[projectId] && PROJECT_DEFINITION_BY_ID.has(projectId),
+  );
+  offers.forEach((offer) => {
+    if (seen[offer.projectId]) return;
+    if (!PROJECT_DEFINITION_BY_ID.has(offer.projectId)) return;
+    if (nextQueue.includes(offer.projectId)) return;
+    nextQueue.push(offer.projectId);
+  });
+  return nextQueue;
 }
 
 function applyOrderRewardTuning(rewards: Order["rewards"]): Order["rewards"] {
@@ -2821,8 +2843,11 @@ function getInitialState(): GameState {
     projectOffers: [],
     activeProject: undefined,
     projectsCompleted: [],
+    projectCompletionLog: {},
     projectMilestones: {},
     projectDebuff: undefined,
+    projectRevealQueue: [],
+    projectRevealSeen: {},
     baronPressure: 0,
     council: buildInitialCouncilState(),
     baronSupplySpawnsRemaining: 0,
@@ -4721,6 +4746,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextRdNodes = state.rdNodes;
       let nextUpgradeMaterials = state.upgradeMaterials;
       let nextCompatibilityComponents = state.compatibilityComponents;
+      let nextProjectRevealQueue = state.projectRevealQueue;
+      let nextProjectCompletionLog = state.projectCompletionLog;
       let queuedTier10ShowcaseBeat = false;
       let nextProjectDebuff = state.projectDebuff;
       let nextActiveProject = state.activeProject;
@@ -5319,6 +5346,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             nextProjectsCompleted = [...nextProjectsCompleted, project.id];
           }
           completedProjectId = project.id;
+          nextProjectCompletionLog = {
+            ...nextProjectCompletionLog,
+            [project.id]: Date.now(),
+          };
 
           const milestoneThresholds = [3, 6, 9];
           milestoneThresholds.forEach((threshold) => {
@@ -5775,11 +5806,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           projectOfferRefreshMode === "force" ||
           (projectOfferRefreshMode === "if_empty" &&
             nextProjectOffers.length === 0);
-        if (shouldRefresh) {
-          const repAfterRewards = state.reputation + repReward;
-          const neighborhoodAfterRewards =
-            getNeighborhoodByRep(repAfterRewards);
-          const offersState: GameState = {
+          if (shouldRefresh) {
+            const repAfterRewards = state.reputation + repReward;
+            const neighborhoodAfterRewards =
+              getNeighborhoodByRep(repAfterRewards);
+            const offersState: GameState = {
             ...state,
             gamePhase: nextGamePhase,
             reputation: repAfterRewards,
@@ -5789,12 +5820,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             projectsUnlocked: nextProjectsUnlocked,
             activeProject: nextActiveProject,
           };
-          nextProjectOffers = generateProjectOffers(offersState, 3);
-          if (
-            nextProjectOffers.length > 0 &&
-            !state.storySeen["project_offer_generic"] &&
-            !projectOfferBeatId
-          ) {
+            nextProjectOffers = generateProjectOffers(offersState, 3);
+            nextProjectRevealQueue = updateProjectRevealQueue(
+              nextProjectRevealQueue,
+              state.projectRevealSeen,
+              nextProjectOffers,
+            );
+            if (
+              nextProjectOffers.length > 0 &&
+              !state.storySeen["project_offer_generic"] &&
+              !projectOfferBeatId
+            ) {
             projectOfferBeatId = "project_offer_generic";
           }
         }
@@ -5919,8 +5955,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectOffers: nextProjectOffers,
         activeProject: nextActiveProject,
         projectsCompleted: nextProjectsCompleted,
+        projectCompletionLog: nextProjectCompletionLog,
         projectMilestones: nextProjectMilestones,
         projectDebuff: nextProjectDebuff,
+        projectRevealQueue: nextProjectRevealQueue,
         council: nextCouncil,
         lockoutActive: lockoutActiveValue,
         lockoutPhase: lockoutPhaseValue,
@@ -6009,6 +6047,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ),
             activeProject: undefined,
             projectOffers: generateProjectOffers(nextState, 3),
+          };
+          nextState = {
+            ...nextState,
+            projectRevealQueue: updateProjectRevealQueue(
+              nextState.projectRevealQueue,
+              nextState.projectRevealSeen,
+              nextState.projectOffers,
+            ),
           };
           nextState = {
             ...nextState,
@@ -6746,9 +6792,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case "PROJECT_GENERATE_OFFERS": {
       if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
       const offers = generateProjectOffers(state, 3);
+      const projectRevealQueue = updateProjectRevealQueue(
+        state.projectRevealQueue,
+        state.projectRevealSeen,
+        offers,
+      );
       let nextState: GameState = {
         ...state,
         projectOffers: offers,
+        projectRevealQueue,
       };
       if (offers.length > 0 && !state.storySeen["project_offer_generic"]) {
         nextState = queueStoryBeat(nextState, "project_offer_generic");
@@ -6768,16 +6820,43 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "project_offer_refresh",
       });
       const offers = generateProjectOffers(state, 3);
+      const projectRevealQueue = updateProjectRevealQueue(
+        state.projectRevealQueue,
+        state.projectRevealSeen,
+        offers,
+      );
       let nextState: GameState = {
         ...state,
         cash: state.cash - refreshCost,
         projectOffers: offers,
+        projectRevealQueue,
         undoSnapshot: undefined,
       };
       if (offers.length > 0 && !state.storySeen["project_offer_generic"]) {
         nextState = queueStoryBeat(nextState, "project_offer_generic");
       }
       return nextState;
+    }
+
+    case "PROJECT_REVEAL_DISMISS": {
+      if (!action.projectId) return state;
+      const nextQueue = state.projectRevealQueue.filter(
+        (id) => id !== action.projectId,
+      );
+      if (
+        state.projectRevealSeen[action.projectId] &&
+        nextQueue.length === state.projectRevealQueue.length
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        projectRevealQueue: nextQueue,
+        projectRevealSeen: {
+          ...state.projectRevealSeen,
+          [action.projectId]: true,
+        },
+      };
     }
 
     case "PROJECT_ACCEPT": {
@@ -6917,13 +6996,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectDebuff: state.projectDebuff,
         undoSnapshot: undefined,
       };
+      const refreshedOffers = generateProjectOffers(nextStateBase, 3);
       let nextState: GameState = {
         ...nextStateBase,
         orders: trimOrdersToMax(
           { ...nextStateBase, activeProject: undefined },
           nextStateBase.orders,
         ),
-        projectOffers: generateProjectOffers(nextStateBase, 3),
+        projectOffers: refreshedOffers,
+        projectRevealQueue: updateProjectRevealQueue(
+          nextStateBase.projectRevealQueue,
+          nextStateBase.projectRevealSeen,
+          refreshedOffers,
+        ),
       };
       const beatId = project.narrativeBeats?.fail;
       if (beatId) {
@@ -6968,13 +7053,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         activeProject: undefined,
         undoSnapshot: undefined,
       };
+      const refreshedOffers = generateProjectOffers(nextStateBase, 3);
       let nextState: GameState = {
         ...nextStateBase,
         orders: trimOrdersToMax(
           { ...nextStateBase, activeProject: undefined },
           nextStateBase.orders,
         ),
-        projectOffers: generateProjectOffers(nextStateBase, 3),
+        projectOffers: refreshedOffers,
+        projectRevealQueue: updateProjectRevealQueue(
+          nextStateBase.projectRevealQueue,
+          nextStateBase.projectRevealSeen,
+          refreshedOffers,
+        ),
       };
       const beatId = active.project.narrativeBeats?.fail;
       if (beatId) {
@@ -9254,6 +9345,44 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             (value) => typeof value === "string",
           )
         : base.projectsCompleted;
+      const projectCompletionLog =
+        action.state.projectCompletionLog &&
+        typeof action.state.projectCompletionLog === "object"
+          ? Object.fromEntries(
+              Object.entries(
+                action.state.projectCompletionLog as Record<string, number>,
+              ).filter(
+                ([projectId, completedAt]) =>
+                  typeof projectId === "string" &&
+                  PROJECT_DEFINITION_BY_ID.has(projectId) &&
+                  typeof completedAt === "number" &&
+                  Number.isFinite(completedAt),
+              ),
+            )
+          : base.projectCompletionLog;
+      const projectRevealSeen =
+        action.state.projectRevealSeen &&
+        typeof action.state.projectRevealSeen === "object"
+          ? Object.fromEntries(
+              Object.entries(
+                action.state.projectRevealSeen as Record<string, boolean>,
+              )
+                .filter(
+                  ([projectId]) =>
+                    typeof projectId === "string" &&
+                    PROJECT_DEFINITION_BY_ID.has(projectId),
+                )
+                .map(([projectId, value]) => [projectId, Boolean(value)]),
+            )
+          : base.projectRevealSeen;
+      const projectRevealQueue = Array.isArray(action.state.projectRevealQueue)
+        ? (action.state.projectRevealQueue as string[]).filter(
+            (projectId) =>
+              typeof projectId === "string" &&
+              PROJECT_DEFINITION_BY_ID.has(projectId) &&
+              !projectRevealSeen[projectId],
+          )
+        : base.projectRevealQueue;
       const projectMilestones =
         action.state.projectMilestones &&
         typeof action.state.projectMilestones === "object"
@@ -9595,8 +9724,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectOffers,
         activeProject,
         projectsCompleted,
+        projectCompletionLog,
         projectMilestones,
         projectDebuff,
+        projectRevealQueue,
+        projectRevealSeen,
         council,
         backpackSlots: restoredBackpackSlots,
         backpack: sanitizedBackpack,
@@ -9922,9 +10054,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         !restoredState.activeProject &&
         restoredState.projectOffers.length === 0
       ) {
+        const refreshedOffers = generateProjectOffers(restoredState, 3);
         restoredState = {
           ...restoredState,
-          projectOffers: generateProjectOffers(restoredState, 3),
+          projectOffers: refreshedOffers,
+          projectRevealQueue: updateProjectRevealQueue(
+            restoredState.projectRevealQueue,
+            restoredState.projectRevealSeen,
+            refreshedOffers,
+          ),
         };
       }
       if (restoredState.tutorialComplete) {

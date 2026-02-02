@@ -24,6 +24,8 @@ import { DependencyMeter } from "@/components/game/DependencyMeter";
 import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
 import { ProjectBoardModal } from "@/components/game/ProjectBoardModal";
+import { ProjectDossierModal } from "@/components/game/ProjectDossierModal";
+import { ProjectRevealModal } from "@/components/game/ProjectRevealModal";
 import { CouncilModal } from "@/components/game/CouncilModal";
 import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
@@ -238,11 +240,21 @@ export default function GameScreen() {
     hydrated,
   } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [projectDossierId, setProjectDossierId] = useState<string | null>(
+    null,
+  );
   const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
     null,
   );
   const overlayQueue = state.overlayQueue || [];
+  const pendingProjectRevealId = state.projectRevealQueue?.[0] ?? null;
+  const revealEligible =
+    !!pendingProjectRevealId &&
+    (state.projectOffers.some(
+      (offer) => offer.projectId === pendingProjectRevealId,
+    ) ||
+      state.activeProject?.projectId === pendingProjectRevealId);
   const [storyLayoutTick, setStoryLayoutTick] = useState(0);
   const [undoTick, setUndoTick] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -331,6 +343,43 @@ export default function GameScreen() {
         : "Audit: choose a response";
 
   const closeModal = () => setActiveModal(null);
+  const markProjectRevealSeen = useCallback(
+    (projectId: string) => {
+      const isOffered = state.projectOffers.some(
+        (offer) => offer.projectId === projectId,
+      );
+      const isActive = state.activeProject?.projectId === projectId;
+      const isQueued = state.projectRevealQueue?.includes(projectId);
+      if (!isOffered && !isActive && !isQueued) return;
+      dispatch({ type: "PROJECT_REVEAL_DISMISS", projectId });
+    },
+    [
+      dispatch,
+      state.projectOffers,
+      state.activeProject,
+      state.projectRevealQueue,
+    ],
+  );
+  const openProjectDossier = useCallback(
+    (projectId: string) => {
+      setProjectDossierId(projectId);
+      markProjectRevealSeen(projectId);
+    },
+    [markProjectRevealSeen],
+  );
+  const dismissProjectReveal = useCallback(() => {
+    if (!pendingProjectRevealId) return;
+    dispatch({
+      type: "PROJECT_REVEAL_DISMISS",
+      projectId: pendingProjectRevealId,
+    });
+  }, [dispatch, pendingProjectRevealId]);
+  const handleRevealDossier = useCallback(
+    (projectId: string) => {
+      openProjectDossier(projectId);
+    },
+    [openProjectDossier],
+  );
   const handleResumeTutorial = () => {
     dispatch({ type: "RESUME_TUTORIAL" });
     showToast("Resuming tutorial.", 1800);
@@ -460,6 +509,14 @@ export default function GameScreen() {
     (state.lockoutPhase === 1 ||
       state.lockoutPhase === 3 ||
       !state.lockoutChoice);
+  const showProjectReveal =
+    revealEligible &&
+    !projectDossierId &&
+    activeModal === null &&
+    selectedPartIndex === null &&
+    !showLockoutModal &&
+    overlayQueue.length === 0 &&
+    !(state.baronOfferAvailable && baronOfferGate);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -474,6 +531,15 @@ export default function GameScreen() {
       setSelectedPartIndex(null);
     }
   }, [state.board, selectedPartIndex]);
+
+  useEffect(() => {
+    if (!pendingProjectRevealId) return;
+    if (revealEligible) return;
+    dispatch({
+      type: "PROJECT_REVEAL_DISMISS",
+      projectId: pendingProjectRevealId,
+    });
+  }, [dispatch, pendingProjectRevealId, revealEligible]);
 
   useEffect(() => {
     if (!state.undoSnapshot || state.undoCooldownUntil <= Date.now()) return;
@@ -1293,7 +1359,24 @@ export default function GameScreen() {
         presentationStyle="pageSheet"
         onRequestClose={closeModal}
       >
-        <ProjectBoardModal onClose={closeModal} />
+        <ProjectBoardModal
+          onClose={closeModal}
+          onOpenDossier={openProjectDossier}
+        />
+      </Modal>
+
+      <Modal
+        visible={Boolean(projectDossierId)}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setProjectDossierId(null)}
+      >
+        {projectDossierId ? (
+          <ProjectDossierModal
+            projectId={projectDossierId}
+            onClose={() => setProjectDossierId(null)}
+          />
+        ) : null}
       </Modal>
 
       <Modal
@@ -1409,6 +1492,19 @@ export default function GameScreen() {
         <BaronOfferModal
           onAccept={() => dispatch({ type: "ACCEPT_BARON_OFFER" })}
           onDecline={() => dispatch({ type: "DECLINE_BARON_OFFER" })}
+        />
+      </Modal>
+
+      <Modal
+        visible={showProjectReveal}
+        animationType="fade"
+        transparent
+        onRequestClose={dismissProjectReveal}
+      >
+        <ProjectRevealModal
+          projectId={pendingProjectRevealId}
+          onDismiss={dismissProjectReveal}
+          onOpenDossier={handleRevealDossier}
         />
       </Modal>
 

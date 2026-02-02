@@ -16,9 +16,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Mayor Marisol Vance", role: "Mayor", tone: "demanding" },
     synopsis:
       "Replace legacy street lighting with open-standard infrastructure. Public visibility is massive.",
+    introHeadline: "Public grid, public stakes.",
+    introNarrative:
+      "Mayor Marisol Vance wants the city grid rebuilt in the open, with every block watching. The Mentor warns that visibility cuts both ways. Tina answers: if the lights are honest, so are the standards.",
     projectCardIcon: "project_card_neon_city_grid",
     clientPortrait: "portrait_mayor_vance",
     trophyIcon: "trophy_city_grid",
+    trophyName: "City Grid Key",
     locationBackdrop: "backdrop_neon_city_municipal",
     unlock: { phaseMin: 2, minRepTier: 4 },
     deposit: { formulaKey: "early" },
@@ -74,6 +78,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.4,
     },
     permanentPerk: "Municipal Trust",
+    perkDescription: "Municipal Trust: +5% cash on open-only installs.",
     trophyId: "trophy_city_grid",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -84,9 +89,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Aria Kale", role: "Festival Director", tone: "visionary" },
     synopsis:
       "A spectacle contract with high stakes and zero tolerance for failure.",
+    introHeadline: "A stage that cannot blink.",
+    introNarrative:
+      "Aria Kale wants a show that never flickers, even when the crowd is the size of a city. The Mentor calls it a stress test in disguise. Tina calls it a chance to make open tech feel legendary.",
     projectCardIcon: "project_card_festival_main_stage",
     clientPortrait: "portrait_aria_kale",
     trophyIcon: "trophy_backstage_pass",
+    trophyName: "Backstage Pass",
     locationBackdrop: "backdrop_riverfront_festival",
     unlock: { phaseMin: 2, minRepTier: 5 },
     deposit: { formulaKey: "early" },
@@ -134,6 +143,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.4,
     },
     permanentPerk: "Showtime Reputation",
+    perkDescription: "Showtime Reputation: +5% reputation from rush installs.",
     trophyId: "trophy_backstage_pass",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -144,9 +154,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Chief Rourke", role: "Port Authority", tone: "skeptical" },
     synopsis:
       "Reliability contract where weather, corrosion, and public safety matter more than flash.",
+    introHeadline: "Stormproof reliability.",
+    introNarrative:
+      "Chief Rourke cares about one thing: the beacon never fails in a storm. Salt, lightning, and inspection logs will punish shortcuts. Tina agrees to build for trust, not applause.",
     projectCardIcon: "project_card_harbor_beacon",
     clientPortrait: "portrait_chief_rourke",
     trophyIcon: "trophy_harbor_lantern",
+    trophyName: "Harbor Lantern",
     locationBackdrop: "backdrop_old_harbor",
     unlock: { phaseMin: 2, minRepTier: 5 },
     deposit: { formulaKey: "early" },
@@ -198,6 +212,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.4,
     },
     permanentPerk: "Reliability Stamp",
+    perkDescription: "Reliability Stamp: recycling yields slightly more.",
     trophyId: "trophy_harbor_lantern",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -212,9 +227,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     },
     synopsis:
       "Systemwide footprint and repetitive installs that test scalable operations.",
+    introHeadline: "Scale without drift.",
+    introNarrative:
+      "Commissioner Han wants a system that works for everyone, everywhere, every hour. This is a scale problem, not a single install. The Mentor says consistency is the real innovation; Tina says prove it across the network.",
     projectCardIcon: "project_card_metro_wayfinding",
     clientPortrait: "portrait_commissioner_han",
     trophyIcon: "trophy_metro_badge",
+    trophyName: "Metro Badge",
     locationBackdrop: "backdrop_underground_metro",
     unlock: { phaseMin: 2, minRepTier: 6 },
     deposit: { formulaKey: "mid" },
@@ -278,6 +297,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.5,
     },
     permanentPerk: "Transit Contract Pipeline",
+    perkDescription:
+      "Transit Contract Pipeline: premium orders appear slightly more often.",
     trophyId: "trophy_metro_badge",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -292,9 +313,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     },
     synopsis:
       "Prestige client with zero tolerance for public failure and huge visibility upside.",
+    introHeadline: "Prestige, no mistakes.",
+    introNarrative:
+      "The Glassspire tower is a skyline signature; every flaw is a headline. Liaison Sato is buying certainty as much as light. Tina commits to a facade that earns industry myth status.",
     projectCardIcon: "project_card_skyline_tower",
     clientPortrait: "portrait_liaison_sato",
     trophyIcon: "trophy_glassspire_plaque",
+    trophyName: "Glassspire Plaque",
     locationBackdrop: "backdrop_glassspire_tower",
     unlock: { phaseMin: 2, minRepTier: 6 },
     deposit: { formulaKey: "mid" },
@@ -346,6 +371,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.5,
     },
     permanentPerk: "Prestige Clientele",
+    perkDescription:
+      "Prestige Clientele: +5% cash from compatibility-required orders.",
     trophyId: "trophy_glassspire_plaque",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -356,9 +383,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Dr. Imani Reyes", role: "Chief Physician", tone: "warm" },
     synopsis:
       "Safety-first install with high scrutiny and high community stakes.",
+    introHeadline: "Comfort without compromise.",
+    introNarrative:
+      "Dr. Imani Reyes wants a wing that feels safe before it feels bright. This is about care, not speed. The Mentor says rush invites risk; Tina says they will do it right.",
     projectCardIcon: "project_card_childrens_hospital",
     clientPortrait: "portrait_dr_reyes",
     trophyIcon: "trophy_nightlight_ribbon",
+    trophyName: "Nightlight Ribbon",
     locationBackdrop: "backdrop_st_luma_hospital",
     unlock: { phaseMin: 2, minRepTier: 7 },
     deposit: { formulaKey: "mid" },
@@ -402,6 +433,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.5,
     },
     permanentPerk: "Community Trust",
+    perkDescription:
+      "Community Trust: Phase 2 pressure tax is slightly reduced.",
     trophyId: "trophy_nightlight_ribbon",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -412,9 +445,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Curator Elowen Shaw", role: "Curator", tone: "visionary" },
     synopsis:
       "A creative contract that leans into compatibility sets and signature builds.",
+    introHeadline: "A signature exhibit.",
+    introNarrative:
+      "Curator Elowen Shaw wants a retrospective that feels alive. Compatibility is part of the art, and every stage is a signature build. Tina promises the exhibit will make open standards feel inevitable.",
     projectCardIcon: "project_card_museum_exhibit",
     clientPortrait: "portrait_curator_shaw",
     trophyIcon: "trophy_curator_seal",
+    trophyName: "Curator's Seal",
     locationBackdrop: "backdrop_museum_of_light",
     unlock: { phaseMin: 2, minRepTier: 7 },
     deposit: { formulaKey: "mid" },
@@ -474,6 +511,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.5,
     },
     permanentPerk: "Exhibit Prestige",
+    perkDescription:
+      "Exhibit Prestige: small research bonus on compatibility installs.",
     trophyId: "trophy_curator_seal",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -484,9 +523,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Jax Moreno", role: "Head of Events", tone: "demanding" },
     synopsis:
       "A pressure contract packed with rush installs and a high payout ceiling.",
+    introHeadline: "The city watches live.",
+    introNarrative:
+      "Jax Moreno demands a halftime that hits like thunder. Everything is timed, everything is public. The Mentor calls it a discipline test; Tina calls it a proving ground.",
     projectCardIcon: "project_card_stadium_halftime",
     clientPortrait: "portrait_jax_moreno",
     trophyIcon: "trophy_halftime",
+    trophyName: "Halftime Trophy",
     locationBackdrop: "backdrop_titan_field",
     unlock: { phaseMin: 2, minRepTier: 8 },
     deposit: { formulaKey: "late" },
@@ -526,6 +569,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.6,
     },
     permanentPerk: "Stadium Grade",
+    perkDescription: "Stadium Grade: +5% cash on rush orders.",
     trophyId: "trophy_halftime",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -539,9 +583,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       tone: "skeptical",
     },
     synopsis: "High scrutiny and procedural checks with a legitimacy payoff.",
+    introHeadline: "Safety written in light.",
+    introNarrative:
+      "Inspector Wren will audit every fixture and every claim. The runway demands precision under pressure. Tina agrees to treat the upgrade like policy, not preference.",
     projectCardIcon: "project_card_airport_runway",
     clientPortrait: "portrait_inspector_wren",
     trophyIcon: "trophy_clearance_badge",
+    trophyName: "Clearance Badge",
     locationBackdrop: "backdrop_neon_airport",
     unlock: { phaseMin: 2, minRepTier: 8 },
     deposit: { formulaKey: "late" },
@@ -593,6 +641,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.6,
     },
     permanentPerk: "Certified Contractor",
+    perkDescription:
+      "Certified Contractor: project deposits cost slightly less.",
     trophyId: "trophy_clearance_badge",
     narrativeBeats: NARRATIVE_GENERIC,
   },
@@ -603,9 +653,13 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     client: { name: "Chair Solenne", role: "Expo Chair", tone: "visionary" },
     synopsis:
       "The capstone contract that crowns you as the industry standard-setter.",
+    introHeadline: "The world stage.",
+    introNarrative:
+      "Chair Solenne wants the pavilion remembered long after the fireworks fade. This is the capstone that proves open standards can lead the industry. The Mentor calls it the spotlight; Tina plans to own it.",
     projectCardIcon: "project_card_international_expo",
     clientPortrait: "portrait_expo_chair_solenne",
     trophyIcon: "trophy_expo_laurel",
+    trophyName: "Expo Laurel",
     locationBackdrop: "backdrop_world_expo",
     unlock: { phaseMin: 2, minRepTier: 9, minProjectsCompleted: 6 },
     deposit: { formulaKey: "capstone" },
@@ -669,6 +723,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       researchMultiplier: 1.8,
     },
     permanentPerk: "Industry Standard-Setter",
+    perkDescription:
+      "Industry Standard-Setter: compatibility rewards improve and Phase 2 pressure tax eases slightly.",
     trophyId: "trophy_expo_laurel",
     narrativeBeats: NARRATIVE_GENERIC,
   },

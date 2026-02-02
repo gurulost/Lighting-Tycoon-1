@@ -177,9 +177,12 @@ export interface ProjectDefinition {
     tone: ProjectTone;
   };
   synopsis: string;
+  introHeadline?: string;
+  introNarrative?: string;
   projectCardIcon?: string;
   clientPortrait?: string;
   trophyIcon?: string;
+  trophyName?: string;
   locationBackdrop?: string;
   unlock: {
     phaseMin: 2;
@@ -197,6 +200,7 @@ export interface ProjectDefinition {
     researchMultiplier: number;
   };
   permanentPerk?: string;
+  perkDescription?: string;
   trophyId?: string;
   narrativeBeats?: {
     offer?: string;
@@ -322,8 +326,11 @@ export interface GameState {
   projectOffers: ProjectOffer[];
   activeProject?: ActiveProject;
   projectsCompleted: string[];
+  projectCompletionLog: Record<string, number>;
   projectMilestones: Record<string, boolean>;
   projectDebuff?: ProjectDebuff;
+  projectRevealQueue: string[];
+  projectRevealSeen: Record<string, boolean>;
   baronPressure: number;
   council: CouncilState;
   baronSupplySpawnsRemaining: number;
