@@ -20,6 +20,9 @@ import { ModalShell } from "./ModalShell";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
+import { getTuning } from "@/lib/tuning";
+import { getCouncilHearingPenalty } from "@/lib/council";
+import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
 import {
   TrimLightStrip,
   TrimLightPattern,
@@ -255,11 +258,31 @@ export function OrdersModal({
   const clinicMax = 20;
   const warrantyOrders = 3;
   const warrantyMax = 6;
-  const refreshCost = 40 + state.reputationTier * 20;
-  const marketingCost = 120 + state.reputationTier * 40;
-  const scoutCost = 90 + state.reputationTier * 30;
-  const clinicCost = 120 + state.reputationTier * 40;
-  const warrantyCost = 150 + state.reputationTier * 45;
+  const tuning = getTuning();
+  const hearingPenalty = getCouncilHearingPenalty(state);
+  const activeHearing = state.council.activeHearing
+    ? COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId]
+    : undefined;
+  const refreshBlocked = !!activeHearing?.constraints?.disallowRefresh;
+  const refreshBase =
+    tuning.economy.orderRefreshBase +
+    state.reputationTier * tuning.economy.orderRefreshStep;
+  const refreshCost = Math.max(
+    0,
+    Math.round(refreshBase * hearingPenalty.refreshCostMult),
+  );
+  const marketingCost =
+    tuning.economy.marketingCostBase +
+    state.reputationTier * tuning.economy.marketingCostStep;
+  const scoutCost =
+    tuning.economy.supplierScoutCostBase +
+    state.reputationTier * tuning.economy.supplierScoutCostStep;
+  const clinicCost =
+    tuning.economy.mentorClinicCostBase +
+    state.reputationTier * tuning.economy.mentorClinicCostStep;
+  const warrantyCost =
+    tuning.economy.warrantyStampCostBase +
+    state.reputationTier * tuning.economy.warrantyStampCostStep;
   const effectiveMaxOrders = state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const showProjectsButton = state.gamePhase === 2;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
@@ -311,7 +334,8 @@ export function OrdersModal({
     !order.modifierIds?.includes("tier5_showcase") &&
     !order.modifierIds?.includes("tier10_showcase") &&
     !order.modifierIds?.includes("threshold_story") &&
-    !order.modifierIds?.includes("project_stage");
+    !order.modifierIds?.includes("project_stage") &&
+    !order.modifierIds?.includes("council_ratify");
 
   const refreshTarget =
     state.highlightedOrderId &&
@@ -320,7 +344,11 @@ export function OrdersModal({
     )
       ? state.orders.find((order) => order.id === state.highlightedOrderId)!
       : state.orders.find((order) => isRefreshable(order));
-  const canRefresh = state.tutorialComplete && Boolean(refreshTarget) && state.cash >= refreshCost;
+  const canRefresh =
+    state.tutorialComplete &&
+    Boolean(refreshTarget) &&
+    state.cash >= refreshCost &&
+    !refreshBlocked;
   const canStartCampaign =
     state.tutorialComplete && state.cash >= marketingCost && !marketingAtCap;
   const canStartScout = canUseBoosts && state.cash >= scoutCost && !scoutAtCap;
@@ -853,7 +881,8 @@ export function OrdersModal({
                 !order.modifierIds?.includes("tier5_showcase") &&
                 !order.modifierIds?.includes("tier10_showcase") &&
                 !order.modifierIds?.includes("threshold_story") &&
-                !order.modifierIds?.includes("project_stage")
+                !order.modifierIds?.includes("project_stage") &&
+                !order.modifierIds?.includes("council_ratify")
               }
             />
           ))

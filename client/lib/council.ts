@@ -1,6 +1,7 @@
 import { COUNCIL_PERKS } from "@/constants/councilPerks";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
 import { GameState } from "@/types/game";
+import { getTuning } from "@/lib/tuning";
 import type { CouncilPerkEffects } from "@/constants/councilPerks";
 
 const DEFAULT_REWARD_MULT = { cash: 1, reputation: 1, research: 1 } as const;
@@ -151,6 +152,7 @@ export function getCouncilHearingPenalty(
   state: GameState,
 ): CouncilHearingPenaltySnapshot {
   const effects = getCouncilPerkEffects(state);
+  const tuning = getTuning();
   const hearing = state.council.activeHearing
     ? COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId]
     : undefined;
@@ -166,7 +168,9 @@ export function getCouncilHearingPenalty(
     };
   }
 
-  const scale = effects.hearingPenaltyMult ?? 1;
+  const scale =
+    (effects.hearingPenaltyMult ?? 1) *
+    (tuning.council.hearingPenaltyMultiplier ?? 1);
   const penalty = hearing.penalty;
 
   const globalRewardMult = mergeRewardMult(

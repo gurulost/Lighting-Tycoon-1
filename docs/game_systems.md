@@ -37,9 +37,9 @@ This document is the single source of truth for the core gameplay systems.
 - Phase 2 inserts a one-time compatibility-focused goal order on liberation
 
 ## Phase 2 Mega-Projects (Empire Contracts)
-Mentor framing: You’re free, but scale has a new kind of pressure. Empire Contracts are how the city measures you now—deposit-heavy, multi-stage work where every install is public, and every misstep compounds. Deliver the stages cleanly and the skyline follows; stumble and the market tightens.
+Mentor framing: You're free, but scale has a new kind of pressure. Empire Contracts are how the city measures you now - deposit-heavy, multi-stage work where every install is public, and every misstep compounds. Deliver the stages cleanly and the skyline follows; stumble and the market tightens.
 
-Tina intent: I’m not just keeping the shop alive; I’m building landmarks. These contracts are the proof—stage by stage, we set the standard, make the open way visible, and turn every big build into a permanent signal that we run this city now.
+Tina intent: I'm not just keeping the shop alive; I'm building landmarks. These contracts are the proof - stage by stage, we set the standard, make the open way visible, and turn every big build into a permanent signal that we run this city now.
 
 - Unlocks after the Phase 2 goal order is completed (`gamePhase = 2` + goal cleared).
 - Project Board offers 3 contracts at a time; refreshable for cash.
@@ -54,12 +54,28 @@ Tina intent: I’m not just keeping the shop alive; I’m building landmarks. Th
 - Completion grants large cash/research/rep and advances Empire milestones.
 - Empire milestones: completing 3/6/9 projects grants +1 base order slot each time.
 
+## Standards Council (Phase 3)
+Mentor framing: You didn't just win contracts - you changed minds. Now you can change policy. Draft standards, prove them in the field, and ratify rules that the entire industry has to follow.
+
+Tina intent: We're not just building installs anymore; we're writing the rulebook. Every campaign we pass makes the open way the default, and the lobby has to keep up.
+
+- Unlocks after the Phase 2 capstone (or fallback: 6 projects + rep tier gate).
+- One active Council campaign at a time; you can switch without losing progress.
+- Campaigns are three steps:
+  - Draft: invest cash + research (partial investment allowed).
+  - Pilot: complete action-based objectives during normal play.
+  - Ratify: a single protected Council showcase order (no real-time timers).
+- Completing a campaign grants a permanent perk (order mix, rewards, supplier tweaks).
+- Lobby Pressure (0-100) rises with Draft/Pilot/Ratify progress and drops via open-only installs.
+- Hearings trigger at thresholds and apply small penalties until cleared via short objectives or pay-to-clear.
+- Municipal Grants (perk): spend cash to reduce Lobby Pressure (and a small amount of Baron Pressure).
+
 ## Order Spawn Pressure
 - Orders spawn on a timer, but pause when the board is congested.
 - Pressure bands:
   - Green: 5+ free slots (normal spawn)
-  - Yellow: 2–4 free slots (slower spawn)
-  - Red: 0–1 free slots (spawn paused)
+  - Yellow: 2-4 free slots (slower spawn)
+  - Red: 0-1 free slots (spawn paused)
 
 ## Dependency
 - 0-100 meter (starts at 100)

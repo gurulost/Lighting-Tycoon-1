@@ -2,8 +2,8 @@
 
 Use this lightweight checklist to validate core friction fixes and first-session sequencing.
 
-## Board Full → Backpack / Recycle
-- Fill the board to 1–2 empty slots.
+## Board Full -> Backpack / Recycle
+- Fill the board to 1-2 empty slots.
 - Drag a low-tier part into Backpack. Verify:
   - Slot highlights are valid.
   - Backpack accepts the item.
@@ -26,7 +26,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 ## First-Session Lockout Suppression
 - During the first-session track, take the Baron offer and perform locked merges.
 - Verify:
-  - Dependency can move but does not trigger crackdown (won’t drop below 21).
+  - Dependency can move but does not trigger crackdown (won't drop below 21).
   - No lockout modal appears before first-session completion.
 
 ## Crackdown Trigger
@@ -86,13 +86,34 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Cancel project:
   - Contract cancels, deposit refund is reduced, and active project clears.
 
+## Standards Council (Phase 3)
+- Unlock gate:
+  - Complete the Expo capstone (or 6 projects + rep tier gate).
+  - Verify Council button appears and opens the Council screen.
+- Draft:
+  - Start a campaign and invest cash + research (partial allowed).
+  - Verify progress saves and status moves to PILOT when fully funded.
+- Pilot:
+  - Complete objective installs (open-only, compat, eco-audit, rush).
+  - Verify counters increment only for the active campaign.
+- Ratify:
+  - When pilot completes, a protected Council showcase order is inserted.
+  - Complete the order and confirm campaign status becomes COMPLETED.
+- Perks:
+  - Verify at least one perk changes gameplay (e.g., open-only drop min tier).
+- Lobby Pressure + Hearings:
+  - Gain pressure during Draft/Pilot and cross thresholds to trigger a hearing.
+  - Confirm penalty applies immediately and clears on objective completion or pay-to-clear.
+- Municipal Grants (perk unlock):
+  - After unlocking the Municipal Grants perk, spend a grant to reduce Lobby Pressure.
+
 ## Second Baron Offer Trigger
 - In first-session:
   - If you accept the first Baron offer, complete two orders.
   - OR perform your first locked merge (whichever comes first).
 - Verify:
   - Second Baron offer appears once.
-  - Story beat “baron_offer_return” appears.
+  - Story beat "baron_offer_return" appears.
 
 ## Lockout Recovery on Load
 - Force `lockoutActive = true` in saved state while removing the lockout order entry.
@@ -103,7 +124,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Orders list is capped to maxOrders with lockout/lab orders preserved.
 
 ## Order Spawn Pressure Gating
-- Fill the board until only 0–1 free slots remain (Red band).
+- Fill the board until only 0-1 free slots remain (Red band).
 - Wait for multiple order spawn intervals.
 - Verify:
   - Orders do not spawn while board is in Red band.
@@ -137,8 +158,8 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Choose Locked route. Verify next 4 spawns force Locked and add +1 Baron Pressure per spawn.
   - Verify forced/tutorial spawns do not consume the counter.
 - Baron supply modifiers:
-  - Accept a Baron crate or rush offer and verify the bonus locked roll for the next N non‑forced spawns.
-  - Confirm counters only decrement on non‑forced spawns with successful placement.
+  - Accept a Baron crate or rush offer and verify the bonus locked roll for the next N non-forced spawns.
+  - Confirm counters only decrement on non-forced spawns with successful placement.
 - Before first session completion, clinic/warranty remain disabled with a clear hint.
 - Mentor Workshop Clinic:
   - Activate clinic. Verify next open merges grant +1 research and reduce dependency by 1.
@@ -169,7 +190,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Most recent beats remain visible and older entries roll off.
 
 ## Save Debounce / Critical Flush
-- Perform rapid merges for 10–15 seconds.
+- Perform rapid merges for 10-15 seconds.
 - Verify:
   - Saves do not trigger on every action (check storage write frequency).
 - Complete an order or purchase an upgrade.

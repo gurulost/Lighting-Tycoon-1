@@ -1,6 +1,7 @@
 import { PartTier } from "@/types/game";
 
 export type CouncilObjectiveType =
+  | "FULFILL_ANY"
   | "FULFILL_OPEN_ONLY"
   | "FULFILL_COMPAT_REQUIRED"
   | "FULFILL_ECO_AUDIT"
@@ -41,6 +42,7 @@ export interface CouncilCampaignDefinition {
   unlock: {
     minRepTier?: number;
     minProjectsCompleted?: number;
+    minCampaignsCompleted?: number;
     requiredProjectIds?: string[];
     requiredCampaignIds?: string[];
   };
@@ -72,7 +74,7 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     tagline: "Make open installs the default in every home.",
     sortIndex: 10,
     unlock: {
-      minRepTier: 8,
+      minRepTier: 6,
     },
     draftCost: { cash: 12000, research: 280, allowPartial: true },
     pressure: { onDraftComplete: 6, onPilotMilestone: 2, onRatifyComplete: 8 },
@@ -100,9 +102,9 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     perkId: "perk_open_baseline",
     story: {
       intro:
-        "The Council invites you to draft a residential standard. The lobby calls it ‘unnecessary.’ The Mentor calls it ‘inevitable.’",
+        "The Council invites you to draft a residential standard. The lobby calls it 'unnecessary.' The Mentor calls it 'inevitable.'",
       draftComplete:
-        "Draft submitted. Now prove it works in the real world—clean installs, no lock-in shortcuts.",
+        "Draft submitted. Now prove it works in the real world - clean installs, no lock-in shortcuts.",
       pilotComplete:
         "Pilot success. The room quiets. One last step: a public showcase install for the Council floor.",
       ratifyComplete:
@@ -116,7 +118,6 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     sortIndex: 20,
     unlock: {
       requiredCampaignIds: ["camp_residential_open_standard"],
-      minRepTier: 9,
     },
     draftCost: { cash: 18000, research: 420, allowPartial: true },
     pressure: { onDraftComplete: 8, onPilotMilestone: 3, onRatifyComplete: 10 },
@@ -138,27 +139,30 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     perkId: "perk_interop_premium",
     story: {
       intro:
-        "A coalition of builders wants interop guarantees. The incumbents want ‘flexible interpretations.’",
+        "A coalition of builders wants interop guarantees. The incumbents want 'flexible interpretations.'",
       draftComplete:
         "Draft filed. The lobby responds with memos and smiles. Your response is output.",
       pilotComplete:
         "Pilot metrics land. Interop reduces callbacks. The Council schedules a ratification vote.",
       ratifyComplete:
-        "Ratified. Commercial clients start paying extra for compatibility—because now it means something.",
+        "Ratified. Commercial clients start paying extra for compatibility - because now it means something.",
     },
   },
   {
     id: "camp_municipal_procurement_reform",
     title: "Municipal Procurement Reform",
-    tagline: "Rewrite how cities buy light—open, auditable, and hard to sabotage.",
+    tagline:
+      "Rewrite how cities buy light - open, auditable, and hard to sabotage.",
     sortIndex: 30,
     unlock: {
       minProjectsCompleted: 3,
-      minRepTier: 9,
-      requiredProjectIds: ["proj_neon_city_grid"],
     },
     draftCost: { cash: 26000, research: 380, allowPartial: true },
-    pressure: { onDraftComplete: 10, onPilotMilestone: 3, onRatifyComplete: 12 },
+    pressure: {
+      onDraftComplete: 10,
+      onPilotMilestone: 3,
+      onRatifyComplete: 12,
+    },
     pilotObjectives: [
       {
         id: "pilot_eco_3",
@@ -184,11 +188,11 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     perkId: "perk_municipal_grants",
     story: {
       intro:
-        "City contracts are where monopolies hide. Reform means visibility—and the lobby hates visibility.",
+        "City contracts are where monopolies hide. Reform means visibility - and the lobby hates visibility.",
       draftComplete:
-        "Draft circulated to municipalities. Now you need proof that the process doesn’t slow the work down.",
+        "Draft circulated to municipalities. Now you need proof that the process doesn't slow the work down.",
       pilotComplete:
-        "Pilot complete. The Council can’t argue with results—only with politics.",
+        "Pilot complete. The Council can't argue with results - only with politics.",
       ratifyComplete:
         "Ratified. Cities start issuing grants that blunt lobbying spikes when they flare up.",
     },
@@ -196,14 +200,18 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
   {
     id: "camp_safety_certification_framework",
     title: "Safety Certification Framework",
-    tagline: "Make audits routine, not punitive—and convert scrutiny into research momentum.",
+    tagline:
+      "Make audits routine, not punitive - and convert scrutiny into research momentum.",
     sortIndex: 40,
     unlock: {
       requiredCampaignIds: ["camp_municipal_procurement_reform"],
-      minRepTier: 10,
     },
     draftCost: { cash: 30000, research: 520, allowPartial: true },
-    pressure: { onDraftComplete: 10, onPilotMilestone: 4, onRatifyComplete: 14 },
+    pressure: {
+      onDraftComplete: 10,
+      onPilotMilestone: 4,
+      onRatifyComplete: 14,
+    },
     pilotObjectives: [
       {
         id: "pilot_eco_6",
@@ -222,23 +230,24 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     perkId: "perk_certified_operations",
     story: {
       intro:
-        "The Council’s strictest committee shows up: safety, compliance, liability. You can either fear it or own it.",
+        "The Council's strictest committee shows up: safety, compliance, liability. You can either fear it or own it.",
       draftComplete:
-        "The framework is drafted. The lobby pivots to procedural tricks—hearings, delays, distractions.",
+        "The framework is drafted. The lobby pivots to procedural tricks - hearings, delays, distractions.",
       pilotComplete:
-        "The audits don’t slow you down. They make you better. The Council schedules ratification.",
+        "The audits don't slow you down. They make you better. The Council schedules ratification.",
       ratifyComplete:
-        "Ratified. Hearings are still annoying—but now you’re built to handle them efficiently.",
+        "Ratified. Hearings are still annoying - but now you're built to handle them efficiently.",
     },
   },
   {
     id: "camp_emergency_response_standard",
     title: "Emergency Response Lighting Standard",
-    tagline: "When power fails, clarity matters. Codify rapid deployment without cutting corners.",
+    tagline:
+      "When power fails, clarity matters. Codify rapid deployment without cutting corners.",
     sortIndex: 50,
     unlock: {
       requiredCampaignIds: ["camp_safety_certification_framework"],
-      minRepTier: 10,
+      minRepTier: 8,
     },
     draftCost: { cash: 24000, research: 420, allowPartial: true },
     pressure: { onDraftComplete: 8, onPilotMilestone: 3, onRatifyComplete: 12 },
@@ -271,7 +280,7 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
       draftComplete:
         "Draft submitted. Now demonstrate you can be fast without becoming sloppy.",
       pilotComplete:
-        "Pilot passed. Rapid deployment doesn’t have to mean proprietary shortcuts.",
+        "Pilot passed. Rapid deployment doesn't have to mean proprietary shortcuts.",
       ratifyComplete:
         "Ratified. Rush work becomes a legitimate specialty, not a gamble.",
     },
@@ -279,11 +288,11 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
   {
     id: "camp_accessibility_wayfinding_standard",
     title: "Accessibility & Wayfinding Standard",
-    tagline: "Make guidance systems predictable—humans first, devices second.",
+    tagline:
+      "Make guidance systems predictable - humans first, devices second.",
     sortIndex: 60,
     unlock: {
       requiredCampaignIds: ["camp_commercial_interop_standard"],
-      minRepTier: 10,
     },
     draftCost: { cash: 20000, research: 360, allowPartial: true },
     pressure: { onDraftComplete: 7, onPilotMilestone: 3, onRatifyComplete: 10 },
@@ -313,21 +322,21 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
       intro:
         "Transit advocates show up with stories. The lobby shows up with fine print. You show up with working installs.",
       draftComplete:
-        "Draft complete. Now prove it in the field—clean, consistent installs that don’t break under pressure.",
+        "Draft complete. Now prove it in the field - clean, consistent installs that don't break under pressure.",
       pilotComplete:
-        "Pilot results are undeniable. The Council can’t unsee the difference.",
+        "Pilot results are undeniable. The Council can't unsee the difference.",
       ratifyComplete:
-        "Ratified. Your reputation rises—because now you stand for clarity, not just brightness.",
+        "Ratified. Your reputation rises - because now you stand for clarity, not just brightness.",
     },
   },
   {
     id: "camp_sustainability_mandate",
     title: "Sustainability Mandate",
-    tagline: "Make efficient installs and responsible sourcing the baseline everywhere.",
+    tagline:
+      "Make efficient installs and responsible sourcing the baseline everywhere.",
     sortIndex: 70,
     unlock: {
       requiredCampaignIds: ["camp_residential_open_standard"],
-      minRepTier: 9,
     },
     draftCost: { cash: 17000, research: 340, allowPartial: true },
     pressure: { onDraftComplete: 7, onPilotMilestone: 3, onRatifyComplete: 10 },
@@ -356,26 +365,30 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     perkId: "perk_circular_supply",
     story: {
       intro:
-        "Sustainability groups demand standards. The lobby calls it ‘costly.’ You call it ‘inefficient not to.’",
+        "Sustainability groups demand standards. The lobby calls it 'costly.' You call it 'inefficient not to.'",
       draftComplete:
         "Draft complete. Now prove sustainable work can still scale.",
       pilotComplete:
         "Pilot passed. The waste argument collapses when the numbers are clean.",
       ratifyComplete:
-        "Ratified. Salvage and recycling improve—because now the system rewards doing it right.",
+        "Ratified. Salvage and recycling improve - because now the system rewards doing it right.",
     },
   },
   {
     id: "camp_open_manufacturing_incentives",
     title: "Open Manufacturing Incentives",
-    tagline: "Scale the open supply chain so no one can bottleneck the market again.",
+    tagline:
+      "Scale the open supply chain so no one can bottleneck the market again.",
     sortIndex: 80,
     unlock: {
       requiredCampaignIds: ["camp_municipal_procurement_reform"],
-      minRepTier: 10,
     },
     draftCost: { cash: 36000, research: 420, allowPartial: true },
-    pressure: { onDraftComplete: 10, onPilotMilestone: 4, onRatifyComplete: 14 },
+    pressure: {
+      onDraftComplete: 10,
+      onPilotMilestone: 4,
+      onRatifyComplete: 14,
+    },
     pilotObjectives: [
       {
         id: "pilot_open_only_8",
@@ -396,27 +409,31 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
       intro:
         "Incumbents can survive standards if they control production. This campaign targets the choke points.",
       draftComplete:
-        "Draft submitted. Now prove the supply chain can support it—through consistent open-only delivery.",
+        "Draft submitted. Now prove the supply chain can support it - through consistent open-only delivery.",
       pilotComplete:
-        "Pilot shows the market can scale without lock-in. The lobby’s leverage shrinks.",
+        "Pilot shows the market can scale without lock-in. The lobby's leverage shrinks.",
       ratifyComplete:
-        "Ratified. Open supply becomes stronger—and large deposits stop feeling like a tax on progress.",
+        "Ratified. Open supply becomes stronger - and large deposits stop feeling like a tax on progress.",
     },
   },
   {
     id: "camp_interop_labeling_program",
     title: "Interoperability Labeling Program",
-    tagline: "Make compatibility measurable. Turn ‘claims’ into a badge that costs effort to earn.",
+    tagline:
+      "Make compatibility measurable. Turn 'claims' into a badge that costs effort to earn.",
     sortIndex: 90,
     unlock: {
       requiredCampaignIds: [
         "camp_commercial_interop_standard",
         "camp_safety_certification_framework",
       ],
-      minRepTier: 10,
     },
     draftCost: { cash: 42000, research: 560, allowPartial: true },
-    pressure: { onDraftComplete: 12, onPilotMilestone: 4, onRatifyComplete: 16 },
+    pressure: {
+      onDraftComplete: 12,
+      onPilotMilestone: 4,
+      onRatifyComplete: 16,
+    },
     pilotObjectives: [
       {
         id: "pilot_compat_8",
@@ -446,31 +463,28 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
       draftComplete:
         "Draft published. Now you need a track record: compatibility that holds up under audit.",
       pilotComplete:
-        "Pilot complete. The Council can finally draw a line between ‘compatible’ and ‘actually interoperable.’",
+        "Pilot complete. The Council can finally draw a line between 'compatible' and 'actually interoperable.'",
       ratifyComplete:
-        "Ratified. The Gold Label becomes the prestige badge—and you own that category.",
+        "Ratified. The Gold Label becomes the prestige badge - and you own that category.",
     },
   },
   {
     id: "camp_international_harmonization_accord",
     title: "International Harmonization Accord",
-    tagline: "Align standards across regions so the market can’t fracture again.",
+    tagline:
+      "Align standards across regions so the market can't fracture again.",
     sortIndex: 100,
     unlock: {
       minRepTier: 10,
-      minProjectsCompleted: 6,
+      minCampaignsCompleted: 7,
       requiredProjectIds: ["proj_international_expo"],
-      requiredCampaignIds: [
-        "camp_residential_open_standard",
-        "camp_commercial_interop_standard",
-        "camp_municipal_procurement_reform",
-        "camp_safety_certification_framework",
-        "camp_sustainability_mandate",
-        "camp_interop_labeling_program",
-      ],
     },
     draftCost: { cash: 65000, research: 900, allowPartial: true },
-    pressure: { onDraftComplete: 14, onPilotMilestone: 5, onRatifyComplete: 20 },
+    pressure: {
+      onDraftComplete: 14,
+      onPilotMilestone: 5,
+      onRatifyComplete: 20,
+    },
     pilotObjectives: [
       {
         id: "pilot_open_only_6",
@@ -509,13 +523,13 @@ export const COUNCIL_CAMPAIGNS: CouncilCampaignDefinition[] = [
     perkId: "perk_global_standard_setter",
     story: {
       intro:
-        "This isn’t one committee. It’s all of them. Harmonization threatens the lobby’s last strategy: fragmentation.",
+        "This isn't one committee. It's all of them. Harmonization threatens the lobby's last strategy: fragmentation.",
       draftComplete:
         "Draft submitted. Every incumbent tries a different angle. You keep building.",
       pilotComplete:
         "Pilot passed. Cross-region installs hold. The market starts acting like one ecosystem.",
       ratifyComplete:
-        "Ratified. You didn’t just beat a monopoly—you wrote the rulebook everyone plays by now.",
+        "Ratified. You didn't just beat a monopoly - you wrote the rulebook everyone plays by now.",
     },
   },
 ];

@@ -18,6 +18,7 @@ import { DependencyMeter } from "@/components/game/DependencyMeter";
 import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
 import { ProjectBoardModal } from "@/components/game/ProjectBoardModal";
+import { CouncilModal } from "@/components/game/CouncilModal";
 import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
 import { LockoutModal } from "@/components/game/LockoutModal";
@@ -85,6 +86,7 @@ const baronPortrait512 = require("../../assets/images/baron/baron-portrait-512.w
 type ModalType =
   | "orders"
   | "projects"
+  | "council"
   | "upgrades"
   | "rd"
   | "settings"
@@ -276,6 +278,8 @@ export default function GameScreen() {
     !state.lockoutActive &&
     state.orders.length < effectiveMaxOrders &&
     boardPressureBand === "red";
+  const showCouncilButton = state.council.unlocked;
+  const councilBadge = state.council.activeHearing ? 1 : 0;
   const tutorialSkipped = state.tutorialComplete && state.tutorialMetrics.skipped;
   const overlayDebugTop = useMemo(() => {
     if (overlayQueue.length === 0) return null;
@@ -1068,6 +1072,18 @@ export default function GameScreen() {
           reducedMotion={state.settings.reducedMotion}
         />
 
+        {showCouncilButton ? (
+          <BottomButton
+            icon="award"
+            label="Council"
+            color={GameColors.currency.research}
+            onPress={() => setActiveModal("council")}
+            badge={councilBadge}
+            compact={isCompactLayout}
+            reducedMotion={state.settings.reducedMotion}
+          />
+        ) : null}
+
         <BottomButton
           icon="shopping-cart"
           label="Shop"
@@ -1170,6 +1186,15 @@ export default function GameScreen() {
         onRequestClose={closeModal}
       >
         <ProjectBoardModal onClose={closeModal} />
+      </Modal>
+
+      <Modal
+        visible={activeModal === "council"}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeModal}
+      >
+        <CouncilModal onClose={closeModal} />
       </Modal>
 
       <Modal

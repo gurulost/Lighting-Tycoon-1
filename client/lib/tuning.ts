@@ -142,6 +142,10 @@ export type TuningConfig = {
     hearingPenaltyMultiplier: number;
     payToClearCostMultiplier: number;
     ratifyRewardMultiplierGlobal: number;
+    municipalGrantCashCost: number;
+    municipalGrantResearchCost: number;
+    municipalGrantLobbyPressureDrop: number;
+    municipalGrantBaronPressureDrop: number;
   };
   merge: {
     momentumThresholds: number[];
@@ -365,6 +369,10 @@ const DEFAULT_TUNING: TuningConfig = {
     hearingPenaltyMultiplier: 1,
     payToClearCostMultiplier: 1,
     ratifyRewardMultiplierGlobal: 1,
+    municipalGrantCashCost: 10000,
+    municipalGrantResearchCost: 0,
+    municipalGrantLobbyPressureDrop: 15,
+    municipalGrantBaronPressureDrop: 5,
   },
   merge: {
     momentumThresholds: [3, 6, 10],

@@ -52,6 +52,19 @@ Status: PostHog wired; core loop, tutorial, economy, and lockout events instrume
 - `project_addon_purchase` (projectId, addon, cost)
 - `project_change_order` (projectId, stageIndex, cost)
 
+## Standards Council (Why: long-horizon progression)
+
+- `council_unlock` (projectsCompleted, reputationTier)
+- `council_campaign_set_active` (campaignId)
+- `council_draft_invest` (campaignId, cash, research, draftComplete)
+- `council_draft_complete` (campaignId)
+- `council_pilot_complete` (campaignId)
+- `council_ratify_spawn` (campaignId, source)
+- `council_ratify_complete` (campaignId)
+- `council_hearing_trigger` (hearingId, source)
+- `council_hearing_clear` (hearingId, method)
+- `council_municipal_grant` (lobbyPressureDrop, baronPressureDrop)
+
 ## Economy (Why: balance)
 
 - `cash_earned` / `cash_spent`

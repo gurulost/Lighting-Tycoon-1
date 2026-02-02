@@ -55,11 +55,10 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
     onClear: { lobbyPressureDrop: 10, bonus: { reputation: 15 } },
     story: {
       triggered:
-        "A public hearing is called. Keep your installs clean—show them what ‘open’ looks like at speed.",
+        "A public hearing is called. Keep your installs clean - show them what 'open' looks like at speed.",
       cleared:
         "The testimony lands. Even the skeptics have to admit the work speaks louder than the lobbying.",
-      paid:
-        "You fund a public demo and drown the noise in proof. The hearing dissolves—quietly.",
+      paid: "You fund a public demo and drown the noise in proof. The hearing dissolves - quietly.",
     },
   },
   {
@@ -84,18 +83,17 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
     onClear: { lobbyPressureDrop: 12, bonus: { research: 30 } },
     story: {
       triggered:
-        "Safety audit. They’re looking for any crack in the process. Don’t give them one.",
+        "Safety audit. They're looking for any crack in the process. Don't give them one.",
       cleared:
-        "Audit passed. The paperwork turns into precedent—and precedent turns into leverage.",
-      paid:
-        "You bring in an external lab and fast-track certification. Expensive. Effective.",
+        "Audit passed. The paperwork turns into precedent - and precedent turns into leverage.",
+      paid: "You bring in an external lab and fast-track certification. Expensive. Effective.",
     },
   },
   {
     id: "hear_lobby_smear",
     title: "Lobby Smear Campaign",
     description:
-      "Incumbents flood the Council with ‘concerns.’ Your reputation takes the hit unless you respond with results.",
+      "Incumbents flood the Council with 'concerns.' Your reputation takes the hit unless you respond with results.",
     penalty: {
       globalRewardMult: { reputation: 0.85 },
     },
@@ -113,16 +111,15 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
       triggered:
         "The smear hits. Ignore it and your standing slips. Counter it with a flawless compatibility install.",
       cleared:
-        "The smear stalls. It’s hard to argue with a system that just… works.",
-      paid:
-        "You run a transparent disclosure campaign. Costly, but it starves the smear of oxygen.",
+        "The smear stalls. It's hard to argue with a system that just... works.",
+      paid: "You run a transparent disclosure campaign. Costly, but it starves the smear of oxygen.",
     },
   },
   {
     id: "hear_committee_filibuster",
     title: "Committee Filibuster",
     description:
-      "They can’t defeat the standard, so they try to bury it in procedure.",
+      "They can't defeat the standard, so they try to bury it in procedure.",
     penalty: {
       projectDepositMult: 1.1,
       refreshCostMult: 1.2,
@@ -130,20 +127,19 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
     clearObjectives: [
       {
         id: "clear_any_2",
-        type: "FULFILL_OPEN_ONLY",
+        type: "FULFILL_ANY",
         target: 2,
-        label: "Complete 2 open-only installs to show momentum",
+        label: "Complete any 2 installs to show momentum",
       },
     ],
     payToClear: { cash: 5200, research: 80 },
     onClear: { lobbyPressureDrop: 10 },
     story: {
       triggered:
-        "A filibuster. It’s not about evidence—it's about delay. Push forward anyway.",
+        "A filibuster. It's not about evidence - it's about delay. Push forward anyway.",
       cleared:
         "Momentum wins. The filibuster collapses when the work keeps landing on time.",
-      paid:
-        "You secure procedural allies and expedite the calendar. It hurts, but it works.",
+      paid: "You secure procedural allies and expedite the calendar. It hurts, but it works.",
     },
   },
   {
@@ -173,18 +169,17 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
     onClear: { lobbyPressureDrop: 12, bonus: { cash: 1200 } },
     story: {
       triggered:
-        "They call it ‘unscalable.’ Prove them wrong with clean, auditable delivery.",
+        "They call it 'unscalable.' Prove them wrong with clean, auditable delivery.",
       cleared:
-        "The challenge backfires. Your installs become the evidence they didn’t want entered into record.",
-      paid:
-        "You fund a public procurement demo. Pricey—then profitable.",
+        "The challenge backfires. Your installs become the evidence they didn't want entered into record.",
+      paid: "You fund a public procurement demo. Pricey - then profitable.",
     },
   },
   {
     id: "hear_standards_confusion",
     title: "Standards Confusion",
     description:
-      "Competing drafts appear overnight. Confusion is the lobby’s favorite tool.",
+      "Competing drafts appear overnight. Confusion is the lobby's favorite tool.",
     penalty: {
       compatOrderWeightMult: 1.2,
       globalRewardMult: { research: 0.95 },
@@ -203,16 +198,15 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
       triggered:
         "They flood the room with alternatives. Cut through it: deliver compatibility installs that are undeniable.",
       cleared:
-        "Clarity returns. Confusion doesn’t survive contact with working systems.",
-      paid:
-        "You publish a reference implementation and collapse the debate into reality.",
+        "Clarity returns. Confusion doesn't survive contact with working systems.",
+      paid: "You publish a reference implementation and collapse the debate into reality.",
     },
   },
   {
     id: "hear_trade_group_objection",
     title: "Trade Group Objection",
     description:
-      "A formal objection is filed—designed to drain your time and cash.",
+      "A formal objection is filed - designed to drain your time and cash.",
     penalty: {
       refreshCostMult: 1.25,
       globalRewardMult: { cash: 0.95 },
@@ -229,18 +223,17 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
     onClear: { lobbyPressureDrop: 10 },
     story: {
       triggered:
-        "An objection lands with a thousand pages. Don’t argue—deliver audited work and move the vote.",
+        "An objection lands with a thousand pages. Don't argue - deliver audited work and move the vote.",
       cleared:
-        "The objection dissolves. It turns out ‘concerns’ are hard to maintain when the data is clean.",
-      paid:
-        "You retain counsel and file a rebuttal that ends the objection on paperwork alone.",
+        "The objection dissolves. It turns out 'concerns' are hard to maintain when the data is clean.",
+      paid: "You retain counsel and file a rebuttal that ends the objection on paperwork alone.",
     },
   },
   {
     id: "hear_emergency_review",
     title: "Emergency Review",
     description:
-      "A last-minute emergency review tries to stall a vote. You can clear it fast—or pay to bulldoze it.",
+      "A last-minute emergency review tries to stall a vote. You can clear it fast - or pay to bulldoze it.",
     penalty: {
       rushRewardMult: { cash: 0.85 },
       globalRewardMult: { reputation: 0.95 },
@@ -257,11 +250,9 @@ export const COUNCIL_HEARINGS: CouncilHearingDefinition[] = [
     onClear: { lobbyPressureDrop: 8, bonus: { reputation: 10 } },
     story: {
       triggered:
-        "Emergency review. They’re betting you can’t respond quickly without breaking your own principles.",
-      cleared:
-        "You respond fast—and correctly. The review loses its teeth.",
-      paid:
-        "You pull political favors and clear the agenda. Effective—and expensive.",
+        "Emergency review. They're betting you can't respond quickly without breaking your own principles.",
+      cleared: "You respond fast - and correctly. The review loses its teeth.",
+      paid: "You pull political favors and clear the agenda. Effective - and expensive.",
     },
   },
 ];

@@ -56,8 +56,8 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 
 **Baron modifiers (extra locked roll)**
 - Contract active: `+0.03` bonus locked roll while active.
-- Crate bonus: `+0.05` bonus locked roll for next 12 **non‑forced** spawns.
-- Rush bonus: `+0.02` bonus locked roll for next 6 **non‑forced** spawns.
+- Crate bonus: `+0.05` bonus locked roll for next 12 **non-forced** spawns.
+- Rush bonus: `+0.02` bonus locked roll for next 6 **non-forced** spawns.
 
 **Baron offers**
 - Offer chance and mix: `baron.offerChance`, `baron.offerCrateChance`, `baron.offerContractThreshold`
@@ -94,10 +94,10 @@ When a supplier is on cooldown, players can still tap to spawn parts at a cost.
 - Open merge: `0`
 
 **Orders**
-- If any locked parts used: `+1` (or `+2` when dependency ≤ 40)
-- If only open parts used: `-2` (or `-1` when dependency ≥ 70) and `+2 research`
+- If any locked parts used: `+1` (or `+2` when dependency <= 40)
+- If only open parts used: `-2` (or `-1` when dependency >= 70) and `+2 research`
 - Compatible open for locked_required avoids penalty but does **not** apply open bonus
-- Open-only installs attempt a bonus open drop (tier 1–2); if no space, convert to +10 cash / +1 research
+- Open-only installs attempt a bonus open drop (tier 1-2); if no space, convert to +10 cash / +1 research
 - Baron pressure: overflow at dependency cap converts to pressure (`overflow * 2`), and open-only installs reduce pressure by `1`
 - Tunables: `orders.openOnlyResearchBonus`, `orders.openOnlyDropTier2Chance`,
   `orders.openOnlyNoSpaceCashBonus`, `orders.openOnlyNoSpaceResearchBonus`,
@@ -126,8 +126,8 @@ When a supplier is on cooldown, players can still tap to spawn parts at a cost.
 - `compatibility_required` orders receive a `1.6x` weight boost when `gamePhase = 2`.
 - Phase 2 target difficulty bumps by `+1`.
 - Phase 2 Baron Pressure reward tax:
-  - 40–69 pressure: `-10%` cash + research
-  - 70–100 pressure: `-20%` cash + research
+  - 40-69 pressure: `-10%` cash + research
+  - 70-100 pressure: `-20%` cash + research
 
 ---
 
@@ -153,6 +153,33 @@ When a supplier is on cooldown, players can still tap to spawn parts at a cost.
   - `projects.addonSiteLogisticsCost`
   - `projects.addonOvertimeCrewCost`
   - `projects.addonChangeOrderCost`
+
+---
+
+## Standards Council (Phase 3)
+- Unlock gates:
+  - `council.unlockMinProjectsCompleted`
+  - `council.unlockMinRepTier`
+  - `council.unlockAfterCapstoneProjectId`
+- Draft scaling:
+  - `council.draftCostCashMultiplier`
+  - `council.draftCostResearchMultiplier`
+- Lobby pressure:
+  - `council.lobbyPressureGainPerDraftInvest`
+  - `council.lobbyPressureGainPerPilotMilestone`
+  - `council.lobbyPressureGainOnRatify`
+  - `council.lobbyPressureDecayOnOpenOnlyInstall`
+- Hearings:
+  - `council.hearingThresholds`
+  - `council.hearingPenaltyMultiplier`
+  - `council.payToClearCostMultiplier`
+- Ratify rewards:
+  - `council.ratifyRewardMultiplierGlobal`
+- Municipal Grants (perk unlock):
+  - `council.municipalGrantCashCost`
+  - `council.municipalGrantResearchCost`
+  - `council.municipalGrantLobbyPressureDrop`
+  - `council.municipalGrantBaronPressureDrop`
 
 ---
 
@@ -227,8 +254,8 @@ Global reward multipliers (applied at order creation):
 - Base interval uses `getOrderIntervalMs` by reputation tier.
 - Pressure bands gate spawning:
   - Green: 5+ free slots (normal)
-  - Yellow: 2–4 free slots (slower)
-  - Red: 0–1 free slots (paused)
+  - Yellow: 2-4 free slots (slower)
+  - Red: 0-1 free slots (paused)
 - Tunables: `orderSpawn.*` and `boardPressure.*`
 
 ---

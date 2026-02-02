@@ -39,7 +39,7 @@ Use this as a quick reference for every icon, badge, and system.
 ## Suppliers
 - Baron Supply Depot: fast locked supply; increases pressure and clutter; overdraw costs cash and can add waste.
 - Open Workshop: open supply; upgrades expand tier drops and bonuses; overdraw costs research.
-- Salvage Corner: refurb drops plus cleanup value; overdraw consumes waste or costs cash if you’re out.
+- Salvage Corner: refurb drops plus cleanup value; overdraw consumes waste or costs cash if you're out.
 
 ## Utilities
 - Backpack: temporary storage; drag items in and out.
@@ -83,3 +83,14 @@ Use this as a quick reference for every icon, badge, and system.
 - Project Stages: protected orders that must be completed in sequence.
 - Action Deadlines: countdown of non-project installs; failing it triggers penalties.
 - Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (swap a stage constraint once).
+
+## Standards Council (Phase 3)
+- Council: the post-empire progression layer where Tina writes industry standards.
+- Campaigns: three-step tracks (Draft -> Pilot -> Ratify) that grant permanent perks.
+- Draft: invest cash + research to start a standard.
+- Pilot: fulfill specific install objectives during normal play.
+- Ratify: a protected Council Showcase order that finalizes a campaign.
+- Lobby Pressure: 0-100 meter that rises with Council progress and can trigger hearings.
+- Hearings: short, action-based challenges that apply temporary penalties until cleared.
+- Perks: permanent rule tweaks (rewards, order mix, supplier behavior).
+- Municipal Grants: perk-unlocked spend action to reduce lobbying pressure immediately.

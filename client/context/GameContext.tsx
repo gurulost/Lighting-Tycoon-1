@@ -139,6 +139,7 @@ type GameAction =
   | { type: "COUNCIL_INVEST_DRAFT"; campaignId: string }
   | { type: "COUNCIL_SPAWN_RATIFY"; campaignId: string }
   | { type: "COUNCIL_PAY_CLEAR_HEARING" }
+  | { type: "COUNCIL_USE_MUNICIPAL_GRANT" }
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
@@ -819,6 +820,12 @@ function canStartCouncilCampaign(
     state.projectsCompleted.length < unlock.minProjectsCompleted
   ) {
     return false;
+  }
+  if (typeof unlock.minCampaignsCompleted === "number") {
+    const completedCount = Object.values(state.council.campaigns).filter(
+      (progress) => progress.status === "COMPLETED",
+    ).length;
+    if (completedCount < unlock.minCampaignsCompleted) return false;
   }
   if (unlock.requiredProjectIds) {
     const missingProject = unlock.requiredProjectIds.some(
@@ -4682,6 +4689,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let projectCompleteBeatId: string | null = null;
       let projectUnlockBeatId: string | null = null;
       let projectOfferBeatId: string | null = null;
+      let councilUnlockedNow = false;
+      let councilHearingTriggeredId: string | null = null;
+      let councilHearingClearedId: string | null = null;
+      let councilCampaignCompletedId: string | null = null;
+      let councilPilotCompletedId: string | null = null;
+      let councilRatifySpawnedId: string | null = null;
       let projectOfferRefreshMode: "none" | "if_empty" | "force" = "none";
       let projectStageFailed = false;
       let completedProjectId: string | null = null;
@@ -5350,6 +5363,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ...nextCouncil,
             unlocked: true,
           };
+          councilUnlockedNow = true;
         }
       }
 
@@ -5394,6 +5408,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             councilLobbyPressure +=
               campaign.pressure.onRatifyComplete +
               tuning.council.lobbyPressureGainOnRatify;
+            councilCampaignCompletedId = councilCampaignId;
           }
         }
 
@@ -5425,6 +5440,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             };
 
             switch (objective.type) {
+              case "FULFILL_ANY":
+                bump();
+                break;
               case "FULFILL_OPEN_ONLY":
                 if (openOnly) bump();
                 else if (consecutive) nextValue = 0;
@@ -5488,6 +5506,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           let status = activeProgress.status;
           if (pilotComplete) {
             status = "RATIFY";
+            councilPilotCompletedId = activeCampaign.id;
             const existingRatify = updatedOrders.some((orderItem) =>
               orderItem.modifierIds?.includes(`council:${activeCampaign.id}`),
             );
@@ -5509,6 +5528,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     ratifyOrder,
                   );
                   ratifyOrderId = ratifyOrder.id;
+                  councilRatifySpawnedId = activeCampaign.id;
                 }
               }
             }
@@ -5541,6 +5561,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 if (current <= 0) return;
                 let qualifies = false;
                 switch (objective.type) {
+                  case "FULFILL_ANY":
+                    qualifies = true;
+                    break;
                   case "FULFILL_OPEN_ONLY":
                     qualifies = openOnly;
                     break;
@@ -5580,6 +5603,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 councilActiveHearing = undefined;
                 hearingClearedThisOrder = true;
                 councilLobbyPressure -= hearingDef.onClear.lobbyPressureDrop;
+                councilHearingClearedId = hearingDef.id;
                 const bonus = hearingDef.onClear.bonus;
                 if (bonus?.cash) cashReward += Math.floor(bonus.cash);
                 if (bonus?.research)
@@ -5623,6 +5647,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 refreshCountAtStart: refreshCount,
               };
               installsSinceHearing = 0;
+              councilHearingTriggeredId = pick.id;
             }
           }
         }
@@ -5766,6 +5791,42 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           amount: researchReward,
           source: "order",
           orderType: order.type,
+        });
+      }
+      if (councilUnlockedNow) {
+        captureEvent("council_unlock", {
+          projectsCompleted: nextProjectsCompleted.length,
+          reputationTier: getNeighborhoodIndex(
+            getNeighborhoodByRep(state.reputation + repReward).id,
+          ),
+        });
+      }
+      if (councilPilotCompletedId) {
+        captureEvent("council_pilot_complete", {
+          campaignId: councilPilotCompletedId,
+        });
+      }
+      if (councilRatifySpawnedId) {
+        captureEvent("council_ratify_spawn", {
+          campaignId: councilRatifySpawnedId,
+          source: "auto",
+        });
+      }
+      if (councilCampaignCompletedId) {
+        captureEvent("council_ratify_complete", {
+          campaignId: councilCampaignCompletedId,
+        });
+      }
+      if (councilHearingTriggeredId) {
+        captureEvent("council_hearing_trigger", {
+          hearingId: councilHearingTriggeredId,
+          source: "fulfill",
+        });
+      }
+      if (councilHearingClearedId) {
+        captureEvent("council_hearing_clear", {
+          hearingId: councilHearingClearedId,
+          method: "play",
         });
       }
 
@@ -5926,6 +5987,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (projectOfferBeatId) {
           nextState = queueStoryBeat(nextState, projectOfferBeatId);
         }
+      }
+
+      if (councilUnlockedNow) {
+        nextState = queueStoryBeat(nextState, "council_unlock");
+      }
+      if (councilHearingTriggeredId) {
+        nextState = queueStoryBeat(nextState, "council_hearing");
+      }
+      if (councilCampaignCompletedId) {
+        nextState = queueStoryBeat(nextState, "council_campaign_complete");
       }
 
       if (dependencyStory) {
@@ -6376,28 +6447,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case "DISMISS_ORDER": {
       const order = state.orders.find((o) => o.id === action.orderId);
       if (!order) return state;
-      if (order.isTutorial || order.id === state.tutorialOrderId) {
-        return state;
-      }
-      if (
-        state.lockoutActive &&
-        (order.isLockout || order.type === "lab_request")
-      ) {
-        return state;
-      }
-      if (order.modifierIds?.includes("first_session")) {
-        return state;
-      }
-      if (order.modifierIds?.includes("tier5_showcase")) {
-        return state;
-      }
-      if (order.modifierIds?.includes("tier10_showcase")) {
-        return state;
-      }
-      if (order.modifierIds?.includes("threshold_story")) {
-        return state;
-      }
-      if (order.modifierIds?.includes("project_stage")) {
+      if (isProtectedOrder(state, order)) {
         return state;
       }
       captureEvent("order_dismiss", {
@@ -7073,6 +7123,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const canSelect =
         progress.status !== "LOCKED" || canStartCouncilCampaign(state, campaignId);
       if (!canSelect) return state;
+      captureEvent("council_campaign_set_active", {
+        campaignId,
+      });
       return {
         ...state,
         council: { ...state.council, activeCampaignId: campaignId },
@@ -7135,6 +7188,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       let activeHearing = state.council.activeHearing;
       let installsSinceHearing = state.council.installsSinceLastHearingCheck;
+      let hearingTriggered = false;
       const perks = getCouncilPerkEffects(state);
       if (!activeHearing) {
         const thresholdShift = perks.lobbyPressureThresholdShift ?? 0;
@@ -7162,6 +7216,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               refreshCountAtStart: state.council.refreshCount,
             };
             installsSinceHearing = 0;
+            hearingTriggered = true;
           }
         }
       }
@@ -7193,14 +7248,33 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "council_draft",
         campaignId: campaign.id,
       });
+      captureEvent("council_draft_invest", {
+        campaignId: campaign.id,
+        cash: spendCash,
+        research: spendResearch,
+        draftComplete,
+      });
+      if (draftComplete) {
+        captureEvent("council_draft_complete", { campaignId: campaign.id });
+      }
+      if (hearingTriggered && activeHearing) {
+        captureEvent("council_hearing_trigger", {
+          hearingId: activeHearing.hearingId,
+          source: "draft",
+        });
+      }
 
-      return {
+      let nextState: GameState = {
         ...state,
         cash: state.cash - spendCash,
         research: state.research - spendResearch,
         council: nextCouncil,
         undoSnapshot: undefined,
       };
+      if (hearingTriggered) {
+        nextState = queueStoryBeat(nextState, "council_hearing");
+      }
+      return nextState;
     }
 
     case "COUNCIL_SPAWN_RATIFY": {
@@ -7217,6 +7291,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!ratifyOrder) return state;
       const insertResult = insertStoryOrder(state, state.orders, ratifyOrder);
       if (!insertResult.inserted) return state;
+      captureEvent("council_ratify_spawn", {
+        campaignId: campaign.id,
+        source: "manual",
+      });
       return {
         ...state,
         orders: insertResult.orders,
@@ -7258,6 +7336,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         0,
         100,
       );
+      const bonusCash = hearing.onClear.bonus?.cash ?? 0;
+      const bonusResearch = hearing.onClear.bonus?.research ?? 0;
+      const bonusRep = hearing.onClear.bonus?.reputation ?? 0;
       captureEvent("cash_spent", {
         amount: cashCost,
         reason: "council_hearing_clear",
@@ -7268,15 +7349,76 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "council_hearing_clear",
         hearingId: hearing.id,
       });
+      captureEvent("council_hearing_clear", {
+        hearingId: hearing.id,
+        method: "pay",
+      });
       return {
         ...state,
-        cash: state.cash - cashCost,
-        research: state.research - researchCost,
+        cash: state.cash - cashCost + Math.floor(bonusCash),
+        research: state.research - researchCost + Math.floor(bonusResearch),
+        reputation: state.reputation + Math.floor(bonusRep),
         council: {
           ...state.council,
           activeHearing: undefined,
           lobbyPressure: nextLobbyPressure,
           installsSinceLastHearingCheck: 0,
+        },
+        undoSnapshot: undefined,
+      };
+    }
+
+    case "COUNCIL_USE_MUNICIPAL_GRANT": {
+      if (!state.council.unlocked) return state;
+      const perks = getCouncilPerkEffects(state);
+      if (!perks.unlockMunicipalGrants) return state;
+      const cashCost = Math.max(0, Math.round(tuning.council.municipalGrantCashCost));
+      const researchCost = Math.max(
+        0,
+        Math.round(tuning.council.municipalGrantResearchCost),
+      );
+      if (state.cash < cashCost || state.research < researchCost) return state;
+      const lobbyDrop = Math.max(
+        0,
+        Math.round(tuning.council.municipalGrantLobbyPressureDrop),
+      );
+      const baronDrop = Math.max(
+        0,
+        Math.round(tuning.council.municipalGrantBaronPressureDrop),
+      );
+      if (lobbyDrop <= 0 && baronDrop <= 0) return state;
+      const nextLobbyPressure = clampNumber(
+        state.council.lobbyPressure - lobbyDrop,
+        0,
+        100,
+      );
+      const nextBaronPressure = clampNumber(
+        state.baronPressure - baronDrop,
+        0,
+        tuning.baron.pressureMax,
+      );
+      captureEvent("cash_spent", {
+        amount: cashCost,
+        reason: "council_municipal_grant",
+      });
+      if (researchCost > 0) {
+        captureEvent("research_spent", {
+          amount: researchCost,
+          reason: "council_municipal_grant",
+        });
+      }
+      captureEvent("council_municipal_grant", {
+        lobbyPressureDrop: lobbyDrop,
+        baronPressureDrop: baronDrop,
+      });
+      return {
+        ...state,
+        cash: state.cash - cashCost,
+        research: state.research - researchCost,
+        baronPressure: nextBaronPressure,
+        council: {
+          ...state.council,
+          lobbyPressure: nextLobbyPressure,
         },
         undoSnapshot: undefined,
       };
@@ -9716,6 +9858,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             unlocked: true,
           },
         };
+        restoredState = queueStoryBeat(restoredState, "council_unlock");
       }
 
       return restoredState;

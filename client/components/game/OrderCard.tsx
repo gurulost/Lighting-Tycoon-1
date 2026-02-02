@@ -287,6 +287,9 @@ export function OrderCard({
     if (order.isLockout) {
       return { label: "LOCKOUT", color: GameColors.ui.danger, icon: "alert-triangle" as const };
     }
+    if (order.modifierIds?.includes("council_ratify")) {
+      return { label: "COUNCIL", color: GameColors.currency.research, icon: "award" as const };
+    }
     if (order.rushDeadline) {
       const label = rushExpired
         ? "EXPIRED"
@@ -298,6 +301,9 @@ export function OrderCard({
       return { label, color: GameColors.ui.danger, icon: "clock" as const };
     }
     if (order.modifierIds?.includes("project_rush")) {
+      return { label: "RUSH", color: GameColors.ui.danger, icon: "clock" as const };
+    }
+    if (order.modifierIds?.includes("council_rush")) {
       return { label: "RUSH", color: GameColors.ui.danger, icon: "clock" as const };
     }
     if (order.type === "locked_required" || order.type === "baron_certified") {
@@ -331,6 +337,13 @@ export function OrderCard({
         icon: "flag",
       });
     }
+    if (order.modifierIds?.includes("council_ratify")) {
+      badges.push({
+        label: "Council Showcase",
+        color: GameColors.currency.research,
+        icon: "award",
+      });
+    }
     if (order.type === "locked_required" || order.type === "baron_certified") {
       badges.push({ label: "Certified", color: GameColors.locked.primary, icon: "lock" });
     }
@@ -358,7 +371,11 @@ export function OrderCard({
         icon: "book-open",
       });
     }
-    if (order.rushDeadline || order.modifierIds?.includes("project_rush")) {
+    if (
+      order.rushDeadline ||
+      order.modifierIds?.includes("project_rush") ||
+      order.modifierIds?.includes("council_rush")
+    ) {
       badges.push({ label: "Rush", color: GameColors.ui.danger, icon: "clock" });
     }
     if (order.type === "style_match") {
