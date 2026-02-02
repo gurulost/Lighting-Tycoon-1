@@ -16,12 +16,17 @@ import { AvatarImage } from "./AvatarImage";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
+import { getTuning } from "@/lib/tuning";
 import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
 
 const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
 
 interface DependencyMeterProps {
   value: number;
+  baronPressure?: number;
+  pressureMax?: number;
+  pressureThresholdLow?: number;
+  pressureThresholdHigh?: number;
   compact?: boolean;
   reducedMotion?: boolean;
   lockoutActive?: boolean;
@@ -32,10 +37,58 @@ const clampProgress = (input: number) => Math.max(0, Math.min(1, input));
 
 export function DependencyMeter({
   value,
+  baronPressure = 0,
+  pressureMax,
+  pressureThresholdLow,
+  pressureThresholdHigh,
   compact = false,
   reducedMotion = false,
   lockoutActive = false,
 }: DependencyMeterProps) {
+  const tuning = getTuning();
+  const pressureCap = Math.max(
+    1,
+    Math.round(
+      typeof pressureMax === "number" ? pressureMax : tuning.baron.pressureMax
+    )
+  );
+  const thresholdLowRaw =
+    typeof pressureThresholdLow === "number"
+      ? pressureThresholdLow
+      : tuning.phase2.pressureTaxThreshold;
+  const thresholdHighRaw =
+    typeof pressureThresholdHigh === "number"
+      ? pressureThresholdHigh
+      : tuning.phase2.pressureTaxHigh;
+  const pressureThresholdLowSafe = Math.max(0, Math.min(pressureCap, thresholdLowRaw));
+  const pressureThresholdHighSafe = Math.max(
+    pressureThresholdLowSafe,
+    Math.min(pressureCap, thresholdHighRaw)
+  );
+  const pressureValue = Math.max(0, Math.min(pressureCap, baronPressure));
+  const pressurePercent = Math.round((pressureValue / pressureCap) * 100);
+  const pressureProgress = clampProgress(pressureValue / pressureCap);
+  const taxMid = Math.max(
+    0,
+    Math.round((1 - tuning.phase2.rewardMultiplierMid) * 100)
+  );
+  const taxHigh = Math.max(
+    0,
+    Math.round((1 - tuning.phase2.rewardMultiplierHigh) * 100)
+  );
+  const pressureThresholds = [
+    {
+      value: pressureThresholdLowSafe,
+      label: taxMid > 0 ? `-${taxMid}%` : "",
+    },
+    {
+      value: pressureThresholdHighSafe,
+      label: taxHigh > 0 ? `-${taxHigh}%` : "",
+    },
+  ].filter((entry, index, list) => {
+    if (index === 0) return true;
+    return entry.value !== list[index - 1].value;
+  });
   const [smoothProgress, setSmoothProgress] = useState(() => clampProgress(value / 100));
   const progressRef = useRef(smoothProgress);
   const animationRef = useRef<number | null>(null);
@@ -43,6 +96,10 @@ export function DependencyMeter({
   const prevValue = useSharedValue(value);
   const warningPulse = useSharedValue(0);
   const baronOpacity = useSharedValue(0);
+  const dependencyStripHeight = compact ? 9 : 12;
+  const pressureStripHeight = compact ? 3 : 4;
+  const pressureStripGap = 2;
+  const pressureChipFontSize = compact ? 8 : 9;
 
   useEffect(() => {
     const crossedThreshold = THRESHOLDS.some(
@@ -150,6 +207,12 @@ export function DependencyMeter({
     opacity: baronOpacity.value,
   }));
 
+  const getPressureColor = () => {
+    if (pressureValue >= pressureThresholdHighSafe) return GameColors.ui.danger;
+    if (pressureValue >= pressureThresholdLowSafe) return GameColors.ui.warning;
+    return GameColors.locked.primary;
+  };
+
   const getStatusText = () => {
     if (lockoutActive) return "Audit";
     if (value <= 20) return "Liberation";
@@ -177,6 +240,7 @@ export function DependencyMeter({
     return "lock";
   };
 
+  const pressureColor = getPressureColor();
   const showExtras = !compact;
   const stripPattern: TrimLightPattern =
     value >= 60 ? "baron" : value >= 30 ? "classic" : "warmWhite";
@@ -206,7 +270,7 @@ export function DependencyMeter({
               Dependency
             </ThemedText>
           </View>
-          <View style={styles.statusContainer}>
+          <View style={[styles.statusContainer, compact && styles.statusContainerCompact]}>
             {!compact ? (
               <ThemedText
                 style={[
@@ -225,23 +289,42 @@ export function DependencyMeter({
                 { color: getStatusColor() },
               ]}
             >
-              {value}%
+              {Math.round(value)}%
             </ThemedText>
+            <ThemedText style={styles.valueDivider}>·</ThemedText>
+            <View style={styles.pressureValue}>
+              <Feather
+                name="briefcase"
+                size={compact ? 10 : 12}
+                color={pressureColor}
+              />
+              <ThemedText
+                style={[
+                  styles.percentage,
+                  compact && styles.percentageCompact,
+                  { color: pressureColor },
+                ]}
+              >
+                {pressurePercent}%
+              </ThemedText>
+            </View>
           </View>
         </View>
 
         <View style={[styles.trackContainer, compact && styles.trackContainerCompact]}>
-          <TrimLightStrip
-            progress={smoothProgress}
-            bulbs={compact ? 10 : 14}
-            height={compact ? 14 : 18}
-            pattern={stripPattern}
-            animated={!compact && value >= 60}
-            reducedMotion={reducedMotion}
-          />
+          <View style={[styles.dependencyStrip, { height: dependencyStripHeight }]}>
+            <TrimLightStrip
+              progress={smoothProgress}
+              bulbs={compact ? 10 : 14}
+              height={dependencyStripHeight}
+              pattern={stripPattern}
+              animated={!compact && value >= 60}
+              reducedMotion={reducedMotion}
+            />
+          </View>
 
           {showExtras ? (
-            <View style={styles.thresholds}>
+            <View style={[styles.thresholds, { height: dependencyStripHeight }]}>
               {THRESHOLDS.map((threshold) => (
                 <View
                   key={threshold}
@@ -260,6 +343,71 @@ export function DependencyMeter({
               ))}
             </View>
           ) : null}
+
+          <View
+            style={[
+              styles.pressureTrack,
+              {
+                height: pressureStripHeight,
+                borderColor: `${pressureColor}55`,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.pressureFill,
+                {
+                  width: `${pressureProgress * 100}%`,
+                  backgroundColor: pressureColor,
+                },
+              ]}
+            />
+            <View style={styles.pressureThresholds}>
+              {pressureThresholds.map((threshold) => (
+                <View
+                  key={`pressure-${threshold.value}`}
+                  style={[
+                    styles.pressureThresholdMarker,
+                    { left: `${(threshold.value / pressureCap) * 100}%` },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.pressureThresholdLine,
+                      { backgroundColor: pressureColor },
+                    ]}
+                  />
+                  {threshold.label ? (
+                    <View style={styles.pressureThresholdLabelWrap}>
+                      <ThemedText style={styles.pressureThresholdLabel}>
+                        {threshold.label}
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View
+            pointerEvents="none"
+            style={[
+              styles.pressureChip,
+              { bottom: pressureStripHeight + pressureStripGap },
+            ]}
+          >
+            <Feather
+              name="feather"
+              size={pressureChipFontSize}
+              color={GameColors.text.secondary}
+            />
+            <ThemedText
+              style={[styles.pressureChipText, { fontSize: pressureChipFontSize }]}
+              numberOfLines={1}
+            >
+              Open-only -P
+            </ThemedText>
+          </View>
         </View>
 
         {showExtras ? (
@@ -337,6 +485,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
+    flexShrink: 1,
+  },
+  statusContainerCompact: {
+    gap: Spacing.xs,
   },
   status: {
     fontSize: 13,
@@ -359,12 +511,15 @@ const styles = StyleSheet.create({
   trackContainerCompact: {
     height: 14,
   },
+  dependencyStrip: {
+    justifyContent: "flex-start",
+  },
   thresholds: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    pointerEvents: "none",
   },
   thresholdMarker: {
     position: "absolute",
@@ -385,6 +540,83 @@ const styles = StyleSheet.create({
   },
   thresholdDotActive: {
     backgroundColor: GameColors.text.secondary,
+  },
+  pressureTrack: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 184, 77, 0.12)",
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  pressureFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+  pressureThresholds: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: -6,
+    bottom: 0,
+    pointerEvents: "none",
+  },
+  pressureThresholdMarker: {
+    position: "absolute",
+    bottom: 0,
+    width: 1,
+    alignItems: "center",
+    transform: [{ translateX: -0.5 }],
+  },
+  pressureThresholdLine: {
+    width: 1,
+    height: 4,
+    borderRadius: 1,
+    opacity: 0.8,
+  },
+  pressureThresholdLabelWrap: {
+    marginBottom: 2,
+    paddingHorizontal: 3,
+    paddingVertical: 0,
+    borderRadius: 4,
+    backgroundColor: "rgba(15, 15, 31, 0.7)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  pressureThresholdLabel: {
+    fontSize: 7,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+  },
+  pressureChip: {
+    position: "absolute",
+    left: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    backgroundColor: "rgba(15, 15, 31, 0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  pressureChipText: {
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  pressureValue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  valueDivider: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.text.disabled,
+    marginHorizontal: 4,
   },
   baronContainer: {
     position: "absolute",

@@ -698,9 +698,9 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "baron-pressure",
         title: "Baron Pressure",
-        summary: "Hidden squeeze meter.",
+        summary: "Visible attention meter.",
         detail:
-          "Builds from locked scout and overflow; high pressure lowers Phase 2 rewards. Open-only orders and waste recycling relieve it.",
+          "Builds from locked scout and overflow; 40+ cuts Phase 2 cash+research 10%, 70+ cuts 20%. Open-only installs and waste recycling relieve it.",
         icon: "alert-circle",
         color: GameColors.ui.warning,
       },

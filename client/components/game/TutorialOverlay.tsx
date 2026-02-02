@@ -84,7 +84,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 5,
     title: "The Baron’s Offer",
-    description: "Dependency starts maxed. Open installs lower it. Baron offers speed with lock-in.",
+    description:
+      "Dependency starts maxed. Open installs lower it. Baron offers speed with lock-in; open-only installs reduce Pressure.",
     icon: "lock",
     highlight: "dependency",
     color: GameColors.locked.primary,

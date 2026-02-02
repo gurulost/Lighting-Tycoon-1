@@ -894,8 +894,8 @@ export default function GameScreen() {
             style={styles.statusItem}
             onLongPress={() =>
               showToast(
-                "Dependency starts maxed. Open work lowers it; locked work reinforces it.",
-                2800
+                "Dependency starts maxed. Open work lowers it; locked work reinforces it. Baron Pressure taxes Phase 2 rewards: 40+ = -10%, 70+ = -20%. Open-only installs reduce Pressure.",
+                3400
               )
             }
             delayLongPress={350}
@@ -903,6 +903,7 @@ export default function GameScreen() {
             <View onLayout={setTarget("dependency")}>
               <DependencyMeter
                 value={state.dependency}
+                baronPressure={state.baronPressure}
                 compact
                 reducedMotion={state.settings.reducedMotion}
                 lockoutActive={state.lockoutActive}

@@ -41,6 +41,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - While Dependency is capped at 100, take Baron actions that add Dependency (contract/offer).
 - Verify:
   - Baron Pressure increases (lockout lab target increases to base+1 at 40, base+2 at 70).
+  - HUD shows the Baron Pressure meter next to Dependency with 40/70 thresholds and the open-only reduction hint.
   - Story beat "baron_attention" triggers the first time pressure crosses 40.
 - Trigger lockout and choose Lab route.
 - Verify:
