@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useCallback,
   useRef,
-  useMemo,
 } from "react";
 import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -514,8 +513,22 @@ function applyMissionRewardTuning(
 
 const MAX_STORY_LOG_ENTRIES = 120;
 const PERSISTED_STORY_LOG_LIMIT = 120;
+const PERSISTED_STORY_QUEUE_LIMIT = 8;
 const MAX_PART_TIER: PartTier = 10;
 const MAX_WASTE_TIER: PartTier = 3;
+const SAVE_VERSION = 1;
+const STORAGE_KEY = "lighting_tycoon_state_v1";
+const STORAGE_BACKUP_KEY = "lighting_tycoon_state_v1_backup";
+const STORY_QUEUE_PERSIST_CATEGORIES = new Set([
+  "tutorial",
+  "system",
+  "discovery",
+  "mission",
+]);
+const DEFAULT_OVERLAY_TELEMETRY: GameState["overlayTelemetry"] = {
+  maxWaitMs: 0,
+  lastShownAt: undefined,
+};
 const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
   generatedByNeighborhood: {},
   generatedByModifier: {},
@@ -524,6 +537,90 @@ const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
 };
 const SAVE_DEBOUNCE_MS = 1200;
 const SAVE_MAX_WAIT_MS = 12000;
+
+type SaveEnvelope = {
+  version: number;
+  state: GameState;
+};
+
+function filterStoryQueue(queue: string[]): string[] {
+  if (!Array.isArray(queue)) return [];
+  const filtered = queue.filter((beatId) => {
+    const beat = STORY_BEATS[beatId];
+    if (!beat) return false;
+    if (beat.priority === "high") return true;
+    return beat.category ? STORY_QUEUE_PERSIST_CATEGORIES.has(beat.category) : false;
+  });
+  if (filtered.length <= PERSISTED_STORY_QUEUE_LIMIT) return filtered;
+  return filtered.slice(-PERSISTED_STORY_QUEUE_LIMIT);
+}
+
+function looksLikeGameState(raw: unknown): raw is GameState {
+  if (!raw || typeof raw !== "object") return false;
+  const candidate = raw as { board?: unknown; cash?: unknown };
+  return Array.isArray(candidate.board) && typeof candidate.cash === "number";
+}
+
+function normalizeSaveEnvelope(raw: unknown): SaveEnvelope | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as { version?: unknown; state?: unknown };
+  if (record.state && typeof record.state === "object") {
+    const rawVersion = record.version;
+    const parsedVersion =
+      typeof rawVersion === "number"
+        ? rawVersion
+        : typeof rawVersion === "string"
+          ? Number(rawVersion)
+          : 0;
+    const version = Number.isFinite(parsedVersion) ? parsedVersion : 0;
+    if (version > SAVE_VERSION) return null;
+    return { version: SAVE_VERSION, state: record.state as GameState };
+  }
+  if (looksLikeGameState(raw)) {
+    return { version: SAVE_VERSION, state: raw as GameState };
+  }
+  return null;
+}
+
+function parseSavePayload(payload: string | null): SaveEnvelope | null {
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    return normalizeSaveEnvelope(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function buildPersistedState(state: GameState): GameState {
+  return {
+    ...state,
+    undoSnapshot: undefined,
+    storyQueue: filterStoryQueue(state.storyQueue),
+    activeStoryBeatId: undefined,
+    overlayQueue: [],
+    overlayTelemetry: DEFAULT_OVERLAY_TELEMETRY,
+    lastRecycleRewardId: 0,
+    lastRecycleReward: null,
+    lastBaronShipmentId: 0,
+    lastCooldownHintId: 0,
+    lastMissionRewardId: 0,
+    lastMissionReward: null,
+    orderMetrics: DEFAULT_ORDER_METRICS,
+    lastCriticalEventId: 0,
+  };
+}
+
+function buildSaveEnvelope(state: GameState): SaveEnvelope {
+  const persistableState = buildPersistedState(state);
+  return {
+    version: SAVE_VERSION,
+    state: {
+      ...persistableState,
+      storyLog: persistableState.storyLog.slice(-PERSISTED_STORY_LOG_LIMIT),
+    },
+  };
+}
 
 function getNeighborhoodIndex(id: string) {
   const index = NEIGHBORHOODS.findIndex((n) => n.id === id);
@@ -6391,6 +6488,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.baronOfferSeen === "boolean"
           ? action.state.baronOfferSeen
           : base.baronOfferSeen;
+      const baronOfferAvailable =
+        typeof action.state.baronOfferAvailable === "boolean"
+          ? action.state.baronOfferAvailable
+          : base.baronOfferAvailable;
+      const baronOfferType =
+        action.state.baronOfferType === "crate" ||
+        action.state.baronOfferType === "contract" ||
+        action.state.baronOfferType === "rush"
+          ? action.state.baronOfferType
+          : base.baronOfferType;
       const baronOfferCooldownUntil =
         typeof action.state.baronOfferCooldownUntil === "number"
           ? action.state.baronOfferCooldownUntil
@@ -6732,10 +6839,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastCooldownHintId: 0,
         baronCooldownHintShown,
         baronChoice,
-        baronOfferAvailable: false,
+        baronOfferAvailable,
         baronOfferSeen,
         baronOfferCooldownUntil,
-        baronOfferType: undefined,
+        baronOfferType,
         baronContractOrdersRemaining,
         lockoutLabOrdersTarget,
         tier5ShowcaseSeen,
@@ -6801,6 +6908,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workbenchCooldownUntil?: number;
       };
       restoredState = cleanedRestoredState as GameState;
+      restoredState = {
+        ...restoredState,
+        storyQueue: filterStoryQueue(restoredState.storyQueue),
+      };
 
       if (restoredState.liberationComplete || restoredState.gamePhase === 2) {
         restoredState = {
@@ -6898,7 +7009,6 @@ interface GameContextValue {
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
-const STORAGE_KEY = "lighting_tycoon_state_v1";
 const FIRST_OPEN_KEY = "lighting_tycoon_first_open_v1";
 const FINAL_TUTORIAL_STEP = 7;
 const tuning = getTuning();
@@ -6917,6 +7027,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const supplierTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastSaveAtRef = useRef(0);
   const lastCriticalEventRef = useRef(state.lastCriticalEventId);
   const [hydrated, setHydrated] = React.useState(false);
@@ -6954,17 +7065,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const loadState = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (!stored) {
+        let envelope = parseSavePayload(stored);
+        if (!envelope) {
+          const backup = await AsyncStorage.getItem(STORAGE_BACKUP_KEY);
+          envelope = parseSavePayload(backup);
+        }
+        if (!envelope) {
           setHydrated(true);
           return;
         }
-        const parsed = JSON.parse(stored) as {
-          version: number;
-          state: GameState;
-        };
-        if (parsed?.version === 1 && parsed.state) {
-          dispatch({ type: "LOAD_STATE", state: parsed.state });
-        }
+        dispatch({ type: "LOAD_STATE", state: envelope.state });
       } catch (error) {
         console.warn("Failed to load saved game state", error);
       } finally {
@@ -7318,145 +7428,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
   }, [endSession, startSession]);
 
-  const persistableState = useMemo(
-    () => ({
-      ...state,
-      undoSnapshot: undefined,
-      storyQueue: [],
-      activeStoryBeatId: undefined,
-      lastRecycleRewardId: 0,
-      lastRecycleReward: null,
-      lastBaronShipmentId: 0,
-      lastCooldownHintId: 0,
-      lastMissionRewardId: 0,
-      lastMissionReward: null,
-      orderSpawnCooldownUntil: 0,
-      lastCriticalEventId: 0,
-    }),
-    [
-      state.board,
-      state.boardSize,
-      state.unlockedSlots,
-      state.blockedSlots,
-      state.stationSlots,
-      state.backpackSlots,
-      state.backpack,
-      state.backpackUnlocked,
-      state.firstSessionComplete,
-      state.firstSessionOrderIndex,
-      state.firstSessionOrdersCompleted,
-      state.firstSessionForcedDrops,
-      state.firstSessionSecondOfferTriggered,
-      state.firstSessionChoiceOffered,
-      state.firstSessionChoiceResolved,
-      state.firstSessionChoiceMentorOrderId,
-      state.firstSessionChoiceBaronOrderId,
-      state.cash,
-      state.reputation,
-      state.research,
-      state.dependency,
-      state.gamePhase,
-      state.liberationComplete,
-      state.liberationCompletedAt,
-      state.phase2GoalPending,
-      state.baronPressure,
-      state.baronSupplySpawnsRemaining,
-      state.baronRushSpawnsRemaining,
-      state.suppliers,
-      state.upgradeMaterials,
-      state.compatibilityComponents,
-      state.orders,
-      state.maxOrders,
-      state.upgrades,
-      state.rdNodes,
-      state.freedomControllerCount,
-      state.tutorialStep,
-      state.tutorialComplete,
-      state.tutorialReplay,
-      state.tutorialSpawnCount,
-      state.tutorialMergeCount,
-      state.tutorialOrderId,
-      state.tutorialStepStartedAt,
-      state.tutorialNudgeCount,
-      state.tutorialHint,
-      state.tutorialMetrics,
-      state.lockoutActive,
-      state.lockoutPhase,
-      state.lockoutOrderId,
-      state.lockoutLabOrdersRemaining,
-      state.lockoutLabOrdersTarget,
-      state.lockoutChoice,
-      state.baronOfferAvailable,
-      state.baronOfferSeen,
-      state.baronOfferCooldownUntil,
-      state.baronChoice,
-      state.baronOfferType,
-      state.baronContractOrdersRemaining,
-      state.settings,
-      state.undoCooldownUntil,
-      state.mergeChainCount,
-      state.mergeChainExpiresAt,
-      state.lastMergeBonusId,
-      state.lastMergeBonusCash,
-      state.mergeMomentumLevel,
-      state.mergeMomentumPending,
-      state.mergeMomentumDropFloor,
-      state.storyLog,
-      state.storySeen,
-      state.lastStoryShownAt,
-      state.reputationTier,
-      state.currentNeighborhoodId,
-      state.orderMetrics,
-      state.highlightedOrderId,
-      state.orderSpawnCooldownUntil,
-      state.lastCriticalEventId,
-      state.tier5ShowcaseSeen,
-      state.tier5ShowcasePending,
-      state.tier10ShowcaseSeen,
-      state.tier10ShowcasePending,
-      state.tierDiscovery,
-      state.lastTierDiscoveryId,
-      state.lastTierDiscovered,
-      state.lockedDiscoverySeen,
-      state.lastLockedDiscoveryId,
-      state.compatibleDiscoverySeen,
-      state.lastCompatibleDiscoveryId,
-      state.maxTierCrafted,
-      state.marketingBoostOrdersRemaining,
-      state.ordersHelpNudgeSeen,
-      state.installStreakCurrent,
-      state.installStreakBest,
-      state.supplierScoutRoute,
-      state.supplierScoutSpawnsRemaining,
-      state.mentorClinicMergesRemaining,
-      state.warrantyStampMode,
-      state.warrantyStampOrdersRemaining,
-      state.missions,
-      state.missionHistory,
-      state.lastMissionRewardId,
-      state.lastMissionReward,
-    ],
-  );
+  const enqueueSave = useCallback((payload: string) => {
+    saveQueueRef.current = saveQueueRef.current
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await AsyncStorage.setItem(STORAGE_BACKUP_KEY, payload);
+        } catch (error) {
+          console.warn("Failed to save backup game state", error);
+        }
+        try {
+          await AsyncStorage.setItem(STORAGE_KEY, payload);
+          lastSaveAtRef.current = Date.now();
+        } catch (error) {
+          console.warn("Failed to save game state", error);
+        }
+      });
+  }, []);
 
-  const flushSave = useCallback(async () => {
+  const flushSave = useCallback(() => {
     if (!hydrated) return;
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    try {
-      const payloadState = {
-        ...persistableState,
-        orderMetrics: DEFAULT_ORDER_METRICS,
-        storyLog: persistableState.storyLog.slice(-PERSISTED_STORY_LOG_LIMIT),
-      };
-      const payload = JSON.stringify({ version: 1, state: payloadState });
-      await AsyncStorage.setItem(STORAGE_KEY, payload);
-      lastSaveAtRef.current = Date.now();
-    } catch (error) {
-      console.warn("Failed to save game state", error);
-    }
-  }, [hydrated, persistableState]);
+    const payload = JSON.stringify(buildSaveEnvelope(stateRef.current));
+    enqueueSave(payload);
+  }, [enqueueSave, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -7472,7 +7470,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     saveTimeoutRef.current = setTimeout(() => {
       flushSave();
     }, SAVE_DEBOUNCE_MS);
-  }, [hydrated, persistableState, flushSave]);
+  }, [hydrated, state, flushSave]);
 
   useEffect(() => {
     if (!hydrated) return;
