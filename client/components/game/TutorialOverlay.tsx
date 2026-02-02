@@ -101,7 +101,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 7,
     title: "You're Ready!",
-    description: "Unlock R&D for the Open Workshop, and recycle waste to speed it up. Keep space for smart chains.",
+    description: "Unlock R&D for the Open Workshop. You can overdraw suppliers during cooldowns at a cost, so keep cash and space ready.",
     icon: "star",
     highlight: null,
     color: GameColors.ui.success,

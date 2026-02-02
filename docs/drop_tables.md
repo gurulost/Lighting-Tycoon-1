@@ -19,6 +19,7 @@ This document captures the current supplier drop tables and bonus channels used 
 | Salvage Corner | 3 | 6 | 62000 |
 
 Note: Workbench speed upgrades reduce cooldowns globally.
+Note: During cooldowns, suppliers can be overdrawn at a cost; Baron overdraws can add extra waste.
 
 ## Baron Supply Depot (Locked)
 

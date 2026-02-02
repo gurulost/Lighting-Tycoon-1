@@ -36,6 +36,7 @@ This document defines the onboarding flow and first-session pacing.
 Guardrails:
 - No hard fails
 - Clear hint messaging when stuck
+- Overdraw is disabled until tutorial complete
 
 ---
 

@@ -26,6 +26,7 @@ import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
 import { getPortraitSource } from "@/constants/characters";
 import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
+import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
 
 interface OrderCardProps {
   order: Order;
@@ -270,6 +271,17 @@ export function OrderCard({
       ? Math.floor((1 + (timeRemaining / order.rushDeadline) * 0.5) * 100 - 100)
       : 0;
 
+  const projectStageMeta = (() => {
+    const tag = order.modifierIds?.find((id) => id.startsWith("project:"));
+    if (!tag) return null;
+    const [, projectId, stageIndexRaw] = tag.split(":");
+    const stageIndex = Number(stageIndexRaw);
+    if (!projectId || !Number.isFinite(stageIndex)) return null;
+    const definition = PROJECT_DEFINITION_BY_ID.get(projectId);
+    const totalStages = definition?.stages.length;
+    return { projectId, stageIndex, totalStages };
+  })();
+
   const priorityBadge = (() => {
     if (order.isLockout) {
       return { label: "LOCKOUT", color: GameColors.ui.danger, icon: "alert-triangle" as const };
@@ -296,8 +308,25 @@ export function OrderCard({
     return null;
   })();
 
+  const projectBadge = projectStageMeta
+    ? {
+        label: `PROJECT ${projectStageMeta.stageIndex + 1}${
+          projectStageMeta.totalStages ? `/${projectStageMeta.totalStages}` : ""
+        }`,
+        color: GameColors.ui.primary,
+        icon: "flag" as const,
+      }
+    : null;
+
   const modifierBadges = (() => {
     const badges: { label: string; color: string; icon: keyof typeof Feather.glyphMap }[] = [];
+    if (projectStageMeta) {
+      badges.push({
+        label: `Project Stage ${projectStageMeta.stageIndex + 1}`,
+        color: GameColors.ui.primary,
+        icon: "flag",
+      });
+    }
     if (order.type === "locked_required" || order.type === "baron_certified") {
       badges.push({ label: "Certified", color: GameColors.locked.primary, icon: "lock" });
     }
@@ -430,6 +459,22 @@ export function OrderCard({
             </ThemedText>
           </View>
           <View style={styles.headerRight}>
+            {projectBadge ? (
+              <Animated.View
+                style={[
+                  styles.statusChip,
+                  { borderColor: `${projectBadge.color}60`, backgroundColor: `${projectBadge.color}20` },
+                ]}
+              >
+                <Feather name={projectBadge.icon} size={11} color={projectBadge.color} />
+                <ThemedText
+                  style={[styles.statusChipText, { color: projectBadge.color }]}
+                  numberOfLines={1}
+                >
+                  {projectBadge.label}
+                </ThemedText>
+              </Animated.View>
+            ) : null}
             {priorityBadge ? (
               <Animated.View
                 style={[

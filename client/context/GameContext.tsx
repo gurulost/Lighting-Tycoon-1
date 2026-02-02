@@ -12,6 +12,7 @@ import {
   GameState,
   Part,
   Order,
+  OrderRequirement,
   OrderType,
   PartFamily,
   PartTier,
@@ -20,6 +21,11 @@ import {
   SupplierScoutRoute,
   WarrantyStampMode,
   Mission,
+  ProjectDefinition,
+  ProjectStageDefinition,
+  ProjectOffer,
+  ActiveProject,
+  ProjectDebuff,
   INITIAL_BOARD_SIZE,
   INITIAL_BACKPACK_SLOTS,
   INITIAL_BLOCKED_SLOTS,
@@ -39,8 +45,15 @@ import {
 } from "@/constants/story";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
 import { getLockoutLabRequestTarget } from "@/constants/lockout";
-import { ORDER_LIBRARY, ARCHETYPES } from "@/constants/orderContentPack";
+import {
+  ORDER_LIBRARY,
+  ARCHETYPES,
+  BASE_RECIPES,
+  computeCustomOrderRewards,
+} from "@/constants/orderContentPack";
+import { PROJECT_DEFINITIONS } from "@/constants/projects";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
+import { getProjectDepositCost, getProjectOfferRefreshCost } from "@/lib/projects";
 import {
   captureEvent,
   getAppInfo,
@@ -93,6 +106,25 @@ type GameAction =
   | { type: "START_SUPPLIER_SCOUT"; route: SupplierScoutRoute }
   | { type: "START_MENTOR_CLINIC" }
   | { type: "START_WARRANTY_STAMP"; mode: WarrantyStampMode }
+  | { type: "PROJECT_GENERATE_OFFERS" }
+  | { type: "PROJECT_REFRESH_OFFERS" }
+  | {
+      type: "PROJECT_ACCEPT";
+      projectId: string;
+      addons?: {
+        permitExpeditor?: boolean;
+        siteLogistics?: boolean;
+        overtimeCrew?: boolean;
+      };
+    }
+  | { type: "PROJECT_CANCEL" }
+  | { type: "PROJECT_STAGE_ADVANCE" }
+  | { type: "PROJECT_STAGE_FAIL" }
+  | {
+      type: "PROJECT_ADDON_PURCHASE";
+      addon: "permit_expeditor" | "site_logistics" | "overtime_crew";
+    }
+  | { type: "PROJECT_CHANGE_ORDER" }
   | { type: "ACCEPT_BARON_OFFER" }
   | { type: "DECLINE_BARON_OFFER" }
   | { type: "ADVANCE_TUTORIAL" }
@@ -119,6 +151,32 @@ type GameAction =
   | { type: "RESOLVE_LOCKOUT"; choice: "baron" | "freedom" }
   | { type: "LOAD_STATE"; state: GameState };
 
+type SupplierTapMode = "tap" | "overdraw";
+
+type SupplierTapFailure =
+  | "locked"
+  | "no_space"
+  | "cooldown"
+  | "insufficient_cash"
+  | "insufficient_research"
+  | "insufficient_waste";
+
+type SupplierOverdrawCost = {
+  cash: number;
+  research: number;
+  wasteRequired: number;
+  extraWasteChance: number;
+  overheatMs: number;
+  salvageMethod?: "waste" | "cash_fallback";
+};
+
+type SupplierTapStatus = {
+  ok: boolean;
+  mode?: SupplierTapMode;
+  reason?: SupplierTapFailure;
+  cost?: SupplierOverdrawCost;
+};
+
 function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
@@ -131,7 +189,9 @@ function normalizeSupplierState(
   baronEarlyRelief = false,
 ) {
   if (supplier.level <= 0) return supplier;
-  if (supplier.chargesRemaining > 0) return supplier;
+  if (supplier.chargesRemaining > 0) {
+    return resetOverdraw(supplier);
+  }
   if (supplier.cooldownEndsAt && supplier.cooldownEndsAt > now) return supplier;
   const config = getEffectiveSupplierConfig(
     supplierId,
@@ -145,7 +205,206 @@ function normalizeSupplierState(
     ...supplier,
     chargesRemaining: config.maxCharges,
     cooldownEndsAt: 0,
+    overdrawCount: 0,
   };
+}
+
+function resetOverdraw(
+  supplier: GameState["suppliers"][SupplierId],
+): GameState["suppliers"][SupplierId] {
+  if (supplier.overdrawCount === 0) return supplier;
+  return { ...supplier, overdrawCount: 0 };
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function countWasteParts(
+  state: GameState,
+  boardOverride?: (Part | null)[],
+  backpackOverride?: (Part | null)[],
+) {
+  const board = boardOverride ?? state.board;
+  const backpack = backpackOverride ?? state.backpack;
+  const boardWaste = board
+    .map((part, index) =>
+      part && part.family === "waste"
+        ? { source: "board" as const, index, tier: part.tier }
+        : null,
+    )
+    .filter(Boolean) as { source: "board"; index: number; tier: PartTier }[];
+  const backpackWaste = backpack
+    .map((part, index) =>
+      part && part.family === "waste"
+        ? { source: "backpack" as const, index, tier: part.tier }
+        : null,
+    )
+    .filter(Boolean) as { source: "backpack"; index: number; tier: PartTier }[];
+  const allWaste = [...boardWaste, ...backpackWaste];
+  allWaste.sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier - b.tier;
+    if (a.source !== b.source) return a.source === "board" ? -1 : 1;
+    return a.index - b.index;
+  });
+  return allWaste;
+}
+
+
+function getOverheatMs(overdrawCountNext: number) {
+  const freeCount = Math.max(0, Math.round(tuning.suppliers.overdraw.freeCount));
+  if (overdrawCountNext <= freeCount) return 0;
+  const base = Math.max(0, Math.round(tuning.suppliers.overdraw.overheatMs));
+  if (!base) return 0;
+  if (tuning.suppliers.overdraw.overheatMode === "linear") {
+    return base * Math.max(1, overdrawCountNext - freeCount);
+  }
+  return base;
+}
+
+function getOverdrawCost(
+  state: GameState,
+  supplierId: SupplierId,
+  overdrawCount: number,
+): SupplierOverdrawCost {
+  const safeCount = Math.max(0, overdrawCount);
+  const overheatMs = getOverheatMs(safeCount + 1);
+  if (supplierId === "baron") {
+    const pct = Math.max(
+      0,
+      tuning.suppliers.overdraw.baron.cashPctBase +
+        tuning.suppliers.overdraw.baron.cashPctStep * safeCount,
+    );
+    const cash = Math.max(
+      0,
+      Math.max(
+        tuning.suppliers.overdraw.baron.cashMin,
+        Math.floor(state.cash * pct),
+      ),
+    );
+    const rawChance =
+      tuning.suppliers.overdraw.baron.wasteChanceBase +
+      tuning.suppliers.overdraw.baron.wasteChanceStep * safeCount;
+    const extraWasteChance = clampNumber(
+      rawChance,
+      0,
+      tuning.suppliers.overdraw.baron.wasteChanceMax,
+    );
+    return {
+      cash,
+      research: 0,
+      wasteRequired: 0,
+      extraWasteChance,
+      overheatMs,
+    };
+  }
+  if (supplierId === "open") {
+    const research = Math.max(
+      0,
+      Math.round(
+        tuning.suppliers.overdraw.open.researchBase +
+          tuning.suppliers.overdraw.open.researchStep * safeCount,
+      ),
+    );
+    return {
+      cash: 0,
+      research,
+      wasteRequired: 0,
+      extraWasteChance: 0,
+      overheatMs,
+    };
+  }
+
+  const requiredWaste = Math.max(
+    1,
+    Math.round(
+      tuning.suppliers.overdraw.salvage.wasteRequiredBase +
+        tuning.suppliers.overdraw.salvage.wasteRequiredStep * safeCount,
+    ),
+  );
+  const availableWaste = countWasteParts(state).length;
+  if (availableWaste >= requiredWaste) {
+    return {
+      cash: 0,
+      research: 0,
+      wasteRequired: requiredWaste,
+      extraWasteChance: 0,
+      overheatMs,
+      salvageMethod: "waste",
+    };
+  }
+  const pct = Math.max(0, tuning.suppliers.overdraw.salvage.cashFallbackPct);
+  const cash = Math.max(
+    0,
+    Math.max(
+      tuning.suppliers.overdraw.salvage.cashFallbackMin,
+      Math.floor(state.cash * pct),
+    ),
+  );
+  return {
+    cash,
+    research: 0,
+    wasteRequired: requiredWaste,
+    extraWasteChance: 0,
+    overheatMs,
+    salvageMethod: "cash_fallback",
+  };
+}
+
+function getTapStatus(
+  state: GameState,
+  supplierId: SupplierId,
+  now = Date.now(),
+): SupplierTapStatus {
+  const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+  const baronEarlyRelief =
+    state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
+  const supplier = normalizeSupplierState(
+    supplierId,
+    state.suppliers[supplierId],
+    now,
+    speedLevel,
+    baronEarlyRelief,
+  );
+  if (supplier.level <= 0) {
+    return { ok: false, reason: "locked" };
+  }
+  if (!hasPlacementSpace(state)) {
+    return { ok: false, reason: "no_space" };
+  }
+  if (supplier.chargesRemaining > 0) {
+    return { ok: true, mode: "tap" };
+  }
+  if (!state.tutorialComplete) {
+    return { ok: false, reason: "cooldown" };
+  }
+  if (!supplier.cooldownEndsAt || supplier.cooldownEndsAt <= now) {
+    return { ok: false, reason: "cooldown" };
+  }
+  const cost = getOverdrawCost(state, supplierId, supplier.overdrawCount);
+  if (cost.cash > 0 && state.cash < cost.cash) {
+    return { ok: false, mode: "overdraw", reason: "insufficient_cash", cost };
+  }
+  if (cost.research > 0 && state.research < cost.research) {
+    return {
+      ok: false,
+      mode: "overdraw",
+      reason: "insufficient_research",
+      cost,
+    };
+  }
+  if (cost.wasteRequired > 0 && cost.salvageMethod !== "cash_fallback") {
+    const availableWaste = countWasteParts(state).length;
+    if (availableWaste < cost.wasteRequired) {
+      return {
+        ok: false,
+        mode: "overdraw",
+        reason: "insufficient_waste",
+        cost,
+      };
+    }
+  }
+  return { ok: true, mode: "overdraw", cost };
 }
 
 function rollWeightedTier(
@@ -246,6 +505,7 @@ function applyBaronSupplierUpgrade(state: GameState): GameState {
         level: nextLevel,
         chargesRemaining: config.maxCharges,
         cooldownEndsAt: 0,
+        overdrawCount: 0,
       },
     },
   };
@@ -465,6 +725,55 @@ function getWarrantyStampCost(reputationTier: number) {
     tuning.economy.warrantyStampCostBase +
     reputationTier * tuning.economy.warrantyStampCostStep
   );
+}
+
+function getProjectStageDeadline(
+  stage: ProjectStageDefinition,
+  stageIndex: number,
+) {
+  if (!tuning.projects.deadlineEnabled) return undefined;
+  if (stage.deadline?.type === "installs") {
+    return Math.max(1, Math.floor(stage.deadline.installsRemaining));
+  }
+  const fallback = tuning.projects.deadlineInstallsByStage[stageIndex];
+  if (typeof fallback === "number") return Math.max(1, Math.floor(fallback));
+  return undefined;
+}
+
+function canOfferProject(project: ProjectDefinition, state: GameState) {
+  if (state.gamePhase !== 2) return false;
+  if (state.reputationTier < project.unlock.minRepTier) return false;
+  const completedCount = state.projectsCompleted.length;
+  if (
+    typeof project.unlock.minProjectsCompleted === "number" &&
+    completedCount < project.unlock.minProjectsCompleted
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function generateProjectOffers(state: GameState, count = 3): ProjectOffer[] {
+  const now = Date.now();
+  const candidates = PROJECT_DEFINITIONS.filter((project) =>
+    canOfferProject(project, state),
+  );
+  if (candidates.length === 0) return [];
+  const offers: ProjectOffer[] = [];
+  const usedIds = new Set<string>();
+  let attempts = 0;
+  while (offers.length < count && attempts < count * 6) {
+    attempts += 1;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!pick || usedIds.has(pick.id)) continue;
+    usedIds.add(pick.id);
+    offers.push({
+      projectId: pick.id,
+      seed: Math.floor(Math.random() * 1000000),
+      generatedAt: now,
+    });
+  }
+  return offers;
 }
 
 function applyOrderRewardTuning(rewards: Order["rewards"]): Order["rewards"] {
@@ -1187,6 +1496,36 @@ function hashString(value: string) {
   return hash;
 }
 
+function createSeededRng(seed: number) {
+  let value = seed >>> 0;
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+
+function getEffectiveMaxOrders(state: GameState) {
+  return state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
+}
+
+function getProjectDefinitionById(projectId: string): ProjectDefinition | undefined {
+  return PROJECT_DEFINITIONS.find((project) => project.id === projectId);
+}
+
+function getProjectStageTag(projectId: string, stageIndex: number) {
+  return `project:${projectId}:${stageIndex}`;
+}
+
+function parseProjectStageTag(order: Order): { projectId: string; stageIndex: number } | null {
+  const tag = order.modifierIds?.find((id) => id.startsWith("project:"));
+  if (!tag) return null;
+  const parts = tag.split(":");
+  if (parts.length < 3) return null;
+  const stageIndex = Number(parts[2]);
+  if (!Number.isFinite(stageIndex)) return null;
+  return { projectId: parts[1], stageIndex };
+}
+
 function ensureSentence(text: string) {
   const trimmed = text.trim();
   if (!trimmed) return "";
@@ -1213,6 +1552,175 @@ function pickWeightedTemplate<T extends { weight?: number }>(
     if (roll <= running) return item;
   }
   return items[items.length - 1];
+}
+
+function getProjectBaseRecipe(
+  stage: ProjectStageDefinition,
+  rng: () => number,
+) {
+  const [rawMin, rawMax] = stage.orderSpec.targetTierRange;
+  const minTier = Math.max(1, Math.min(rawMin, rawMax));
+  const maxTier = Math.min(10, Math.max(rawMin, rawMax));
+  const candidates = BASE_RECIPES.filter((recipe) => {
+    const recipeMax = Math.max(...recipe.requirements.map((req) => req.tier));
+    return recipeMax >= minTier && recipeMax <= maxTier;
+  });
+  const pool = candidates.length > 0 ? candidates : BASE_RECIPES;
+  const index = Math.floor(rng() * pool.length);
+  return pool[Math.max(0, Math.min(pool.length - 1, index))];
+}
+
+function applyProjectStageRequirements(
+  requirements: OrderRequirement[],
+  stage: ProjectStageDefinition,
+): { requirements: OrderRequirement[]; type: OrderType } {
+  const spec = stage.orderSpec;
+  const maxTier = Math.max(...requirements.map((req) => req.tier));
+  let type: OrderType = requirements.some((req) => req.tier >= 5)
+    ? "premium"
+    : "basic";
+  let next = requirements.map((req) => ({ ...req }));
+
+  if (spec.requiresOpenOnly) {
+    type = "style_match";
+    next = next.map((req) => ({ ...req, family: "open" }));
+  } else if (spec.requiresCompatibility) {
+    type = "compatibility_required";
+    next = next.map((req) => {
+      const family = req.family === "locked" ? "open" : req.family;
+      if (req.tier === maxTier) {
+        return { ...req, family: "open", requiresCompatible: true };
+      }
+      return { ...req, family };
+    });
+  }
+
+  return { requirements: next, type };
+}
+
+function buildProjectStageOrder(
+  state: GameState,
+  project: ProjectDefinition,
+  stage: ProjectStageDefinition,
+  seed: number,
+  rerollCount = 0,
+): Order {
+  const seedKey = hashString(`${seed}:${project.id}:${stage.stageIndex}:${rerollCount}`);
+  const rng = createSeededRng(seedKey);
+  const baseRecipe = getProjectBaseRecipe(stage, rng);
+  const derived = applyProjectStageRequirements(baseRecipe.requirements, stage);
+
+  const rewardModifierIds: string[] = [];
+  if (stage.orderSpec.requiresOpenOnly) rewardModifierIds.push("mod_style_open");
+  if (stage.orderSpec.requiresCompatibility)
+    rewardModifierIds.push("mod_compatible");
+  if (stage.orderSpec.ecoAudit) rewardModifierIds.push("mod_eco_audit");
+  if (stage.orderSpec.rush) rewardModifierIds.push("mod_rush_60");
+  if (stage.orderSpec.noSubstitutions) rewardModifierIds.push("mod_no_sub");
+
+  const baseRewards = computeCustomOrderRewards({
+    requirements: derived.requirements,
+    neighborhoodId: state.currentNeighborhoodId,
+    modifierIds: rewardModifierIds,
+  });
+
+  const stageMultiplier =
+    Math.max(0, stage.stageRewards.rewardMultiplier) *
+    Math.max(0, tuning.projects.stageRewardMultiplier);
+  const rewards = {
+    cash: Math.round(baseRewards.cash * stageMultiplier),
+    reputation: Math.round(baseRewards.reputation * stageMultiplier),
+    research: Math.round(baseRewards.research * stageMultiplier),
+  };
+  if (stage.stageRewards.repBonusFlat) {
+    rewards.reputation += stage.stageRewards.repBonusFlat;
+  }
+  if (stage.stageRewards.researchBonusFlat) {
+    rewards.research += stage.stageRewards.researchBonusFlat;
+  }
+
+  const ecoAuditBonus =
+    stage.orderSpec.ecoAudit
+      ? 15
+      : undefined;
+  const rushDeadline = stage.orderSpec.rush ? 60000 : undefined;
+
+  const modifierIds = [
+    "project_stage",
+    getProjectStageTag(project.id, stage.stageIndex),
+  ];
+  if (stage.orderSpec.requiresOpenOnly) modifierIds.push("project_open_only");
+  if (stage.orderSpec.requiresCompatibility)
+    modifierIds.push("project_compatibility");
+  if (stage.orderSpec.ecoAudit) modifierIds.push("project_eco_audit");
+  if (stage.orderSpec.rush) modifierIds.push("project_rush");
+
+  return withTunedRewards({
+    id: generateId(),
+    title: stage.stageTitle,
+    type: derived.type,
+    requirements: derived.requirements,
+    rewards,
+    flavorText: project.synopsis,
+    templateId: `project:${project.id}:${stage.stageIndex}`,
+    modifierIds,
+    ecoAuditBonusResearch: ecoAuditBonus,
+    rushDeadline,
+    rushStartTime: rushDeadline ? Date.now() : undefined,
+    noSubstitutions: stage.orderSpec.noSubstitutions || false,
+  });
+}
+
+function getActiveProjectStage(state: GameState): {
+  project: ProjectDefinition;
+  stage: ProjectStageDefinition;
+} | null {
+  if (!state.activeProject) return null;
+  const project = getProjectDefinitionById(state.activeProject.projectId);
+  if (!project) return null;
+  const stage = project.stages[state.activeProject.stageIndex];
+  if (!stage) return null;
+  return { project, stage };
+}
+
+function stripProjectOrders(orders: Order[]) {
+  return orders.filter((order) => !order.modifierIds?.includes("project_stage"));
+}
+
+function applyProjectFailPenalty(
+  state: GameState,
+  stage: ProjectStageDefinition,
+): Pick<GameState, "cash" | "baronPressure" | "projectDebuff"> {
+  const penalty = stage.failPenalty;
+  if (penalty.type === "lose_deposit") {
+    const depositPaid = state.activeProject?.depositPaid ?? 0;
+    const loss = Math.floor(depositPaid * penalty.loseDepositPercent);
+    return {
+      cash: Math.max(0, state.cash - loss),
+      baronPressure: state.baronPressure,
+      projectDebuff: state.projectDebuff,
+    };
+  }
+  if (penalty.type === "pressure") {
+    const bumped = Math.min(
+      tuning.baron.pressureMax,
+      state.baronPressure + penalty.pressureIncrease,
+    );
+    return {
+      cash: state.cash,
+      baronPressure: bumped,
+      projectDebuff: state.projectDebuff,
+    };
+  }
+  return {
+    cash: state.cash,
+    baronPressure: state.baronPressure,
+    projectDebuff: {
+      type: "rep",
+      remainingOrders: penalty.remainingOrders,
+      multiplier: penalty.repMultiplier,
+    },
+  };
 }
 
 function createLockoutOrder(): Order {
@@ -1318,7 +1826,7 @@ function insertFirstSessionChoiceOrders(
   const nonFirstSessionOrders = orders.filter(
     (order) => !order.modifierIds?.includes("first_session"),
   );
-  const availableSlots = state.maxOrders - nonFirstSessionOrders.length;
+  const availableSlots = getEffectiveMaxOrders(state) - nonFirstSessionOrders.length;
   if (availableSlots < 2) {
     return {
       orders,
@@ -1369,6 +1877,7 @@ function isProtectedOrder(state: GameState, order: Order) {
   if (order.modifierIds?.includes("tier5_showcase")) return true;
   if (order.modifierIds?.includes("tier10_showcase")) return true;
   if (order.modifierIds?.includes("threshold_story")) return true;
+  if (order.modifierIds?.includes("project_stage")) return true;
   return false;
 }
 
@@ -1377,7 +1886,7 @@ function insertTier5ShowcaseOrder(
   orders: Order[],
 ): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
   const showcaseOrder = createTier5ShowcaseOrder();
-  if (orders.length < state.maxOrders) {
+  if (orders.length < getEffectiveMaxOrders(state)) {
     return {
       orders: [...orders, showcaseOrder],
       highlightedOrderId: state.highlightedOrderId,
@@ -1419,7 +1928,7 @@ function insertTier10ShowcaseOrder(
   orders: Order[],
 ): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
   const showcaseOrder = createTier10ShowcaseOrder();
-  if (orders.length < state.maxOrders) {
+  if (orders.length < getEffectiveMaxOrders(state)) {
     return {
       orders: [...orders, showcaseOrder],
       highlightedOrderId: state.highlightedOrderId,
@@ -1461,7 +1970,7 @@ function insertStoryOrder(
   orders: Order[],
   order: Order,
 ): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
-  if (orders.length < state.maxOrders) {
+  if (orders.length < getEffectiveMaxOrders(state)) {
     return {
       orders: [...orders, order],
       highlightedOrderId: state.highlightedOrderId,
@@ -1496,6 +2005,15 @@ function insertStoryOrder(
     highlightedOrderId: nextHighlightedOrderId,
     inserted: true,
   };
+}
+
+function trimOrdersToMax(state: GameState, orders: Order[]) {
+  const maxOrders = getEffectiveMaxOrders(state);
+  if (orders.length <= maxOrders) return orders;
+  const required = orders.filter((order) => isProtectedOrder(state, order));
+  const others = orders.filter((order) => !isProtectedOrder(state, order));
+  const trimmed = [...required, ...others].slice(0, maxOrders);
+  return trimmed;
 }
 
 function createDependencyStoryOrder(
@@ -1640,7 +2158,7 @@ function beginLockout(state: GameState): GameState {
     lockoutLabOrdersTarget,
     lockoutChoice: undefined,
     baronPressure: 0,
-    orders: [lockoutOrder, ...nextOrders].slice(0, state.maxOrders),
+    orders: [lockoutOrder, ...nextOrders].slice(0, getEffectiveMaxOrders(state)),
   };
   let queued = queueStoryBeat(nextState, "lockout_begin");
   queued = queueStoryBeat(queued, "tina_lockout_react");
@@ -1976,13 +2494,19 @@ function getInitialState(): GameState {
     liberationComplete: false,
     liberationCompletedAt: undefined,
     phase2GoalPending: false,
+    projectsUnlocked: false,
+    projectOffers: [],
+    activeProject: undefined,
+    projectsCompleted: [],
+    projectMilestones: {},
+    projectDebuff: undefined,
     baronPressure: 0,
     baronSupplySpawnsRemaining: 0,
     baronRushSpawnsRemaining: 0,
     suppliers: {
-      baron: { level: 1, chargesRemaining: 6, cooldownEndsAt: 0 },
-      open: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0 },
-      salvage: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0 },
+      baron: { level: 1, chargesRemaining: 6, cooldownEndsAt: 0, overdrawCount: 0 },
+      open: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
+      salvage: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
     },
     upgradeMaterials: 0,
     compatibilityComponents: 0,
@@ -2354,11 +2878,38 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
-      if (supplier.chargesRemaining <= 0) {
+      const isOverdraw =
+        supplier.chargesRemaining <= 0 && supplier.cooldownEndsAt > now;
+      if (supplier.chargesRemaining <= 0 && !isOverdraw) {
         return {
           ...state,
           suppliers: { ...state.suppliers, [supplierId]: supplier },
         };
+      }
+      if (isOverdraw && !state.tutorialComplete) {
+        return {
+          ...state,
+          suppliers: { ...state.suppliers, [supplierId]: supplier },
+        };
+      }
+      let overdrawCost: SupplierOverdrawCost | null = null;
+      if (isOverdraw) {
+        overdrawCost = getOverdrawCost(state, supplierId, supplier.overdrawCount);
+        if (overdrawCost.cash > 0 && state.cash < overdrawCost.cash) {
+          return state;
+        }
+        if (overdrawCost.research > 0 && state.research < overdrawCost.research) {
+          return state;
+        }
+        if (
+          overdrawCost.wasteRequired > 0 &&
+          overdrawCost.salvageMethod !== "cash_fallback"
+        ) {
+          const availableWaste = countWasteParts(state).length;
+          if (availableWaste < overdrawCost.wasteRequired) {
+            return state;
+          }
+        }
       }
 
       const isTutorial = !state.tutorialComplete;
@@ -2376,6 +2927,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const scoutRoute = scoutActive ? state.supplierScoutRoute : undefined;
 
       let rollResult = rollSupplierDrop(supplierId, supplier.level);
+      const wasteToConsume =
+        isOverdraw &&
+        overdrawCost &&
+        overdrawCost.wasteRequired > 0 &&
+        overdrawCost.salvageMethod !== "cash_fallback"
+          ? countWasteParts(state).slice(0, overdrawCost.wasteRequired)
+          : [];
       if (forceOpenParts || typeof forcedTier === "number") {
         const tier =
           typeof forcedTier === "number" ? forcedTier : forceTierOne ? 1 : 1;
@@ -2385,6 +2943,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           upgradeMaterialsDelta: 0,
           compatibilityComponentsDelta: 0,
         };
+      }
+      let extraWasteTriggered = false;
+      if (
+        isOverdraw &&
+        supplierId === "baron" &&
+        overdrawCost &&
+        overdrawCost.extraWasteChance > 0
+      ) {
+        if (Math.random() < overdrawCost.extraWasteChance) {
+          rollResult.bonusItems.push({ family: "waste", tier: 1 });
+          extraWasteTriggered = true;
+        }
       }
       const gainedUpgradeMaterial = rollResult.upgradeMaterialsDelta > 0;
       const gainedCompatibilityComponent =
@@ -2500,6 +3070,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       });
 
+      let overdrawCash = 0;
+      let overdrawResearch = 0;
+      let overdrawWasteConsumed = 0;
+      let overdrawOverheatMs = 0;
+      if (isOverdraw && overdrawCost) {
+        overdrawCash = Math.max(0, overdrawCost.cash);
+        overdrawResearch = Math.max(0, overdrawCost.research);
+        overdrawOverheatMs = Math.max(0, overdrawCost.overheatMs);
+        if (wasteToConsume.length > 0) {
+          const nextBoardCopy = [...nextBoard];
+          const nextBackpackCopy = [...nextBackpack];
+          wasteToConsume.forEach((entry) => {
+            if (entry.source === "board") {
+              nextBoardCopy[entry.index] = null;
+            } else {
+              nextBackpackCopy[entry.index] = null;
+            }
+          });
+          nextBoard = nextBoardCopy;
+          nextBackpack = nextBackpackCopy;
+          overdrawWasteConsumed = wasteToConsume.length;
+        }
+      }
+
       let nextBaronSupplyRemaining = state.baronSupplySpawnsRemaining;
       let nextBaronRushRemaining = state.baronRushSpawnsRemaining;
       const baronBonusAllowed =
@@ -2585,12 +3179,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           baronEarlyRelief,
         },
       );
-      const nextCharges = Math.max(0, supplier.chargesRemaining - 1);
+      const nextCharges = isOverdraw
+        ? 0
+        : Math.max(0, supplier.chargesRemaining - 1);
+      const nextOverdrawCount = isOverdraw ? supplier.overdrawCount + 1 : 0;
+      const nextCooldownEndsAt = isOverdraw
+        ? Math.max(0, supplier.cooldownEndsAt + overdrawOverheatMs)
+        : nextCharges === 0
+          ? now + config.cooldownMs
+          : supplier.cooldownEndsAt;
       const nextSupplier = {
         ...supplier,
         chargesRemaining: nextCharges,
-        cooldownEndsAt:
-          nextCharges === 0 ? now + config.cooldownMs : supplier.cooldownEndsAt,
+        cooldownEndsAt: nextCooldownEndsAt,
+        overdrawCount: nextOverdrawCount,
       };
       const hitBaronCooldown =
         supplierId === "baron" &&
@@ -2774,6 +3376,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         orders: nextOrders,
         highlightedOrderId: nextHighlightedOrderId,
         suppliers: { ...state.suppliers, [supplierId]: nextSupplier },
+        cash: state.cash - overdrawCash,
+        research: state.research - overdrawResearch,
         upgradeMaterials:
           state.upgradeMaterials + rollResult.upgradeMaterialsDelta,
         compatibilityComponents:
@@ -2821,6 +3425,42 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         };
         if (state.tutorialComplete) {
           nextState = queueStoryBeat(nextState, "discover_locked");
+        }
+      }
+
+      if (isOverdraw && overdrawCost) {
+        if (overdrawCash > 0) {
+          captureEvent("cash_spent", {
+            amount: overdrawCash,
+            reason: "supplier_overdraw",
+            supplierId,
+          });
+        }
+        if (overdrawResearch > 0) {
+          captureEvent("research_spent", {
+            amount: overdrawResearch,
+            reason: "supplier_overdraw",
+            supplierId,
+          });
+        }
+        captureEvent("supplier_overdraw", {
+          supplierId,
+          overdrawCount: nextSupplier.overdrawCount,
+          cashSpent: overdrawCash,
+          researchSpent: overdrawResearch,
+          wasteConsumed: overdrawWasteConsumed,
+          extraWasteTriggered,
+          overheatMs: overdrawOverheatMs,
+          salvageMethod: overdrawCost.salvageMethod,
+        });
+        if (state.tutorialComplete) {
+          const beatId =
+            supplierId === "baron"
+              ? "overdraw_baron"
+              : supplierId === "open"
+                ? "overdraw_open"
+                : "overdraw_salvage";
+          nextState = queueStoryBeat(nextState, beatId);
         }
       }
 
@@ -3043,9 +3683,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (isTutorial && state.tutorialStep === 2 && newTier === 3) {
         tutorialUpdate = advanceTutorialStep(state, 3);
         tutorialOrder = createTutorialOrder();
+        const maxOrders = getEffectiveMaxOrders(state);
         const trimmedOrders =
-          state.orders.length >= state.maxOrders
-            ? state.orders.slice(0, Math.max(0, state.maxOrders - 1))
+          state.orders.length >= maxOrders
+            ? state.orders.slice(0, Math.max(0, maxOrders - 1))
             : state.orders;
         tutorialOrders = [...trimmedOrders, tutorialOrder];
         tutorialBonusRep = 2;
@@ -3556,6 +4197,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   openSupplier.chargesRemaining + 1,
                 ),
                 cooldownEndsAt: 0,
+                overdrawCount: 0,
               },
             };
           } else if (
@@ -3575,6 +4217,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   ...openSupplier,
                   chargesRemaining: config.maxCharges,
                   cooldownEndsAt: 0,
+                  overdrawCount: 0,
                 },
               };
             } else {
@@ -3663,6 +4306,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const { orderId, partIndices } = action;
       const order = state.orders.find((o) => o.id === orderId);
       if (!order) return state;
+      const projectStageInfo =
+        order.modifierIds?.includes("project_stage")
+          ? parseProjectStageTag(order)
+          : null;
+      const isProjectStageOrder = !!projectStageInfo;
+      const completedPhase2Goal = order.modifierIds?.includes("phase2_goal");
       if (order.rushStartTime && order.rushDeadline) {
         const elapsed = Date.now() - order.rushStartTime;
         if (elapsed > order.rushDeadline) {
@@ -3687,6 +4336,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextUpgradeMaterials = state.upgradeMaterials;
       let nextCompatibilityComponents = state.compatibilityComponents;
       let queuedTier10ShowcaseBeat = false;
+      let nextProjectDebuff = state.projectDebuff;
+      let nextActiveProject = state.activeProject;
+      let nextProjectOffers = state.projectOffers;
+      let nextProjectsCompleted = state.projectsCompleted;
+      let nextProjectMilestones = state.projectMilestones;
+      let nextProjectsUnlocked = state.projectsUnlocked;
+      let projectCompletionReward: { cash: number; reputation: number; research: number } | null = null;
+      let nextMaxOrders = state.maxOrders;
+      let projectStageBeatId: string | null = null;
+      let projectCompleteBeatId: string | null = null;
+      let projectUnlockBeatId: string | null = null;
+      let projectStageFailed = false;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
       const warrantyMode = warrantyActive ? state.warrantyStampMode : undefined;
@@ -3832,6 +4493,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         dependencyOutcome.dependency,
       );
       let phase2PenaltyActive = false;
+      let phase2RewardMultiplier = 1;
       if (state.gamePhase === 2) {
         const rewardMultiplier = getPhase2RewardMultiplier(
           dependencyOutcome.baronPressure,
@@ -3841,6 +4503,26 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           researchReward = Math.floor(researchReward * rewardMultiplier);
           phase2PenaltyActive = true;
         }
+        phase2RewardMultiplier = rewardMultiplier;
+      }
+      if (projectCompletionReward) {
+        const completionCash = Math.floor(
+          projectCompletionReward.cash * phase2RewardMultiplier,
+        );
+        const completionResearch = Math.floor(
+          projectCompletionReward.research * phase2RewardMultiplier,
+        );
+        cashReward += completionCash;
+        researchReward += completionResearch;
+        repReward += projectCompletionReward.reputation;
+      }
+      if (nextProjectDebuff && nextProjectDebuff.remainingOrders > 0) {
+        repReward = Math.floor(repReward * nextProjectDebuff.multiplier);
+        const remaining = nextProjectDebuff.remainingOrders - 1;
+        nextProjectDebuff =
+          remaining > 0
+            ? { ...nextProjectDebuff, remainingOrders: remaining }
+            : undefined;
       }
       const firstSessionActive =
         state.tutorialComplete && !state.firstSessionComplete;
@@ -3976,6 +4658,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 level: nextLevel,
                 chargesRemaining: config.maxCharges,
                 cooldownEndsAt: 0,
+                overdrawCount: 0,
               },
             };
             const upgradedNodes = { ...nextRdNodes };
@@ -4049,7 +4732,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (
         firstSessionActive &&
-        updatedOrders.length < state.maxOrders &&
+        updatedOrders.length < getEffectiveMaxOrders(state) &&
         nextFirstSessionOrderIndex < FIRST_SESSION_ORDERS.length &&
         !blockScriptedOrdersForChoice
       ) {
@@ -4083,6 +4766,133 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           FIRST_SESSION_CHOICE_COMPLETIONS + 1 &&
         state.baronOfferSeen &&
         !state.baronOfferAvailable;
+
+      const activeProjectData =
+        isProjectStageOrder && state.activeProject
+          ? getActiveProjectStage(state)
+          : null;
+      const projectStageMatches =
+        activeProjectData &&
+        projectStageInfo &&
+        activeProjectData.project.id === projectStageInfo.projectId &&
+        activeProjectData.stage.stageIndex === projectStageInfo.stageIndex;
+
+      if (projectStageMatches && state.activeProject) {
+        const { project, stage } = activeProjectData;
+        const stageHistory = [
+          ...state.activeProject.stageHistory,
+          { stageIndex: stage.stageIndex, completedAt: Date.now() },
+        ];
+        const isFinalStage =
+          stage.stageIndex >= project.stages.length - 1;
+
+        if (isFinalStage) {
+          projectCompletionReward = {
+            cash: Math.round(
+              order.rewards.cash *
+                project.completionRewards.cashMultiplier *
+                tuning.projects.completionRewardMultiplier,
+            ),
+            reputation: Math.round(
+              order.rewards.reputation *
+                project.completionRewards.reputationMultiplier,
+            ),
+            research: Math.round(
+              order.rewards.research *
+                project.completionRewards.researchMultiplier *
+                tuning.projects.completionRewardMultiplier,
+            ),
+          };
+          captureEvent("project_complete", {
+            projectId: project.id,
+            stages: project.stages.length,
+          });
+
+          if (!nextProjectsCompleted.includes(project.id)) {
+            nextProjectsCompleted = [...nextProjectsCompleted, project.id];
+          }
+
+          const milestoneThresholds = [3, 6, 9];
+          milestoneThresholds.forEach((threshold) => {
+            const key = `milestone_${threshold}`;
+            if (
+              nextProjectsCompleted.length >= threshold &&
+              !nextProjectMilestones[key]
+            ) {
+              nextProjectMilestones = {
+                ...nextProjectMilestones,
+                [key]: true,
+              };
+              nextMaxOrders += 1;
+            }
+          });
+
+          updatedOrders = stripProjectOrders(updatedOrders);
+          nextActiveProject = undefined;
+          nextProjectOffers = generateProjectOffers(
+            { ...state, projectsCompleted: nextProjectsCompleted },
+            3,
+          );
+          projectCompleteBeatId = project.narrativeBeats?.complete || null;
+        } else {
+          const nextStageIndex = stage.stageIndex + 1;
+          const nextStage = project.stages[nextStageIndex];
+          if (nextStage) {
+            const rerollCount =
+              state.activeProject.rerolledStages?.filter(
+                (value) => value === nextStageIndex,
+              ).length ?? 0;
+            const nextStageOrder = buildProjectStageOrder(
+              state,
+              project,
+              nextStage,
+              state.activeProject.seed,
+              rerollCount,
+            );
+            const insertResult = insertStoryOrder(
+              state,
+              updatedOrders,
+              nextStageOrder,
+            );
+            if (insertResult.inserted) {
+              updatedOrders = insertResult.orders;
+              nextOrderMetrics = updateOrderMetrics(
+                { ...state, orderMetrics: nextOrderMetrics },
+                nextStageOrder,
+              );
+            }
+            const nextDeadline = getProjectStageDeadline(
+              nextStage,
+              nextStageIndex,
+            );
+            nextActiveProject = {
+              ...state.activeProject,
+              stageIndex: nextStageIndex,
+              stageDeadlineRemaining: nextDeadline,
+              stageHistory,
+            };
+            captureEvent("project_stage_complete", {
+              projectId: project.id,
+              stageIndex: stage.stageIndex,
+            });
+          }
+        }
+        projectStageBeatId = project.narrativeBeats?.stageComplete || null;
+      }
+
+      if (
+        !isProjectStageOrder &&
+        nextActiveProject &&
+        typeof nextActiveProject.stageDeadlineRemaining === "number"
+      ) {
+        const remaining = nextActiveProject.stageDeadlineRemaining - 1;
+        projectStageFailed = remaining <= 0;
+        nextActiveProject = {
+          ...nextActiveProject,
+          stageDeadlineRemaining: remaining,
+        };
+      }
+
       let nextHighlightedOrderId = updatedOrders.some(
         (o) => o.id === state.highlightedOrderId,
       )
@@ -4130,6 +4940,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         } else {
           nextPhase2GoalPending = true;
         }
+      }
+      if (completedPhase2Goal && state.gamePhase === 2) {
+        nextProjectsUnlocked = true;
+        if (nextProjectOffers.length === 0) {
+          nextProjectOffers = generateProjectOffers(state, 3);
+        }
+        projectUnlockBeatId = "mentor_empire_contracts";
       }
       const nextBaronContractOrdersRemaining = contractActive
         ? Math.max(0, state.baronContractOrdersRemaining - 1)
@@ -4211,6 +5028,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         liberationComplete: nextLiberationComplete,
         liberationCompletedAt: nextLiberationCompletedAt,
         phase2GoalPending: nextPhase2GoalPending,
+        projectsUnlocked: nextProjectsUnlocked,
+        projectOffers: nextProjectOffers,
+        activeProject: nextActiveProject,
+        projectsCompleted: nextProjectsCompleted,
+        projectMilestones: nextProjectMilestones,
+        projectDebuff: nextProjectDebuff,
         lockoutActive: lockoutActiveValue,
         lockoutPhase: lockoutPhaseValue,
         lockoutOrderId: lockoutResolution ? undefined : nextLockoutOrderId,
@@ -4251,12 +5074,60 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           : state.tutorialOrderId,
         highlightedOrderId: nextHighlightedOrderId,
         orderMetrics: nextOrderMetrics,
+        maxOrders: nextMaxOrders,
         maxTierCrafted: nextMaxTierCrafted,
         installStreakCurrent: nextInstallStreakCurrent,
         installStreakBest: nextInstallStreakBest,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+
+      if (nextState.orders.length > getEffectiveMaxOrders(nextState)) {
+        nextState = {
+          ...nextState,
+          orders: trimOrdersToMax(nextState, nextState.orders),
+        };
+      }
+
+      if (projectStageFailed) {
+        const active = getActiveProjectStage(nextState);
+        if (active) {
+          const penaltyResult = applyProjectFailPenalty(nextState, active.stage);
+          const orders = stripProjectOrders(nextState.orders);
+          nextState = {
+            ...nextState,
+            cash: penaltyResult.cash,
+            baronPressure: penaltyResult.baronPressure,
+            projectDebuff: penaltyResult.projectDebuff,
+            orders,
+            activeProject: undefined,
+            projectOffers: generateProjectOffers(nextState, 3),
+          };
+          nextState = {
+            ...nextState,
+            orders: trimOrdersToMax(
+              { ...nextState, activeProject: undefined },
+              nextState.orders,
+            ),
+          };
+          if (active.project.narrativeBeats?.fail) {
+            nextState = queueStoryBeat(
+              nextState,
+              active.project.narrativeBeats.fail,
+            );
+          }
+        }
+      } else {
+        if (projectStageBeatId) {
+          nextState = queueStoryBeat(nextState, projectStageBeatId);
+        }
+        if (projectCompleteBeatId) {
+          nextState = queueStoryBeat(nextState, projectCompleteBeatId);
+        }
+        if (projectUnlockBeatId) {
+          nextState = queueStoryBeat(nextState, projectUnlockBeatId);
+        }
+      }
 
       if (dependencyStory) {
         nextState = queueStoryBeat(nextState, dependencyStory);
@@ -4413,6 +5284,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             level: 1,
             chargesRemaining: config.maxCharges,
             cooldownEndsAt: 0,
+            overdrawCount: 0,
           },
         };
       }
@@ -4433,6 +5305,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             level: nextLevel,
             chargesRemaining: config.maxCharges,
             cooldownEndsAt: 0,
+            overdrawCount: 0,
           },
         };
       }
@@ -4589,6 +5462,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               level,
               chargesRemaining: config.maxCharges,
               cooldownEndsAt: 0,
+              overdrawCount: 0,
             },
           },
         };
@@ -4711,6 +5585,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
       if (order.modifierIds?.includes("threshold_story")) {
+        return state;
+      }
+      if (order.modifierIds?.includes("project_stage")) {
         return state;
       }
       captureEvent("order_dismiss", {
@@ -4934,6 +5811,350 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
       nextState = queueStoryBeat(nextState, "mentor_warranty_stamp");
       return nextState;
+    }
+
+    case "PROJECT_GENERATE_OFFERS": {
+      if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
+      return {
+        ...state,
+        projectOffers: generateProjectOffers(state, 3),
+      };
+    }
+
+    case "PROJECT_REFRESH_OFFERS": {
+      if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
+      const refreshCost = getProjectOfferRefreshCost(state.reputationTier);
+      if (state.cash < refreshCost) return state;
+      captureEvent("project_offer_refresh", {
+        cost: refreshCost,
+      });
+      captureEvent("cash_spent", {
+        amount: refreshCost,
+        reason: "project_offer_refresh",
+      });
+      return {
+        ...state,
+        cash: state.cash - refreshCost,
+        projectOffers: generateProjectOffers(state, 3),
+        undoSnapshot: undefined,
+      };
+    }
+
+    case "PROJECT_ACCEPT": {
+      if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
+      if (state.activeProject) return state;
+      const project = getProjectDefinitionById(action.projectId);
+      if (!project) return state;
+      if (!canOfferProject(project, state)) return state;
+      const offer = state.projectOffers.find(
+        (entry) => entry.projectId === action.projectId,
+      );
+      if (!offer) return state;
+      const depositCost = getProjectDepositCost(
+        project,
+        state.reputationTier,
+        state.maxTierCrafted,
+      );
+      const addon = action.addons || {};
+      const addonCost =
+        (addon.permitExpeditor ? tuning.projects.addonPermitExpeditorCost : 0) +
+        (addon.siteLogistics ? tuning.projects.addonSiteLogisticsCost : 0) +
+        (addon.overtimeCrew ? tuning.projects.addonOvertimeCrewCost : 0);
+      const totalCost = depositCost + addonCost;
+      if (state.cash < totalCost) return state;
+      const stage = project.stages[0];
+      if (!stage) return state;
+      const stageOrder = buildProjectStageOrder(
+        state,
+        project,
+        stage,
+        offer.seed,
+      );
+      const insertResult = insertStoryOrder(state, state.orders, stageOrder);
+      if (!insertResult.inserted) return state;
+
+      let deadlineRemaining = getProjectStageDeadline(stage, 0);
+      let expeditorUsedStages: number[] = [];
+      if (addon.permitExpeditor && typeof deadlineRemaining === "number") {
+        deadlineRemaining += 2;
+        expeditorUsedStages = [0];
+      }
+      let nextSuppliers = state.suppliers;
+      if (addon.siteLogistics) {
+        nextSuppliers = {
+          ...state.suppliers,
+          open: {
+            ...state.suppliers.open,
+            chargesRemaining: state.suppliers.open.chargesRemaining + 2,
+          },
+        };
+      }
+      const nextActiveProject: ActiveProject = {
+        projectId: project.id,
+        seed: offer.seed,
+        acceptedAt: Date.now(),
+        stageIndex: 0,
+        depositPaid: depositCost,
+        stageDeadlineRemaining: deadlineRemaining,
+        stageHistory: [],
+        rerolledStages: [],
+        expeditorUsedStages,
+        siteLogisticsUsed: !!addon.siteLogistics,
+        overtimeCrew: !!addon.overtimeCrew,
+      };
+
+      let nextState: GameState = {
+        ...state,
+        cash: state.cash - totalCost,
+        orders: insertResult.orders,
+        highlightedOrderId: insertResult.highlightedOrderId,
+        orderMetrics: updateOrderMetrics(state, stageOrder),
+        activeProject: nextActiveProject,
+        projectOffers: state.projectOffers.filter(
+          (entry) => entry.projectId !== project.id,
+        ),
+        suppliers: nextSuppliers,
+        undoSnapshot: undefined,
+      };
+
+      const beatId = project.narrativeBeats?.accept;
+      if (beatId) {
+        nextState = queueStoryBeat(nextState, beatId);
+      }
+      captureEvent("project_accept", {
+        projectId: project.id,
+        deposit: depositCost,
+        addonCost,
+      });
+      captureEvent("cash_spent", {
+        amount: totalCost,
+        reason: "project_deposit",
+      });
+      return nextState;
+    }
+
+    case "PROJECT_CANCEL": {
+      if (!state.activeProject) return state;
+      const activeProject = state.activeProject;
+      const project = getProjectDefinitionById(activeProject.projectId);
+      if (!project) return state;
+      const progressRate =
+        project.stages.length > 0
+          ? activeProject.stageIndex / project.stages.length
+          : 0;
+      const penaltyRate = Math.min(
+        1,
+        tuning.projects.cancelPenaltyRate + progressRate * 0.2,
+      );
+      const refund = Math.max(
+        0,
+        Math.floor(activeProject.depositPaid * (1 - penaltyRate)),
+      );
+      const orders = stripProjectOrders(state.orders);
+      const nextStateBase: GameState = {
+        ...state,
+        cash: state.cash + refund,
+        orders,
+        activeProject: undefined,
+        projectDebuff: state.projectDebuff,
+        undoSnapshot: undefined,
+      };
+      let nextState: GameState = {
+        ...nextStateBase,
+        orders: trimOrdersToMax(
+          { ...nextStateBase, activeProject: undefined },
+          nextStateBase.orders,
+        ),
+        projectOffers: generateProjectOffers(nextStateBase, 3),
+      };
+      const beatId = project.narrativeBeats?.fail;
+      if (beatId) {
+        nextState = queueStoryBeat(nextState, beatId);
+      }
+      captureEvent("project_cancel", {
+        projectId: project.id,
+        refund,
+      });
+      return nextState;
+    }
+
+    case "PROJECT_STAGE_FAIL": {
+      if (!state.activeProject) return state;
+      const active = getActiveProjectStage(state);
+      if (!active) return state;
+      const penaltyResult = applyProjectFailPenalty(state, active.stage);
+      const orders = stripProjectOrders(state.orders);
+      const nextStateBase: GameState = {
+        ...state,
+        cash: penaltyResult.cash,
+        baronPressure: penaltyResult.baronPressure,
+        projectDebuff: penaltyResult.projectDebuff,
+        orders,
+        activeProject: undefined,
+        undoSnapshot: undefined,
+      };
+      let nextState: GameState = {
+        ...nextStateBase,
+        orders: trimOrdersToMax(
+          { ...nextStateBase, activeProject: undefined },
+          nextStateBase.orders,
+        ),
+        projectOffers: generateProjectOffers(nextStateBase, 3),
+      };
+      const beatId = active.project.narrativeBeats?.fail;
+      if (beatId) {
+        nextState = queueStoryBeat(nextState, beatId);
+      }
+      captureEvent("project_stage_fail", {
+        projectId: active.project.id,
+        stageIndex: active.stage.stageIndex,
+        penalty: active.stage.failPenalty.type,
+      });
+      return nextState;
+    }
+
+    case "PROJECT_ADDON_PURCHASE": {
+      if (!state.activeProject) return state;
+      if (state.gamePhase !== 2) return state;
+      const activeProject = state.activeProject;
+      const project = getProjectDefinitionById(activeProject.projectId);
+      if (!project) return state;
+      const stageIndex = activeProject.stageIndex;
+      if (action.addon === "permit_expeditor") {
+        if (typeof activeProject.stageDeadlineRemaining !== "number") {
+          return state;
+        }
+        const usedStages = new Set(activeProject.expeditorUsedStages || []);
+        if (usedStages.has(stageIndex)) return state;
+        const cost = tuning.projects.addonPermitExpeditorCost;
+        if (state.cash < cost) return state;
+        usedStages.add(stageIndex);
+        captureEvent("project_addon_purchase", {
+          projectId: project.id,
+          addon: "permit_expeditor",
+          cost,
+        });
+        captureEvent("cash_spent", {
+          amount: cost,
+          reason: "project_addon_expeditor",
+        });
+        return {
+          ...state,
+          cash: state.cash - cost,
+          activeProject: {
+            ...activeProject,
+            stageDeadlineRemaining: activeProject.stageDeadlineRemaining + 2,
+            expeditorUsedStages: Array.from(usedStages),
+          },
+          undoSnapshot: undefined,
+        };
+      }
+      if (action.addon === "site_logistics") {
+        if (activeProject.siteLogisticsUsed) return state;
+        const cost = tuning.projects.addonSiteLogisticsCost;
+        if (state.cash < cost) return state;
+        captureEvent("project_addon_purchase", {
+          projectId: project.id,
+          addon: "site_logistics",
+          cost,
+        });
+        captureEvent("cash_spent", {
+          amount: cost,
+          reason: "project_addon_logistics",
+        });
+        return {
+          ...state,
+          cash: state.cash - cost,
+          suppliers: {
+            ...state.suppliers,
+            open: {
+              ...state.suppliers.open,
+              chargesRemaining: state.suppliers.open.chargesRemaining + 2,
+            },
+          },
+          activeProject: {
+            ...activeProject,
+            siteLogisticsUsed: true,
+          },
+          undoSnapshot: undefined,
+        };
+      }
+      if (action.addon === "overtime_crew") {
+        if (activeProject.overtimeCrew) return state;
+        const cost = tuning.projects.addonOvertimeCrewCost;
+        if (state.cash < cost) return state;
+        captureEvent("project_addon_purchase", {
+          projectId: project.id,
+          addon: "overtime_crew",
+          cost,
+        });
+        captureEvent("cash_spent", {
+          amount: cost,
+          reason: "project_addon_overtime",
+        });
+        return {
+          ...state,
+          cash: state.cash - cost,
+          activeProject: {
+            ...activeProject,
+            overtimeCrew: true,
+          },
+          undoSnapshot: undefined,
+        };
+      }
+      return state;
+    }
+
+    case "PROJECT_CHANGE_ORDER": {
+      if (!state.activeProject) return state;
+      if (state.gamePhase !== 2) return state;
+      const activeProject = state.activeProject;
+      const project = getProjectDefinitionById(activeProject.projectId);
+      if (!project) return state;
+      const stage = project.stages[activeProject.stageIndex];
+      if (!stage) return state;
+      const stageIndex = activeProject.stageIndex;
+      const usedStages = new Set(activeProject.rerolledStages || []);
+      if (usedStages.has(stageIndex)) return state;
+      const cost = tuning.projects.addonChangeOrderCost;
+      if (state.cash < cost) return state;
+      const existingOrder = state.orders.find((order) =>
+        order.modifierIds?.includes(getProjectStageTag(project.id, stageIndex)),
+      );
+      if (!existingOrder) return state;
+      const rerollCount = (activeProject.rerolledStages || []).length + 1;
+      const nextOrder = buildProjectStageOrder(
+        state,
+        project,
+        stage,
+        activeProject.seed,
+        rerollCount,
+      );
+      const remainingOrders = state.orders.filter(
+        (order) => order.id !== existingOrder.id,
+      );
+      const nextOrders = [...remainingOrders, nextOrder];
+      usedStages.add(stageIndex);
+      captureEvent("project_change_order", {
+        projectId: project.id,
+        stageIndex,
+        cost,
+      });
+      captureEvent("cash_spent", {
+        amount: cost,
+        reason: "project_change_order",
+      });
+      return {
+        ...state,
+        cash: state.cash - cost,
+        orders: nextOrders,
+        orderMetrics: updateOrderMetrics(state, nextOrder),
+        activeProject: {
+          ...activeProject,
+          rerolledStages: Array.from(usedStages),
+        },
+        undoSnapshot: undefined,
+      };
     }
 
     case "ACCEPT_BARON_OFFER": {
@@ -5374,7 +6595,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
-      if (workingState.orders.length >= workingState.maxOrders)
+      if (workingState.orders.length >= getEffectiveMaxOrders(workingState))
         return workingState;
 
       if (
@@ -5597,8 +6818,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       const tutorialOrder = createTutorialOrder();
       const trimmedOrders =
-        state.orders.length >= state.maxOrders
-          ? state.orders.slice(0, Math.max(0, state.maxOrders - 1))
+        state.orders.length >= getEffectiveMaxOrders(state)
+          ? state.orders.slice(0, Math.max(0, getEffectiveMaxOrders(state) - 1))
           : state.orders;
 
       return {
@@ -5747,7 +6968,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const seededOrders = [...state.orders];
         let seededMetrics = state.orderMetrics;
         while (
-          seededOrders.length < state.maxOrders &&
+          seededOrders.length < getEffectiveMaxOrders(state) &&
           nextOrderIndex < FIRST_SESSION_ORDERS.length
         ) {
           const order = createFirstSessionOrder(nextOrderIndex);
@@ -5849,9 +7070,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronSupplySpawnsRemaining: 0,
         baronRushSpawnsRemaining: 0,
         suppliers: {
-          baron: { level: 1, chargesRemaining: 6, cooldownEndsAt: 0 },
-          open: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0 },
-          salvage: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0 },
+          baron: { level: 1, chargesRemaining: 6, cooldownEndsAt: 0, overdrawCount: 0 },
+          open: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
+          salvage: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
         },
         upgradeMaterials: 0,
         compatibilityComponents: 0,
@@ -5928,8 +7149,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (!state.tutorialOrderId) {
           const tutorialOrder = createTutorialOrder();
           const trimmedOrders =
-            state.orders.length >= state.maxOrders
-              ? state.orders.slice(0, Math.max(0, state.maxOrders - 1))
+            state.orders.length >= getEffectiveMaxOrders(state)
+              ? state.orders.slice(0, Math.max(0, getEffectiveMaxOrders(state) - 1))
               : state.orders;
           nextOrders = [...trimmedOrders, tutorialOrder];
           nextTutorialOrderId = tutorialOrder.id;
@@ -6193,6 +7414,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               current.chargesRemaining + 1,
             ),
             cooldownEndsAt: 0,
+            overdrawCount: 0,
           },
         };
       };
@@ -6236,6 +7458,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   ...current,
                   chargesRemaining: config.maxCharges,
                   cooldownEndsAt: 0,
+                  overdrawCount: 0,
                 }
               : { ...current, cooldownEndsAt: now + reducedRemaining },
         };
@@ -6549,10 +7772,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           typeof raw.cooldownEndsAt === "number"
             ? raw.cooldownEndsAt
             : fallback.cooldownEndsAt;
+        const overdrawCount =
+          typeof raw.overdrawCount === "number" ? raw.overdrawCount : 0;
+        const normalizedOverdrawCount =
+          chargesRemaining > 0 ? 0 : Math.max(0, overdrawCount);
         return {
           level: Math.max(0, level),
           chargesRemaining: Math.max(0, chargesRemaining),
           cooldownEndsAt: Math.max(0, cooldownEndsAt),
+          overdrawCount: normalizedOverdrawCount,
         };
       };
       const suppliers: GameState["suppliers"] = {
@@ -6586,6 +7814,94 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         gamePhase === 2 &&
         !hasPhase2GoalOrder &&
         !phase2GoalSeen;
+      const projectsUnlockedRaw =
+        typeof action.state.projectsUnlocked === "boolean"
+          ? action.state.projectsUnlocked
+          : undefined;
+      const projectsUnlocked =
+        typeof projectsUnlockedRaw === "boolean"
+          ? projectsUnlockedRaw
+          : gamePhase === 2 && phase2GoalSeen;
+      const projectOffers = Array.isArray(action.state.projectOffers)
+        ? (action.state.projectOffers as ProjectOffer[]).filter(
+            (offer) =>
+              offer &&
+              typeof offer.projectId === "string" &&
+              typeof offer.seed === "number" &&
+              typeof offer.generatedAt === "number",
+          )
+        : base.projectOffers;
+      const rawActiveProject =
+        action.state.activeProject && typeof action.state.activeProject === "object"
+          ? (action.state.activeProject as ActiveProject)
+          : undefined;
+      const activeProjectDefinition =
+        rawActiveProject?.projectId
+          ? getProjectDefinitionById(rawActiveProject.projectId)
+          : undefined;
+      const activeProject =
+        rawActiveProject &&
+        activeProjectDefinition &&
+        typeof rawActiveProject.seed === "number" &&
+        typeof rawActiveProject.acceptedAt === "number" &&
+        typeof rawActiveProject.stageIndex === "number"
+          ? {
+              projectId: rawActiveProject.projectId,
+              seed: rawActiveProject.seed,
+              acceptedAt: rawActiveProject.acceptedAt,
+              stageIndex: Math.max(
+                0,
+                Math.min(
+                  rawActiveProject.stageIndex,
+                  activeProjectDefinition.stages.length - 1,
+                ),
+              ),
+              depositPaid:
+                typeof rawActiveProject.depositPaid === "number"
+                  ? rawActiveProject.depositPaid
+                  : 0,
+              stageDeadlineRemaining:
+                typeof rawActiveProject.stageDeadlineRemaining === "number"
+                  ? rawActiveProject.stageDeadlineRemaining
+                  : undefined,
+              stageHistory: Array.isArray(rawActiveProject.stageHistory)
+                ? rawActiveProject.stageHistory.filter(
+                    (entry) =>
+                      entry &&
+                      typeof entry.stageIndex === "number" &&
+                      typeof entry.completedAt === "number",
+                  )
+                : [],
+              rerolledStages: Array.isArray(rawActiveProject.rerolledStages)
+                ? rawActiveProject.rerolledStages.filter((value) =>
+                    Number.isFinite(value),
+                  )
+                : [],
+              expeditorUsedStages: Array.isArray(
+                rawActiveProject.expeditorUsedStages,
+              )
+                ? rawActiveProject.expeditorUsedStages.filter((value) =>
+                    Number.isFinite(value),
+                  )
+                : [],
+              siteLogisticsUsed: !!rawActiveProject.siteLogisticsUsed,
+              overtimeCrew: !!rawActiveProject.overtimeCrew,
+            }
+          : undefined;
+      const projectsCompleted = Array.isArray(action.state.projectsCompleted)
+        ? (action.state.projectsCompleted as string[]).filter(
+            (value) => typeof value === "string",
+          )
+        : base.projectsCompleted;
+      const projectMilestones =
+        action.state.projectMilestones &&
+        typeof action.state.projectMilestones === "object"
+          ? (action.state.projectMilestones as Record<string, boolean>)
+          : base.projectMilestones;
+      const projectDebuff =
+        action.state.projectDebuff && typeof action.state.projectDebuff === "object"
+          ? (action.state.projectDebuff as ProjectDebuff)
+          : base.projectDebuff;
       const lockoutLabOrdersTarget =
         typeof action.state.lockoutLabOrdersTarget === "number"
           ? action.state.lockoutLabOrdersTarget
@@ -6791,6 +8107,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         liberationComplete,
         liberationCompletedAt,
         phase2GoalPending,
+        projectsUnlocked,
+        projectOffers,
+        activeProject,
+        projectsCompleted,
+        projectMilestones,
+        projectDebuff,
         backpackSlots: restoredBackpackSlots,
         backpack: sanitizedBackpack,
         backpackUnlocked:
@@ -6954,14 +8276,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
 
-        if (orders.length > restoredState.maxOrders) {
+        const effectiveMaxOrders = getEffectiveMaxOrders(restoredState);
+        if (orders.length > effectiveMaxOrders) {
           const required = orders.filter(
             (order) => order.isLockout || order.type === "lab_request",
           );
           const others = orders.filter(
             (order) => !order.isLockout && order.type !== "lab_request",
           );
-          orders = [...required, ...others].slice(0, restoredState.maxOrders);
+          orders = [...required, ...others].slice(0, effectiveMaxOrders);
         }
 
         const highlightStillValid =
@@ -6993,7 +8316,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 interface GameContextValue {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
-  tapSupplier: (supplierId: SupplierId) => boolean;
+  hydrated: boolean;
+  tapSupplier: (supplierId: SupplierId) => SupplierTapStatus;
+  getSupplierTapStatus: (supplierId: SupplierId, now?: number) => SupplierTapStatus;
   claimMergeMomentum: (choice: MergeMomentumChoice) => void;
   mergeParts: (fromIndex: number, toIndex: number) => boolean;
   movePart: (fromIndex: number, toIndex: number) => void;
@@ -7155,7 +8480,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.tutorialComplete &&
       state.firstSessionComplete &&
       !state.lockoutActive &&
-      state.orders.length < state.maxOrders &&
+      state.orders.length < getEffectiveMaxOrders(state) &&
       boardPressureBand === "red";
   }, [hydrated, state]);
 
@@ -7296,17 +8621,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated || !telemetryReadyRef.current) return;
     const freeSlots = countFreeSlots(state);
     const boardPressureBand = getBoardPressureBand(freeSlots);
+    const effectiveMaxOrders = getEffectiveMaxOrders(state);
     const orderSpawnPaused =
       state.tutorialComplete &&
       state.firstSessionComplete &&
       !state.lockoutActive &&
-      state.orders.length < state.maxOrders &&
+      state.orders.length < effectiveMaxOrders &&
       boardPressureBand === "red";
     if (orderSpawnPaused && !prevOrderSpawnPausedRef.current) {
       captureEvent("order_spawn_paused", {
         freeSlots,
         orders: state.orders.length,
-        maxOrders: state.maxOrders,
+        maxOrders: effectiveMaxOrders,
       });
     }
     prevOrderSpawnPausedRef.current = orderSpawnPaused;
@@ -7314,10 +8640,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     hydrated,
     state.board,
     state.orders.length,
-    state.maxOrders,
     state.firstSessionComplete,
     state.tutorialComplete,
     state.lockoutActive,
+    state.activeProject?.overtimeCrew,
   ]);
 
   useEffect(() => {
@@ -7591,22 +8917,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [state.tutorialComplete, state.tutorialStep, dispatch]);
 
   const tapSupplier = useCallback(
-    (supplierId: SupplierId): boolean => {
-      const supplier = normalizeSupplierState(
-        supplierId,
-        state.suppliers[supplierId],
-        Date.now(),
-        state.upgrades["workbench_speed_1"] || 0,
-        state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0,
-      );
-      if (supplier.level <= 0) return false;
-      if (supplier.chargesRemaining <= 0) return false;
-      if (!hasPlacementSpace(state)) {
-        return false;
-      }
+    (supplierId: SupplierId): SupplierTapStatus => {
+      const status = getTapStatus(state, supplierId);
+      if (!status.ok) return status;
       dispatch({ type: "TAP_SUPPLIER", supplierId });
-      return true;
+      return status;
     },
+    [state],
+  );
+
+  const getSupplierTapStatus = useCallback(
+    (supplierId: SupplierId, now?: number) =>
+      getTapStatus(state, supplierId, now ?? Date.now()),
     [state],
   );
 
@@ -7706,7 +9028,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       value={{
         state,
         dispatch,
+        hydrated,
         tapSupplier,
+        getSupplierTapStatus,
         claimMergeMomentum,
         mergeParts,
         movePart,

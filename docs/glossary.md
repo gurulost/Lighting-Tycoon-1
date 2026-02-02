@@ -37,9 +37,9 @@ Use this as a quick reference for every icon, badge, and system.
 - R&D Bench: spend research to unlock Freedom tech.
 
 ## Suppliers
-- Baron Supply Depot: fast locked supply; increases pressure and clutter.
-- Open Workshop: open supply; upgrades expand tier drops and bonuses.
-- Salvage Corner: refurb drops plus cleanup value.
+- Baron Supply Depot: fast locked supply; increases pressure and clutter; overdraw costs cash and can add waste.
+- Open Workshop: open supply; upgrades expand tier drops and bonuses; overdraw costs research.
+- Salvage Corner: refurb drops plus cleanup value; overdraw consumes waste or costs cash if you’re out.
 
 ## Utilities
 - Backpack: temporary storage; drag items in and out.
@@ -76,3 +76,10 @@ Use this as a quick reference for every icon, badge, and system.
 - Exact Tiers: no substitutions allowed.
 - Eco Audit: open kits grant bonus research.
 - Lockout: audit crackdown triggered near freedom; choose compliance or the lab route.
+
+## Empire Contracts (Phase 2)
+- Project Board: multi-stage city-scale contracts unlocked after the Phase 2 goal order.
+- Deposit: large upfront cash sink required to accept a contract.
+- Project Stages: protected orders that must be completed in sequence.
+- Action Deadlines: countdown of non-project installs; failing it triggers penalties.
+- Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (reroll stage order once).

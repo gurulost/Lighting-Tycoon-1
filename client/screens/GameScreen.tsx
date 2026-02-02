@@ -17,6 +17,7 @@ import { CurrencyDisplay } from "@/components/game/CurrencyDisplay";
 import { DependencyMeter } from "@/components/game/DependencyMeter";
 import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
+import { ProjectBoardModal } from "@/components/game/ProjectBoardModal";
 import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
 import { LockoutModal } from "@/components/game/LockoutModal";
@@ -83,6 +84,7 @@ const baronPortrait512 = require("../../assets/images/baron/baron-portrait-512.w
 
 type ModalType =
   | "orders"
+  | "projects"
   | "upgrades"
   | "rd"
   | "settings"
@@ -217,8 +219,16 @@ function BottomButton({
 
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, undoLastMove, getFulfillmentIndices, claimMergeMomentum } = useGame();
+  const {
+    state,
+    dispatch,
+    undoLastMove,
+    getFulfillmentIndices,
+    claimMergeMomentum,
+    hydrated,
+  } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
   const overlayQueue = state.overlayQueue || [];
   const [storyLayoutTick, setStoryLayoutTick] = useState(0);
@@ -259,11 +269,12 @@ export default function GameScreen() {
   const canUndoNow =
     state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
+  const effectiveMaxOrders = state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const orderSpawnPaused =
     state.tutorialComplete &&
     state.firstSessionComplete &&
     !state.lockoutActive &&
-    state.orders.length < state.maxOrders &&
+    state.orders.length < effectiveMaxOrders &&
     boardPressureBand === "red";
   const tutorialSkipped = state.tutorialComplete && state.tutorialMetrics.skipped;
   const overlayDebugTop = useMemo(() => {
@@ -418,6 +429,14 @@ export default function GameScreen() {
   const showLockoutModal =
     state.lockoutActive &&
     (state.lockoutPhase === 1 || state.lockoutPhase === 3 || !state.lockoutChoice);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const timer = setTimeout(() => {
+      setBaronOfferGate(true);
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [hydrated]);
 
   useEffect(() => {
     if (selectedPartIndex !== null && !state.board[selectedPartIndex]) {
@@ -1140,7 +1159,17 @@ export default function GameScreen() {
           closeDisabled={
             !state.tutorialComplete && state.tutorialStep === 3
           }
+          onOpenProjects={() => setActiveModal("projects")}
         />
+      </Modal>
+
+      <Modal
+        visible={activeModal === "projects"}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeModal}
+      >
+        <ProjectBoardModal onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -1235,7 +1264,17 @@ export default function GameScreen() {
         <MissionDetailModal onClose={closeModal} />
       </Modal>
 
-      <Modal visible={state.baronOfferAvailable} animationType="fade" transparent>
+      <Modal
+        visible={
+          state.baronOfferAvailable &&
+          baronOfferGate &&
+          !showLockoutModal &&
+          activeModal === null &&
+          selectedPartIndex === null
+        }
+        animationType="fade"
+        transparent
+      >
         <BaronOfferModal
           onAccept={() => dispatch({ type: "ACCEPT_BARON_OFFER" })}
           onDecline={() => dispatch({ type: "DECLINE_BARON_OFFER" })}

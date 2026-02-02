@@ -19,7 +19,18 @@ Example payload (partial):
   "merge": { "chainWindowMs": 10000, "chainBonusThreshold": 3 },
   "missions": { "maxActive": 2, "repeatWindowMs": 720000 },
   "rewards": { "orderCashMultiplier": 1, "mergeCashMultiplier": 1 },
-  "suppliers": { "baronEarlyCooldownMs": 35000, "open": { "cooldownMultiplier": 1, "chargeBonus": 0 } }
+  "suppliers": {
+    "baronEarlyCooldownMs": 35000,
+    "overdraw": {
+      "freeCount": 3,
+      "overheatMs": 4000,
+      "overheatMode": "flat",
+      "baron": { "cashPctBase": 0.02, "cashPctStep": 0.02, "cashMin": 8, "wasteChanceBase": 0.1, "wasteChanceStep": 0.1, "wasteChanceMax": 0.5 },
+      "open": { "researchBase": 1, "researchStep": 1 },
+      "salvage": { "wasteRequiredBase": 1, "wasteRequiredStep": 1, "cashFallbackPct": 0.03, "cashFallbackMin": 8 }
+    },
+    "open": { "cooldownMultiplier": 1, "chargeBonus": 0 }
+  }
 }
 ```
 
@@ -59,6 +70,21 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
   - Tier Route: `+1 tier` on base drop.
 - Consumption: only on non-forced spawns.
  - Locked Route: shorter burst, adds Baron pressure per spawn.
+
+---
+
+## Supplier Overdraw (Cooldown Borrowing)
+When a supplier is on cooldown, players can still tap to spawn parts at a cost.
+
+**Costs by supplier**
+- Baron: cash fee (percent-of-wallet + minimum) and an extra waste chance that ramps up.
+- Open: research cost that ramps up.
+- Salvage: consume waste parts; if insufficient waste, pay a cash fallback.
+
+**Overheat guardrail**
+- `freeCount`: overdraw taps per cooldown with no extra cooldown extension.
+- After free count: each additional overdraw adds `overheatMs` to `cooldownEndsAt`
+  (flat or linear based on `overheatMode`).
 
 ---
 
@@ -102,6 +128,31 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 - Phase 2 Baron Pressure reward tax:
   - 40–69 pressure: `-10%` cash + research
   - 70–100 pressure: `-20%` cash + research
+
+---
+
+## Empire Contracts (Projects)
+- Deposit formula inputs:
+  - `projects.depositBase`
+  - `projects.depositScaleByRepTier`
+  - `projects.depositScaleByMaxTier`
+- Deposit bands (multipliers in code): early `x4`, mid `x6`, late `x8`, capstone `x12`.
+- Deadlines:
+  - `projects.deadlineEnabled`
+  - `projects.deadlineInstallsByStage` (fallback per stage index)
+- Cancel penalties:
+  - `projects.cancelPenaltyRate` (base rate, scales with progress)
+- Rewards:
+  - `projects.stageRewardMultiplier`
+  - `projects.completionRewardMultiplier`
+- Offer refresh:
+  - `projects.offerRefreshBase`
+  - `projects.offerRefreshStep`
+- Add-on costs:
+  - `projects.addonPermitExpeditorCost`
+  - `projects.addonSiteLogisticsCost`
+  - `projects.addonOvertimeCrewCost`
+  - `projects.addonChangeOrderCost`
 
 ---
 

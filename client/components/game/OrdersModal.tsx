@@ -235,12 +235,14 @@ interface OrdersModalProps {
   onClose: () => void;
   closeDisabled?: boolean;
   onOrderFulfilled?: (order: Order) => void;
+  onOpenProjects?: () => void;
 }
 
 export function OrdersModal({
   onClose,
   closeDisabled = false,
   onOrderFulfilled,
+  onOpenProjects,
 }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
@@ -258,6 +260,8 @@ export function OrdersModal({
   const scoutCost = 90 + state.reputationTier * 30;
   const clinicCost = 120 + state.reputationTier * 40;
   const warrantyCost = 150 + state.reputationTier * 45;
+  const effectiveMaxOrders = state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
+  const showProjectsButton = state.gamePhase === 2;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
@@ -306,7 +310,8 @@ export function OrdersModal({
     !order.modifierIds?.includes("first_session") &&
     !order.modifierIds?.includes("tier5_showcase") &&
     !order.modifierIds?.includes("tier10_showcase") &&
-    !order.modifierIds?.includes("threshold_story");
+    !order.modifierIds?.includes("threshold_story") &&
+    !order.modifierIds?.includes("project_stage");
 
   const refreshTarget =
     state.highlightedOrderId &&
@@ -475,6 +480,39 @@ export function OrdersModal({
       onClose={closeDisabled ? undefined : onClose}
       closeDisabled={closeDisabled}
       contentStyle={styles.modalContent}
+      headerRight={
+        showProjectsButton ? (
+          <Pressable
+            style={[
+              styles.projectButton,
+              !onOpenProjects && styles.projectButtonDisabled,
+            ]}
+            onPress={onOpenProjects}
+            disabled={!onOpenProjects}
+          >
+            <Feather
+              name={state.projectsUnlocked ? "flag" : "lock"}
+              size={14}
+              color={
+                state.projectsUnlocked
+                  ? GameColors.ui.primary
+                  : GameColors.text.secondary
+              }
+            />
+            <ThemedText
+              style={[
+                styles.projectButtonLabel,
+                !state.projectsUnlocked && styles.projectButtonLabelMuted,
+              ]}
+            >
+              Projects
+            </ThemedText>
+            {state.activeProject ? (
+              <View style={styles.projectActiveDot} />
+            ) : null}
+          </Pressable>
+        ) : null
+      }
     >
       <InstallMomentCelebration
         moment={installMoment}
@@ -494,7 +532,7 @@ export function OrdersModal({
         <View style={styles.statItem}>
           <Feather name="inbox" size={18} color={GameColors.currency.reputation} />
           <ThemedText style={styles.statValue}>
-            {state.orders.length}/{state.maxOrders}
+            {state.orders.length}/{effectiveMaxOrders}
           </ThemedText>
           <ThemedText style={styles.statLabel}>Active</ThemedText>
         </View>
@@ -814,7 +852,8 @@ export function OrdersModal({
                 !order.modifierIds?.includes("first_session") &&
                 !order.modifierIds?.includes("tier5_showcase") &&
                 !order.modifierIds?.includes("tier10_showcase") &&
-                !order.modifierIds?.includes("threshold_story")
+                !order.modifierIds?.includes("threshold_story") &&
+                !order.modifierIds?.includes("project_stage")
               }
             />
           ))
@@ -848,6 +887,35 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     position: "relative",
+  },
+  projectButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}55`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  projectButtonDisabled: {
+    opacity: 0.6,
+  },
+  projectButtonLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.ui.primary,
+    letterSpacing: 0.2,
+  },
+  projectButtonLabelMuted: {
+    color: GameColors.text.secondary,
+  },
+  projectActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: GameColors.ui.success,
   },
   installMomentOverlay: {
     position: "absolute",

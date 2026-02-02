@@ -25,6 +25,7 @@ This document is the single source of truth for the core gameplay systems.
 ## Workbench / Spawning
 - Workbench opens the Supplier panel (Baron, Open, Salvage)
 - Each supplier has charges and a cooldown
+- During cooldowns, suppliers can be overdrawn at a cost (cash/research/waste) with a soft overheat penalty
 - Drop tiers are driven by supplier level tables
 - Baron offers add a temporary **bonus locked roll**
 - Phase 2 freezes Dependency at 0; Baron offers can still inject locked spikes
@@ -34,6 +35,21 @@ This document is the single source of truth for the core gameplay systems.
 - Types: basic, style match, rush, premium, certified, locked required, lab request
 - Modifiers add constraints without adding new items
 - Phase 2 inserts a one-time compatibility-focused goal order on liberation
+
+## Phase 2 Mega-Projects (Empire Contracts)
+Mentor framing: You’re free, but scale has a new kind of pressure. Empire Contracts turn each install into a public signal — deposit-heavy, multi-stage work that rewards steady execution.
+
+Tina intent: I’m not just keeping the shop alive; I’m building landmarks. Stage by stage, every contract proves we set the standard now.
+
+- Unlocks after the Phase 2 goal order is completed (`gamePhase = 2` + goal cleared).
+- Project Board offers 3 contracts at a time; refreshable for cash.
+- Accepting a contract pays a large deposit and inserts a protected stage order.
+- Each stage is a normal order tagged `project_stage` and cannot be refreshed/dismissed.
+- Action deadlines count down by non-project fulfillments (no real-time timers).
+- Failure penalties: lose deposit, add Baron pressure, or temporary rep debuff.
+- Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (reroll stage order once).
+- Completion grants large cash/research/rep and advances Empire milestones.
+- Empire milestones: completing 3/6/9 projects grants +1 base order slot each time.
 
 ## Order Spawn Pressure
 - Orders spawn on a timer, but pause when the board is congested.

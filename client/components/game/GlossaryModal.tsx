@@ -91,7 +91,7 @@ const SECTION_ORDER: Record<GlossaryTier, string[]> = {
     "order-badges",
   ],
   advanced: ["merge-momentum", "boosts", "freedom-tech"],
-  endgame: ["compliance"],
+  endgame: ["compliance", "projects"],
 };
 const getSectionSortIndex = (tier: GlossaryTier, id: string) => {
   const list = SECTION_ORDER[tier] ?? [];
@@ -317,7 +317,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "station-workbench",
         title: "Workbench",
         summary: "Open suppliers.",
-        detail: "Each source has charges and cooldowns.",
+        detail: "Each source has charges and cooldowns. After the tutorial, you can overdraw during cooldowns at a cost.",
         image: stationWorkbench,
       },
       {
@@ -345,7 +345,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "supplier-baron",
         title: "Baron Supply Depot",
         summary: "Fast locked supply.",
-        detail: "Raises Dependency; shipments can include waste.",
+        detail: "Raises Dependency; shipments can include waste. Overdraws cost cash and can add extra waste.",
         icon: "package",
         color: GameColors.locked.primary,
       },
@@ -354,7 +354,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Open Workshop",
         summary: "Open-standard supply.",
         detail:
-          "Unlocked via R&D; scales with upgrades; can drop materials and compatibility components.",
+          "Unlocked via R&D; scales with upgrades; can drop materials and compatibility components. Overdraws cost research.",
         icon: "tool",
         color: GameColors.openStandard.primary,
       },
@@ -362,7 +362,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "supplier-salvage",
         title: "Salvage Corner",
         summary: "Refurb supply source.",
-        detail: "Drops open parts, waste, or upgrade materials.",
+        detail: "Drops open parts, waste, or upgrade materials. Overdraws consume waste or cost cash if you're out.",
         icon: "refresh-cw",
         color: GameColors.ui.warning,
       },
@@ -736,6 +736,40 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
           "Dependency resets and harder orders arrive; Baron pressure can cut payouts.",
         icon: "flag",
         color: GameColors.ui.primary,
+      },
+    ],
+  },
+  {
+    id: "projects",
+    title: "Empire Contracts",
+    tier: "endgame",
+    items: [
+      {
+        id: "projects-board",
+        title: "Project Board",
+        summary: "Multi-stage city-scale contracts.",
+        detail:
+          "Unlocked after the Phase 2 goal order. Accept a contract, pay a large deposit, and complete protected stages.",
+        icon: "flag",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "projects-deadlines",
+        title: "Action Deadlines",
+        summary: "Complete stages within X installs.",
+        detail:
+          "Deadlines count down with each non-project fulfillment. Use Permit Expeditor to add installs.",
+        icon: "clock",
+        color: GameColors.ui.danger,
+      },
+      {
+        id: "projects-addons",
+        title: "Project Add-ons",
+        summary: "Pay for logistics support.",
+        detail:
+          "Site Logistics adds Open supplier charges; Overtime Crew adds an order slot; Change Order rerolls constraints.",
+        icon: "truck",
+        color: GameColors.ui.success,
       },
     ],
   },

@@ -58,6 +58,33 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Compatibility-required orders appear more frequently.
   - Target difficulty feels +1 higher on average.
 
+## Empire Contracts (Projects)
+- After completing the Phase 2 goal order, open the Project Board.
+- Verify:
+  - Three offers appear and include deposit costs + stage counts.
+  - Refreshing offers deducts cash and replaces all offers.
+- Accept a project:
+  - Deposit (and add-on costs) are deducted.
+  - A protected project stage order is inserted and cannot be refreshed/dismissed.
+  - Project Board shows active stage and installs-remaining countdown (if enabled).
+- Complete a project stage:
+  - Stage reward is granted.
+  - Next stage order appears and stage index advances.
+  - Stage-complete story beat appears.
+- Complete all stages:
+  - Completion payout applies and active project clears.
+  - Completing 3/6/9 total projects increases base order slots by +1 each.
+- Action deadline:
+  - Fulfill non-project orders and confirm deadline decrements.
+  - When deadline reaches 0, project fails and penalty applies (deposit loss/pressure/rep debuff).
+- Add-ons:
+  - Permit Expeditor adds +2 installs to deadline once per stage.
+  - Site Logistics grants +2 Open supplier charges.
+  - Overtime Crew grants +1 order slot for the project duration.
+  - Change Order rerolls the stage order once.
+- Cancel project:
+  - Contract cancels, deposit refund is reduced, and active project clears.
+
 ## Second Baron Offer Trigger
 - In first-session:
   - If you accept the first Baron offer, complete two orders.
@@ -120,6 +147,19 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Contract Edge: with an active Baron contract, confirm higher cash bonus.
   - Verify Contract Edge is unavailable when no active contract is running.
   - Counter decrements only on non-tutorial, non-lockout, non-lab orders.
+
+## Supplier Overdraw
+- Enter cooldown on a supplier and verify the Overdraw button appears after tutorial completion.
+- Baron overdraw:
+  - Cash is deducted only after placement succeeds.
+  - Extra waste chance triggers over multiple taps.
+  - Overheat extends cooldown after the free overdraw count.
+- Open overdraw:
+  - Research is deducted only after placement succeeds.
+- Salvage overdraw:
+  - Waste parts are consumed (lowest tiers first).
+  - If insufficient waste, cash fallback is used instead.
+- Verify no charge is taken when the board/backpack is full and placement fails.
 
 ## Story Log Cap
 - Trigger a high volume of story beats (300+).

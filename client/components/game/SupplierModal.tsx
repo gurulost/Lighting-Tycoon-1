@@ -51,7 +51,7 @@ export function SupplierModal({
   onClose,
   onToast,
 }: SupplierModalProps) {
-  const { state, tapSupplier, dispatch } = useGame();
+  const { state, tapSupplier, getSupplierTapStatus, dispatch } = useGame();
   const insets = useSafeAreaInsets();
   const screenHeight = Dimensions.get("window").height;
   const [now, setNow] = useState(() => Date.now());
@@ -81,10 +81,21 @@ export function SupplierModal({
   ]);
 
   const handleTap = (supplierId: SupplierId) => {
-    const success = tapSupplier(supplierId);
-    if (!success) {
-      onToast?.("No space or charges available.", 1800);
-    }
+    const result = tapSupplier(supplierId);
+    if (result.ok) return;
+    const message =
+      result.reason === "locked"
+        ? "Supplier locked."
+        : result.reason === "no_space"
+          ? "No space available."
+          : result.reason === "insufficient_cash"
+            ? "Not enough cash to overdraw."
+            : result.reason === "insufficient_research"
+              ? "Not enough research to overdraw."
+              : result.reason === "insufficient_waste"
+                ? "Need more waste to overdraw."
+                : "Cooling down.";
+    onToast?.(message, 1800);
   };
 
   const materialLabel = useMemo(
@@ -171,15 +182,55 @@ export function SupplierModal({
                 supplier.cooldownEndsAt - now,
               );
               const charges = supplier.chargesRemaining;
+              const tapStatus = getSupplierTapStatus(supplierId, now);
               const chargesDisplay = locked
                 ? "Locked"
                 : `${charges}/${config.maxCharges}`;
               const isCooling = !locked && charges <= 0 && cooldownRemaining > 0;
+              const isOverdraw = tapStatus.mode === "overdraw";
               const buttonLabel = locked
                 ? "Locked"
-                : isCooling
-                  ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
-                  : "Tap";
+                : isOverdraw
+                  ? "Overdraw"
+                  : isCooling
+                    ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
+                    : "Tap";
+              const overdrawCost = tapStatus.cost;
+              let overdrawLabel: string | null = null;
+              if (isOverdraw && overdrawCost) {
+                const parts: string[] = [];
+                const isSalvageFallback =
+                  supplierId === "salvage" &&
+                  overdrawCost.salvageMethod === "cash_fallback";
+                if (isSalvageFallback && overdrawCost.wasteRequired > 0) {
+                  parts.push(
+                    `${overdrawCost.wasteRequired} waste or $${overdrawCost.cash}`,
+                  );
+                } else {
+                  if (overdrawCost.cash > 0) {
+                    parts.push(`$${overdrawCost.cash}`);
+                  }
+                  if (overdrawCost.research > 0) {
+                    parts.push(`-${overdrawCost.research} research`);
+                  }
+                  if (overdrawCost.wasteRequired > 0) {
+                    parts.push(`-${overdrawCost.wasteRequired} waste`);
+                  }
+                }
+                if (overdrawCost.extraWasteChance > 0) {
+                  parts.push(
+                    `+${Math.round(overdrawCost.extraWasteChance * 100)}% waste`,
+                  );
+                }
+                if (overdrawCost.overheatMs > 0) {
+                  parts.push(
+                    `+${Math.ceil(overdrawCost.overheatMs / 1000)}s cooldown`,
+                  );
+                }
+                if (parts.length > 0) {
+                  overdrawLabel = `Overdraw: ${parts.join(" · ")}`;
+                }
+              }
               return (
                 <LinearGradient
                   key={supplierId}
@@ -212,6 +263,11 @@ export function SupplierModal({
                           {mentorTip}
                         </ThemedText>
                       ) : null}
+                      {overdrawLabel ? (
+                        <ThemedText style={styles.overdrawHint}>
+                          {overdrawLabel}
+                        </ThemedText>
+                      ) : null}
                     </View>
                     <View style={styles.levelPill}>
                       <ThemedText style={styles.levelText}>
@@ -226,12 +282,12 @@ export function SupplierModal({
                     </ThemedText>
                     <Pressable
                       onPress={() => handleTap(supplierId)}
-                      disabled={locked || isCooling}
+                      disabled={locked || !tapStatus.ok}
                       style={[
                         styles.tapButton,
                         {
                           backgroundColor:
-                            locked || isCooling
+                            locked || !tapStatus.ok
                               ? GameColors.ui.surface
                               : meta.accent,
                         },
@@ -327,6 +383,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     color: GameColors.text.primary,
+  },
+  overdrawHint: {
+    marginTop: 6,
+    fontSize: 11,
+    color: GameColors.text.secondary,
   },
   levelPill: {
     borderRadius: BorderRadius.full,

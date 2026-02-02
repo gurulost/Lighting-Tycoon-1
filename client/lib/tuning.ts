@@ -112,6 +112,22 @@ export type TuningConfig = {
     rewardMultiplierHigh: number;
     compatibilityOrderWeight: number;
   };
+  projects: {
+    depositBase: number;
+    depositScaleByRepTier: number;
+    depositScaleByMaxTier: number;
+    deadlineEnabled: boolean;
+    deadlineInstallsByStage: number[];
+    cancelPenaltyRate: number;
+    stageRewardMultiplier: number;
+    completionRewardMultiplier: number;
+    offerRefreshBase: number;
+    offerRefreshStep: number;
+    addonPermitExpeditorCost: number;
+    addonSiteLogisticsCost: number;
+    addonOvertimeCrewCost: number;
+    addonChangeOrderCost: number;
+  };
   merge: {
     momentumThresholds: number[];
     chainWindowMs: number;
@@ -154,6 +170,29 @@ export type TuningConfig = {
     cooldownReductionPerLevelMs: number;
     cooldownMinMs: number;
     baronEarlyCooldownMs: number;
+    overdraw: {
+      freeCount: number;
+      overheatMs: number;
+      overheatMode: "flat" | "linear";
+      baron: {
+        cashPctBase: number;
+        cashPctStep: number;
+        cashMin: number;
+        wasteChanceBase: number;
+        wasteChanceStep: number;
+        wasteChanceMax: number;
+      };
+      open: {
+        researchBase: number;
+        researchStep: number;
+      };
+      salvage: {
+        wasteRequiredBase: number;
+        wasteRequiredStep: number;
+        cashFallbackPct: number;
+        cashFallbackMin: number;
+      };
+    };
     open: {
       cooldownMultiplier: number;
       chargeBonus: number;
@@ -281,6 +320,22 @@ const DEFAULT_TUNING: TuningConfig = {
     rewardMultiplierHigh: 0.8,
     compatibilityOrderWeight: 1.6,
   },
+  projects: {
+    depositBase: 1200,
+    depositScaleByRepTier: 220,
+    depositScaleByMaxTier: 260,
+    deadlineEnabled: true,
+    deadlineInstallsByStage: [10, 9, 8, 7, 6],
+    cancelPenaltyRate: 0.45,
+    stageRewardMultiplier: 1,
+    completionRewardMultiplier: 1.6,
+    offerRefreshBase: 220,
+    offerRefreshStep: 80,
+    addonPermitExpeditorCost: 180,
+    addonSiteLogisticsCost: 260,
+    addonOvertimeCrewCost: 320,
+    addonChangeOrderCost: 220,
+  },
   merge: {
     momentumThresholds: [3, 6, 10],
     chainWindowMs: 10000,
@@ -323,6 +378,29 @@ const DEFAULT_TUNING: TuningConfig = {
     cooldownReductionPerLevelMs: 2000,
     cooldownMinMs: 15000,
     baronEarlyCooldownMs: 35000,
+    overdraw: {
+      freeCount: 3,
+      overheatMs: 4000,
+      overheatMode: "flat",
+      baron: {
+        cashPctBase: 0.02,
+        cashPctStep: 0.02,
+        cashMin: 8,
+        wasteChanceBase: 0.1,
+        wasteChanceStep: 0.1,
+        wasteChanceMax: 0.5,
+      },
+      open: {
+        researchBase: 1,
+        researchStep: 1,
+      },
+      salvage: {
+        wasteRequiredBase: 1,
+        wasteRequiredStep: 1,
+        cashFallbackPct: 0.03,
+        cashFallbackMin: 8,
+      },
+    },
     open: {
       cooldownMultiplier: 1,
       chargeBonus: 0,

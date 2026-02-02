@@ -1730,6 +1730,61 @@ function sumWeights(reqs: OrderRequirement[]) {
   return { cash: Math.round(cash), rep, research: Math.round(research), maxTier };
 }
 
+export function computeCustomOrderRewards({
+  requirements,
+  neighborhoodId,
+  modifierIds,
+  archetypeId,
+  rewardOverride,
+}: {
+  requirements: OrderRequirement[];
+  neighborhoodId: string;
+  modifierIds?: string[];
+  archetypeId?: string;
+  rewardOverride?: Partial<{ cash: number; rep: number; research: number }>;
+}): { cash: number; reputation: number; research: number } {
+  const weights = sumWeights(requirements);
+  let cash = weights.cash;
+  let rep = weights.rep;
+  let research = weights.research;
+
+  if (archetypeId) {
+    const archetype = ARCHETYPES.find((a) => a.id === archetypeId);
+    if (archetype) {
+      cash = Math.round(cash * archetype.rewardBias.cash);
+      rep = Math.round(rep * archetype.rewardBias.rep);
+      research = Math.round(research * archetype.rewardBias.research);
+    }
+  }
+
+  const modMap = new Map(ORDER_MODIFIERS.map((m) => [m.id, m]));
+  const modifiers = (modifierIds || [])
+    .map((id) => modMap.get(id))
+    .filter(Boolean) as OrderModifier[];
+  for (const mod of modifiers) {
+    if (mod.rewardMult) {
+      cash = Math.round(cash * mod.rewardMult.cash);
+      rep = Math.round(rep * mod.rewardMult.rep);
+      research = Math.round(research * mod.rewardMult.research);
+    }
+  }
+
+  const neighborhoodMult =
+    NEIGHBORHOOD_REWARD_MULT[neighborhoodId] ||
+    NEIGHBORHOOD_REWARD_MULT.starter;
+  cash = Math.round(cash * neighborhoodMult.cash);
+  rep = Math.round(rep * neighborhoodMult.rep);
+  research = Math.round(research * neighborhoodMult.research);
+
+  if (rewardOverride) {
+    cash = rewardOverride.cash ?? cash;
+    rep = rewardOverride.rep ?? rep;
+    research = rewardOverride.research ?? research;
+  }
+
+  return { cash, reputation: rep, research };
+}
+
 export const ORDER_LIBRARY: OrderTemplate[] = (() => {
   const baseMap = new Map(BASE_RECIPES.map((b) => [b.id, b]));
   const modMap = new Map(ORDER_MODIFIERS.map((m) => [m.id, m]));

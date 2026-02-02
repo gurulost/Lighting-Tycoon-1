@@ -26,6 +26,7 @@ export interface SupplierState {
   level: number;
   chargesRemaining: number;
   cooldownEndsAt: number;
+  overdrawCount: number;
 }
 
 export const TIER_NAMES: Record<PartTier, string> = {
@@ -129,6 +130,105 @@ export interface Order {
   isTutorial?: boolean;
 }
 
+export type ProjectTone = "warm" | "demanding" | "visionary" | "skeptical";
+
+export type ProjectStageDeadline = {
+  type: "installs";
+  installsRemaining: number;
+};
+
+export type ProjectStageFailPenalty =
+  | { type: "lose_deposit"; loseDepositPercent: number }
+  | { type: "pressure"; pressureIncrease: number }
+  | { type: "rep_debuff"; repMultiplier: number; remainingOrders: number };
+
+export type ProjectStageRewards = {
+  rewardMultiplier: number;
+  researchBonusFlat?: number;
+  repBonusFlat?: number;
+};
+
+export interface ProjectStageOrderSpec {
+  targetTierRange: [PartTier, PartTier];
+  requiresCompatibility?: boolean;
+  requiresOpenOnly?: boolean;
+  ecoAudit?: boolean;
+  rush?: boolean;
+  noSubstitutions?: boolean;
+  difficultyBonus?: number;
+}
+
+export interface ProjectStageDefinition {
+  stageIndex: number;
+  stageTitle: string;
+  orderSpec: ProjectStageOrderSpec;
+  deadline?: ProjectStageDeadline;
+  stageRewards: ProjectStageRewards;
+  failPenalty: ProjectStageFailPenalty;
+}
+
+export interface ProjectDefinition {
+  id: string;
+  title: string;
+  locationName: string;
+  client: {
+    name: string;
+    role: string;
+    tone: ProjectTone;
+  };
+  synopsis: string;
+  unlock: {
+    phaseMin: 2;
+    minRepTier: number;
+    minProjectsCompleted?: number;
+  };
+  offerWeight?: number;
+  deposit: {
+    formulaKey: "early" | "mid" | "late" | "capstone";
+  };
+  stages: ProjectStageDefinition[];
+  completionRewards: {
+    cashMultiplier: number;
+    reputationMultiplier: number;
+    researchMultiplier: number;
+  };
+  permanentPerk?: string;
+  trophyId?: string;
+  narrativeBeats?: {
+    offer?: string;
+    accept?: string;
+    stageComplete?: string;
+    fail?: string;
+    complete?: string;
+  };
+}
+
+export interface ProjectOffer {
+  projectId: string;
+  seed: number;
+  generatedAt: number;
+}
+
+export interface ActiveProject {
+  projectId: string;
+  seed: number;
+  acceptedAt: number;
+  stageIndex: number;
+  depositPaid: number;
+  stageDeadlineRemaining?: number;
+  stageHistory: { stageIndex: number; completedAt: number }[];
+  rerolledStages?: number[];
+  expeditorUsedStages?: number[];
+  siteLogisticsUsed?: boolean;
+  overtimeCrew?: boolean;
+}
+
+export interface ProjectDebuff {
+  type: "rep";
+  remainingOrders: number;
+  multiplier: number;
+}
+
 export interface Upgrade {
   id: string;
   category: "space" | "workbench" | "quality" | "logistics" | "rd";
@@ -179,6 +279,12 @@ export interface GameState {
   liberationComplete: boolean;
   liberationCompletedAt?: number;
   phase2GoalPending: boolean;
+  projectsUnlocked: boolean;
+  projectOffers: ProjectOffer[];
+  activeProject?: ActiveProject;
+  projectsCompleted: string[];
+  projectMilestones: Record<string, boolean>;
+  projectDebuff?: ProjectDebuff;
   baronPressure: number;
   baronSupplySpawnsRemaining: number;
   baronRushSpawnsRemaining: number;

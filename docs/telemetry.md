@@ -41,6 +41,17 @@ Status: PostHog wired; core loop, tutorial, economy, and lockout events instrume
 - `craft_freedom_controller`
 - `use_freedom_controller`
 
+## Empire Contracts (Why: endgame engagement)
+
+- `project_offer_refresh` (cost)
+- `project_accept` (projectId, deposit, addonCost)
+- `project_cancel` (projectId, refund)
+- `project_stage_complete` (projectId, stageIndex)
+- `project_complete` (projectId, stages)
+- `project_stage_fail` (projectId, stageIndex, penalty)
+- `project_addon_purchase` (projectId, addon, cost)
+- `project_change_order` (projectId, stageIndex, cost)
+
 ## Economy (Why: balance)
 
 - `cash_earned` / `cash_spent`
@@ -48,6 +59,7 @@ Status: PostHog wired; core loop, tutorial, economy, and lockout events instrume
 - `reputation_earned`
 - `boost_start` (type, mode, cost, remaining)
 - `boost_consume` (type, remaining, trigger)
+- `supplier_overdraw` (supplierId, overdrawCount, cashSpent, researchSpent, wasteConsumed, extraWasteTriggered, overheatMs, salvageMethod)
 
 ## Friction Signals (Why: churn predictors)
 
