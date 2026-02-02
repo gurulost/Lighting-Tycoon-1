@@ -50,7 +50,7 @@ const BARON_PORTRAITS = {
 export function getPortraitSource(
   speaker: StorySpeaker,
   size: PortraitSize,
-  portrait: PortraitVariant = "portrait"
+  portrait: PortraitVariant = "portrait",
 ) {
   if (speaker === "tina") {
     return (TINA_PORTRAITS[portrait] ?? TINA_PORTRAITS.portrait)[size];

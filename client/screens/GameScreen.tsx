@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { View, StyleSheet, Modal, Pressable, AppState } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -42,10 +48,7 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
 import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
-import {
-  OverlayItem,
-  OVERLAY_PRIORITY,
-} from "@/types/overlay";
+import { OverlayItem, OVERLAY_PRIORITY } from "@/types/overlay";
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
 const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
@@ -96,7 +99,13 @@ type ModalType =
   | "suppliers"
   | null;
 
-type TutorialTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
+type TutorialTarget =
+  | "board"
+  | "orders"
+  | "upgrades"
+  | "dependency"
+  | "currency"
+  | "workbench";
 
 interface LayoutRect {
   x: number;
@@ -144,10 +153,10 @@ function BottomButton({
       pulseAnim.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 1000 }),
-          withTiming(0, { duration: 1000 })
+          withTiming(0, { duration: 1000 }),
         ),
         -1,
-        true
+        true,
       );
     } else {
       cancelAnimation(pulseAnim);
@@ -179,15 +188,14 @@ function BottomButton({
       onLayout={onLayout}
     >
       <Animated.View
-        style={[
-          styles.buttonIconContainer,
-          { shadowColor: color },
-          glowStyle,
-        ]}
+        style={[styles.buttonIconContainer, { shadowColor: color }, glowStyle]}
       >
         <LinearGradient
           colors={[`${color}20`, `${color}08`, `${color}20`]}
-          style={[styles.buttonGradient, compact && styles.buttonGradientCompact]}
+          style={[
+            styles.buttonGradient,
+            compact && styles.buttonGradientCompact,
+          ]}
         >
           <Feather
             name={icon}
@@ -231,7 +239,9 @@ export default function GameScreen() {
   } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [baronOfferGate, setBaronOfferGate] = useState(false);
-  const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(null);
+  const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
+    null,
+  );
   const overlayQueue = state.overlayQueue || [];
   const [storyLayoutTick, setStoryLayoutTick] = useState(0);
   const [undoTick, setUndoTick] = useState(0);
@@ -248,9 +258,12 @@ export default function GameScreen() {
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
   const [topBarLayout, setTopBarLayout] = useState<LayoutRect | null>(null);
-  const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(null);
+  const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(
+    null,
+  );
   const [topStackLayout, setTopStackLayout] = useState<LayoutRect | null>(null);
-  const [boardContainerLayout, setBoardContainerLayout] = useState<LayoutRect | null>(null);
+  const [boardContainerLayout, setBoardContainerLayout] =
+    useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
   const boardContainerRef = useRef<View>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
@@ -262,16 +275,20 @@ export default function GameScreen() {
   const momentLockExpiresAtRef = useRef(0);
   const tutorialStepRef = useRef(state.tutorialStep);
   const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
-  const highlightedOrderRef = useRef<string | undefined>(state.highlightedOrderId);
+  const highlightedOrderRef = useRef<string | undefined>(
+    state.highlightedOrderId,
+  );
   const marketingBoostRef = useRef(state.marketingBoostOrdersRemaining);
   const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
   const [momentLockActive, setMomentLockActive] = useState(false);
   const reputationTierRef = useRef(state.reputationTier);
   const canUndoNow =
-    state.undoSnapshot !== undefined && Date.now() + undoTick >= state.undoCooldownUntil;
+    state.undoSnapshot !== undefined &&
+    Date.now() + undoTick >= state.undoCooldownUntil;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
-  const effectiveMaxOrders = state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
+  const effectiveMaxOrders =
+    state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const orderSpawnPaused =
     state.tutorialComplete &&
     state.firstSessionComplete &&
@@ -280,7 +297,8 @@ export default function GameScreen() {
     boardPressureBand === "red";
   const showCouncilButton = state.council.unlocked;
   const councilBadge = state.council.activeHearing ? 1 : 0;
-  const tutorialSkipped = state.tutorialComplete && state.tutorialMetrics.skipped;
+  const tutorialSkipped =
+    state.tutorialComplete && state.tutorialMetrics.skipped;
   const overlayDebugTop = useMemo(() => {
     if (overlayQueue.length === 0) return null;
     return overlayQueue.reduce((best, entry) => {
@@ -309,8 +327,8 @@ export default function GameScreen() {
     state.lockoutChoice === "lab"
       ? `Audit: ${Math.max(0, state.lockoutLabOrdersRemaining)}/${lockoutLabTarget} lab requests`
       : state.lockoutChoice === "baron"
-      ? "Audit: compliance order pending"
-      : "Audit: choose a response";
+        ? "Audit: compliance order pending"
+        : "Audit: choose a response";
 
   const closeModal = () => setActiveModal(null);
   const handleResumeTutorial = () => {
@@ -350,7 +368,7 @@ export default function GameScreen() {
         return changed ? next : prev;
       });
     },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -369,13 +387,19 @@ export default function GameScreen() {
       nextTargets.dependency = applyOffset(relativeTargets.dependency);
     }
     if (relativeTargets.currency) {
-      nextTargets.currency = applyOffset(relativeTargets.currency, topBarLayout);
+      nextTargets.currency = applyOffset(
+        relativeTargets.currency,
+        topBarLayout,
+      );
     }
     if (relativeTargets.orders) {
       nextTargets.orders = applyOffset(relativeTargets.orders, bottomBarLayout);
     }
     if (relativeTargets.upgrades) {
-      nextTargets.upgrades = applyOffset(relativeTargets.upgrades, bottomBarLayout);
+      nextTargets.upgrades = applyOffset(
+        relativeTargets.upgrades,
+        bottomBarLayout,
+      );
     }
 
     setTutorialTargets({ ...nextTargets, ...absoluteTargets });
@@ -384,23 +408,25 @@ export default function GameScreen() {
     (item: OverlayItem) => {
       dispatch({ type: "ENQUEUE_OVERLAY", item });
     },
-    [dispatch]
+    [dispatch],
   );
 
   const dismissOverlay = useCallback(
     (id: string) => {
       dispatch({ type: "DISMISS_OVERLAY", id });
     },
-    [dispatch]
+    [dispatch],
   );
 
   const dismissOverlaysByType = useCallback(
     (type: OverlayItem["type"]) => {
-      const ids = overlayQueue.filter((entry) => entry.type === type).map((entry) => entry.id);
+      const ids = overlayQueue
+        .filter((entry) => entry.type === type)
+        .map((entry) => entry.id);
       if (ids.length === 0) return;
       ids.forEach((id) => dispatch({ type: "DISMISS_OVERLAY", id }));
     },
-    [dispatch, overlayQueue]
+    [dispatch, overlayQueue],
   );
 
   const showToast = useCallback(
@@ -412,7 +438,7 @@ export default function GameScreen() {
         payload: { message, durationMs },
       });
     },
-    [enqueueOverlay]
+    [enqueueOverlay],
   );
 
   const measureBoardContainer = useCallback(() => {
@@ -420,7 +446,6 @@ export default function GameScreen() {
       setBoardContainerLayout({ x, y, width, height });
     });
   }, []);
-
 
   const handleStoryPress = useCallback(() => {
     if (!state.activeStoryBeatId) return;
@@ -432,7 +457,9 @@ export default function GameScreen() {
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
   const showLockoutModal =
     state.lockoutActive &&
-    (state.lockoutPhase === 1 || state.lockoutPhase === 3 || !state.lockoutChoice);
+    (state.lockoutPhase === 1 ||
+      state.lockoutPhase === 3 ||
+      !state.lockoutChoice);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -545,7 +572,9 @@ export default function GameScreen() {
       partPremiumOpen,
       partPremiumLocked,
     ];
-    Promise.all(sources.map((source) => Image.loadAsync(source).catch(() => null)));
+    Promise.all(
+      sources.map((source) => Image.loadAsync(source).catch(() => null)),
+    );
   }, []);
 
   useEffect(() => {
@@ -553,12 +582,23 @@ export default function GameScreen() {
   }, [state.settings.soundEnabled]);
 
   useEffect(() => {
-    if (state.lastMergeBonusId !== mergeBonusRef.current && state.lastMergeBonusCash > 0) {
-      showToast(`Merge chain x${state.mergeChainCount}! +${state.lastMergeBonusCash} coins`);
+    if (
+      state.lastMergeBonusId !== mergeBonusRef.current &&
+      state.lastMergeBonusCash > 0
+    ) {
+      showToast(
+        `Merge chain x${state.mergeChainCount}! +${state.lastMergeBonusCash} coins`,
+      );
       dispatch({ type: "CLEAR_MERGE_BONUS" });
     }
     mergeBonusRef.current = state.lastMergeBonusId;
-  }, [state.lastMergeBonusId, state.lastMergeBonusCash, state.mergeChainCount, showToast, dispatch]);
+  }, [
+    state.lastMergeBonusId,
+    state.lastMergeBonusCash,
+    state.mergeChainCount,
+    showToast,
+    dispatch,
+  ]);
 
   useEffect(() => {
     if (state.lastBaronShipmentId !== baronShipmentRef.current) {
@@ -570,7 +610,10 @@ export default function GameScreen() {
   useEffect(() => {
     if (state.lastCooldownHintId !== cooldownHintRef.current) {
       cooldownHintRef.current = state.lastCooldownHintId;
-      showToast("Unlock Salvage to find materials for the Open Workshop.", 2600);
+      showToast(
+        "Unlock Salvage to find materials for the Open Workshop.",
+        2600,
+      );
     }
   }, [state.lastCooldownHintId, showToast]);
 
@@ -590,17 +633,13 @@ export default function GameScreen() {
       state.lastRecycleRewardId !== recycleRewardRef.current &&
       state.lastRecycleReward
     ) {
-      const {
-        cash,
-        research,
-        openCooldownMs,
-        openCharge,
-        pressureReduction,
-      } = state.lastRecycleReward;
+      const { cash, research, openCooldownMs, openCharge, pressureReduction } =
+        state.lastRecycleReward;
       const parts: string[] = [];
       if (cash > 0) parts.push(`+${cash} coins`);
       if (research > 0) parts.push(`+${research} research`);
-      if (openCharge && openCharge > 0) parts.push(`+${openCharge} Workshop charge`);
+      if (openCharge && openCharge > 0)
+        parts.push(`+${openCharge} Workshop charge`);
       if (openCooldownMs && openCooldownMs > 0) {
         parts.push(`-${Math.ceil(openCooldownMs / 1000)}s Workshop cooldown`);
       }
@@ -660,7 +699,10 @@ export default function GameScreen() {
   useEffect(() => {
     const previous = marketingBoostRef.current;
     if (state.marketingBoostOrdersRemaining > previous) {
-      showToast("Marketing campaign active — higher-tier orders boosted.", 2400);
+      showToast(
+        "Marketing campaign active — higher-tier orders boosted.",
+        2400,
+      );
     } else if (previous > 0 && state.marketingBoostOrdersRemaining === 0) {
       showToast("Marketing campaign ended.", 2000);
     }
@@ -680,7 +722,7 @@ export default function GameScreen() {
   useEffect(() => {
     const previousIds = new Set(orderIdsRef.current);
     const newRushOrder = state.orders.find(
-      (order) => order.rushDeadline && !previousIds.has(order.id)
+      (order) => order.rushDeadline && !previousIds.has(order.id),
     );
     if (newRushOrder) {
       showToast("Rush order incoming — limited-time bonus!", 2600);
@@ -769,7 +811,6 @@ export default function GameScreen() {
     });
   }, [state.activeStoryBeatId, dismissOverlaysByType, enqueueOverlay]);
 
-
   useEffect(() => {
     if (state.tutorialComplete) return;
     if (state.tutorialStep === 3) {
@@ -783,7 +824,10 @@ export default function GameScreen() {
 
   // Milestone celebration for reputation tier-ups
   useEffect(() => {
-    if (state.reputationTier > reputationTierRef.current && state.tutorialComplete) {
+    if (
+      state.reputationTier > reputationTierRef.current &&
+      state.tutorialComplete
+    ) {
       if (!state.settings.reducedMotion) {
         enqueueOverlay({
           id: `milestone:${Date.now()}`,
@@ -793,7 +837,12 @@ export default function GameScreen() {
       }
     }
     reputationTierRef.current = state.reputationTier;
-  }, [state.reputationTier, state.tutorialComplete, state.settings.reducedMotion, enqueueOverlay]);
+  }, [
+    state.reputationTier,
+    state.tutorialComplete,
+    state.settings.reducedMotion,
+    enqueueOverlay,
+  ]);
 
   return (
     <LinearGradient
@@ -849,76 +898,105 @@ export default function GameScreen() {
                 showToast("Cash buys upgrades and expansions.", 2400)
               }
               onReputationLongPress={() =>
-                showToast("Reputation unlocks neighborhoods and better orders.", 2600)
+                showToast(
+                  "Reputation unlocks neighborhoods and better orders.",
+                  2600,
+                )
               }
               onResearchLongPress={() =>
-                showToast("Research unlocks R&D and the Freedom Controller.", 2600)
+                showToast(
+                  "Research unlocks R&D and the Freedom Controller.",
+                  2600,
+                )
               }
               reducedMotion={state.settings.reducedMotion}
             />
           </View>
           <View style={styles.topActions}>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => setActiveModal("story")}
-          >
+            <Pressable
+              style={styles.settingsButton}
+              onPress={() => setActiveModal("story")}
+            >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
                 style={styles.settingsGradient}
               >
-                <Feather name="book-open" size={20} color={GameColors.text.secondary} />
+                <Feather
+                  name="book-open"
+                  size={20}
+                  color={GameColors.text.secondary}
+                />
               </LinearGradient>
             </Pressable>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => setActiveModal("glossary")}
-          >
+            <Pressable
+              style={styles.settingsButton}
+              onPress={() => setActiveModal("glossary")}
+            >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
                 style={styles.settingsGradient}
               >
-                <Feather name="help-circle" size={20} color={GameColors.text.secondary} />
+                <Feather
+                  name="help-circle"
+                  size={20}
+                  color={GameColors.text.secondary}
+                />
               </LinearGradient>
             </Pressable>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => setActiveModal("settings")}
-            testID="settings-button"
-          >
-            <LinearGradient
-              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-              style={styles.settingsGradient}
+            <Pressable
+              style={styles.settingsButton}
+              onPress={() => setActiveModal("settings")}
+              testID="settings-button"
             >
-              <Feather name="settings" size={20} color={GameColors.text.secondary} />
-            </LinearGradient>
-          </Pressable>
-          <Pressable
-            style={[styles.settingsButton, isCompactScreen && styles.settingsButtonDisabled]}
-            onPress={
-              isCompactScreen ? undefined : () => setHudCollapsed((prev) => !prev)
-            }
-          >
-            <LinearGradient
-              colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-              style={styles.settingsGradient}
+              <LinearGradient
+                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                style={styles.settingsGradient}
+              >
+                <Feather
+                  name="settings"
+                  size={20}
+                  color={GameColors.text.secondary}
+                />
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.settingsButton,
+                isCompactScreen && styles.settingsButtonDisabled,
+              ]}
+              onPress={
+                isCompactScreen
+                  ? undefined
+                  : () => setHudCollapsed((prev) => !prev)
+              }
             >
-              <Feather
-                name={topCondensed ? "chevrons-down" : "chevrons-up"}
-                size={20}
-                color={isCompactScreen ? GameColors.text.disabled : GameColors.text.secondary}
-              />
-            </LinearGradient>
-          </Pressable>
+              <LinearGradient
+                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                style={styles.settingsGradient}
+              >
+                <Feather
+                  name={topCondensed ? "chevrons-down" : "chevrons-up"}
+                  size={20}
+                  color={
+                    isCompactScreen
+                      ? GameColors.text.disabled
+                      : GameColors.text.secondary
+                  }
+                />
+              </LinearGradient>
+            </Pressable>
+          </View>
         </View>
-      </View>
 
-        <View style={[styles.statusRow, topCondensed && styles.statusRowCompact]}>
+        <View
+          style={[styles.statusRow, topCondensed && styles.statusRowCompact]}
+        >
           <Pressable
             style={styles.statusItem}
             onLongPress={() =>
               showToast(
                 "Dependency starts maxed. Open work lowers it; locked work reinforces it. Baron Pressure taxes Phase 2 rewards: 40+ = -10%, 70+ = -20%. Open-only installs reduce Pressure.",
-                3400
+                3400,
               )
             }
             delayLongPress={350}
@@ -944,7 +1022,10 @@ export default function GameScreen() {
 
         {state.lockoutActive ? (
           <View
-            style={[styles.lockoutHintRow, topCondensed && styles.lockoutHintRowCompact]}
+            style={[
+              styles.lockoutHintRow,
+              topCondensed && styles.lockoutHintRowCompact,
+            ]}
           >
             <Feather
               name="alert-circle"
@@ -953,7 +1034,7 @@ export default function GameScreen() {
             />
             <View style={styles.lockoutHintTextWrap}>
               <ThemedText style={styles.lockoutHintText}>
-                Audit in progress - Dependency can't drop below 20.
+                Audit in progress - Dependency can&apos;t drop below 20.
               </ThemedText>
               <ThemedText style={styles.lockoutHintSubtext}>
                 {lockoutProgressLabel}
@@ -966,7 +1047,9 @@ export default function GameScreen() {
           missions={state.missions}
           locked={!state.tutorialComplete}
           onPress={() => setActiveModal("missions")}
-          onLockedPress={() => showToast("Finish the tutorial to unlock goals.", 2200)}
+          onLockedPress={() =>
+            showToast("Finish the tutorial to unlock goals.", 2200)
+          }
           compact={topCondensed}
           collapsed={topCondensed}
         />
@@ -974,15 +1057,22 @@ export default function GameScreen() {
         {tutorialSkipped ? (
           <Pressable style={styles.resumeBanner} onPress={handleResumeTutorial}>
             <View style={styles.resumeBannerContent}>
-              <Feather name="play-circle" size={16} color={GameColors.ui.primary} />
+              <Feather
+                name="play-circle"
+                size={16}
+                color={GameColors.ui.primary}
+              />
               <ThemedText style={styles.resumeBannerText}>
                 Tutorial skipped — tap to resume
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={GameColors.text.secondary}
+            />
           </Pressable>
         ) : null}
-
       </View>
 
       <View
@@ -1018,14 +1108,23 @@ export default function GameScreen() {
             if (station === "workbench") {
               showToast("Suppliers: tap to access your supply panel.", 2600);
             } else if (station === "orders") {
-              showToast("Orders: fulfill installs for cash, reputation, and research.", 2600);
+              showToast(
+                "Orders: fulfill installs for cash, reputation, and research.",
+                2600,
+              );
             } else {
-              showToast("R&D: spend research to unlock Freedom Controller tech.", 2600);
+              showToast(
+                "R&D: spend research to unlock Freedom Controller tech.",
+                2600,
+              );
             }
           }}
           onUtilityLongPress={(utility) => {
             if (utility === "backpack") {
-              showToast("Backpack: temporary storage. Drag items in and out.", 2400);
+              showToast(
+                "Backpack: temporary storage. Drag items in and out.",
+                2400,
+              );
             } else {
               showToast("Recycle: delete a part for a small refund.", 2400);
             }
@@ -1037,8 +1136,8 @@ export default function GameScreen() {
             !state.tutorialComplete && state.tutorialStep === 0
               ? "workbench"
               : !state.tutorialComplete && state.tutorialStep === 3
-              ? "orders"
-              : null
+                ? "orders"
+                : null
           }
         />
       </View>
@@ -1048,7 +1147,10 @@ export default function GameScreen() {
         style={[
           styles.bottomBar,
           isCompactLayout && styles.bottomBarCompact,
-          { paddingBottom: insets.bottom + (isCompactLayout ? Spacing.sm : Spacing.md) },
+          {
+            paddingBottom:
+              insets.bottom + (isCompactLayout ? Spacing.sm : Spacing.md),
+          },
         ]}
         onLayout={(event) => {
           const layout = event?.nativeEvent?.layout;
@@ -1119,7 +1221,9 @@ export default function GameScreen() {
               contentFit="contain"
               cachePolicy="memory-disk"
             />
-            <ThemedText style={styles.freedomCount}>{state.freedomControllerCount}</ThemedText>
+            <ThemedText style={styles.freedomCount}>
+              {state.freedomControllerCount}
+            </ThemedText>
           </View>
         ) : null}
       </LinearGradient>
@@ -1132,12 +1236,18 @@ export default function GameScreen() {
           <Feather
             name="rotate-ccw"
             size={16}
-            color={canUndoNow ? GameColors.text.primary : GameColors.text.disabled}
+            color={
+              canUndoNow ? GameColors.text.primary : GameColors.text.disabled
+            }
           />
           <ThemedText
             style={[
               styles.undoText,
-              { color: canUndoNow ? GameColors.text.primary : GameColors.text.disabled },
+              {
+                color: canUndoNow
+                  ? GameColors.text.primary
+                  : GameColors.text.disabled,
+              },
             ]}
           >
             Undo
@@ -1172,9 +1282,7 @@ export default function GameScreen() {
       >
         <OrdersModal
           onClose={closeModal}
-          closeDisabled={
-            !state.tutorialComplete && state.tutorialStep === 3
-          }
+          closeDisabled={!state.tutorialComplete && state.tutorialStep === 3}
           onOpenProjects={() => setActiveModal("projects")}
         />
       </Modal>
@@ -1228,9 +1336,7 @@ export default function GameScreen() {
       >
         <UpgradesModal
           onClose={closeModal}
-          closeDisabled={
-            !state.tutorialComplete && state.tutorialStep === 4
-          }
+          closeDisabled={!state.tutorialComplete && state.tutorialStep === 4}
           tutorialOnlyUpgradeId={
             !state.tutorialComplete && state.tutorialStep === 4
               ? "space_1"
@@ -1312,7 +1418,10 @@ export default function GameScreen() {
             part={selectedPart}
             onClose={() => setSelectedPartIndex(null)}
             onUseFreedomController={() =>
-              dispatch({ type: "USE_FREEDOM_CONTROLLER", partIndex: selectedPartIndex! })
+              dispatch({
+                type: "USE_FREEDOM_CONTROLLER",
+                partIndex: selectedPartIndex!,
+              })
             }
             canUseFreedomController={state.freedomControllerCount > 0}
           />
@@ -1322,7 +1431,10 @@ export default function GameScreen() {
       {showLockoutModal ? <LockoutModal onClose={() => {}} /> : null}
 
       {!state.tutorialComplete ? (
-        <TutorialOverlay targets={tutorialTargets} safeBottom={bottomBarLayout?.height} />
+        <TutorialOverlay
+          targets={tutorialTargets}
+          safeBottom={bottomBarLayout?.height}
+        />
       ) : null}
     </LinearGradient>
   );

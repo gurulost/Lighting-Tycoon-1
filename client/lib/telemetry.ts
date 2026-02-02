@@ -35,7 +35,10 @@ function toPostHogProperties(
   return cleaned;
 }
 
-export function captureEvent(name: string, properties?: Record<string, unknown>) {
+export function captureEvent(
+  name: string,
+  properties?: Record<string, unknown>,
+) {
   posthog?.capture(name, toPostHogProperties(properties));
 }
 

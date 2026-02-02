@@ -1,5 +1,11 @@
 import React, { useMemo, useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView, Dimensions } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Dimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -108,8 +114,7 @@ export function SupplierModal({
   );
 
   if (!visible) return null;
-  const maxHeight =
-    screenHeight - insets.top - insets.bottom - Spacing["4xl"];
+  const maxHeight = screenHeight - insets.top - insets.bottom - Spacing["4xl"];
 
   return (
     <View
@@ -152,155 +157,164 @@ export function SupplierModal({
                   size={12}
                   color={GameColors.text.secondary}
                 />
-                <ThemedText style={styles.resourceText}>{compatLabel}</ThemedText>
+                <ThemedText style={styles.resourceText}>
+                  {compatLabel}
+                </ThemedText>
               </View>
             </View>
 
-            {(["baron", "open", "salvage"] as SupplierId[]).map((supplierId) => {
-              const meta = SUPPLIER_META[supplierId];
-              const supplier = state.suppliers[supplierId];
-              const locked = supplier.level <= 0;
-              const lockedHint =
-                supplierId === "open"
-                  ? "Requires R&D Access + Open Workshop I (1 Upgrade Material). Upgrade Materials come from Salvage (unlock in Upgrades)."
-                  : supplierId === "salvage"
-                    ? "Unlock via Upgrades: Salvage Corner (350 cash)."
+            {(["baron", "open", "salvage"] as SupplierId[]).map(
+              (supplierId) => {
+                const meta = SUPPLIER_META[supplierId];
+                const supplier = state.suppliers[supplierId];
+                const locked = supplier.level <= 0;
+                const lockedHint =
+                  supplierId === "open"
+                    ? "Requires R&D Access + Open Workshop I (1 Upgrade Material). Upgrade Materials come from Salvage (unlock in Upgrades)."
+                    : supplierId === "salvage"
+                      ? "Unlock via Upgrades: Salvage Corner (350 cash)."
+                      : undefined;
+                const mentorTip =
+                  supplierId === "baron"
+                    ? "Mentor tip: Baron shipments include waste — merge or recycle it for value."
                     : undefined;
-              const mentorTip =
-                supplierId === "baron"
-                  ? "Mentor tip: Baron shipments include waste — merge or recycle it for value."
-                  : undefined;
-              const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-              const config = getEffectiveSupplierConfig(
-                supplierId,
-                Math.max(1, supplier.level),
-                speedLevel,
-                { baronEarlyRelief },
-              );
-              const cooldownRemaining = Math.max(
-                0,
-                supplier.cooldownEndsAt - now,
-              );
-              const charges = supplier.chargesRemaining;
-              const tapStatus = getSupplierTapStatus(supplierId, now);
-              const chargesDisplay = locked
-                ? "Locked"
-                : `${charges}/${config.maxCharges}`;
-              const isCooling = !locked && charges <= 0 && cooldownRemaining > 0;
-              const isOverdraw = tapStatus.mode === "overdraw";
-              const buttonLabel = locked
-                ? "Locked"
-                : isOverdraw
-                  ? "Overdraw"
-                  : isCooling
-                    ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
-                    : "Tap";
-              const overdrawCost = tapStatus.cost;
-              let overdrawLabel: string | null = null;
-              if (isOverdraw && overdrawCost) {
-                const parts: string[] = [];
-                const isSalvageFallback =
-                  supplierId === "salvage" &&
-                  overdrawCost.salvageMethod === "cash_fallback";
-                if (isSalvageFallback && overdrawCost.wasteRequired > 0) {
-                  parts.push(
-                    `${overdrawCost.wasteRequired} waste or $${overdrawCost.cash}`,
-                  );
-                } else {
-                  if (overdrawCost.cash > 0) {
-                    parts.push(`$${overdrawCost.cash}`);
+                const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+                const config = getEffectiveSupplierConfig(
+                  supplierId,
+                  Math.max(1, supplier.level),
+                  speedLevel,
+                  { baronEarlyRelief },
+                );
+                const cooldownRemaining = Math.max(
+                  0,
+                  supplier.cooldownEndsAt - now,
+                );
+                const charges = supplier.chargesRemaining;
+                const tapStatus = getSupplierTapStatus(supplierId, now);
+                const chargesDisplay = locked
+                  ? "Locked"
+                  : `${charges}/${config.maxCharges}`;
+                const isCooling =
+                  !locked && charges <= 0 && cooldownRemaining > 0;
+                const isOverdraw = tapStatus.mode === "overdraw";
+                const buttonLabel = locked
+                  ? "Locked"
+                  : isOverdraw
+                    ? "Overdraw"
+                    : isCooling
+                      ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
+                      : "Tap";
+                const overdrawCost = tapStatus.cost;
+                let overdrawLabel: string | null = null;
+                if (isOverdraw && overdrawCost) {
+                  const parts: string[] = [];
+                  const isSalvageFallback =
+                    supplierId === "salvage" &&
+                    overdrawCost.salvageMethod === "cash_fallback";
+                  if (isSalvageFallback && overdrawCost.wasteRequired > 0) {
+                    parts.push(
+                      `${overdrawCost.wasteRequired} waste or $${overdrawCost.cash}`,
+                    );
+                  } else {
+                    if (overdrawCost.cash > 0) {
+                      parts.push(`$${overdrawCost.cash}`);
+                    }
+                    if (overdrawCost.research > 0) {
+                      parts.push(`-${overdrawCost.research} research`);
+                    }
+                    if (overdrawCost.wasteRequired > 0) {
+                      parts.push(`-${overdrawCost.wasteRequired} waste`);
+                    }
                   }
-                  if (overdrawCost.research > 0) {
-                    parts.push(`-${overdrawCost.research} research`);
+                  if (overdrawCost.extraWasteChance > 0) {
+                    parts.push(
+                      `+${Math.round(overdrawCost.extraWasteChance * 100)}% waste`,
+                    );
                   }
-                  if (overdrawCost.wasteRequired > 0) {
-                    parts.push(`-${overdrawCost.wasteRequired} waste`);
+                  if (overdrawCost.overheatMs > 0) {
+                    parts.push(
+                      `+${Math.ceil(overdrawCost.overheatMs / 1000)}s cooldown`,
+                    );
+                  }
+                  if (parts.length > 0) {
+                    overdrawLabel = `Overdraw: ${parts.join(" · ")}`;
                   }
                 }
-                if (overdrawCost.extraWasteChance > 0) {
-                  parts.push(
-                    `+${Math.round(overdrawCost.extraWasteChance * 100)}% waste`,
-                  );
-                }
-                if (overdrawCost.overheatMs > 0) {
-                  parts.push(
-                    `+${Math.ceil(overdrawCost.overheatMs / 1000)}s cooldown`,
-                  );
-                }
-                if (parts.length > 0) {
-                  overdrawLabel = `Overdraw: ${parts.join(" · ")}`;
-                }
-              }
-              return (
-                <LinearGradient
-                  key={supplierId}
-                  colors={["#1F1F2E", "#26263A", "#1F1F2E"]}
-                  style={[styles.card, { borderColor: meta.accent + "40" }]}
-                >
-                  <View style={styles.cardHeader}>
-                    <View
-                      style={[
-                        styles.iconWrap,
-                        { backgroundColor: meta.accent + "20" },
-                      ]}
-                    >
-                      <Feather name={meta.icon} size={18} color={meta.accent} />
-                    </View>
-                    <View style={styles.cardTitleWrap}>
-                      <ThemedText style={styles.cardTitle}>
-                        {meta.name}
-                      </ThemedText>
-                      <ThemedText style={styles.cardSubtitle}>
-                        {meta.description}
-                      </ThemedText>
-                      {locked && lockedHint ? (
-                        <ThemedText style={styles.lockedHint}>
-                          {lockedHint}
+                return (
+                  <LinearGradient
+                    key={supplierId}
+                    colors={["#1F1F2E", "#26263A", "#1F1F2E"]}
+                    style={[styles.card, { borderColor: meta.accent + "40" }]}
+                  >
+                    <View style={styles.cardHeader}>
+                      <View
+                        style={[
+                          styles.iconWrap,
+                          { backgroundColor: meta.accent + "20" },
+                        ]}
+                      >
+                        <Feather
+                          name={meta.icon}
+                          size={18}
+                          color={meta.accent}
+                        />
+                      </View>
+                      <View style={styles.cardTitleWrap}>
+                        <ThemedText style={styles.cardTitle}>
+                          {meta.name}
                         </ThemedText>
-                      ) : null}
-                      {mentorTip ? (
-                        <ThemedText style={styles.mentorTip}>
-                          {mentorTip}
+                        <ThemedText style={styles.cardSubtitle}>
+                          {meta.description}
                         </ThemedText>
-                      ) : null}
-                      {overdrawLabel ? (
-                        <ThemedText style={styles.overdrawHint}>
-                          {overdrawLabel}
+                        {locked && lockedHint ? (
+                          <ThemedText style={styles.lockedHint}>
+                            {lockedHint}
+                          </ThemedText>
+                        ) : null}
+                        {mentorTip ? (
+                          <ThemedText style={styles.mentorTip}>
+                            {mentorTip}
+                          </ThemedText>
+                        ) : null}
+                        {overdrawLabel ? (
+                          <ThemedText style={styles.overdrawHint}>
+                            {overdrawLabel}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                      <View style={styles.levelPill}>
+                        <ThemedText style={styles.levelText}>
+                          {locked ? "L0" : `L${supplier.level}`}
                         </ThemedText>
-                      ) : null}
+                      </View>
                     </View>
-                    <View style={styles.levelPill}>
-                      <ThemedText style={styles.levelText}>
-                        {locked ? "L0" : `L${supplier.level}`}
-                      </ThemedText>
-                    </View>
-                  </View>
 
-                  <View style={styles.cardFooter}>
-                    <ThemedText style={styles.chargeText}>
-                      Charges: {chargesDisplay}
-                    </ThemedText>
-                    <Pressable
-                      onPress={() => handleTap(supplierId)}
-                      disabled={locked || !tapStatus.ok}
-                      style={[
-                        styles.tapButton,
-                        {
-                          backgroundColor:
-                            locked || !tapStatus.ok
-                              ? GameColors.ui.surface
-                              : meta.accent,
-                        },
-                      ]}
-                    >
-                      <ThemedText style={styles.tapButtonText}>
-                        {buttonLabel}
+                    <View style={styles.cardFooter}>
+                      <ThemedText style={styles.chargeText}>
+                        Charges: {chargesDisplay}
                       </ThemedText>
-                    </Pressable>
-                  </View>
-                </LinearGradient>
-              );
-            })}
+                      <Pressable
+                        onPress={() => handleTap(supplierId)}
+                        disabled={locked || !tapStatus.ok}
+                        style={[
+                          styles.tapButton,
+                          {
+                            backgroundColor:
+                              locked || !tapStatus.ok
+                                ? GameColors.ui.surface
+                                : meta.accent,
+                          },
+                        ]}
+                      >
+                        <ThemedText style={styles.tapButtonText}>
+                          {buttonLabel}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  </LinearGradient>
+                );
+              },
+            )}
           </ScrollView>
         </ModalShell>
       </View>

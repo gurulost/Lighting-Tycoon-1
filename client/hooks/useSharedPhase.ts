@@ -32,7 +32,7 @@ export function useSharedPhase({
     phase.value = withRepeat(
       withTiming(1, { duration, easing: Easing.linear }),
       -1,
-      false
+      false,
     );
 
     return () => {

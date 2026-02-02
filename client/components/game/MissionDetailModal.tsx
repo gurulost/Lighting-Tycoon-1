@@ -29,7 +29,9 @@ function RewardChip({
   return (
     <View style={[styles.rewardChip, { borderColor: `${color}50` }]}>
       <Feather name={icon} size={12} color={color} />
-      <ThemedText style={[styles.rewardChipText, { color }]}>{label}</ThemedText>
+      <ThemedText style={[styles.rewardChipText, { color }]}>
+        {label}
+      </ThemedText>
     </View>
   );
 }
@@ -43,7 +45,11 @@ function MissionCard({
 }) {
   const giver = getMissionGiverMeta(mission.giver);
   const progress = Math.min(1, mission.progress / mission.target);
-  const rewardChips: Array<{ icon: keyof typeof Feather.glyphMap; color: string; label: string }> = [];
+  const rewardChips: Array<{
+    icon: keyof typeof Feather.glyphMap;
+    color: string;
+    label: string;
+  }> = [];
 
   if (mission.reward.cash) {
     rewardChips.push({
@@ -84,7 +90,11 @@ function MissionCard({
           />
         ) : (
           <View style={[styles.cardIcon, { borderColor: `${giver.color}80` }]}>
-            <Feather name={giver.icon as keyof typeof Feather.glyphMap} size={16} color={giver.color} />
+            <Feather
+              name={giver.icon as keyof typeof Feather.glyphMap}
+              size={16}
+              color={giver.color}
+            />
           </View>
         )}
         <View style={styles.cardHeaderText}>
@@ -92,17 +102,26 @@ function MissionCard({
             <ThemedText style={styles.cardTitle}>{mission.label}</ThemedText>
             {mission.chainIndex && mission.chainLength ? (
               <View style={styles.chainTag}>
-                <Feather name="bookmark" size={10} color={GameColors.text.secondary} />
+                <Feather
+                  name="bookmark"
+                  size={10}
+                  color={GameColors.text.secondary}
+                />
                 <ThemedText style={styles.chainTagText}>
                   {mission.chainIndex}/{mission.chainLength}
                 </ThemedText>
               </View>
             ) : null}
           </View>
-          <ThemedText style={styles.cardSubtitle}>{mission.description}</ThemedText>
+          <ThemedText style={styles.cardSubtitle}>
+            {mission.description}
+          </ThemedText>
         </View>
         {onSkip ? (
-          <Pressable onPress={() => onSkip(mission.id)} style={styles.skipButton}>
+          <Pressable
+            onPress={() => onSkip(mission.id)}
+            style={styles.skipButton}
+          >
             <Feather name="x" size={14} color={GameColors.text.secondary} />
           </Pressable>
         ) : null}
@@ -160,7 +179,9 @@ export function MissionDetailModal({ onClose }: MissionDetailModalProps) {
         {activeMissions.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather name="target" size={28} color={GameColors.text.disabled} />
-            <ThemedText style={styles.emptyText}>No active goals yet.</ThemedText>
+            <ThemedText style={styles.emptyText}>
+              No active goals yet.
+            </ThemedText>
           </View>
         ) : (
           <View style={styles.cardStack}>
@@ -168,7 +189,9 @@ export function MissionDetailModal({ onClose }: MissionDetailModalProps) {
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onSkip={(missionId) => dispatch({ type: "SKIP_MISSION", missionId })}
+                onSkip={(missionId) =>
+                  dispatch({ type: "SKIP_MISSION", missionId })
+                }
               />
             ))}
           </View>
@@ -184,14 +207,23 @@ export function MissionDetailModal({ onClose }: MissionDetailModalProps) {
           <View style={styles.recentSection}>
             <ThemedText style={styles.sectionTitle}>Recent wins</ThemedText>
             {recentEntries.map((entry, index) => {
-              const template = MISSION_TEMPLATES.find((item) => item.id === entry.templateId);
+              const template = MISSION_TEMPLATES.find(
+                (item) => item.id === entry.templateId,
+              );
               const label = template?.label ?? "Goal";
               return (
-                <View key={`${entry.templateId}-${index}`} style={styles.recentRow}>
+                <View
+                  key={`${entry.templateId}-${index}`}
+                  style={styles.recentRow}
+                >
                   <Feather
                     name={entry.skipped ? "x-circle" : "check-circle"}
                     size={14}
-                    color={entry.skipped ? GameColors.text.secondary : GameColors.ui.success}
+                    color={
+                      entry.skipped
+                        ? GameColors.text.secondary
+                        : GameColors.ui.success
+                    }
                   />
                   <ThemedText style={styles.recentLabel}>{label}</ThemedText>
                   <ThemedText style={styles.recentMeta}>

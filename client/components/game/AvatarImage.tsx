@@ -56,7 +56,11 @@ export function AvatarImage({
           style as StyleProp<ViewStyle>,
         ]}
       >
-        <Feather name={icon} size={Math.max(10, size * 0.5)} color={iconColor} />
+        <Feather
+          name={icon}
+          size={Math.max(10, size * 0.5)}
+          color={iconColor}
+        />
       </View>
     );
   }

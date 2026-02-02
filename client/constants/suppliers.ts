@@ -8,7 +8,10 @@ export interface SupplierConfig {
   cooldownMs: number;
 }
 
-export const SUPPLIER_CONFIG: Record<SupplierId, Record<number, SupplierConfig>> = {
+export const SUPPLIER_CONFIG: Record<
+  SupplierId,
+  Record<number, SupplierConfig>
+> = {
   baron: {
     1: { maxCharges: 6, cooldownMs: 45000 },
     2: { maxCharges: 8, cooldownMs: 42000 },
@@ -31,17 +34,15 @@ export const SUPPLIER_CONFIG: Record<SupplierId, Record<number, SupplierConfig>>
 export function getSupplierConfig(
   supplierId: SupplierId,
   level: number,
-  speedLevel = 0
+  speedLevel = 0,
 ) {
   const config = SUPPLIER_CONFIG[supplierId] || {};
   const levels = Object.keys(config)
     .map((entry) => Number(entry))
     .filter((value) => Number.isFinite(value));
   const fallbackLevel = levels.length > 0 ? Math.max(...levels) : 1;
-  const base =
-    config[level] ||
-    config[fallbackLevel] ||
-    { maxCharges: 0, cooldownMs: 60000 };
+  const base = config[level] ||
+    config[fallbackLevel] || { maxCharges: 0, cooldownMs: 60000 };
   const supplierTuning = tuning.suppliers[supplierId];
   const cooldownMultiplier = Math.max(0, supplierTuning.cooldownMultiplier);
   const tunedCharges = Math.max(
@@ -55,11 +56,13 @@ export function getSupplierConfig(
       cooldownMs: Math.max(tuning.suppliers.cooldownMinMs, cooldownMs),
     };
   }
-  const reduction =
-    speedLevel * tuning.suppliers.cooldownReductionPerLevelMs;
+  const reduction = speedLevel * tuning.suppliers.cooldownReductionPerLevelMs;
   return {
     maxCharges: tunedCharges,
-    cooldownMs: Math.max(tuning.suppliers.cooldownMinMs, cooldownMs - reduction),
+    cooldownMs: Math.max(
+      tuning.suppliers.cooldownMinMs,
+      cooldownMs - reduction,
+    ),
   };
 }
 
@@ -67,14 +70,10 @@ export function getEffectiveSupplierConfig(
   supplierId: SupplierId,
   level: number,
   speedLevel = 0,
-  options?: { baronEarlyRelief?: boolean }
+  options?: { baronEarlyRelief?: boolean },
 ) {
   const base = getSupplierConfig(supplierId, level, speedLevel);
-  if (
-    options?.baronEarlyRelief &&
-    supplierId === "baron" &&
-    level === 1
-  ) {
+  if (options?.baronEarlyRelief && supplierId === "baron" && level === 1) {
     return {
       ...base,
       cooldownMs: Math.min(

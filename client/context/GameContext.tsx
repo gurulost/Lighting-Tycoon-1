@@ -60,11 +60,11 @@ import {
 import { COUNCIL_PERKS } from "@/constants/councilPerks";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
-import { getProjectDepositCost, getProjectOfferRefreshCost } from "@/lib/projects";
 import {
-  getCouncilPerkEffects,
-  getCouncilHearingPenalty,
-} from "@/lib/council";
+  getProjectDepositCost,
+  getProjectOfferRefreshCost,
+} from "@/lib/projects";
+import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
 import {
   captureEvent,
   getAppInfo,
@@ -72,7 +72,11 @@ import {
   identifyUser,
   posthog,
 } from "@/lib/telemetry";
-import { applyTuningFromPayload, getTuning, TUNING_FLAG_KEY } from "@/lib/tuning";
+import {
+  applyTuningFromPayload,
+  getTuning,
+  TUNING_FLAG_KEY,
+} from "@/lib/tuning";
 import { useFeatureFlagWithPayload } from "posthog-react-native";
 import type { PostHog as PostHogClient } from "posthog-react-native";
 import {
@@ -267,9 +271,11 @@ function countWasteParts(
   return allWaste;
 }
 
-
 function getOverheatMs(overdrawCountNext: number) {
-  const freeCount = Math.max(0, Math.round(tuning.suppliers.overdraw.freeCount));
+  const freeCount = Math.max(
+    0,
+    Math.round(tuning.suppliers.overdraw.freeCount),
+  );
   if (overdrawCountNext <= freeCount) return 0;
   const base = Math.max(0, Math.round(tuning.suppliers.overdraw.overheatMs));
   if (!base) return 0;
@@ -799,7 +805,8 @@ function canUnlockCouncil(state: GameState) {
     capstoneId && state.projectsCompleted.includes(capstoneId);
   if (capstoneComplete) return true;
   return (
-    state.projectsCompleted.length >= tuning.council.unlockMinProjectsCompleted &&
+    state.projectsCompleted.length >=
+      tuning.council.unlockMinProjectsCompleted &&
     state.reputationTier >= tuning.council.unlockMinRepTier
   );
 }
@@ -812,7 +819,10 @@ function canStartCouncilCampaign(
   const campaign = COUNCIL_CAMPAIGN_BY_ID[campaignId];
   if (!campaign) return false;
   const unlock = campaign.unlock;
-  if (typeof unlock.minRepTier === "number" && state.reputationTier < unlock.minRepTier) {
+  if (
+    typeof unlock.minRepTier === "number" &&
+    state.reputationTier < unlock.minRepTier
+  ) {
     return false;
   }
   if (
@@ -980,7 +990,9 @@ function generateProjectOffers(state: GameState, count = 3): ProjectOffer[] {
       seed: Math.floor(Math.random() * 1000000),
       generatedAt: now,
     });
-    const removeIndex = available.findIndex((project) => project.id === pick.id);
+    const removeIndex = available.findIndex(
+      (project) => project.id === pick.id,
+    );
     if (removeIndex >= 0) {
       available.splice(removeIndex, 1);
     } else {
@@ -1072,7 +1084,9 @@ function filterStoryQueue(queue: string[]): string[] {
     const beat = STORY_BEATS[beatId];
     if (!beat) return false;
     if (beat.priority === "high") return true;
-    return beat.category ? STORY_QUEUE_PERSIST_CATEGORIES.has(beat.category) : false;
+    return beat.category
+      ? STORY_QUEUE_PERSIST_CATEGORIES.has(beat.category)
+      : false;
   });
   if (filtered.length <= PERSISTED_STORY_QUEUE_LIMIT) return filtered;
   return filtered.slice(-PERSISTED_STORY_QUEUE_LIMIT);
@@ -1722,7 +1736,9 @@ function getEffectiveMaxOrders(state: GameState) {
   return state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
 }
 
-function getProjectDefinitionById(projectId: string): ProjectDefinition | undefined {
+function getProjectDefinitionById(
+  projectId: string,
+): ProjectDefinition | undefined {
   return PROJECT_DEFINITIONS.find((project) => project.id === projectId);
 }
 
@@ -1730,7 +1746,9 @@ function getProjectStageTag(projectId: string, stageIndex: number) {
   return `project:${projectId}:${stageIndex}`;
 }
 
-function parseProjectStageTag(order: Order): { projectId: string; stageIndex: number } | null {
+function parseProjectStageTag(
+  order: Order,
+): { projectId: string; stageIndex: number } | null {
   const tag = order.modifierIds?.find((id) => id.startsWith("project:"));
   if (!tag) return null;
   const parts = tag.split(":");
@@ -1858,21 +1876,22 @@ function buildProjectStageOrder(
   rerollCount = 0,
   modifierVariant?: ProjectModifierVariant,
 ): Order {
-  const seedKey = hashString(`${seed}:${project.id}:${stage.stageIndex}:${rerollCount}`);
+  const seedKey = hashString(
+    `${seed}:${project.id}:${stage.stageIndex}:${rerollCount}`,
+  );
   const rng = createSeededRng(seedKey);
   const baseRecipe = getProjectBaseRecipe(stage, rng);
   const spec = modifierVariant
     ? { ...stage.orderSpec, ...modifierVariant }
     : stage.orderSpec;
-  const derived = applyProjectStageRequirements(
-    baseRecipe.requirements,
-    { ...stage, orderSpec: spec },
-  );
+  const derived = applyProjectStageRequirements(baseRecipe.requirements, {
+    ...stage,
+    orderSpec: spec,
+  });
 
   const rewardModifierIds: string[] = [];
   if (spec.requiresOpenOnly) rewardModifierIds.push("mod_style_open");
-  if (spec.requiresCompatibility)
-    rewardModifierIds.push("mod_compatible");
+  if (spec.requiresCompatibility) rewardModifierIds.push("mod_compatible");
   if (spec.ecoAudit) rewardModifierIds.push("mod_eco_audit");
   if (spec.rush) rewardModifierIds.push("mod_rush_60");
   if (spec.noSubstitutions) rewardModifierIds.push("mod_no_sub");
@@ -1906,8 +1925,7 @@ function buildProjectStageOrder(
     getProjectStageTag(project.id, stage.stageIndex),
   ];
   if (spec.requiresOpenOnly) modifierIds.push("project_open_only");
-  if (spec.requiresCompatibility)
-    modifierIds.push("project_compatibility");
+  if (spec.requiresCompatibility) modifierIds.push("project_compatibility");
   if (spec.ecoAudit) modifierIds.push("project_eco_audit");
   if (spec.rush) modifierIds.push("project_rush");
 
@@ -1940,7 +1958,9 @@ function getActiveProjectStage(state: GameState): {
 }
 
 function stripProjectOrders(orders: Order[]) {
-  return orders.filter((order) => !order.modifierIds?.includes("project_stage"));
+  return orders.filter(
+    (order) => !order.modifierIds?.includes("project_stage"),
+  );
 }
 
 function removeProjectSiteLogisticsCharges(
@@ -2125,7 +2145,8 @@ function insertFirstSessionChoiceOrders(
   const nonFirstSessionOrders = orders.filter(
     (order) => !order.modifierIds?.includes("first_session"),
   );
-  const availableSlots = getEffectiveMaxOrders(state) - nonFirstSessionOrders.length;
+  const availableSlots =
+    getEffectiveMaxOrders(state) - nonFirstSessionOrders.length;
   if (availableSlots < 2) {
     return {
       orders,
@@ -2431,10 +2452,7 @@ function getRecycleReward(part: Part) {
     research = Math.max(research, openBoost);
   }
   return {
-    cash: Math.max(
-      0,
-      Math.floor(cash * tuning.rewards.recycleCashMultiplier),
-    ),
+    cash: Math.max(0, Math.floor(cash * tuning.rewards.recycleCashMultiplier)),
     research: Math.max(
       0,
       Math.floor(research * tuning.rewards.recycleResearchMultiplier),
@@ -2458,7 +2476,10 @@ function beginLockout(state: GameState): GameState {
     lockoutLabOrdersTarget,
     lockoutChoice: undefined,
     baronPressure: 0,
-    orders: [lockoutOrder, ...nextOrders].slice(0, getEffectiveMaxOrders(state)),
+    orders: [lockoutOrder, ...nextOrders].slice(
+      0,
+      getEffectiveMaxOrders(state),
+    ),
   };
   let queued = queueStoryBeat(nextState, "lockout_begin");
   queued = queueStoryBeat(queued, "tina_lockout_react");
@@ -2806,9 +2827,24 @@ function getInitialState(): GameState {
     baronSupplySpawnsRemaining: 0,
     baronRushSpawnsRemaining: 0,
     suppliers: {
-      baron: { level: 1, chargesRemaining: 6, cooldownEndsAt: 0, overdrawCount: 0 },
-      open: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
-      salvage: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
+      baron: {
+        level: 1,
+        chargesRemaining: 6,
+        cooldownEndsAt: 0,
+        overdrawCount: 0,
+      },
+      open: {
+        level: 0,
+        chargesRemaining: 0,
+        cooldownEndsAt: 0,
+        overdrawCount: 0,
+      },
+      salvage: {
+        level: 0,
+        chargesRemaining: 0,
+        cooldownEndsAt: 0,
+        overdrawCount: 0,
+      },
     },
     upgradeMaterials: 0,
     compatibilityComponents: 0,
@@ -3198,11 +3234,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       let overdrawCost: SupplierOverdrawCost | null = null;
       if (isOverdraw) {
-        overdrawCost = getOverdrawCost(state, supplierId, supplier.overdrawCount);
+        overdrawCost = getOverdrawCost(
+          state,
+          supplierId,
+          supplier.overdrawCount,
+        );
         if (overdrawCost.cash > 0 && state.cash < overdrawCost.cash) {
           return state;
         }
-        if (overdrawCost.research > 0 && state.research < overdrawCost.research) {
+        if (
+          overdrawCost.research > 0 &&
+          state.research < overdrawCost.research
+        ) {
           return state;
         }
         if (
@@ -3683,7 +3726,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         : state.supplierScoutSpawnsRemaining;
       const nextScoutRoute =
         nextScoutRemaining > 0 ? state.supplierScoutRoute : undefined;
-      if (shouldConsumeScout && nextScoutRemaining < state.supplierScoutSpawnsRemaining) {
+      if (
+        shouldConsumeScout &&
+        nextScoutRemaining < state.supplierScoutSpawnsRemaining
+      ) {
         captureEvent("boost_consume", {
           type: "supplier_scout",
           remaining: nextScoutRemaining,
@@ -3948,8 +3994,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextChainCount = chainActive ? state.mergeChainCount + 1 : 1;
         nextChainExpiresAt = now + tuning.merge.chainWindowMs;
         if (nextChainCount >= tuning.merge.chainBonusThreshold) {
-          chainBonusCash =
-            tuning.merge.chainBonusCashPerMerge * nextChainCount;
+          chainBonusCash = tuning.merge.chainBonusCashPerMerge * nextChainCount;
           nextBonusId = state.lastMergeBonusId + 1;
         }
         if (!chainActive) {
@@ -4641,10 +4686,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const { orderId, partIndices } = action;
       const order = state.orders.find((o) => o.id === orderId);
       if (!order) return state;
-      const projectStageInfo =
-        order.modifierIds?.includes("project_stage")
-          ? parseProjectStageTag(order)
-          : null;
+      const projectStageInfo = order.modifierIds?.includes("project_stage")
+        ? parseProjectStageTag(order)
+        : null;
       const isProjectStageOrder = !!projectStageInfo;
       const councilCampaignId = order.modifierIds?.includes("council_ratify")
         ? getCouncilCampaignIdFromOrder(order)
@@ -4683,7 +4727,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextProjectsCompleted = state.projectsCompleted;
       let nextProjectMilestones = state.projectMilestones;
       let nextProjectsUnlocked = state.projectsUnlocked;
-      let projectCompletionReward: { cash: number; reputation: number; research: number } | null = null;
+      let projectCompletionReward: {
+        cash: number;
+        reputation: number;
+        research: number;
+      } | null = null;
       let nextMaxOrders = state.maxOrders;
       let projectStageBeatId: string | null = null;
       let projectCompleteBeatId: string | null = null;
@@ -4910,8 +4958,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
       const rushRewardMult = {
         cash:
-          councilPerks.rushRewardMult.cash *
-          councilHearing.rushRewardMult.cash,
+          councilPerks.rushRewardMult.cash * councilHearing.rushRewardMult.cash,
         reputation:
           councilPerks.rushRewardMult.reputation *
           councilHearing.rushRewardMult.reputation,
@@ -5232,8 +5279,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ...state.activeProject.stageHistory,
           { stageIndex: stage.stageIndex, completedAt: Date.now() },
         ];
-        const isFinalStage =
-          stage.stageIndex >= project.stages.length - 1;
+        const isFinalStage = stage.stageIndex >= project.stages.length - 1;
 
         if (isFinalStage) {
           const completionScale = Math.max(
@@ -5374,7 +5420,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         let councilPerksUnlocked = nextCouncil.perksUnlocked;
         let councilActiveCampaignId = nextCouncil.activeCampaignId;
         let councilActiveHearing = nextCouncil.activeHearing;
-        let installsSinceHearing = nextCouncil.installsSinceLastHearingCheck + 1;
+        let installsSinceHearing =
+          nextCouncil.installsSinceLastHearingCheck + 1;
         const refreshCount = nextCouncil.refreshCount;
         let hearingClearedThisOrder = false;
 
@@ -5416,8 +5463,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           councilActiveCampaignId &&
           COUNCIL_CAMPAIGN_BY_ID[councilActiveCampaignId];
         const activeProgress =
-          councilActiveCampaignId &&
-          councilCampaigns[councilActiveCampaignId];
+          councilActiveCampaignId && councilCampaigns[councilActiveCampaignId];
 
         if (
           activeCampaign &&
@@ -5460,8 +5506,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 else if (consecutive) nextValue = 0;
                 break;
               case "REACH_INSTALL_STREAK": {
-                const target =
-                  objective.params?.minStreak ?? objective.target;
+                const target = objective.params?.minStreak ?? objective.target;
                 if (nextInstallStreakCurrent >= target) {
                   nextValue = objective.target;
                 }
@@ -5725,7 +5770,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             nextProjectOffers.length === 0);
         if (shouldRefresh) {
           const repAfterRewards = state.reputation + repReward;
-          const neighborhoodAfterRewards = getNeighborhoodByRep(repAfterRewards);
+          const neighborhoodAfterRewards =
+            getNeighborhoodByRep(repAfterRewards);
           const offersState: GameState = {
             ...state,
             gamePhase: nextGamePhase,
@@ -5927,7 +5973,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (projectStageFailed) {
         const active = getActiveProjectStage(nextState);
         if (active) {
-          const penaltyResult = applyProjectFailPenalty(nextState, active.stage);
+          const penaltyResult = applyProjectFailPenalty(
+            nextState,
+            active.stage,
+          );
           const orders = stripProjectOrders(nextState.orders);
           const nextHighlightedOrderId =
             nextState.highlightedOrderId &&
@@ -6694,10 +6743,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         projectOffers: offers,
       };
-      if (
-        offers.length > 0 &&
-        !state.storySeen["project_offer_generic"]
-      ) {
+      if (offers.length > 0 && !state.storySeen["project_offer_generic"]) {
         nextState = queueStoryBeat(nextState, "project_offer_generic");
       }
       return nextState;
@@ -6721,10 +6767,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectOffers: offers,
         undoSnapshot: undefined,
       };
-      if (
-        offers.length > 0 &&
-        !state.storySeen["project_offer_generic"]
-      ) {
+      if (offers.length > 0 && !state.storySeen["project_offer_generic"]) {
         nextState = queueStoryBeat(nextState, "project_offer_generic");
       }
       return nextState;
@@ -7125,7 +7168,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const progress = state.council.campaigns[campaignId];
       if (!progress) return state;
       const canSelect =
-        progress.status !== "LOCKED" || canStartCouncilCampaign(state, campaignId);
+        progress.status !== "LOCKED" ||
+        canStartCouncilCampaign(state, campaignId);
       if (!canSelect) return state;
       captureEvent("council_campaign_set_active", {
         campaignId,
@@ -7320,7 +7364,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "COUNCIL_PAY_CLEAR_HEARING": {
       if (!state.council.activeHearing) return state;
-      const hearing = COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId];
+      const hearing =
+        COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId];
       if (!hearing) return state;
       const perks = getCouncilPerkEffects(state);
       const costMultiplier =
@@ -7376,7 +7421,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.council.unlocked) return state;
       const perks = getCouncilPerkEffects(state);
       if (!perks.unlockMunicipalGrants) return state;
-      const cashCost = Math.max(0, Math.round(tuning.council.municipalGrantCashCost));
+      const cashCost = Math.max(
+        0,
+        Math.round(tuning.council.municipalGrantCashCost),
+      );
       const researchCost = Math.max(
         0,
         Math.round(tuning.council.municipalGrantResearchCost),
@@ -8347,9 +8395,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronSupplySpawnsRemaining: 0,
         baronRushSpawnsRemaining: 0,
         suppliers: {
-          baron: { level: 1, chargesRemaining: 6, cooldownEndsAt: 0, overdrawCount: 0 },
-          open: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
-          salvage: { level: 0, chargesRemaining: 0, cooldownEndsAt: 0, overdrawCount: 0 },
+          baron: {
+            level: 1,
+            chargesRemaining: 6,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+          open: {
+            level: 0,
+            chargesRemaining: 0,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+          salvage: {
+            level: 0,
+            chargesRemaining: 0,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
         },
         upgradeMaterials: 0,
         compatibilityComponents: 0,
@@ -8427,7 +8490,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           const tutorialOrder = createTutorialOrder();
           const trimmedOrders =
             state.orders.length >= getEffectiveMaxOrders(state)
-              ? state.orders.slice(0, Math.max(0, getEffectiveMaxOrders(state) - 1))
+              ? state.orders.slice(
+                  0,
+                  Math.max(0, getEffectiveMaxOrders(state) - 1),
+                )
               : state.orders;
           nextOrders = [...trimmedOrders, tutorialOrder];
           nextTutorialOrderId = tutorialOrder.id;
@@ -9114,13 +9180,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           )
         : base.projectOffers;
       const rawActiveProject =
-        action.state.activeProject && typeof action.state.activeProject === "object"
+        action.state.activeProject &&
+        typeof action.state.activeProject === "object"
           ? (action.state.activeProject as ActiveProject)
           : undefined;
-      const activeProjectDefinition =
-        rawActiveProject?.projectId
-          ? getProjectDefinitionById(rawActiveProject.projectId)
-          : undefined;
+      const activeProjectDefinition = rawActiveProject?.projectId
+        ? getProjectDefinitionById(rawActiveProject.projectId)
+        : undefined;
       const activeProject =
         rawActiveProject &&
         activeProjectDefinition &&
@@ -9185,7 +9251,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? (action.state.projectMilestones as Record<string, boolean>)
           : base.projectMilestones;
       const projectDebuff =
-        action.state.projectDebuff && typeof action.state.projectDebuff === "object"
+        action.state.projectDebuff &&
+        typeof action.state.projectDebuff === "object"
           ? (action.state.projectDebuff as ProjectDebuff)
           : base.projectDebuff;
       const baseCouncil = base.council ?? buildInitialCouncilState();
@@ -9219,12 +9286,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : baseProgress.status;
         const pilotObjectiveProgress: Record<string, number> = {};
         campaign.pilotObjectives.forEach((objective) => {
-          const rawValue =
-            rawProgress?.pilotObjectiveProgress?.[objective.id];
+          const rawValue = rawProgress?.pilotObjectiveProgress?.[objective.id];
           pilotObjectiveProgress[objective.id] =
             typeof rawValue === "number" && Number.isFinite(rawValue)
               ? Math.max(0, rawValue)
-              : baseProgress.pilotObjectiveProgress?.[objective.id] ?? 0;
+              : (baseProgress.pilotObjectiveProgress?.[objective.id] ?? 0);
         });
         campaigns[campaign.id] = {
           status,
@@ -9476,13 +9542,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ? action.state.missionHistory
         : base.missionHistory;
       const normalizedHistory = trimMissionHistory(
-        rawHistory
-          .filter(
-            (entry) =>
-              entry &&
-              typeof entry.templateId === "string" &&
-              typeof entry.completedAt === "number",
-          ),
+        rawHistory.filter(
+          (entry) =>
+            entry &&
+            typeof entry.templateId === "string" &&
+            typeof entry.completedAt === "number",
+        ),
       );
       const derivedMaxTier = Math.max(
         1,
@@ -9712,7 +9777,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         };
       }
       if (restoredState.activeProject) {
-        const project = getProjectDefinitionById(restoredState.activeProject.projectId);
+        const project = getProjectDefinitionById(
+          restoredState.activeProject.projectId,
+        );
         const stageIndex = restoredState.activeProject.stageIndex;
         const stage = project?.stages[stageIndex];
         if (!project || !stage) {
@@ -9803,7 +9870,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
           if (
             restoredState.activeProject &&
-            typeof restoredState.activeProject.stageDeadlineRemaining !== "number"
+            typeof restoredState.activeProject.stageDeadlineRemaining !==
+              "number"
           ) {
             const fallbackDeadline = getProjectStageDeadline(stage, stageIndex);
             if (typeof fallbackDeadline === "number") {
@@ -9878,7 +9946,10 @@ interface GameContextValue {
   dispatch: React.Dispatch<GameAction>;
   hydrated: boolean;
   tapSupplier: (supplierId: SupplierId) => SupplierTapStatus;
-  getSupplierTapStatus: (supplierId: SupplierId, now?: number) => SupplierTapStatus;
+  getSupplierTapStatus: (
+    supplierId: SupplierId,
+    now?: number,
+  ) => SupplierTapStatus;
   claimMergeMomentum: (choice: MergeMomentumChoice) => void;
   mergeParts: (fromIndex: number, toIndex: number) => boolean;
   movePart: (fromIndex: number, toIndex: number) => void;
@@ -9906,8 +9977,10 @@ const fallbackFeatureFlagClient = {
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, getInitialState());
   const featureFlagClient = posthog ?? fallbackFeatureFlagClient;
-  const [tuningVariant, tuningPayload] =
-    useFeatureFlagWithPayload(TUNING_FLAG_KEY, featureFlagClient);
+  const [tuningVariant, tuningPayload] = useFeatureFlagWithPayload(
+    TUNING_FLAG_KEY,
+    featureFlagClient,
+  );
   const orderRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const supplierTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -9933,9 +10006,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
   const prevFreeSlotsRef = useRef(countFreeSlots(state));
   const prevOrderSpawnPausedRef = useRef(false);
-  const prevOrderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
-  const prevPressureBandRef =
-    useRef<ReturnType<typeof getBoardPressureBand> | null>(null);
+  const prevOrderIdsRef = useRef<string[]>(
+    state.orders.map((order) => order.id),
+  );
+  const prevPressureBandRef = useRef<ReturnType<
+    typeof getBoardPressureBand
+  > | null>(null);
   const prevTierDiscoveryIdRef = useRef(state.lastTierDiscoveryId);
   const prevNeighborhoodIdRef = useRef(state.currentNeighborhoodId);
   const prevGamePhaseRef = useRef(state.gamePhase);
@@ -9975,10 +10051,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const payload = tuningPayload ?? null;
     const signature = JSON.stringify(payload ?? {});
     tuningSignatureRef.current = signature;
-    if (
-      telemetryReadyRef.current &&
-      tuningCapturedRef.current !== signature
-    ) {
+    if (telemetryReadyRef.current && tuningCapturedRef.current !== signature) {
       captureEvent("tuning_applied", {
         variant: tuningVariant,
         payload,
@@ -10007,16 +10080,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const endSession = useCallback((reason: "background" | "inactive" | "unmount") => {
-    if (!sessionActiveRef.current) return;
-    const durationMs = Math.max(0, Date.now() - sessionStartRef.current);
-    captureEvent("session_end", {
-      sessionId: sessionIdRef.current,
-      durationMs,
-      reason,
-    });
-    sessionActiveRef.current = false;
-  }, []);
+  const endSession = useCallback(
+    (reason: "background" | "inactive" | "unmount") => {
+      if (!sessionActiveRef.current) return;
+      const durationMs = Math.max(0, Date.now() - sessionStartRef.current);
+      captureEvent("session_end", {
+        sessionId: sessionIdRef.current,
+        durationMs,
+        reason,
+      });
+      sessionActiveRef.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!hydrated || telemetryReadyRef.current) return;

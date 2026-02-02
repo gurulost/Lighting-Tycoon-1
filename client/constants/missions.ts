@@ -1,4 +1,9 @@
-import { MissionGiver, MissionType, MissionReward, PartTier } from "@/types/game";
+import {
+  MissionGiver,
+  MissionType,
+  MissionReward,
+  PartTier,
+} from "@/types/game";
 
 export interface MissionTemplate {
   id: string;
@@ -48,7 +53,8 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     giver: "mentor",
     type: "complete_order_no_locked",
     label: "Complete 2 open-only installs",
-    description: "Open installs keep your options flexible and research steady.",
+    description:
+      "Open installs keep your options flexible and research steady.",
     target: 2,
     reward: { reputation: 10, research: 6 },
     weight: 1.0,

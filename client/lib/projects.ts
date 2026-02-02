@@ -1,8 +1,13 @@
 import { getTuning } from "@/lib/tuning";
 import { ProjectDefinition, ProjectOffer } from "@/types/game";
-import { PROJECT_DEFINITION_BY_ID, PROJECT_DEFINITIONS } from "@/constants/projects";
+import {
+  PROJECT_DEFINITION_BY_ID,
+  PROJECT_DEFINITIONS,
+} from "@/constants/projects";
 
-export function getProjectDefinition(projectId: string): ProjectDefinition | undefined {
+export function getProjectDefinition(
+  projectId: string,
+): ProjectDefinition | undefined {
   return PROJECT_DEFINITION_BY_ID.get(projectId);
 }
 
@@ -33,10 +38,10 @@ export function getProjectDepositCost(
     project.deposit.formulaKey === "early"
       ? 4
       : project.deposit.formulaKey === "mid"
-      ? 6
-      : project.deposit.formulaKey === "late"
-        ? 8
-        : 12;
+        ? 6
+        : project.deposit.formulaKey === "late"
+          ? 8
+          : 12;
   return Math.max(0, Math.round(base * bandMult * depositMultiplier));
 }
 

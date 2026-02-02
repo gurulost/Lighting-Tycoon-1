@@ -24,7 +24,14 @@ interface SettingRowProps {
   color: string;
 }
 
-function SettingRow({ icon, label, description, value, onValueChange, color }: SettingRowProps) {
+function SettingRow({
+  icon,
+  label,
+  description,
+  value,
+  onValueChange,
+  color,
+}: SettingRowProps) {
   return (
     <View style={styles.settingRow}>
       <LinearGradient
@@ -59,7 +66,10 @@ export function SettingsModal({
 
   return (
     <Pressable style={styles.overlay} onPress={onClose} testID="settings-modal">
-      <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.modalContainer}
+        onPress={(e) => e.stopPropagation()}
+      >
         <ModalShell
           title="Settings"
           subtitle="Tune your workshop experience"
@@ -75,7 +85,10 @@ export function SettingsModal({
               description="Play sounds during gameplay"
               value={soundEnabled}
               onValueChange={(value) =>
-                dispatch({ type: "UPDATE_SETTINGS", settings: { soundEnabled: value } })
+                dispatch({
+                  type: "UPDATE_SETTINGS",
+                  settings: { soundEnabled: value },
+                })
               }
               color={GameColors.ui.primary}
             />
@@ -86,7 +99,10 @@ export function SettingsModal({
               description="Vibrate on actions"
               value={hapticsEnabled}
               onValueChange={(value) =>
-                dispatch({ type: "UPDATE_SETTINGS", settings: { hapticsEnabled: value } })
+                dispatch({
+                  type: "UPDATE_SETTINGS",
+                  settings: { hapticsEnabled: value },
+                })
               }
               color={GameColors.currency.research}
             />
@@ -97,7 +113,10 @@ export function SettingsModal({
               description="Tone down animations and effects"
               value={reducedMotion}
               onValueChange={(value) =>
-                dispatch({ type: "UPDATE_SETTINGS", settings: { reducedMotion: value } })
+                dispatch({
+                  type: "UPDATE_SETTINGS",
+                  settings: { reducedMotion: value },
+                })
               }
               color={GameColors.currency.cash}
             />
@@ -129,18 +148,27 @@ export function SettingsModal({
                         onClose();
                       },
                     },
-                  ]
+                  ],
                 )
               }
             >
               <LinearGradient
-                colors={[`${GameColors.ui.primary}30`, `${GameColors.ui.primary}10`]}
+                colors={[
+                  `${GameColors.ui.primary}30`,
+                  `${GameColors.ui.primary}10`,
+                ]}
                 style={styles.settingIcon}
               >
-                <Feather name="refresh-cw" size={20} color={GameColors.ui.primary} />
+                <Feather
+                  name="refresh-cw"
+                  size={20}
+                  color={GameColors.ui.primary}
+                />
               </LinearGradient>
               <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>Replay Tutorial</ThemedText>
+                <ThemedText style={styles.settingLabel}>
+                  Replay Tutorial
+                </ThemedText>
                 <ThemedText style={styles.settingDescription}>
                   Restart the guided onboarding steps
                 </ThemedText>
@@ -155,10 +183,17 @@ export function SettingsModal({
               }}
             >
               <LinearGradient
-                colors={[`${GameColors.ui.primary}30`, `${GameColors.ui.primary}10`]}
+                colors={[
+                  `${GameColors.ui.primary}30`,
+                  `${GameColors.ui.primary}10`,
+                ]}
                 style={styles.settingIcon}
               >
-                <Feather name="help-circle" size={20} color={GameColors.ui.primary} />
+                <Feather
+                  name="help-circle"
+                  size={20}
+                  color={GameColors.ui.primary}
+                />
               </LinearGradient>
               <View style={styles.settingContent}>
                 <ThemedText style={styles.settingLabel}>Glossary</ThemedText>
@@ -171,7 +206,9 @@ export function SettingsModal({
 
           <View style={styles.footer}>
             <View style={styles.versionContainer}>
-              <ThemedText style={styles.versionLabel}>Lighting Tycoon</ThemedText>
+              <ThemedText style={styles.versionLabel}>
+                Lighting Tycoon
+              </ThemedText>
               <ThemedText style={styles.versionNumber}>v1.0.0</ThemedText>
             </View>
           </View>

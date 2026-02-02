@@ -97,16 +97,16 @@ function InstallMomentCelebration({
           if (finished && latestKey.current === moment.key) {
             runOnJS(onComplete)(moment.key);
           }
-        })
-      )
+        }),
+      ),
     );
     translateY.value = withSequence(
       withTiming(0, { duration: inDuration + 40 }),
-      withDelay(holdDuration, withTiming(-6, { duration: outDuration }))
+      withDelay(holdDuration, withTiming(-6, { duration: outDuration })),
     );
     scale.value = withSequence(
       withTiming(1, { duration: inDuration + 40 }),
-      withDelay(holdDuration, withTiming(0.98, { duration: outDuration }))
+      withDelay(holdDuration, withTiming(0.98, { duration: outDuration })),
     );
   }, [moment?.key, reducedMotion, onComplete, opacity, translateY, scale]);
 
@@ -129,16 +129,22 @@ function InstallMomentCelebration({
 
   return (
     <Animated.View
-      style={[styles.installMomentOverlay, overlayStyle, { pointerEvents: "none" }]}
+      style={[
+        styles.installMomentOverlay,
+        overlayStyle,
+        { pointerEvents: "none" },
+      ]}
     >
       {/* Radial glow burst behind panel */}
       <Animated.View style={styles.installGlowBurst}>
         <LinearGradient
           colors={[
-            moment.pattern === "baron" ? "#A855F780" :
-            moment.pattern === "rainbow" ? "#FF6B6B80" :
-            "#00D9FF80",
-            "transparent"
+            moment.pattern === "baron"
+              ? "#A855F780"
+              : moment.pattern === "rainbow"
+                ? "#FF6B6B80"
+                : "#00D9FF80",
+            "transparent",
           ]}
           style={styles.glowBurstGradient}
           start={{ x: 0.5, y: 0.5 }}
@@ -154,9 +160,11 @@ function InstallMomentCelebration({
             name="zap"
             size={24}
             color={
-              moment.pattern === "baron" ? GameColors.locked.accent :
-              moment.pattern === "rainbow" ? "#FFD700" :
-              GameColors.openStandard.primary
+              moment.pattern === "baron"
+                ? GameColors.locked.accent
+                : moment.pattern === "rainbow"
+                  ? "#FFD700"
+                  : GameColors.openStandard.primary
             }
           />
         </View>
@@ -201,7 +209,9 @@ function InstallMomentCelebration({
 
         {/* Success text */}
         <View style={styles.successTextContainer}>
-          <ThemedText style={styles.successText}>Installation Complete!</ThemedText>
+          <ThemedText style={styles.successText}>
+            Installation Complete!
+          </ThemedText>
         </View>
       </Animated.View>
 
@@ -283,7 +293,8 @@ export function OrdersModal({
   const warrantyCost =
     tuning.economy.warrantyStampCostBase +
     state.reputationTier * tuning.economy.warrantyStampCostStep;
-  const effectiveMaxOrders = state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
+  const effectiveMaxOrders =
+    state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const showProjectsButton = state.gamePhase === 2;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
@@ -303,11 +314,12 @@ export function OrdersModal({
   const [showScoutOptions, setShowScoutOptions] = React.useState(false);
   const [showWarrantyOptions, setShowWarrantyOptions] = React.useState(false);
   const [showOrdersHint, setShowOrdersHint] = React.useState(
-    () => !state.ordersHelpNudgeSeen
+    () => !state.ordersHelpNudgeSeen,
   );
   const isMountedRef = React.useRef(true);
   const installMomentKey = React.useRef(0);
-  const [installMoment, setInstallMoment] = React.useState<InstallMoment | null>(null);
+  const [installMoment, setInstallMoment] =
+    React.useState<InstallMoment | null>(null);
   const orderLegend = [
     { key: "CL", label: "Clip" },
     { key: "TR", label: "Track" },
@@ -340,7 +352,7 @@ export function OrdersModal({
   const refreshTarget =
     state.highlightedOrderId &&
     state.orders.find(
-      (order) => order.id === state.highlightedOrderId && isRefreshable(order)
+      (order) => order.id === state.highlightedOrderId && isRefreshable(order),
     )
       ? state.orders.find((order) => order.id === state.highlightedOrderId)!
       : state.orders.find((order) => isRefreshable(order));
@@ -352,13 +364,15 @@ export function OrdersModal({
   const canStartCampaign =
     state.tutorialComplete && state.cash >= marketingCost && !marketingAtCap;
   const canStartScout = canUseBoosts && state.cash >= scoutCost && !scoutAtCap;
-  const canStartClinic = canUseClinic && state.cash >= clinicCost && !clinicAtCap;
-  const canStartWarranty = canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
+  const canStartClinic =
+    canUseClinic && state.cash >= clinicCost && !clinicAtCap;
+  const canStartWarranty =
+    canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
   const hasFulfillableOrder = React.useMemo(
     () => state.orders.some((order) => Boolean(getFulfillmentIndices(order))),
-    [state.orders, getFulfillmentIndices]
+    [state.orders, getFulfillmentIndices],
   );
   const orderTrimPhase = useSharedPhase({
     active: hasFulfillableOrder,
@@ -373,16 +387,16 @@ export function OrdersModal({
     state.supplierScoutRoute === "open"
       ? "Open route"
       : state.supplierScoutRoute === "locked"
-      ? "Locked route"
-      : state.supplierScoutRoute === "tier"
-      ? "Tier route"
-      : "Route";
+        ? "Locked route"
+        : state.supplierScoutRoute === "tier"
+          ? "Tier route"
+          : "Route";
   const warrantyModeLabel =
     state.warrantyStampMode === "refund"
       ? "Refund relief"
       : state.warrantyStampMode === "contract"
-      ? "Contract edge"
-      : "Mode";
+        ? "Contract edge"
+        : "Mode";
   const contractOptionSub =
     state.baronContractOrdersRemaining > 0
       ? "Higher Baron contract bonus"
@@ -412,27 +426,27 @@ export function OrdersModal({
   const triggerInstallMoment = React.useCallback(
     (order: Order) => {
       if (state.settings.reducedMotion) return;
-      
+
       // Select pattern based on order type
       const pattern: TrimLightPattern =
         order.type === "baron_certified" || order.type === "locked_required"
           ? "baron"
           : order.type === "premium"
-          ? "rainbow"
-          : order.type === "style_match"
-          ? "classic"
-          : "warmWhite";
-      
+            ? "rainbow"
+            : order.type === "style_match"
+              ? "classic"
+              : "warmWhite";
+
       // Select animation mode based on order type for variety
       const animationMode: TrimLightAnimation =
         order.type === "premium"
-          ? "meteor"  // Premium orders get dramatic meteor effect
+          ? "meteor" // Premium orders get dramatic meteor effect
           : order.type === "baron_certified" || order.type === "locked_required"
-          ? "chase"   // Baron orders get chase effect
-          : order.type === "style_match"
-          ? "wave"    // Style match orders get smooth wave
-          : "twinkle"; // Standard orders get classic twinkle
-      
+            ? "chase" // Baron orders get chase effect
+            : order.type === "style_match"
+              ? "wave" // Style match orders get smooth wave
+              : "twinkle"; // Standard orders get classic twinkle
+
       installMomentKey.current += 1;
       setInstallMoment({
         key: installMomentKey.current,
@@ -440,12 +454,14 @@ export function OrdersModal({
         animationMode,
       });
     },
-    [state.settings.reducedMotion]
+    [state.settings.reducedMotion],
   );
 
   const handleInstallMomentComplete = React.useCallback((key: number) => {
     if (!isMountedRef.current) return;
-    setInstallMoment((current) => (current && current.key === key ? null : current));
+    setInstallMoment((current) =>
+      current && current.key === key ? null : current,
+    );
   }, []);
 
   const handleFulfillOrder = (orderId: string) => {
@@ -482,7 +498,7 @@ export function OrdersModal({
       dispatch({ type: "START_SUPPLIER_SCOUT", route });
       setShowScoutOptions(false);
     },
-    [canStartScout, dispatch]
+    [canStartScout, dispatch],
   );
 
   const handleStartClinic = React.useCallback(() => {
@@ -496,7 +512,7 @@ export function OrdersModal({
       dispatch({ type: "START_WARRANTY_STAMP", mode });
       setShowWarrantyOptions(false);
     },
-    [canStartWarranty, dispatch]
+    [canStartWarranty, dispatch],
   );
 
   return (
@@ -556,354 +572,524 @@ export function OrdersModal({
         showsVerticalScrollIndicator={false}
         testID="orders-modal"
       >
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Feather name="inbox" size={18} color={GameColors.currency.reputation} />
-          <ThemedText style={styles.statValue}>
-            {state.orders.length}/{effectiveMaxOrders}
-          </ThemedText>
-          <ThemedText style={styles.statLabel}>Active</ThemedText>
-        </View>
-
-        <View style={styles.statItem}>
-          <Feather name="dollar-sign" size={18} color={GameColors.currency.cash} />
-          <ThemedText style={[styles.statValue, { color: GameColors.currency.cash }]}>
-            {state.cash}
-          </ThemedText>
-          <ThemedText style={styles.statLabel}>Coins</ThemedText>
-        </View>
-
-        <View style={styles.statItem}>
-          <Feather name="zap" size={18} color={GameColors.currency.reputation} />
-          <ThemedText style={styles.statValue}>
-            {state.installStreakCurrent}
-          </ThemedText>
-          <ThemedText
-            style={[styles.statLabel, styles.statLabelCompact]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            Streak · Best {state.installStreakBest}
-          </ThemedText>
-        </View>
-      </View>
-
-      {showOrdersHint ? (
-        <Pressable style={styles.helpBanner} onPress={handleDismissOrdersHint}>
-          <Feather name="info" size={16} color={GameColors.ui.primary} />
-          <View style={styles.helpCopy}>
-            <ThemedText style={styles.helpTitle}>Orders Help</ThemedText>
-            <ThemedText style={styles.helpText}>
-              Legend now shows letters + tile badges.
-            </ThemedText>
-          </View>
-          <Feather name="x" size={14} color={GameColors.text.secondary} />
-        </Pressable>
-      ) : null}
-
-      {state.tutorialComplete ? (
-        <View style={styles.actionStack}>
-          <View style={styles.refreshRow}>
-            <Pressable
-              style={[styles.refreshButton, !canRefresh && styles.refreshButtonDisabled]}
-              onPress={canRefresh ? handleRefreshOrder : undefined}
-            >
-              <Feather name="refresh-cw" size={16} color={GameColors.ui.primary} />
-              <ThemedText style={styles.refreshLabel}>Refresh 1 order</ThemedText>
-            </Pressable>
-            <View style={styles.refreshCost}>
-              <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
-              <ThemedText style={styles.refreshCostText}>{refreshCost}</ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.refreshRow}>
-            <Pressable
-              style={[styles.refreshButton, !canStartCampaign && styles.refreshButtonDisabled]}
-              onPress={canStartCampaign ? handleStartCampaign : undefined}
-            >
-              <Feather name="trending-up" size={16} color={GameColors.currency.reputation} />
-              <ThemedText style={styles.refreshLabel}>
-                {marketingActive ? "Extend marketing campaign" : "Run marketing campaign"}
-              </ThemedText>
-            </Pressable>
-            <View style={styles.refreshCost}>
-              <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
-              <ThemedText style={styles.refreshCostText}>{marketingCost}</ThemedText>
-            </View>
-          </View>
-
-          {marketingActive ? (
-            <View style={styles.campaignStatus}>
-              <Feather name="trending-up" size={14} color={GameColors.currency.reputation} />
-              <ThemedText style={styles.campaignText}>
-                Campaign active · {marketingRemaining} order{marketingRemaining === 1 ? "" : "s"} left
-              </ThemedText>
-            </View>
-          ) : (
-            <ThemedText style={styles.campaignHint}>
-              Boosts higher-tier orders for the next {marketingOrders} orders.
-            </ThemedText>
-          )}
-
-          {canUseBoosts ? (
-            <View style={styles.boostStack}>
-              <View style={styles.boostHeader}>
-                <Feather name="compass" size={14} color={GameColors.ui.primary} />
-                <ThemedText style={styles.boostHeaderText}>Tactical Boosts</ThemedText>
-              </View>
-
-              <View style={styles.boostCard}>
-                <View style={styles.refreshRow}>
-                  <Pressable
-                    style={styles.refreshButton}
-                    onPress={() => setShowScoutOptions((prev) => !prev)}
-                  >
-                    <Feather name="compass" size={16} color={GameColors.ui.primary} />
-                    <ThemedText style={styles.refreshLabel}>Supplier Scout</ThemedText>
-                  </Pressable>
-                  <View
-                    style={[
-                      styles.refreshCost,
-                      !canStartScout && styles.boostCostDisabled,
-                    ]}
-                  >
-                    <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
-                    <ThemedText style={styles.refreshCostText}>{scoutCost}</ThemedText>
-                  </View>
-                </View>
-                {scoutActive ? (
-                  <View style={styles.boostStatus}>
-                    <Feather name="target" size={12} color={GameColors.text.secondary} />
-                    <ThemedText style={styles.boostStatusText}>
-                      Active · {scoutRouteLabel} · {scoutRemaining} spawn{scoutRemaining === 1 ? "" : "s"}
-                    </ThemedText>
-                  </View>
-                ) : (
-                  <ThemedText style={styles.boostHint}>
-                    Next {scoutSpawnsOpen} spawns (Open/Tier) or {scoutSpawnsLocked} spawns (Locked).
-                  </ThemedText>
-                )}
-                {showScoutOptions ? (
-                  <View style={styles.boostOptionsRow}>
-                    <Pressable
-                      style={[
-                        styles.boostOption,
-                        state.supplierScoutRoute === "open" && styles.boostOptionSelected,
-                        !canStartScout && styles.boostOptionDisabled,
-                      ]}
-                      onPress={canStartScout ? () => handleStartScout("open") : undefined}
-                    >
-                      <ThemedText style={styles.boostOptionLabel}>Open Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>Force Open parts</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.boostOption,
-                        state.supplierScoutRoute === "locked" && styles.boostOptionSelected,
-                        !canStartScout && styles.boostOptionDisabled,
-                      ]}
-                      onPress={canStartScout ? () => handleStartScout("locked") : undefined}
-                    >
-                      <ThemedText style={styles.boostOptionLabel}>Locked Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>Force Locked parts (+pressure)</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.boostOption,
-                        state.supplierScoutRoute === "tier" && styles.boostOptionSelected,
-                        !canStartScout && styles.boostOptionDisabled,
-                      ]}
-                      onPress={canStartScout ? () => handleStartScout("tier") : undefined}
-                    >
-                      <ThemedText style={styles.boostOptionLabel}>Tier Route</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>+1 tier on base drop</ThemedText>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.boostCard}>
-                <View style={styles.refreshRow}>
-                  <Pressable
-                    style={[styles.refreshButton, !canStartClinic && styles.refreshButtonDisabled]}
-                    onPress={canStartClinic ? handleStartClinic : undefined}
-                  >
-                    <Feather name="activity" size={16} color={GameColors.currency.research} />
-                    <ThemedText style={styles.refreshLabel}>Mentor Workshop Clinic</ThemedText>
-                  </Pressable>
-                  <View
-                    style={[
-                      styles.refreshCost,
-                      !canStartClinic && styles.boostCostDisabled,
-                    ]}
-                  >
-                    <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
-                    <ThemedText style={styles.refreshCostText}>{clinicCost}</ThemedText>
-                  </View>
-                </View>
-                {clinicActive ? (
-                  <View style={styles.boostStatus}>
-                    <Feather name="zap" size={12} color={GameColors.currency.research} />
-                    <ThemedText style={styles.boostStatusText}>
-                      Active · {clinicRemaining} merge{clinicRemaining === 1 ? "" : "s"} left
-                    </ThemedText>
-                  </View>
-                ) : (
-                  <ThemedText style={styles.boostHint}>
-                    {canUseClinic
-                      ? `Next ${clinicMerges} merges: open merges grant +1 research and reduce dependency.`
-                      : "Finish your first session to unlock the clinic."}
-                  </ThemedText>
-                )}
-              </View>
-
-              <View style={styles.boostCard}>
-                <View style={styles.refreshRow}>
-                  <Pressable
-                    style={styles.refreshButton}
-                    onPress={() => setShowWarrantyOptions((prev) => !prev)}
-                  >
-                    <Feather name="shield" size={16} color={GameColors.currency.cash} />
-                    <ThemedText style={styles.refreshLabel}>Baron Warranty Stamp</ThemedText>
-                  </Pressable>
-                  <View
-                    style={[
-                      styles.refreshCost,
-                      !canStartWarranty && styles.boostCostDisabled,
-                    ]}
-                  >
-                    <Feather name="dollar-sign" size={14} color={GameColors.currency.cash} />
-                    <ThemedText style={styles.refreshCostText}>{warrantyCost}</ThemedText>
-                  </View>
-                </View>
-                {warrantyActive ? (
-                  <View style={styles.boostStatus}>
-                    <Feather name="shield" size={12} color={GameColors.currency.cash} />
-                    <ThemedText style={styles.boostStatusText}>
-                      Active · {warrantyModeLabel} · {warrantyRemaining} order{warrantyRemaining === 1 ? "" : "s"}
-                    </ThemedText>
-                  </View>
-                ) : (
-                  <ThemedText style={styles.boostHint}>
-                    {canUseWarranty
-                      ? `Next ${warrantyOrders} orders: reduce wrong-family penalties or boost contracts.`
-                      : "Finish your first session to unlock the warranty stamp."}
-                  </ThemedText>
-                )}
-                {showWarrantyOptions ? (
-                  <View style={styles.boostOptionsRow}>
-                    <Pressable
-                      style={[
-                        styles.boostOption,
-                        state.warrantyStampMode === "refund" && styles.boostOptionSelected,
-                        !canStartWarranty && styles.boostOptionDisabled,
-                      ]}
-                      onPress={canStartWarranty ? () => handleStartWarranty("refund") : undefined}
-                    >
-                      <ThemedText style={styles.boostOptionLabel}>Refund Relief</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>Smaller wrong-family penalty</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.boostOption,
-                        state.warrantyStampMode === "contract" && styles.boostOptionSelected,
-                        !canSelectWarrantyContract && styles.boostOptionDisabled,
-                      ]}
-                      onPress={
-                        canSelectWarrantyContract ? () => handleStartWarranty("contract") : undefined
-                      }
-                    >
-                      <ThemedText style={styles.boostOptionLabel}>Contract Edge</ThemedText>
-                      <ThemedText style={styles.boostOptionSub}>{contractOptionSub}</ThemedText>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          ) : (
-            <ThemedText style={styles.boostLockedHint}>
-              Finish the tutorial to unlock boosts.
-            </ThemedText>
-          )}
-        </View>
-      ) : null}
-
-      <View style={styles.legendCard}>
-        <View style={styles.legendHeader}>
-          <Feather name="type" size={14} color={GameColors.text.secondary} />
-          <ThemedText style={styles.legendTitle}>Legend</ThemedText>
-        </View>
-        <ThemedText style={styles.legendSubtitle}>
-          Order hints + tile badges
-        </ThemedText>
-        <View style={styles.legendGroup}>
-          <ThemedText style={styles.legendGroupLabel}>Order letters</ThemedText>
-          <View style={styles.legendRow}>
-            {orderLegend.map((item, index) => (
-              <View key={`${item.key}-${index}`} style={styles.legendChip}>
-                <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
-                <ThemedText style={styles.legendLabel}>{item.label}</ThemedText>
-              </View>
-            ))}
-          </View>
-        </View>
-        <View style={styles.legendGroup}>
-          <ThemedText style={styles.legendGroupLabel}>Tile badges</ThemedText>
-          <View style={styles.legendRow}>
-            {badgeLegend.map((item) => (
-              <View key={item.key} style={styles.legendChip}>
-                <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
-                <ThemedText style={styles.legendLabel}>{item.label}</ThemedText>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.ordersList}>
-        {state.orders.length > 0 ? (
-          state.orders.map((order, index) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onFulfill={() => handleFulfillOrder(order.id)}
-              onDismiss={() => handleDismissOrder(order.id)}
-              onSelect={() => dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })}
-              selected={state.highlightedOrderId === order.id}
-              trimPhase={orderTrimPhase}
-              fulfillTestID={`order-fulfill-${index}`}
-              dismissible={
-                !order.isTutorial &&
-                !order.isLockout &&
-                !(state.lockoutActive && order.type === "lab_request") &&
-                !order.modifierIds?.includes("first_session") &&
-                !order.modifierIds?.includes("tier5_showcase") &&
-                !order.modifierIds?.includes("tier10_showcase") &&
-                !order.modifierIds?.includes("threshold_story") &&
-                !order.modifierIds?.includes("project_stage") &&
-                !order.modifierIds?.includes("council_ratify")
-              }
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Feather
+              name="inbox"
+              size={18}
+              color={GameColors.currency.reputation}
             />
-          ))
-        ) : (
-          <Animated.View entering={emptyEnterAnim} style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <Feather name="inbox" size={48} color={GameColors.text.disabled} />
-            </View>
-            <ThemedText style={styles.emptyTitle}>No Orders Yet</ThemedText>
-            <ThemedText style={styles.emptyDescription}>
-              New orders will appear automatically. Keep merging parts to be ready!
+            <ThemedText style={styles.statValue}>
+              {state.orders.length}/{effectiveMaxOrders}
             </ThemedText>
-            <View style={styles.tipContainer}>
-              <Feather name="info" size={14} color={GameColors.ui.primary} />
-              <ThemedText style={styles.tipText}>
-                Tip: Orders arrive faster as your reputation grows
+            <ThemedText style={styles.statLabel}>Active</ThemedText>
+          </View>
+
+          <View style={styles.statItem}>
+            <Feather
+              name="dollar-sign"
+              size={18}
+              color={GameColors.currency.cash}
+            />
+            <ThemedText
+              style={[styles.statValue, { color: GameColors.currency.cash }]}
+            >
+              {state.cash}
+            </ThemedText>
+            <ThemedText style={styles.statLabel}>Coins</ThemedText>
+          </View>
+
+          <View style={styles.statItem}>
+            <Feather
+              name="zap"
+              size={18}
+              color={GameColors.currency.reputation}
+            />
+            <ThemedText style={styles.statValue}>
+              {state.installStreakCurrent}
+            </ThemedText>
+            <ThemedText
+              style={[styles.statLabel, styles.statLabelCompact]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              Streak · Best {state.installStreakBest}
+            </ThemedText>
+          </View>
+        </View>
+
+        {showOrdersHint ? (
+          <Pressable
+            style={styles.helpBanner}
+            onPress={handleDismissOrdersHint}
+          >
+            <Feather name="info" size={16} color={GameColors.ui.primary} />
+            <View style={styles.helpCopy}>
+              <ThemedText style={styles.helpTitle}>Orders Help</ThemedText>
+              <ThemedText style={styles.helpText}>
+                Legend now shows letters + tile badges.
               </ThemedText>
             </View>
-          </Animated.View>
-        )}
-      </View>
+            <Feather name="x" size={14} color={GameColors.text.secondary} />
+          </Pressable>
+        ) : null}
+
+        {state.tutorialComplete ? (
+          <View style={styles.actionStack}>
+            <View style={styles.refreshRow}>
+              <Pressable
+                style={[
+                  styles.refreshButton,
+                  !canRefresh && styles.refreshButtonDisabled,
+                ]}
+                onPress={canRefresh ? handleRefreshOrder : undefined}
+              >
+                <Feather
+                  name="refresh-cw"
+                  size={16}
+                  color={GameColors.ui.primary}
+                />
+                <ThemedText style={styles.refreshLabel}>
+                  Refresh 1 order
+                </ThemedText>
+              </Pressable>
+              <View style={styles.refreshCost}>
+                <Feather
+                  name="dollar-sign"
+                  size={14}
+                  color={GameColors.currency.cash}
+                />
+                <ThemedText style={styles.refreshCostText}>
+                  {refreshCost}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.refreshRow}>
+              <Pressable
+                style={[
+                  styles.refreshButton,
+                  !canStartCampaign && styles.refreshButtonDisabled,
+                ]}
+                onPress={canStartCampaign ? handleStartCampaign : undefined}
+              >
+                <Feather
+                  name="trending-up"
+                  size={16}
+                  color={GameColors.currency.reputation}
+                />
+                <ThemedText style={styles.refreshLabel}>
+                  {marketingActive
+                    ? "Extend marketing campaign"
+                    : "Run marketing campaign"}
+                </ThemedText>
+              </Pressable>
+              <View style={styles.refreshCost}>
+                <Feather
+                  name="dollar-sign"
+                  size={14}
+                  color={GameColors.currency.cash}
+                />
+                <ThemedText style={styles.refreshCostText}>
+                  {marketingCost}
+                </ThemedText>
+              </View>
+            </View>
+
+            {marketingActive ? (
+              <View style={styles.campaignStatus}>
+                <Feather
+                  name="trending-up"
+                  size={14}
+                  color={GameColors.currency.reputation}
+                />
+                <ThemedText style={styles.campaignText}>
+                  Campaign active · {marketingRemaining} order
+                  {marketingRemaining === 1 ? "" : "s"} left
+                </ThemedText>
+              </View>
+            ) : (
+              <ThemedText style={styles.campaignHint}>
+                Boosts higher-tier orders for the next {marketingOrders} orders.
+              </ThemedText>
+            )}
+
+            {canUseBoosts ? (
+              <View style={styles.boostStack}>
+                <View style={styles.boostHeader}>
+                  <Feather
+                    name="compass"
+                    size={14}
+                    color={GameColors.ui.primary}
+                  />
+                  <ThemedText style={styles.boostHeaderText}>
+                    Tactical Boosts
+                  </ThemedText>
+                </View>
+
+                <View style={styles.boostCard}>
+                  <View style={styles.refreshRow}>
+                    <Pressable
+                      style={styles.refreshButton}
+                      onPress={() => setShowScoutOptions((prev) => !prev)}
+                    >
+                      <Feather
+                        name="compass"
+                        size={16}
+                        color={GameColors.ui.primary}
+                      />
+                      <ThemedText style={styles.refreshLabel}>
+                        Supplier Scout
+                      </ThemedText>
+                    </Pressable>
+                    <View
+                      style={[
+                        styles.refreshCost,
+                        !canStartScout && styles.boostCostDisabled,
+                      ]}
+                    >
+                      <Feather
+                        name="dollar-sign"
+                        size={14}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.refreshCostText}>
+                        {scoutCost}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  {scoutActive ? (
+                    <View style={styles.boostStatus}>
+                      <Feather
+                        name="target"
+                        size={12}
+                        color={GameColors.text.secondary}
+                      />
+                      <ThemedText style={styles.boostStatusText}>
+                        Active · {scoutRouteLabel} · {scoutRemaining} spawn
+                        {scoutRemaining === 1 ? "" : "s"}
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <ThemedText style={styles.boostHint}>
+                      Next {scoutSpawnsOpen} spawns (Open/Tier) or{" "}
+                      {scoutSpawnsLocked} spawns (Locked).
+                    </ThemedText>
+                  )}
+                  {showScoutOptions ? (
+                    <View style={styles.boostOptionsRow}>
+                      <Pressable
+                        style={[
+                          styles.boostOption,
+                          state.supplierScoutRoute === "open" &&
+                            styles.boostOptionSelected,
+                          !canStartScout && styles.boostOptionDisabled,
+                        ]}
+                        onPress={
+                          canStartScout
+                            ? () => handleStartScout("open")
+                            : undefined
+                        }
+                      >
+                        <ThemedText style={styles.boostOptionLabel}>
+                          Open Route
+                        </ThemedText>
+                        <ThemedText style={styles.boostOptionSub}>
+                          Force Open parts
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.boostOption,
+                          state.supplierScoutRoute === "locked" &&
+                            styles.boostOptionSelected,
+                          !canStartScout && styles.boostOptionDisabled,
+                        ]}
+                        onPress={
+                          canStartScout
+                            ? () => handleStartScout("locked")
+                            : undefined
+                        }
+                      >
+                        <ThemedText style={styles.boostOptionLabel}>
+                          Locked Route
+                        </ThemedText>
+                        <ThemedText style={styles.boostOptionSub}>
+                          Force Locked parts (+pressure)
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.boostOption,
+                          state.supplierScoutRoute === "tier" &&
+                            styles.boostOptionSelected,
+                          !canStartScout && styles.boostOptionDisabled,
+                        ]}
+                        onPress={
+                          canStartScout
+                            ? () => handleStartScout("tier")
+                            : undefined
+                        }
+                      >
+                        <ThemedText style={styles.boostOptionLabel}>
+                          Tier Route
+                        </ThemedText>
+                        <ThemedText style={styles.boostOptionSub}>
+                          +1 tier on base drop
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={styles.boostCard}>
+                  <View style={styles.refreshRow}>
+                    <Pressable
+                      style={[
+                        styles.refreshButton,
+                        !canStartClinic && styles.refreshButtonDisabled,
+                      ]}
+                      onPress={canStartClinic ? handleStartClinic : undefined}
+                    >
+                      <Feather
+                        name="activity"
+                        size={16}
+                        color={GameColors.currency.research}
+                      />
+                      <ThemedText style={styles.refreshLabel}>
+                        Mentor Workshop Clinic
+                      </ThemedText>
+                    </Pressable>
+                    <View
+                      style={[
+                        styles.refreshCost,
+                        !canStartClinic && styles.boostCostDisabled,
+                      ]}
+                    >
+                      <Feather
+                        name="dollar-sign"
+                        size={14}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.refreshCostText}>
+                        {clinicCost}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  {clinicActive ? (
+                    <View style={styles.boostStatus}>
+                      <Feather
+                        name="zap"
+                        size={12}
+                        color={GameColors.currency.research}
+                      />
+                      <ThemedText style={styles.boostStatusText}>
+                        Active · {clinicRemaining} merge
+                        {clinicRemaining === 1 ? "" : "s"} left
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <ThemedText style={styles.boostHint}>
+                      {canUseClinic
+                        ? `Next ${clinicMerges} merges: open merges grant +1 research and reduce dependency.`
+                        : "Finish your first session to unlock the clinic."}
+                    </ThemedText>
+                  )}
+                </View>
+
+                <View style={styles.boostCard}>
+                  <View style={styles.refreshRow}>
+                    <Pressable
+                      style={styles.refreshButton}
+                      onPress={() => setShowWarrantyOptions((prev) => !prev)}
+                    >
+                      <Feather
+                        name="shield"
+                        size={16}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.refreshLabel}>
+                        Baron Warranty Stamp
+                      </ThemedText>
+                    </Pressable>
+                    <View
+                      style={[
+                        styles.refreshCost,
+                        !canStartWarranty && styles.boostCostDisabled,
+                      ]}
+                    >
+                      <Feather
+                        name="dollar-sign"
+                        size={14}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.refreshCostText}>
+                        {warrantyCost}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  {warrantyActive ? (
+                    <View style={styles.boostStatus}>
+                      <Feather
+                        name="shield"
+                        size={12}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.boostStatusText}>
+                        Active · {warrantyModeLabel} · {warrantyRemaining} order
+                        {warrantyRemaining === 1 ? "" : "s"}
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <ThemedText style={styles.boostHint}>
+                      {canUseWarranty
+                        ? `Next ${warrantyOrders} orders: reduce wrong-family penalties or boost contracts.`
+                        : "Finish your first session to unlock the warranty stamp."}
+                    </ThemedText>
+                  )}
+                  {showWarrantyOptions ? (
+                    <View style={styles.boostOptionsRow}>
+                      <Pressable
+                        style={[
+                          styles.boostOption,
+                          state.warrantyStampMode === "refund" &&
+                            styles.boostOptionSelected,
+                          !canStartWarranty && styles.boostOptionDisabled,
+                        ]}
+                        onPress={
+                          canStartWarranty
+                            ? () => handleStartWarranty("refund")
+                            : undefined
+                        }
+                      >
+                        <ThemedText style={styles.boostOptionLabel}>
+                          Refund Relief
+                        </ThemedText>
+                        <ThemedText style={styles.boostOptionSub}>
+                          Smaller wrong-family penalty
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.boostOption,
+                          state.warrantyStampMode === "contract" &&
+                            styles.boostOptionSelected,
+                          !canSelectWarrantyContract &&
+                            styles.boostOptionDisabled,
+                        ]}
+                        onPress={
+                          canSelectWarrantyContract
+                            ? () => handleStartWarranty("contract")
+                            : undefined
+                        }
+                      >
+                        <ThemedText style={styles.boostOptionLabel}>
+                          Contract Edge
+                        </ThemedText>
+                        <ThemedText style={styles.boostOptionSub}>
+                          {contractOptionSub}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            ) : (
+              <ThemedText style={styles.boostLockedHint}>
+                Finish the tutorial to unlock boosts.
+              </ThemedText>
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.legendCard}>
+          <View style={styles.legendHeader}>
+            <Feather name="type" size={14} color={GameColors.text.secondary} />
+            <ThemedText style={styles.legendTitle}>Legend</ThemedText>
+          </View>
+          <ThemedText style={styles.legendSubtitle}>
+            Order hints + tile badges
+          </ThemedText>
+          <View style={styles.legendGroup}>
+            <ThemedText style={styles.legendGroupLabel}>
+              Order letters
+            </ThemedText>
+            <View style={styles.legendRow}>
+              {orderLegend.map((item, index) => (
+                <View key={`${item.key}-${index}`} style={styles.legendChip}>
+                  <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
+                  <ThemedText style={styles.legendLabel}>
+                    {item.label}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+          </View>
+          <View style={styles.legendGroup}>
+            <ThemedText style={styles.legendGroupLabel}>Tile badges</ThemedText>
+            <View style={styles.legendRow}>
+              {badgeLegend.map((item) => (
+                <View key={item.key} style={styles.legendChip}>
+                  <ThemedText style={styles.legendKey}>{item.key}</ThemedText>
+                  <ThemedText style={styles.legendLabel}>
+                    {item.label}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.ordersList}>
+          {state.orders.length > 0 ? (
+            state.orders.map((order, index) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onFulfill={() => handleFulfillOrder(order.id)}
+                onDismiss={() => handleDismissOrder(order.id)}
+                onSelect={() =>
+                  dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })
+                }
+                selected={state.highlightedOrderId === order.id}
+                trimPhase={orderTrimPhase}
+                fulfillTestID={`order-fulfill-${index}`}
+                dismissible={
+                  !order.isTutorial &&
+                  !order.isLockout &&
+                  !(state.lockoutActive && order.type === "lab_request") &&
+                  !order.modifierIds?.includes("first_session") &&
+                  !order.modifierIds?.includes("tier5_showcase") &&
+                  !order.modifierIds?.includes("tier10_showcase") &&
+                  !order.modifierIds?.includes("threshold_story") &&
+                  !order.modifierIds?.includes("project_stage") &&
+                  !order.modifierIds?.includes("council_ratify")
+                }
+              />
+            ))
+          ) : (
+            <Animated.View entering={emptyEnterAnim} style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <Feather
+                  name="inbox"
+                  size={48}
+                  color={GameColors.text.disabled}
+                />
+              </View>
+              <ThemedText style={styles.emptyTitle}>No Orders Yet</ThemedText>
+              <ThemedText style={styles.emptyDescription}>
+                New orders will appear automatically. Keep merging parts to be
+                ready!
+              </ThemedText>
+              <View style={styles.tipContainer}>
+                <Feather name="info" size={14} color={GameColors.ui.primary} />
+                <ThemedText style={styles.tipText}>
+                  Tip: Orders arrive faster as your reputation grows
+                </ThemedText>
+              </View>
+            </Animated.View>
+          )}
+        </View>
       </ScrollView>
     </ModalShell>
   );

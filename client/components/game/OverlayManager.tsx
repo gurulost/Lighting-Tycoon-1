@@ -78,15 +78,20 @@ export function OverlayManager({
       .find((item) => item.id !== primary.id && allowed.includes(item.type));
   }, [sorted, primary]);
 
-  const milestoneEnter = reducedMotion ? FadeIn.duration(120) : FadeIn.duration(200);
-  const milestoneExit = reducedMotion ? FadeOut.duration(150) : FadeOut.duration(400);
-  const hasStory =
-    primary?.type === "story" || secondary?.type === "story";
+  const milestoneEnter = reducedMotion
+    ? FadeIn.duration(120)
+    : FadeIn.duration(200);
+  const milestoneExit = reducedMotion
+    ? FadeOut.duration(150)
+    : FadeOut.duration(400);
+  const hasStory = primary?.type === "story" || secondary?.type === "story";
   const shouldBlockInput = Boolean(momentLockActive && hasStory);
 
   useEffect(() => {
     if (!primary) return undefined;
-    const ttl = (primary.payload?.durationMs as number | undefined) ?? OVERLAY_AUTO_DISMISS_MS[primary.type];
+    const ttl =
+      (primary.payload?.durationMs as number | undefined) ??
+      OVERLAY_AUTO_DISMISS_MS[primary.type];
     if (primary.sticky || !ttl) return undefined;
     const timeout = setTimeout(() => onDismiss(primary.id), ttl);
     return () => clearTimeout(timeout);

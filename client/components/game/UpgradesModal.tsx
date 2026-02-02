@@ -45,12 +45,18 @@ export function UpgradesModal({
       onClose={closeDisabled ? undefined : onClose}
       closeDisabled={closeDisabled}
     >
-
       <LinearGradient
-        colors={[`${GameColors.currency.cash}20`, `${GameColors.currency.cash}08`]}
+        colors={[
+          `${GameColors.currency.cash}20`,
+          `${GameColors.currency.cash}08`,
+        ]}
         style={styles.cashDisplay}
       >
-        <Feather name="dollar-sign" size={20} color={GameColors.currency.cash} />
+        <Feather
+          name="dollar-sign"
+          size={20}
+          color={GameColors.currency.cash}
+        />
         <ThemedText style={styles.cashValue}>{state.cash}</ThemedText>
         <ThemedText style={styles.cashLabel}>Available</ThemedText>
       </LinearGradient>
@@ -73,14 +79,22 @@ export function UpgradesModal({
         ) : null}
 
         {CATEGORIES.map((category) => {
-          const upgrades = visibleUpgrades.filter((u) => u.category === category.id);
+          const upgrades = visibleUpgrades.filter(
+            (u) => u.category === category.id,
+          );
           if (upgrades.length === 0) return null;
 
           return (
             <View key={category.id} style={styles.categorySection}>
               <View style={styles.categoryHeader}>
-                <Feather name={category.icon} size={18} color={GameColors.text.secondary} />
-                <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
+                <Feather
+                  name={category.icon}
+                  size={18}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.categoryName}>
+                  {category.name}
+                </ThemedText>
               </View>
 
               {upgrades.map((upgrade) => (

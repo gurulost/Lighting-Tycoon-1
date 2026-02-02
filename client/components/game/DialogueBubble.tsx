@@ -6,7 +6,14 @@ import { AvatarImage } from "./AvatarImage";
 import Svg, { Defs, Pattern, Rect, Circle } from "react-native-svg";
 
 import { ThemedText } from "@/components/ThemedText";
-import { GameColors, DialogueTokens, DialogueTypography, Fonts, Spacing, BorderRadius } from "@/constants/theme";
+import {
+  GameColors,
+  DialogueTokens,
+  DialogueTypography,
+  Fonts,
+  Spacing,
+  BorderRadius,
+} from "@/constants/theme";
 import { StoryBeat, StorySpeaker } from "@/constants/story";
 import { getPortraitForBeat } from "@/constants/characters";
 
@@ -88,25 +95,33 @@ export function DialogueBubble({
   showHalftone = true,
 }: DialogueBubbleProps) {
   const variant =
-    beat.category === "inner_monologue" ? "caption" : VARIANT_BY_SPEAKER[beat.speaker];
+    beat.category === "inner_monologue"
+      ? "caption"
+      : VARIANT_BY_SPEAKER[beat.speaker];
   const palette = DialogueTokens[variant];
   const labelColor = SPEAKER_COLOR[beat.speaker];
   const tagText = showTag ? getTagText(beat) : null;
-  const showTail = withTail && variant === "speech" && beat.category !== "inner_monologue";
+  const showTail =
+    withTail && variant === "speech" && beat.category !== "inner_monologue";
   const labelFont = beat.speaker === "baron" ? Fonts.mono : Fonts.rounded;
   const bodyFont = variant === "legal" ? Fonts.sans : Fonts.rounded;
   const outerRadius = variant === "legal" ? BorderRadius.md : BorderRadius.lg;
   const innerRadius = Math.max(BorderRadius.sm, outerRadius - 6);
   const innerInset = Math.max(1, Math.round(palette.borderWidth));
   const chipBackground =
-    variant === "legal" ? DialogueTokens.legalChipBackground : DialogueTokens.chipBackground;
+    variant === "legal"
+      ? DialogueTokens.legalChipBackground
+      : DialogueTokens.chipBackground;
   const accentColor = `${labelColor}33`;
   const tailColor = palette.gradient?.[1] ?? palette.background;
   const tabColor = palette.gradient?.[0] ?? palette.background;
   const patternId = React.useId().replace(/:/g, "");
   const showStamp = beat.speaker === "baron" && expanded;
   const showCaptionTab = beat.speaker === "system";
-  const showPortrait = beat.speaker === "tina" || beat.speaker === "mentor" || beat.speaker === "baron";
+  const showPortrait =
+    beat.speaker === "tina" ||
+    beat.speaker === "mentor" ||
+    beat.speaker === "baron";
   const portraitSource = getPortraitForBeat(beat, "sm");
 
   return (
@@ -161,7 +176,13 @@ export function DialogueBubble({
                   height={8}
                   patternUnits="userSpaceOnUse"
                 >
-                  <Circle cx={1.5} cy={1.5} r={0.8} fill="#1C1C2B" opacity={0.12} />
+                  <Circle
+                    cx={1.5}
+                    cy={1.5}
+                    r={0.8}
+                    fill="#1C1C2B"
+                    opacity={0.12}
+                  />
                 </Pattern>
               </Defs>
               <Rect width="100%" height="100%" fill={`url(#${patternId})`} />
@@ -179,37 +200,41 @@ export function DialogueBubble({
           ) : null}
           <View style={styles.contentBody}>
             <View style={styles.header}>
-            <View
-              style={[
-                styles.labelChip,
-                {
-                  borderColor: palette.border,
-                  borderWidth: palette.borderWidth,
-                  backgroundColor: chipBackground,
-                },
-              ]}
-            >
-              {showPortrait ? (
-                <AvatarImage
-                  source={portraitSource}
-                  size={16}
-                  borderColor={palette.border}
-                  backgroundColor="rgba(255,255,255,0.12)"
-                  icon={
-                    beat.speaker === "tina"
-                      ? "smile"
-                      : beat.speaker === "baron"
-                      ? "briefcase"
-                      : "user"
-                  }
-                  iconColor={labelColor}
-                />
-              ) : (
-                <Feather name={SPEAKER_ICON[beat.speaker]} size={12} color={labelColor} />
-              )}
-              <ThemedText
+              <View
                 style={[
-                  styles.labelText,
+                  styles.labelChip,
+                  {
+                    borderColor: palette.border,
+                    borderWidth: palette.borderWidth,
+                    backgroundColor: chipBackground,
+                  },
+                ]}
+              >
+                {showPortrait ? (
+                  <AvatarImage
+                    source={portraitSource}
+                    size={16}
+                    borderColor={palette.border}
+                    backgroundColor="rgba(255,255,255,0.12)"
+                    icon={
+                      beat.speaker === "tina"
+                        ? "smile"
+                        : beat.speaker === "baron"
+                          ? "briefcase"
+                          : "user"
+                    }
+                    iconColor={labelColor}
+                  />
+                ) : (
+                  <Feather
+                    name={SPEAKER_ICON[beat.speaker]}
+                    size={12}
+                    color={labelColor}
+                  />
+                )}
+                <ThemedText
+                  style={[
+                    styles.labelText,
                     { color: labelColor, fontFamily: labelFont },
                   ]}
                 >
@@ -226,7 +251,9 @@ export function DialogueBubble({
                   <ThemedText
                     style={[
                       styles.tagText,
-                      variant === "legal" ? styles.tagTextLegal : styles.tagTextDefault,
+                      variant === "legal"
+                        ? styles.tagTextLegal
+                        : styles.tagTextDefault,
                     ]}
                   >
                     {tagText}

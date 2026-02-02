@@ -78,7 +78,10 @@ export function StoryBeatCard({
   const isChip = variant === "chip";
   const isLog = variant === "log";
   const portraitSize = isChip ? 88 : isLog ? 56 : 96;
-  const portraitSource = getPortraitForBeat(beat, isChip ? "sm" : isLog ? "md" : "lg");
+  const portraitSource = getPortraitForBeat(
+    beat,
+    isChip ? "sm" : isLog ? "md" : "lg",
+  );
   const hasPortrait = Boolean(portraitSource);
 
   if (isChip) {
@@ -92,7 +95,10 @@ export function StoryBeatCard({
           {hasPortrait ? (
             <Image
               source={portraitSource}
-              style={[styles.chipPortrait, { width: portraitSize, height: portraitSize }]}
+              style={[
+                styles.chipPortrait,
+                { width: portraitSize, height: portraitSize },
+              ]}
               contentFit="cover"
               cachePolicy="memory-disk"
             />
@@ -100,28 +106,38 @@ export function StoryBeatCard({
             <View
               style={[
                 styles.chipFallback,
-                { width: portraitSize, height: portraitSize, borderColor: `${color}55` },
+                {
+                  width: portraitSize,
+                  height: portraitSize,
+                  borderColor: `${color}55`,
+                },
               ]}
             >
-              <Feather name={SPEAKER_ICON[beat.speaker]} size={14} color={color} />
+              <Feather
+                name={SPEAKER_ICON[beat.speaker]}
+                size={14}
+                color={color}
+              />
             </View>
           )}
           <View style={styles.chipText}>
-            <ThemedText style={[styles.chipLabel, { color }]}>{SPEAKER_LABEL[beat.speaker]}</ThemedText>
-          <ThemedText style={styles.chipLine} numberOfLines={2}>
-            {beat.line1}
-          </ThemedText>
+            <ThemedText style={[styles.chipLabel, { color }]}>
+              {SPEAKER_LABEL[beat.speaker]}
+            </ThemedText>
+            <ThemedText style={styles.chipLine} numberOfLines={2}>
+              {beat.line1}
+            </ThemedText>
           </View>
           {onPress ? (
-            <Feather name="chevron-right" size={16} color={GameColors.text.secondary} />
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={GameColors.text.secondary}
+            />
           ) : null}
         </Pressable>
         {onDismiss ? (
-          <Pressable
-            onPress={onDismiss}
-            hitSlop={8}
-            style={styles.chipDismiss}
-          >
+          <Pressable onPress={onDismiss} hitSlop={8} style={styles.chipDismiss}>
             <Feather name="x" size={14} color={GameColors.text.secondary} />
           </Pressable>
         ) : null}
@@ -138,8 +154,14 @@ export function StoryBeatCard({
       >
         <View style={styles.headerRow}>
           <View style={styles.speakerRow}>
-            <Feather name={SPEAKER_ICON[beat.speaker]} size={12} color={color} />
-            <ThemedText style={[styles.speakerLabel, { color }]}>{SPEAKER_LABEL[beat.speaker]}</ThemedText>
+            <Feather
+              name={SPEAKER_ICON[beat.speaker]}
+              size={12}
+              color={color}
+            />
+            <ThemedText style={[styles.speakerLabel, { color }]}>
+              {SPEAKER_LABEL[beat.speaker]}
+            </ThemedText>
           </View>
           <View style={styles.headerRight}>
             {tagText ? (
@@ -148,7 +170,11 @@ export function StoryBeatCard({
               </View>
             ) : null}
             {onDismiss ? (
-              <Pressable onPress={onDismiss} hitSlop={8} style={styles.cardDismiss}>
+              <Pressable
+                onPress={onDismiss}
+                hitSlop={8}
+                style={styles.cardDismiss}
+              >
                 <Feather name="x" size={14} color={GameColors.text.secondary} />
               </Pressable>
             ) : null}
@@ -167,10 +193,18 @@ export function StoryBeatCard({
               <View
                 style={[
                   styles.portraitFallback,
-                  { width: portraitSize, height: portraitSize, borderColor: `${color}55` },
+                  {
+                    width: portraitSize,
+                    height: portraitSize,
+                    borderColor: `${color}55`,
+                  },
                 ]}
               >
-                <Feather name={SPEAKER_ICON[beat.speaker]} size={20} color={color} />
+                <Feather
+                  name={SPEAKER_ICON[beat.speaker]}
+                  size={20}
+                  color={color}
+                />
               </View>
             )}
           </View>
@@ -185,8 +219,14 @@ export function StoryBeatCard({
             ) : null}
             {onOpenLog && !isLog ? (
               <Pressable onPress={onOpenLog} style={styles.logHint}>
-                <Feather name="book-open" size={12} color={GameColors.text.secondary} />
-                <ThemedText style={styles.logHintText}>Open Story Log</ThemedText>
+                <Feather
+                  name="book-open"
+                  size={12}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.logHintText}>
+                  Open Story Log
+                </ThemedText>
               </Pressable>
             ) : null}
           </View>

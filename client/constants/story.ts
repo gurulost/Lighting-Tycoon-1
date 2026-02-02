@@ -1,4 +1,10 @@
-export type StorySpeaker = "mentor" | "baron" | "customer" | "system" | "rd" | "tina";
+export type StorySpeaker =
+  | "mentor"
+  | "baron"
+  | "customer"
+  | "system"
+  | "rd"
+  | "tina";
 
 export interface StoryBeat {
   id: string;
@@ -109,7 +115,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   tina_compat_order: {
     id: "tina_compat_order",
     speaker: "tina",
-    line1: "Compatibility jobs need compatible parts. I should save those components.",
+    line1:
+      "Compatibility jobs need compatible parts. I should save those components.",
     onceOnly: true,
     portrait: "focused",
     category: "inner_monologue",
@@ -236,7 +243,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_phase2_pressure: {
     id: "mentor_phase2_pressure",
     speaker: "mentor",
-    line1: "Freedom’s real, but he can still squeeze margins. Clean installs protect rewards.",
+    line1:
+      "Freedom’s real, but he can still squeeze margins. Clean installs protect rewards.",
     onceOnly: true,
     portrait: "concerned",
     category: "mentor_tip",
@@ -245,7 +253,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     id: "mentor_empire_contracts",
     speaker: "mentor",
     line1: "You’re not surviving anymore. You’re delivering landmarks.",
-    line2: "Empire Contracts turn every install into a public signal—finish them and the city follows.",
+    line2:
+      "Empire Contracts turn every install into a public signal—finish them and the city follows.",
     onceOnly: true,
     portrait: "confident",
     category: "mentor_tip",
@@ -262,7 +271,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   project_accept_generic: {
     id: "project_accept_generic",
     speaker: "tina",
-    line1: "Deposit’s down. We build this in stages and make the skyline remember.",
+    line1:
+      "Deposit’s down. We build this in stages and make the skyline remember.",
     onceOnly: false,
     portrait: "confident",
     category: "inner_monologue",
@@ -270,7 +280,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   project_stage_complete_generic: {
     id: "project_stage_complete_generic",
     speaker: "mentor",
-    line1: "Stage delivered. Keep the rhythm—final payout is where the real weight lands.",
+    line1:
+      "Stage delivered. Keep the rhythm—final payout is where the real weight lands.",
     onceOnly: false,
     portrait: "focused",
     category: "mentor_tip",
@@ -891,7 +902,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   baron_fax_3: {
     id: "baron_fax_3",
     speaker: "baron",
-    line1: "BaronFax: Quota season begins Monday. Glow targets are non-negotiable.",
+    line1:
+      "BaronFax: Quota season begins Monday. Glow targets are non-negotiable.",
     category: "baron_fax",
   },
   baron_fax_4: {
@@ -1010,7 +1022,12 @@ export const MENTOR_TIP_BEATS = [
   "mentor_tip_6",
 ];
 
-export const RD_MEMO_BEATS = ["rd_memo_1", "rd_memo_2", "rd_memo_3", "rd_memo_4"];
+export const RD_MEMO_BEATS = [
+  "rd_memo_1",
+  "rd_memo_2",
+  "rd_memo_3",
+  "rd_memo_4",
+];
 
 export const TINA_BEATS = [
   "tina_thought_1",

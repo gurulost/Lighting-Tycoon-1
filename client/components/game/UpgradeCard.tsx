@@ -49,15 +49,14 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   const cost = Math.max(
     0,
     Math.round(
-      upgrade.cost *
-        (currentLevel + 1) *
-        tuning.economy.upgradeCostMultiplier,
+      upgrade.cost * (currentLevel + 1) * tuning.economy.upgradeCostMultiplier,
     ),
   );
   const canAfford = state.cash >= cost;
   const canPurchase = !isMaxed && canAfford;
 
-  const categoryColor = CATEGORY_COLORS[upgrade.category] || GameColors.text.secondary;
+  const categoryColor =
+    CATEGORY_COLORS[upgrade.category] || GameColors.text.secondary;
   const categoryIcon = CATEGORY_ICONS[upgrade.category] || "circle";
 
   const handlePurchase = React.useCallback(() => {
@@ -73,10 +72,7 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
       handlePurchase();
       scale.value = withSequence(
         withSpring(0.95, { damping: 15 }),
-        withDelay(
-          100,
-          withSpring(1, { damping: 15 })
-        )
+        withDelay(100, withSpring(1, { damping: 15 })),
       );
     } else {
       SoundManager.play("error");
@@ -93,12 +89,19 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
       <View style={styles.header}>
-        <View style={[styles.iconContainer, { backgroundColor: categoryColor + "20" }]}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: categoryColor + "20" },
+          ]}
+        >
           <Feather name={categoryIcon} size={20} color={categoryColor} />
         </View>
         <View style={styles.titleContainer}>
           <ThemedText style={styles.name}>{upgrade.name}</ThemedText>
-          <ThemedText style={styles.description}>{upgrade.description}</ThemedText>
+          <ThemedText style={styles.description}>
+            {upgrade.description}
+          </ThemedText>
         </View>
       </View>
 
@@ -130,8 +133,8 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
             backgroundColor: canPurchase
               ? categoryColor
               : isMaxed
-              ? GameColors.ui.success + "30"
-              : GameColors.ui.surface,
+                ? GameColors.ui.success + "30"
+                : GameColors.ui.surface,
             opacity: canPurchase ? 1 : isMaxed ? 1 : 0.5,
           },
         ]}
@@ -139,7 +142,9 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
         {isMaxed ? (
           <>
             <Feather name="check" size={16} color={GameColors.ui.success} />
-            <ThemedText style={[styles.purchaseText, { color: GameColors.ui.success }]}>
+            <ThemedText
+              style={[styles.purchaseText, { color: GameColors.ui.success }]}
+            >
               Maxed
             </ThemedText>
           </>

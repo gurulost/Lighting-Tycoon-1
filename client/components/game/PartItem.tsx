@@ -21,7 +21,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
-import { TrimLightStrip, TrimLightAnimation } from "@/components/game/TrimLightStrip";
+import {
+  TrimLightStrip,
+  TrimLightAnimation,
+} from "@/components/game/TrimLightStrip";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
@@ -46,7 +49,10 @@ const partKingdomLocked = require("../../../assets/images/part-kingdom-locked.pn
 const mergeParticleOpen = require("../../../assets/images/particle-merge-open.png");
 const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.png");
 
-const PART_SPRITES: Record<PartTier, Record<Exclude<PartFamily, "waste">, ImageSourcePropType>> = {
+const PART_SPRITES: Record<
+  PartTier,
+  Record<Exclude<PartFamily, "waste">, ImageSourcePropType>
+> = {
   1: { open: partClipOpen, locked: partClipLocked },
   2: { open: partTrackOpen, locked: partTrackLocked },
   3: { open: partSegmentOpen, locked: partSegmentLocked },
@@ -79,7 +85,7 @@ interface PartItemProps {
     translationX: number,
     translationY: number,
     absoluteX: number,
-    absoluteY: number
+    absoluteY: number,
   ) => void;
   onTap?: () => void;
   onLongPress?: () => void;
@@ -128,29 +134,29 @@ export function PartItem({
     ? part.tier === 1
       ? "W1"
       : part.tier === 2
-      ? "W2"
-      : "W3"
+        ? "W2"
+        : "W3"
     : null;
   const primaryColor = isWaste
     ? GameColors.ui.warning
     : isOpen
-    ? GameColors.openStandard.primary
-    : GameColors.locked.primary;
+      ? GameColors.openStandard.primary
+      : GameColors.locked.primary;
   const glowColor = isWaste
     ? GameColors.ui.warning
     : isOpen
-    ? GameColors.openStandard.glow
-    : GameColors.locked.accent;
+      ? GameColors.openStandard.glow
+      : GameColors.locked.accent;
   const tierAccent =
     !isWaste && part.tier >= 6 ? GameColors.tiers[part.tier] : undefined;
   const isLegendary = !isWaste && part.tier >= 8;
   const gradientColors = isWaste
     ? ["#3A3A45", "#4A4A5A", "#3A3A45"]
     : tierAccent
-    ? [`${primaryColor}15`, `${tierAccent}55`, `${primaryColor}15`]
-    : isOpen
-    ? ["#4A9EFF20", "#00D9FF40", "#4A9EFF20"]
-    : ["#FFB84D20", "#A855F740", "#FFB84D20"];
+      ? [`${primaryColor}15`, `${tierAccent}55`, `${primaryColor}15`]
+      : isOpen
+        ? ["#4A9EFF20", "#00D9FF40", "#4A9EFF20"]
+        : ["#FFB84D20", "#A855F740", "#FFB84D20"];
 
   // Materialize spawn animation
   React.useEffect(() => {
@@ -161,17 +167,17 @@ export function PartItem({
       return;
     }
     hasSpawned.current = true;
-    
+
     // Scale: 0 -> 1.15 -> 1 with spring bounce
     scale.value = withSequence(
       withTiming(1.15, { duration: 180 }),
-      withSpring(1, { damping: 8, stiffness: 200 })
+      withSpring(1, { damping: 8, stiffness: 200 }),
     );
-    
+
     // Bright glow pulse that fades out
     spawnGlow.value = withSequence(
       withTiming(1.5, { duration: 100 }),
-      withTiming(0, { duration: 400 })
+      withTiming(0, { duration: 400 }),
     );
   }, []);
 
@@ -185,10 +191,10 @@ export function PartItem({
     glowPulse.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 1500 }),
-        withTiming(0, { duration: 1500 })
+        withTiming(0, { duration: 1500 }),
       ),
       -1,
-      true
+      true,
     );
     return () => {
       cancelAnimation(glowPulse);
@@ -219,7 +225,10 @@ export function PartItem({
       zIndex.value = 100;
       scale.value = withSpring(1.2, { damping: 12, stiffness: 200 });
       if (dragPreviewScale) {
-        dragPreviewScale.value = withSpring(1.2, { damping: 12, stiffness: 200 });
+        dragPreviewScale.value = withSpring(1.2, {
+          damping: 12,
+          stiffness: 200,
+        });
       }
       if (dragLift) {
         dragLift.value = withSpring(8, { damping: 12, stiffness: 200 });
@@ -241,7 +250,7 @@ export function PartItem({
         event.translationX,
         event.translationY,
         event.absoluteX,
-        event.absoluteY
+        event.absoluteY,
       );
       translateX.value = withSpring(0, { damping: 15 });
       translateY.value = withSpring(0, { damping: 15 });
@@ -277,11 +286,21 @@ export function PartItem({
   }
 
   const animatedStyle = useAnimatedStyle(() => {
-    const baseGlow = interpolate(glowPulse.value, [0, 1], [0.4, 0.8], Extrapolation.CLAMP);
-    const spawnBoost = interpolate(spawnGlow.value, [0, 1, 1.5], [0, 0.5, 1], Extrapolation.CLAMP);
+    const baseGlow = interpolate(
+      glowPulse.value,
+      [0, 1],
+      [0.4, 0.8],
+      Extrapolation.CLAMP,
+    );
+    const spawnBoost = interpolate(
+      spawnGlow.value,
+      [0, 1, 1.5],
+      [0, 0.5, 1],
+      Extrapolation.CLAMP,
+    );
     const glowOpacity = Math.min(1, baseGlow + spawnBoost);
     const shadowRadius = 12 + spawnGlow.value * 20;
-    
+
     return {
       transform: [
         { translateX: translateX.value },
@@ -294,17 +313,28 @@ export function PartItem({
       shadowRadius: shadowRadius,
     };
   });
-  
+
   const spawnRingStyle = useAnimatedStyle(() => {
-    const ringScale = interpolate(spawnGlow.value, [0, 1.5], [1, 1.8], Extrapolation.CLAMP);
-    const ringOpacity = interpolate(spawnGlow.value, [0, 0.5, 1.5], [0, 0.6, 0], Extrapolation.CLAMP);
+    const ringScale = interpolate(
+      spawnGlow.value,
+      [0, 1.5],
+      [1, 1.8],
+      Extrapolation.CLAMP,
+    );
+    const ringOpacity = interpolate(
+      spawnGlow.value,
+      [0, 0.5, 1.5],
+      [0, 0.6, 0],
+      Extrapolation.CLAMP,
+    );
     return {
       transform: [{ scale: ringScale }],
       opacity: ringOpacity,
     };
   });
 
-  const sprite = part.family === "waste" ? null : PART_SPRITES[part.tier][part.family];
+  const sprite =
+    part.family === "waste" ? null : PART_SPRITES[part.tier][part.family];
   const showPremiumLights = part.tier >= 5 && !isWaste;
 
   const content = (
@@ -327,7 +357,13 @@ export function PartItem({
       >
         {isOpen ? (
           <LinearGradient
-            colors={["transparent", `${primaryColor}30`, "transparent", `${primaryColor}30`, "transparent"]}
+            colors={[
+              "transparent",
+              `${primaryColor}30`,
+              "transparent",
+              `${primaryColor}30`,
+              "transparent",
+            ]}
             locations={[0, 0.18, 0.36, 0.54, 0.72]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -366,7 +402,12 @@ export function PartItem({
       <Animated.View
         style={[
           styles.spawnRing,
-          { borderColor: glowColor, width: size, height: size, pointerEvents: "none" },
+          {
+            borderColor: glowColor,
+            width: size,
+            height: size,
+            pointerEvents: "none",
+          },
           spawnRingStyle,
         ]}
       />
@@ -380,7 +421,12 @@ export function PartItem({
         />
       ) : null}
 
-      <View style={[styles.tierBadge, { backgroundColor: GameColors.tiers[part.tier] }]}>
+      <View
+        style={[
+          styles.tierBadge,
+          { backgroundColor: GameColors.tiers[part.tier] },
+        ]}
+      >
         <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
       </View>
 
@@ -390,8 +436,8 @@ export function PartItem({
           part.family === "locked"
             ? { backgroundColor: GameColors.locked.accent + "80" }
             : part.family === "waste"
-            ? { backgroundColor: GameColors.ui.warning + "80" }
-            : styles.familyIndicatorOpen,
+              ? { backgroundColor: GameColors.ui.warning + "80" }
+              : styles.familyIndicatorOpen,
         ]}
       >
         <ThemedText
@@ -400,8 +446,8 @@ export function PartItem({
             part.family === "locked"
               ? styles.familyTextLocked
               : part.family === "waste"
-              ? styles.familyTextWaste
-              : styles.familyTextOpen,
+                ? styles.familyTextWaste
+                : styles.familyTextOpen,
           ]}
         >
           {part.family === "locked" ? "L" : part.family === "waste" ? "W" : "O"}
@@ -409,7 +455,12 @@ export function PartItem({
       </View>
 
       {part.compatible && !isWaste ? (
-        <View style={[styles.compatibleIndicator, { backgroundColor: GameColors.ui.success }]}>
+        <View
+          style={[
+            styles.compatibleIndicator,
+            { backgroundColor: GameColors.ui.success },
+          ]}
+        >
           <ThemedText style={styles.compatibleText}>C</ThemedText>
         </View>
       ) : null}
@@ -445,18 +496,18 @@ export function MergeAnimation({
   const primaryColor = isWaste
     ? GameColors.ui.warning
     : isOpen
-    ? GameColors.openStandard.primary
-    : GameColors.locked.primary;
+      ? GameColors.openStandard.primary
+      : GameColors.locked.primary;
   const glowColor = isWaste
     ? GameColors.ui.warning
     : isOpen
-    ? GameColors.openStandard.glow
-    : GameColors.locked.accent;
+      ? GameColors.openStandard.glow
+      : GameColors.locked.accent;
 
   React.useEffect(() => {
     scale.value = withSequence(
       withTiming(1.5, { duration: 150 }),
-      withSpring(1, { damping: 8 })
+      withSpring(1, { damping: 8 }),
     );
     rotation.value = withTiming(360, { duration: 300 });
 
@@ -466,7 +517,7 @@ export function MergeAnimation({
         if (finished) {
           runOnJS(onComplete)();
         }
-      })
+      }),
     );
   }, []);
 
@@ -498,7 +549,12 @@ export function MergeAnimation({
         contentFit="contain"
         cachePolicy="memory-disk"
       />
-      <Image source={sprite} style={styles.mergeSprite} contentFit="contain" cachePolicy="memory-disk" />
+      <Image
+        source={sprite}
+        style={styles.mergeSprite}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+      />
     </Animated.View>
   );
 }

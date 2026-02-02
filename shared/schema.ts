@@ -1,5 +1,13 @@
-import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, jsonb, timestamp, boolean } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  jsonb,
+  timestamp,
+  boolean,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -25,7 +33,9 @@ export const gameSaves = pgTable("game_saves", {
   unlockedSlots: jsonb("unlocked_slots").notNull().default([]),
   upgrades: jsonb("upgrades").notNull().default({}),
   rdNodes: jsonb("rd_nodes").notNull().default({}),
-  freedomControllerCount: integer("freedom_controller_count").notNull().default(0),
+  freedomControllerCount: integer("freedom_controller_count")
+    .notNull()
+    .default(0),
   maxOrders: integer("max_orders").notNull().default(2),
   tutorialComplete: boolean("tutorial_complete").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),

@@ -67,11 +67,11 @@ function CurrencyItem({
     if (value > prevValue.value) {
       scale.value = withSequence(
         withSpring(1.15, { damping: 10 }),
-        withSpring(1, { damping: 10 })
+        withSpring(1, { damping: 10 }),
       );
       glowOpacity.value = withSequence(
         withTiming(1, { duration: 100 }),
-        withTiming(0, { duration: 400 })
+        withTiming(0, { duration: 400 }),
       );
     }
     prevValue.value = value;

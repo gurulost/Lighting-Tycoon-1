@@ -22,7 +22,13 @@ import { withRepeat } from "@/lib/reanimated";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DIM_COLOR = "rgba(10, 10, 20, 0.45)";
 
-type HighlightTarget = "board" | "orders" | "upgrades" | "dependency" | "currency" | "workbench";
+type HighlightTarget =
+  | "board"
+  | "orders"
+  | "upgrades"
+  | "dependency"
+  | "currency"
+  | "workbench";
 
 interface LayoutRect {
   x: number;
@@ -44,7 +50,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 0,
     title: "Tap a Supplier",
-    description: "Tap the Workbench, then tap Baron Supply Depot twice. Charges refill over time.",
+    description:
+      "Tap the Workbench, then tap Baron Supply Depot twice. Charges refill over time.",
     icon: "tool",
     highlight: "workbench",
     color: GameColors.ui.primary,
@@ -52,7 +59,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 1,
     title: "First Merge",
-    description: "Mentor: Parts climb tiers. Drag one Clip onto another to make a Track.",
+    description:
+      "Mentor: Parts climb tiers. Drag one Clip onto another to make a Track.",
     icon: "layers",
     highlight: "board",
     color: GameColors.openStandard.primary,
@@ -68,7 +76,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 3,
     title: "Complete an Order",
-    description: "Customer wants clean glow. Open Orders and fulfill the Starter Install.",
+    description:
+      "Customer wants clean glow. Open Orders and fulfill the Starter Install.",
     icon: "inbox",
     highlight: "orders",
     color: GameColors.currency.reputation,
@@ -93,7 +102,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 6,
     title: "Locked vs Open",
-    description: "Merge locked + open. It stays locked and reinforces Dependency. Open parts are your escape.",
+    description:
+      "Merge locked + open. It stays locked and reinforces Dependency. Open parts are your escape.",
     icon: "shield",
     highlight: "board",
     color: GameColors.locked.primary,
@@ -101,7 +111,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 7,
     title: "You're Ready!",
-    description: "Unlock R&D for the Open Workshop. You can overdraw suppliers during cooldowns at a cost, so keep cash and space ready.",
+    description:
+      "Unlock R&D for the Open Workshop. You can overdraw suppliers during cooldowns at a cost, so keep cash and space ready.",
     icon: "star",
     highlight: null,
     color: GameColors.ui.success,
@@ -113,22 +124,17 @@ interface TutorialOverlayProps {
   safeBottom?: number;
 }
 
-export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayProps) {
+export function TutorialOverlay({
+  targets,
+  safeBottom = 120,
+}: TutorialOverlayProps) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
   const reducedMotion = state.settings.reducedMotion;
   const [confirmSkip, setConfirmSkip] = React.useState(false);
   const pulse = useSharedValue(0);
-
-  if (state.tutorialComplete) {
-    return null;
-  }
-
   const currentStep = TUTORIAL_STEPS[state.tutorialStep];
-  if (!currentStep) {
-    dispatch({ type: "COMPLETE_TUTORIAL" });
-    return null;
-  }
+  const shouldRender = !state.tutorialComplete && Boolean(currentStep);
 
   const isLastStep = state.tutorialStep === TUTORIAL_STEPS.length - 1;
   const cardPointerEvents = isLastStep ? "box-none" : "none";
@@ -146,28 +152,54 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
   };
 
   React.useEffect(() => {
+    if (!state.tutorialComplete && !currentStep) {
+      dispatch({ type: "COMPLETE_TUTORIAL" });
+    }
+  }, [currentStep, dispatch, state.tutorialComplete]);
+
+  React.useEffect(() => {
+    if (!shouldRender) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
     if (reducedMotion) {
       cancelAnimation(pulse);
       pulse.value = 0;
       return;
     }
     pulse.value = withRepeat(
-      withSequence(withTiming(1, { duration: 1000 }), withTiming(0, { duration: 1000 })),
+      withSequence(
+        withTiming(1, { duration: 1000 }),
+        withTiming(0, { duration: 1000 }),
+      ),
       -1,
-      true
+      true,
     );
     return () => {
       cancelAnimation(pulse);
       pulse.value = 0;
     };
-  }, [reducedMotion, pulse]);
+  }, [
+    currentStep,
+    dispatch,
+    pulse,
+    reducedMotion,
+    shouldRender,
+    state.tutorialComplete,
+  ]);
 
   React.useEffect(() => {
+    if (!shouldRender) {
+      return;
+    }
     setConfirmSkip(false);
-  }, [state.tutorialStep]);
+  }, [shouldRender, state.tutorialStep]);
 
   const highlightRect =
-    currentStep?.highlight && targets ? targets[currentStep.highlight] : undefined;
+    currentStep?.highlight && targets
+      ? targets[currentStep.highlight]
+      : undefined;
   const holePadding = 10;
   const holeRect = highlightRect
     ? (() => {
@@ -175,11 +207,11 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         const y = Math.max(0, highlightRect.y - holePadding);
         const width = Math.min(
           Math.max(0, SCREEN_WIDTH - x),
-          highlightRect.width + holePadding * 2
+          highlightRect.width + holePadding * 2,
         );
         const height = Math.min(
           Math.max(0, SCREEN_HEIGHT - y),
-          highlightRect.height + holePadding * 2
+          highlightRect.height + holePadding * 2,
         );
         return { x, y, width, height, rx: BorderRadius.lg };
       })()
@@ -197,23 +229,44 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         return [
           { top: 0, left: 0, right: 0, height: topHeight },
           { top: bottomTop, left: 0, right: 0, height: bottomHeight },
-          { top: holeRect.y, left: 0, width: leftWidth, height: holeRect.height },
-          { top: holeRect.y, left: rightLeft, width: rightWidth, height: holeRect.height },
+          {
+            top: holeRect.y,
+            left: 0,
+            width: leftWidth,
+            height: holeRect.height,
+          },
+          {
+            top: holeRect.y,
+            left: rightLeft,
+            width: rightWidth,
+            height: holeRect.height,
+          },
         ];
       })()
     : [{ top: 0, left: 0, right: 0, bottom: 0 }];
 
   const topSafe = insets.top + Spacing.md;
   const bottomSafe = insets.bottom + safeBottom + Spacing.md;
-  const availableAbove = holeRect ? Math.max(0, holeRect.y - topSafe - Spacing.md) : SCREEN_HEIGHT;
+  const availableAbove = holeRect
+    ? Math.max(0, holeRect.y - topSafe - Spacing.md)
+    : SCREEN_HEIGHT;
   const availableBelow = holeRect
-    ? Math.max(0, SCREEN_HEIGHT - bottomSafe - (holeRect.y + holeRect.height) - Spacing.md)
+    ? Math.max(
+        0,
+        SCREEN_HEIGHT -
+          bottomSafe -
+          (holeRect.y + holeRect.height) -
+          Spacing.md,
+      )
     : SCREEN_HEIGHT;
   const placeCardAtTop = !holeRect || availableAbove >= availableBelow;
   const availableSpace = placeCardAtTop ? availableAbove : availableBelow;
-  const compactMode = availableSpace > 0 ? availableSpace < 300 : SCREEN_HEIGHT < 700;
-  const microMode = availableSpace > 0 ? availableSpace < 220 : SCREEN_HEIGHT < 640;
-  const nanoMode = availableSpace > 0 ? availableSpace < 150 : SCREEN_HEIGHT < 600;
+  const compactMode =
+    availableSpace > 0 ? availableSpace < 300 : SCREEN_HEIGHT < 700;
+  const microMode =
+    availableSpace > 0 ? availableSpace < 220 : SCREEN_HEIGHT < 640;
+  const nanoMode =
+    availableSpace > 0 ? availableSpace < 150 : SCREEN_HEIGHT < 600;
   const clampHeight = availableSpace > 0 ? availableSpace : undefined;
   const cardPositionStyle = placeCardAtTop
     ? { top: topSafe }
@@ -227,14 +280,31 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
   const cutoutGlowStyle = useAnimatedStyle(() => ({
     opacity: 0.35 + pulse.value * 0.45,
   }));
-  const overlayEnter = reducedMotion ? FadeIn.duration(150) : FadeIn.duration(300);
-  const overlayExit = reducedMotion ? FadeOut.duration(150) : FadeOut.duration(200);
-  const cardEnter = reducedMotion ? FadeIn.duration(150) : SlideInDown.duration(400).springify();
+  const overlayEnter = reducedMotion
+    ? FadeIn.duration(150)
+    : FadeIn.duration(300);
+  const overlayExit = reducedMotion
+    ? FadeOut.duration(150)
+    : FadeOut.duration(200);
+  const cardEnter = reducedMotion
+    ? FadeIn.duration(150)
+    : SlideInDown.duration(400).springify();
+  if (!shouldRender) {
+    return null;
+  }
+
   return (
     <Animated.View
       entering={overlayEnter}
       exiting={overlayExit}
-      style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom, pointerEvents: "box-none" }]}
+      style={[
+        styles.overlay,
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          pointerEvents: "box-none",
+        },
+      ]}
     >
       <View style={[styles.backdropLayer, { pointerEvents: "none" }]}>
         {dimPanels.map((panel, index) => (
@@ -297,7 +367,13 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
         />
       ) : null}
 
-      <View style={[styles.content, cardPositionStyle, { pointerEvents: cardPointerEvents }]}>
+      <View
+        style={[
+          styles.content,
+          cardPositionStyle,
+          { pointerEvents: cardPointerEvents },
+        ]}
+      >
         <Animated.View
           key={currentStep.id}
           entering={cardEnter}
@@ -343,7 +419,10 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
             </ThemedText>
             {!nanoMode ? (
               <ThemedText
-                style={[styles.description, compactMode ? styles.descriptionCompact : null]}
+                style={[
+                  styles.description,
+                  compactMode ? styles.descriptionCompact : null,
+                ]}
                 numberOfLines={compactMode ? 2 : undefined}
               >
                 {currentStep.description}
@@ -351,7 +430,10 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
             ) : null}
             {state.tutorialHint && !microMode ? (
               <ThemedText
-                style={[styles.hintText, compactMode ? styles.hintTextCompact : null]}
+                style={[
+                  styles.hintText,
+                  compactMode ? styles.hintTextCompact : null,
+                ]}
                 numberOfLines={compactMode ? 1 : undefined}
               >
                 {state.tutorialHint}
@@ -370,8 +452,8 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
                           index === state.tutorialStep
                             ? currentStep.color
                             : index < state.tutorialStep
-                            ? `${currentStep.color}60`
-                            : "#2A2A4A",
+                              ? `${currentStep.color}60`
+                              : "#2A2A4A",
                       },
                     ]}
                   />
@@ -385,19 +467,31 @@ export function TutorialOverlay({ targets, safeBottom = 120 }: TutorialOverlayPr
                 style={styles.nextButtonContainer}
               >
                 <LinearGradient
-                  colors={[currentStep.color, `${currentStep.color}CC`, currentStep.color]}
+                  colors={[
+                    currentStep.color,
+                    `${currentStep.color}CC`,
+                    currentStep.color,
+                  ]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.nextButton}
                 >
-                  <ThemedText style={styles.nextButtonText}>Start Playing!</ThemedText>
+                  <ThemedText style={styles.nextButtonText}>
+                    Start Playing!
+                  </ThemedText>
                   <Feather name="play" size={20} color="#0F0F1F" />
                 </LinearGradient>
               </Pressable>
             ) : !compactMode && !microMode ? (
               <View style={styles.waitingContainer}>
-                <Feather name="chevron-down" size={18} color={GameColors.text.secondary} />
-                <ThemedText style={styles.waitingText}>Complete the step to continue</ThemedText>
+                <Feather
+                  name="chevron-down"
+                  size={18}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.waitingText}>
+                  Complete the step to continue
+                </ThemedText>
               </View>
             ) : null}
           </LinearGradient>

@@ -17,7 +17,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
 import { getTuning } from "@/lib/tuning";
-import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
+import {
+  TrimLightStrip,
+  TrimLightPattern,
+} from "@/components/game/TrimLightStrip";
 
 const baronPortrait = require("../../../assets/images/baron/baron-portrait-128.webp");
 
@@ -49,8 +52,8 @@ export function DependencyMeter({
   const pressureCap = Math.max(
     1,
     Math.round(
-      typeof pressureMax === "number" ? pressureMax : tuning.baron.pressureMax
-    )
+      typeof pressureMax === "number" ? pressureMax : tuning.baron.pressureMax,
+    ),
   );
   const thresholdLowRaw =
     typeof pressureThresholdLow === "number"
@@ -60,21 +63,24 @@ export function DependencyMeter({
     typeof pressureThresholdHigh === "number"
       ? pressureThresholdHigh
       : tuning.phase2.pressureTaxHigh;
-  const pressureThresholdLowSafe = Math.max(0, Math.min(pressureCap, thresholdLowRaw));
+  const pressureThresholdLowSafe = Math.max(
+    0,
+    Math.min(pressureCap, thresholdLowRaw),
+  );
   const pressureThresholdHighSafe = Math.max(
     pressureThresholdLowSafe,
-    Math.min(pressureCap, thresholdHighRaw)
+    Math.min(pressureCap, thresholdHighRaw),
   );
   const pressureValue = Math.max(0, Math.min(pressureCap, baronPressure));
   const pressurePercent = Math.round((pressureValue / pressureCap) * 100);
   const pressureProgress = clampProgress(pressureValue / pressureCap);
   const taxMid = Math.max(
     0,
-    Math.round((1 - tuning.phase2.rewardMultiplierMid) * 100)
+    Math.round((1 - tuning.phase2.rewardMultiplierMid) * 100),
   );
   const taxHigh = Math.max(
     0,
-    Math.round((1 - tuning.phase2.rewardMultiplierHigh) * 100)
+    Math.round((1 - tuning.phase2.rewardMultiplierHigh) * 100),
   );
   const pressureThresholds = [
     {
@@ -89,7 +95,9 @@ export function DependencyMeter({
     if (index === 0) return true;
     return entry.value !== list[index - 1].value;
   });
-  const [smoothProgress, setSmoothProgress] = useState(() => clampProgress(value / 100));
+  const [smoothProgress, setSmoothProgress] = useState(() =>
+    clampProgress(value / 100),
+  );
   const progressRef = useRef(smoothProgress);
   const animationRef = useRef<number | null>(null);
   const pulseScale = useSharedValue(1);
@@ -103,7 +111,7 @@ export function DependencyMeter({
 
   useEffect(() => {
     const crossedThreshold = THRESHOLDS.some(
-      (t) => prevValue.value > t && value <= t
+      (t) => prevValue.value > t && value <= t,
     );
 
     if (crossedThreshold && !reducedMotion) {
@@ -111,7 +119,7 @@ export function DependencyMeter({
         withTiming(1.03, { duration: 100 }),
         withTiming(1, { duration: 100 }),
         withTiming(1.03, { duration: 100 }),
-        withTiming(1, { duration: 100 })
+        withTiming(1, { duration: 100 }),
       );
     } else if (reducedMotion) {
       cancelAnimation(pulseScale);
@@ -122,14 +130,17 @@ export function DependencyMeter({
       warningPulse.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 1000 }),
-          withTiming(0, { duration: 1000 })
+          withTiming(0, { duration: 1000 }),
         ),
         -1,
-        true
+        true,
       );
-      baronOpacity.value = withTiming(interpolate(value, [60, 100], [0.3, 1], Extrapolation.CLAMP), {
-        duration: 500,
-      });
+      baronOpacity.value = withTiming(
+        interpolate(value, [60, 100], [0.3, 1], Extrapolation.CLAMP),
+        {
+          duration: 500,
+        },
+      );
     } else {
       cancelAnimation(warningPulse);
       warningPulse.value = 0;
@@ -196,7 +207,12 @@ export function DependencyMeter({
   }));
 
   const warningGlowStyle = useAnimatedStyle(() => {
-    const glowOpacity = interpolate(warningPulse.value, [0, 1], [0, 0.3], Extrapolation.CLAMP);
+    const glowOpacity = interpolate(
+      warningPulse.value,
+      [0, 1],
+      [0, 0.3],
+      Extrapolation.CLAMP,
+    );
     return {
       borderColor: `rgba(255, 77, 77, ${glowOpacity})`,
       shadowOpacity: glowOpacity,
@@ -263,14 +279,28 @@ export function DependencyMeter({
       >
         <View style={[styles.header, compact && styles.headerCompact]}>
           <View style={styles.labelContainer}>
-            <View style={[styles.statusIcon, { backgroundColor: getStatusColor() + "30" }]}>
-              <Feather name={getStatusIcon()} size={12} color={getStatusColor()} />
+            <View
+              style={[
+                styles.statusIcon,
+                { backgroundColor: getStatusColor() + "30" },
+              ]}
+            >
+              <Feather
+                name={getStatusIcon()}
+                size={12}
+                color={getStatusColor()}
+              />
             </View>
             <ThemedText style={[styles.label, compact && styles.labelCompact]}>
               Dependency
             </ThemedText>
           </View>
-          <View style={[styles.statusContainer, compact && styles.statusContainerCompact]}>
+          <View
+            style={[
+              styles.statusContainer,
+              compact && styles.statusContainerCompact,
+            ]}
+          >
             {!compact ? (
               <ThemedText
                 style={[
@@ -311,8 +341,15 @@ export function DependencyMeter({
           </View>
         </View>
 
-        <View style={[styles.trackContainer, compact && styles.trackContainerCompact]}>
-          <View style={[styles.dependencyStrip, { height: dependencyStripHeight }]}>
+        <View
+          style={[
+            styles.trackContainer,
+            compact && styles.trackContainerCompact,
+          ]}
+        >
+          <View
+            style={[styles.dependencyStrip, { height: dependencyStripHeight }]}
+          >
             <TrimLightStrip
               progress={smoothProgress}
               bulbs={compact ? 10 : 14}
@@ -324,14 +361,13 @@ export function DependencyMeter({
           </View>
 
           {showExtras ? (
-            <View style={[styles.thresholds, { height: dependencyStripHeight }]}>
+            <View
+              style={[styles.thresholds, { height: dependencyStripHeight }]}
+            >
               {THRESHOLDS.map((threshold) => (
                 <View
                   key={threshold}
-                  style={[
-                    styles.thresholdMarker,
-                    { left: `${threshold}%` },
-                  ]}
+                  style={[styles.thresholdMarker, { left: `${threshold}%` }]}
                 >
                   <View
                     style={[
@@ -402,7 +438,10 @@ export function DependencyMeter({
               color={GameColors.text.secondary}
             />
             <ThemedText
-              style={[styles.pressureChipText, { fontSize: pressureChipFontSize }]}
+              style={[
+                styles.pressureChipText,
+                { fontSize: pressureChipFontSize },
+              ]}
               numberOfLines={1}
             >
               Open-only -P

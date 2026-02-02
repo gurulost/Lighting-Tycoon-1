@@ -51,10 +51,10 @@ function RDNodeCard({
       glow.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 1000 }),
-          withTiming(0, { duration: 1000 })
+          withTiming(0, { duration: 1000 }),
         ),
         -1,
-        true
+        true,
       );
     } else {
       cancelAnimation(glow);
@@ -78,10 +78,7 @@ function RDNodeCard({
       handleUnlock();
       scale.value = withSequence(
         withSpring(0.95, { damping: 15 }),
-        withDelay(
-          100,
-          withSpring(1, { damping: 15 })
-        )
+        withDelay(100, withSpring(1, { damping: 15 })),
       );
     }
   };
@@ -127,13 +124,19 @@ function RDNodeCard({
             <Feather
               name="unlock"
               size={24}
-              color={isUnlocked ? GameColors.ui.success : GameColors.text.disabled}
+              color={
+                isUnlocked ? GameColors.ui.success : GameColors.text.disabled
+              }
             />
           ) : (
             <Feather
               name="zap"
               size={20}
-              color={isUnlocked ? GameColors.currency.research : GameColors.text.disabled}
+              color={
+                isUnlocked
+                  ? GameColors.currency.research
+                  : GameColors.text.disabled
+              }
             />
           )}
         </View>
@@ -144,7 +147,9 @@ function RDNodeCard({
         )}
       </View>
 
-      <ThemedText style={[styles.nodeName, isFreedomBuild && styles.nodeNameFreedom]}>
+      <ThemedText
+        style={[styles.nodeName, isFreedomBuild && styles.nodeNameFreedom]}
+      >
         {node.name}
       </ThemedText>
       <ThemedText style={styles.nodeDescription}>{node.description}</ThemedText>
@@ -155,7 +160,9 @@ function RDNodeCard({
           style={[
             styles.unlockButton,
             {
-              backgroundColor: canUnlock ? GameColors.currency.research : GameColors.ui.surface,
+              backgroundColor: canUnlock
+                ? GameColors.currency.research
+                : GameColors.ui.surface,
               opacity: canUnlock ? 1 : 0.5,
             },
           ]}
@@ -187,8 +194,12 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
   const canUnlockNode = (node: RDNode): boolean => {
     if (state.rdNodes[node.id]) return false;
     if (state.research < node.cost) return false;
-    if (node.materialCost && state.upgradeMaterials < node.materialCost) return false;
-    if (node.compatibilityCost && state.compatibilityComponents < node.compatibilityCost) {
+    if (node.materialCost && state.upgradeMaterials < node.materialCost)
+      return false;
+    if (
+      node.compatibilityCost &&
+      state.compatibilityComponents < node.compatibilityCost
+    ) {
       return false;
     }
     return node.prerequisites.every((p) => state.rdNodes[p]);
@@ -212,13 +223,21 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           <ThemedText style={styles.researchLabel}>Research</ThemedText>
         </View>
         <View style={styles.materialDisplay}>
-          <Feather name="clipboard" size={18} color={GameColors.text.secondary} />
-          <ThemedText style={styles.materialValue}>{state.upgradeMaterials}</ThemedText>
+          <Feather
+            name="clipboard"
+            size={18}
+            color={GameColors.text.secondary}
+          />
+          <ThemedText style={styles.materialValue}>
+            {state.upgradeMaterials}
+          </ThemedText>
           <ThemedText style={styles.materialLabel}>Materials</ThemedText>
         </View>
         <View style={styles.materialDisplay}>
           <Feather name="shield" size={18} color={GameColors.text.secondary} />
-          <ThemedText style={styles.materialValue}>{state.compatibilityComponents}</ThemedText>
+          <ThemedText style={styles.materialValue}>
+            {state.compatibilityComponents}
+          </ThemedText>
           <ThemedText style={styles.materialLabel}>Compat</ThemedText>
         </View>
       </View>
@@ -231,10 +250,9 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
                 style={[
                   styles.connector,
                   {
-                    backgroundColor:
-                      state.rdNodes[node.prerequisites[0] || ""]
-                        ? GameColors.currency.research
-                        : GameColors.text.disabled,
+                    backgroundColor: state.rdNodes[node.prerequisites[0] || ""]
+                      ? GameColors.currency.research
+                      : GameColors.text.disabled,
                   },
                 ]}
               />
@@ -254,16 +272,20 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
 
       {state.rdNodes["freedom_build"] && (
         <View style={styles.craftSection}>
-          <ThemedText style={styles.craftTitle}>Craft Freedom Controller</ThemedText>
+          <ThemedText style={styles.craftTitle}>
+            Craft Freedom Controller
+          </ThemedText>
           <ThemedText style={styles.craftDescription}>
-            Convert locked parts to open-standard. You have {state.freedomControllerCount} in
-            inventory.
+            Convert locked parts to open-standard. You have{" "}
+            {state.freedomControllerCount} in inventory.
           </ThemedText>
           <Pressable
             onPress={() => {
               if (canCraft) {
                 if (hapticsEnabled) {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  Haptics.notificationAsync(
+                    Haptics.NotificationFeedbackType.Success,
+                  );
                 }
                 SoundManager.play("rd_craft");
                 craftFreedomController();
@@ -273,7 +295,9 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
             style={[
               styles.craftButton,
               {
-                backgroundColor: canCraft ? GameColors.ui.success : GameColors.ui.surface,
+                backgroundColor: canCraft
+                  ? GameColors.ui.success
+                  : GameColors.ui.surface,
                 opacity: canCraft ? 1 : 0.5,
               },
             ]}

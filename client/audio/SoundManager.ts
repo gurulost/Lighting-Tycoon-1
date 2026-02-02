@@ -70,7 +70,7 @@ class SoundManager {
         } catch (error) {
           console.warn(`Failed to load sound ${id}`, error);
         }
-      })
+      }),
     );
   }
 

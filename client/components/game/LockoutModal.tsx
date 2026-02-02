@@ -39,10 +39,10 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
     pulseScale.value = withRepeat(
       withSequence(
         withTiming(1.02, { duration: 800 }),
-        withTiming(1, { duration: 800 })
+        withTiming(1, { duration: 800 }),
       ),
       -1,
-      true
+      true,
     );
     return () => {
       cancelAnimation(pulseScale);
@@ -120,8 +120,8 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           <View style={styles.messageBox}>
             <Feather name="lock" size={20} color={GameColors.locked.primary} />
             <ThemedText style={styles.message}>
-              Audit agents demand certified installs. Open-standard parts are flagged until
-              you pass the review.
+              Audit agents demand certified installs. Open-standard parts are
+              flagged until you pass the review.
             </ThemedText>
           </View>
 
@@ -134,33 +134,82 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
 
           {isPhase2 && !state.lockoutChoice ? (
             <>
-              <ThemedText style={styles.choiceTitle}>Choose Your Response:</ThemedText>
+              <ThemedText style={styles.choiceTitle}>
+                Choose Your Response:
+              </ThemedText>
               <View style={styles.choices}>
-                <Pressable style={styles.baronChoice} onPress={handleBaronChoice}>
-                  <View style={[styles.choiceIcon, { backgroundColor: GameColors.locked.primary + "30" }]}>
-                    <Feather name="package" size={24} color={GameColors.locked.primary} />
+                <Pressable
+                  style={styles.baronChoice}
+                  onPress={handleBaronChoice}
+                >
+                  <View
+                    style={[
+                      styles.choiceIcon,
+                      { backgroundColor: GameColors.locked.primary + "30" },
+                    ]}
+                  >
+                    <Feather
+                      name="package"
+                      size={24}
+                      color={GameColors.locked.primary}
+                    />
                   </View>
-                  <ThemedText style={styles.choiceName}>Emergency Crate</ThemedText>
+                  <ThemedText style={styles.choiceName}>
+                    Emergency Crate
+                  </ThemedText>
                   <ThemedText style={styles.choiceDescription}>
-                    Accept Baron's compliance crate. The audit passes, but Dependency resets to 60.
+                    Accept Baron&apos;s compliance crate. The audit passes, but
+                    Dependency resets to 60.
                   </ThemedText>
                   <View style={styles.choiceTag}>
-                    <Feather name="alert-circle" size={12} color={GameColors.ui.danger} />
-                    <ThemedText style={styles.choiceTagText}>Dependency set to 60</ThemedText>
+                    <Feather
+                      name="alert-circle"
+                      size={12}
+                      color={GameColors.ui.danger}
+                    />
+                    <ThemedText style={styles.choiceTagText}>
+                      Dependency set to 60
+                    </ThemedText>
                   </View>
                 </Pressable>
 
                 <Pressable style={styles.labChoice} onPress={handleLabChoice}>
-                  <View style={[styles.choiceIcon, { backgroundColor: GameColors.currency.research + "30" }]}>
-                    <Feather name="zap" size={24} color={GameColors.currency.research} />
+                  <View
+                    style={[
+                      styles.choiceIcon,
+                      { backgroundColor: GameColors.currency.research + "30" },
+                    ]}
+                  >
+                    <Feather
+                      name="zap"
+                      size={24}
+                      color={GameColors.currency.research}
+                    />
                   </View>
-                  <ThemedText style={styles.choiceName}>Lab Requests</ThemedText>
-                  <ThemedText style={styles.choiceDescription}>
-                    Complete lab requests to earn Research and craft a Freedom Controller.
+                  <ThemedText style={styles.choiceName}>
+                    Lab Requests
                   </ThemedText>
-                  <View style={[styles.choiceTag, { backgroundColor: GameColors.currency.research + "20" }]}>
-                    <Feather name="zap" size={12} color={GameColors.currency.research} />
-                    <ThemedText style={[styles.choiceTagText, { color: GameColors.currency.research }]}>
+                  <ThemedText style={styles.choiceDescription}>
+                    Complete lab requests to earn Research and craft a Freedom
+                    Controller.
+                  </ThemedText>
+                  <View
+                    style={[
+                      styles.choiceTag,
+                      { backgroundColor: GameColors.currency.research + "20" },
+                    ]}
+                  >
+                    <Feather
+                      name="zap"
+                      size={12}
+                      color={GameColors.currency.research}
+                    />
+                    <ThemedText
+                      style={[
+                        styles.choiceTagText,
+                        { color: GameColors.currency.research },
+                      ]}
+                    >
                       {state.lockoutChoice ? labRemainingLabel : labTargetLabel}
                     </ThemedText>
                   </View>
@@ -172,7 +221,8 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           {isPhase2 && state.lockoutChoice === "baron" ? (
             <View style={styles.phaseHint}>
               <ThemedText style={styles.choiceDescription}>
-                Complete the compliance audit order using Baron parts to end the crackdown.
+                Complete the compliance audit order using Baron parts to end the
+                crackdown.
               </ThemedText>
             </View>
           ) : null}
@@ -180,18 +230,31 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
           {isPhase2 && state.lockoutChoice === "lab" ? (
             <View style={styles.phaseHint}>
               <ThemedText style={styles.choiceDescription}>
-                Complete {labRemaining} lab requests, then craft a Freedom Controller.
+                Complete {labRemaining} lab requests, then craft a Freedom
+                Controller.
               </ThemedText>
             </View>
           ) : null}
 
           {isPhase3 ? (
             <Pressable
-              style={[styles.freedomChoice, !canUseFreedom && styles.choiceDisabled]}
+              style={[
+                styles.freedomChoice,
+                !canUseFreedom && styles.choiceDisabled,
+              ]}
               onPress={canUseFreedom ? handleFreedomChoice : undefined}
             >
-              <View style={[styles.choiceIcon, { backgroundColor: GameColors.ui.success + "30" }]}>
-                <Feather name="unlock" size={24} color={GameColors.ui.success} />
+              <View
+                style={[
+                  styles.choiceIcon,
+                  { backgroundColor: GameColors.ui.success + "30" },
+                ]}
+              >
+                <Feather
+                  name="unlock"
+                  size={24}
+                  color={GameColors.ui.success}
+                />
               </View>
               <ThemedText style={styles.choiceName}>Break Free</ThemedText>
               <ThemedText style={styles.choiceDescription}>
@@ -199,9 +262,23 @@ export function LockoutModal({ onClose }: LockoutModalProps) {
                   ? "Use a Freedom Controller to end the audit and reset Dependency to 0."
                   : "Craft a Freedom Controller in R&D to use this option."}
               </ThemedText>
-              <View style={[styles.choiceTag, { backgroundColor: GameColors.ui.success + "20" }]}>
-                <Feather name="trending-down" size={12} color={GameColors.ui.success} />
-                <ThemedText style={[styles.choiceTagText, { color: GameColors.ui.success }]}>
+              <View
+                style={[
+                  styles.choiceTag,
+                  { backgroundColor: GameColors.ui.success + "20" },
+                ]}
+              >
+                <Feather
+                  name="trending-down"
+                  size={12}
+                  color={GameColors.ui.success}
+                />
+                <ThemedText
+                  style={[
+                    styles.choiceTagText,
+                    { color: GameColors.ui.success },
+                  ]}
+                >
                   Dependency to 0
                 </ThemedText>
               </View>

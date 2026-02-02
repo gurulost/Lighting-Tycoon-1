@@ -51,10 +51,12 @@ export function DebugOverlay({
 
   const boardUsed = useMemo(
     () => state.board.reduce((count, part) => (part ? count + 1 : count), 0),
-    [state.board]
+    [state.board],
   );
   const orderMods = Object.keys(state.orderMetrics.generatedByModifier).length;
-  const orderMixes = Object.keys(state.orderMetrics.generatedByNeighborhoodModifier).length;
+  const orderMixes = Object.keys(
+    state.orderMetrics.generatedByNeighborhoodModifier,
+  ).length;
   const orderTypes = Object.keys(state.orderMetrics.generatedByType).length;
   const storySeen = Object.keys(state.storySeen).length;
 
@@ -144,7 +146,15 @@ export function DebugOverlay({
       });
     }, 30000);
     return () => clearInterval(interval);
-  }, [visible, jsFps, rendersPerSecond, activeModal, selectedPartIndex, isDragging, showLockoutModal]);
+  }, [
+    visible,
+    jsFps,
+    rendersPerSecond,
+    activeModal,
+    selectedPartIndex,
+    isDragging,
+    showLockoutModal,
+  ]);
 
   if (!visible) return null;
 
@@ -178,7 +188,9 @@ export function DebugOverlay({
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Story Queue</ThemedText>
-          <ThemedText style={styles.value}>{state.storyQueue.length}</ThemedText>
+          <ThemedText style={styles.value}>
+            {state.storyQueue.length}
+          </ThemedText>
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Story Log</ThemedText>
@@ -228,12 +240,16 @@ export function DebugOverlay({
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Drag</ThemedText>
-          <ThemedText style={styles.value}>{isDragging ? "yes" : "no"}</ThemedText>
+          <ThemedText style={styles.value}>
+            {isDragging ? "yes" : "no"}
+          </ThemedText>
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Selected Part</ThemedText>
           <ThemedText style={styles.value}>
-            {selectedPartIndex === null || selectedPartIndex === undefined ? "none" : selectedPartIndex}
+            {selectedPartIndex === null || selectedPartIndex === undefined
+              ? "none"
+              : selectedPartIndex}
           </ThemedText>
         </View>
         <View style={styles.row}>
@@ -245,7 +261,9 @@ export function DebugOverlay({
         </View>
         <View style={styles.row}>
           <ThemedText style={styles.label}>Baron Offer</ThemedText>
-          <ThemedText style={styles.value}>{state.baronOfferAvailable ? "up" : "none"}</ThemedText>
+          <ThemedText style={styles.value}>
+            {state.baronOfferAvailable ? "up" : "none"}
+          </ThemedText>
         </View>
       </View>
     </View>

@@ -19,7 +19,12 @@ export type SfxId =
 
 export const SFX: Record<
   SfxId,
-  { file: number; volume: number; cooldownMs?: number; rateRange?: [number, number] }
+  {
+    file: number;
+    volume: number;
+    cooldownMs?: number;
+    rateRange?: [number, number];
+  }
 > = {
   spawn: {
     file: require("../../assets/sounds/spawn.wav"),

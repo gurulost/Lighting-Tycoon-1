@@ -6,7 +6,10 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
-import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
+import {
+  TrimLightStrip,
+  TrimLightPattern,
+} from "@/components/game/TrimLightStrip";
 
 interface NeighborhoodBadgeProps {
   reputation: number;
@@ -21,7 +24,7 @@ export function NeighborhoodBadge({
 }: NeighborhoodBadgeProps) {
   const currentIndex = Math.max(
     0,
-    NEIGHBORHOODS.findIndex((n) => n.id === currentNeighborhoodId)
+    NEIGHBORHOODS.findIndex((n) => n.id === currentNeighborhoodId),
   );
   const current = NEIGHBORHOODS[currentIndex] || NEIGHBORHOODS[0];
   const next = NEIGHBORHOODS[currentIndex + 1];
@@ -37,10 +40,10 @@ export function NeighborhoodBadge({
     current.id === "downtown"
       ? "rainbow"
       : current.id === "certified" || current.id === "lockout"
-      ? "baron"
-      : current.id === "liberation"
-      ? "classic"
-      : "warmWhite";
+        ? "baron"
+        : current.id === "liberation"
+          ? "classic"
+          : "warmWhite";
   const bulbCount = compact ? 10 : 12;
   const stripHeight = compact ? 14 : 18;
   const iconSize = compact ? 22 : 28;
@@ -75,7 +78,9 @@ export function NeighborhoodBadge({
       </View>
 
       <View style={[styles.progressRow, compact && styles.progressRowCompact]}>
-        <View style={[styles.progressStrip, compact && styles.progressStripCompact]}>
+        <View
+          style={[styles.progressStrip, compact && styles.progressStripCompact]}
+        >
           <TrimLightStrip
             progress={progress}
             bulbs={bulbCount}
@@ -85,7 +90,9 @@ export function NeighborhoodBadge({
             reducedMotion
           />
         </View>
-        <ThemedText style={[styles.progressText, compact && styles.progressTextCompact]}>
+        <ThemedText
+          style={[styles.progressText, compact && styles.progressTextCompact]}
+        >
           {next ? `${reputation}/${nextRep} Rep` : "All unlocked"}
         </ThemedText>
       </View>

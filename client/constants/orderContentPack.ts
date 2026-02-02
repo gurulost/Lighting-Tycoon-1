@@ -1,4 +1,10 @@
-import { PartTier, OrderType, OrderRequirement, Order, OrderFamilyPreference } from "@/types/game";
+import {
+  PartTier,
+  OrderType,
+  OrderRequirement,
+  Order,
+  OrderFamilyPreference,
+} from "@/types/game";
 
 export interface BaseRecipe {
   id: string;
@@ -91,7 +97,10 @@ export const BASE_RECIPES: BaseRecipe[] = [
   {
     id: "base_track_clip",
     name: "Under Cabinet Basic",
-    requirements: [{ tier: 2 as PartTier, family: "any", count: 1 }, { tier: 1 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 2 as PartTier, family: "any", count: 1 },
+      { tier: 1 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "starter",
     tags: ["basic"],
   },
@@ -112,14 +121,20 @@ export const BASE_RECIPES: BaseRecipe[] = [
   {
     id: "base_segment_track",
     name: "Mood Lighting",
-    requirements: [{ tier: 3 as PartTier, family: "any", count: 1 }, { tier: 2 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 3 as PartTier, family: "any", count: 1 },
+      { tier: 2 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "hoa",
     tags: ["mid"],
   },
   {
     id: "base_segment_clip",
     name: "Soft Accent",
-    requirements: [{ tier: 3 as PartTier, family: "any", count: 1 }, { tier: 1 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 3 as PartTier, family: "any", count: 1 },
+      { tier: 1 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "hoa",
     tags: ["mid"],
   },
@@ -140,28 +155,40 @@ export const BASE_RECIPES: BaseRecipe[] = [
   {
     id: "base_smart_track",
     name: "Smart Upgrade+",
-    requirements: [{ tier: 4 as PartTier, family: "any", count: 1 }, { tier: 2 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 4 as PartTier, family: "any", count: 1 },
+      { tier: 2 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
   {
     id: "base_smart_segment",
     name: "Smart Scene",
-    requirements: [{ tier: 4 as PartTier, family: "any", count: 1 }, { tier: 3 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 4 as PartTier, family: "any", count: 1 },
+      { tier: 3 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
   {
     id: "base_smart_2tracks",
     name: "Smart Runner",
-    requirements: [{ tier: 4 as PartTier, family: "any", count: 1 }, { tier: 2 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 4 as PartTier, family: "any", count: 1 },
+      { tier: 2 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
   {
     id: "base_smart_2segments",
     name: "Smart Geometry",
-    requirements: [{ tier: 4 as PartTier, family: "any", count: 1 }, { tier: 3 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 4 as PartTier, family: "any", count: 1 },
+      { tier: 3 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
@@ -175,63 +202,92 @@ export const BASE_RECIPES: BaseRecipe[] = [
   {
     id: "base_premium_segment",
     name: "Premium Client",
-    requirements: [{ tier: 5 as PartTier, family: "any", count: 1 }, { tier: 3 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 5 as PartTier, family: "any", count: 1 },
+      { tier: 3 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "certified",
     tags: ["premium"],
   },
   {
     id: "base_premium_track",
     name: "Premium Run",
-    requirements: [{ tier: 5 as PartTier, family: "any", count: 1 }, { tier: 2 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 5 as PartTier, family: "any", count: 1 },
+      { tier: 2 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "certified",
     tags: ["premium"],
   },
   {
     id: "base_premium_smart",
     name: "Premium Network",
-    requirements: [{ tier: 5 as PartTier, family: "any", count: 1 }, { tier: 4 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 5 as PartTier, family: "any", count: 1 },
+      { tier: 4 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "certified",
     tags: ["premium"],
   },
   {
     id: "base_premium_segment_track",
     name: "Premium Blend",
-    requirements: [{ tier: 5 as PartTier, family: "any", count: 1 }, { tier: 3 as PartTier, family: "any", count: 1 }, { tier: 2 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 5 as PartTier, family: "any", count: 1 },
+      { tier: 3 as PartTier, family: "any", count: 1 },
+      { tier: 2 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "certified",
     tags: ["premium"],
   },
   {
     id: "base_track_segment",
     name: "Track and Segment",
-    requirements: [{ tier: 2 as PartTier, family: "any", count: 2 }, { tier: 3 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 2 as PartTier, family: "any", count: 2 },
+      { tier: 3 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "hoa",
     tags: ["mid"],
   },
   {
     id: "base_clip_track_segment",
     name: "Trim Mix",
-    requirements: [{ tier: 1 as PartTier, family: "any", count: 1 }, { tier: 2 as PartTier, family: "any", count: 1 }, { tier: 3 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 1 as PartTier, family: "any", count: 1 },
+      { tier: 2 as PartTier, family: "any", count: 1 },
+      { tier: 3 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "hoa",
     tags: ["mid"],
   },
   {
     id: "base_track_segment2",
     name: "Segment Focus",
-    requirements: [{ tier: 3 as PartTier, family: "any", count: 2 }, { tier: 2 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 3 as PartTier, family: "any", count: 2 },
+      { tier: 2 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "hoa",
     tags: ["mid"],
   },
   {
     id: "base_smart_clip",
     name: "Smart Starter",
-    requirements: [{ tier: 4 as PartTier, family: "any", count: 1 }, { tier: 1 as PartTier, family: "any", count: 2 }],
+    requirements: [
+      { tier: 4 as PartTier, family: "any", count: 1 },
+      { tier: 1 as PartTier, family: "any", count: 2 },
+    ],
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
   {
     id: "base_segment_smart",
     name: "Segment and Smart",
-    requirements: [{ tier: 3 as PartTier, family: "any", count: 2 }, { tier: 4 as PartTier, family: "any", count: 1 }],
+    requirements: [
+      { tier: 3 as PartTier, family: "any", count: 2 },
+      { tier: 4 as PartTier, family: "any", count: 1 },
+    ],
     minNeighborhoodId: "downtown",
     tags: ["high"],
   },
@@ -428,7 +484,7 @@ export const ARCHETYPES: Archetype[] = [
       "Uniformity gets approvals",
     ],
     preferredModifiers: ["mod_style_open", "mod_style_locked"],
-    rewardBias: { cash: 0.90, rep: 1.30, research: 0.80 },
+    rewardBias: { cash: 0.9, rep: 1.3, research: 0.8 },
   },
   {
     id: "party_planner",
@@ -444,7 +500,7 @@ export const ARCHETYPES: Archetype[] = [
       "Set the mood fast",
     ],
     preferredModifiers: ["mod_rush_60"],
-    rewardBias: { cash: 1.20, rep: 1.10, research: 0.80 },
+    rewardBias: { cash: 1.2, rep: 1.1, research: 0.8 },
   },
   {
     id: "sports_superfan",
@@ -460,7 +516,7 @@ export const ARCHETYPES: Archetype[] = [
       "Stadium vibes, home edition",
     ],
     preferredModifiers: ["mod_rush_60"],
-    rewardBias: { cash: 1.20, rep: 1.00, research: 0.80 },
+    rewardBias: { cash: 1.2, rep: 1.0, research: 0.8 },
   },
   {
     id: "cozy_minimalist",
@@ -476,7 +532,7 @@ export const ARCHETYPES: Archetype[] = [
       "Keep it simple",
     ],
     preferredModifiers: ["mod_pref_open", "mod_eco_audit"],
-    rewardBias: { cash: 0.90, rep: 1.00, research: 1.30 },
+    rewardBias: { cash: 0.9, rep: 1.0, research: 1.3 },
   },
   {
     id: "tech_dad",
@@ -492,7 +548,7 @@ export const ARCHETYPES: Archetype[] = [
       "Logs or it did not happen",
     ],
     preferredModifiers: ["mod_certified", "mod_pref_locked"],
-    rewardBias: { cash: 1.10, rep: 1.00, research: 1.10 },
+    rewardBias: { cash: 1.1, rep: 1.0, research: 1.1 },
   },
   {
     id: "subscription_skeptic",
@@ -508,7 +564,7 @@ export const ARCHETYPES: Archetype[] = [
       "I want the switch in my hand",
     ],
     preferredModifiers: ["mod_pref_open"],
-    rewardBias: { cash: 1.00, rep: 1.10, research: 1.20 },
+    rewardBias: { cash: 1.0, rep: 1.1, research: 1.2 },
   },
   {
     id: "boutique_owner",
@@ -524,7 +580,7 @@ export const ARCHETYPES: Archetype[] = [
       "Lux matters",
     ],
     preferredModifiers: ["mod_pref_locked"],
-    rewardBias: { cash: 1.20, rep: 1.00, research: 0.90 },
+    rewardBias: { cash: 1.2, rep: 1.0, research: 0.9 },
   },
   {
     id: "neighbor_rival",
@@ -540,7 +596,7 @@ export const ARCHETYPES: Archetype[] = [
       "Let them notice",
     ],
     preferredModifiers: ["mod_pref_locked"],
-    rewardBias: { cash: 1.30, rep: 1.00, research: 0.80 },
+    rewardBias: { cash: 1.3, rep: 1.0, research: 0.8 },
   },
 ];
 
@@ -1712,8 +1768,6 @@ const NEIGHBORHOOD_REWARD_MULT: Record<
   liberation: { cash: 1.3, rep: 1.2, research: 1.35 },
 };
 
-
-
 function sumWeights(reqs: OrderRequirement[]) {
   let cash = 0;
   let research = 0;
@@ -1727,7 +1781,12 @@ function sumWeights(reqs: OrderRequirement[]) {
     cash *= PREMIUM_MULT;
   }
   const rep = Math.round(cash * (maxTier >= 5 ? 0.25 : 0.2));
-  return { cash: Math.round(cash), rep, research: Math.round(research), maxTier };
+  return {
+    cash: Math.round(cash),
+    rep,
+    research: Math.round(research),
+    maxTier,
+  };
 }
 
 export function computeCustomOrderRewards({
@@ -1796,11 +1855,15 @@ export const ORDER_LIBRARY: OrderTemplate[] = (() => {
       throw new Error(`Missing base recipe: ${ov.baseId}`);
     }
     const archetype = archetypeMap.get(ov.archetypeId);
-    const modifiers = (ov.modifierIds || []).map((id) => modMap.get(id)).filter(Boolean) as OrderModifier[];
+    const modifiers = (ov.modifierIds || [])
+      .map((id) => modMap.get(id))
+      .filter(Boolean) as OrderModifier[];
 
     let requirements = base.requirements.map((r) => ({ ...r }));
 
-    let type: OrderType = base.requirements.some((r) => r.tier >= 5) ? "premium" : "basic";
+    let type: OrderType = base.requirements.some((r) => r.tier >= 5)
+      ? "premium"
+      : "basic";
     let rushDeadline: number | undefined;
     let familyPreference: OrderFamilyPreference | undefined;
     let penaltyIfWrongFamily: boolean | undefined;
@@ -1810,7 +1873,10 @@ export const ORDER_LIBRARY: OrderTemplate[] = (() => {
     for (const mod of modifiers) {
       if (mod.type === "style_match" && mod.styleMatchFamily) {
         type = "style_match";
-        requirements = requirements.map((r) => ({ ...r, family: mod.styleMatchFamily! }));
+        requirements = requirements.map((r) => ({
+          ...r,
+          family: mod.styleMatchFamily!,
+        }));
       }
       if (mod.type === "rush" && mod.rushDeadlineSec) {
         rushDeadline = mod.rushDeadlineSec * 1000;
@@ -1825,7 +1891,7 @@ export const ORDER_LIBRARY: OrderTemplate[] = (() => {
         requirements = requirements.map((r) =>
           r.tier === maxTier
             ? { ...r, family: "open", requiresCompatible: true }
-            : { ...r }
+            : { ...r },
         );
       }
       if (mod.type === "client_preference" && mod.clientPreference) {
@@ -1863,7 +1929,8 @@ export const ORDER_LIBRARY: OrderTemplate[] = (() => {
     }
 
     const neighborhoodMult =
-      NEIGHBORHOOD_REWARD_MULT[ov.neighborhoodId] || NEIGHBORHOOD_REWARD_MULT.starter;
+      NEIGHBORHOOD_REWARD_MULT[ov.neighborhoodId] ||
+      NEIGHBORHOOD_REWARD_MULT.starter;
     cash = Math.round(cash * neighborhoodMult.cash);
     rep = Math.round(rep * neighborhoodMult.rep);
     research = Math.round(research * neighborhoodMult.research);

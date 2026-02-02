@@ -900,15 +900,15 @@ export function CouncilModal({ onClose }: CouncilModalProps) {
         <View style={styles.introCard}>
           <ThemedText style={styles.introLead}>Mentor</ThemedText>
           <ThemedText style={styles.introText}>
-            You didn't just win contracts - you changed minds. Now the Council
-            is listening. Draft the standards, prove them in the field, and
-            ratify the rules everyone will have to follow.
+            You didn&apos;t just win contracts - you changed minds. Now the
+            Council is listening. Draft the standards, prove them in the field,
+            and ratify the rules everyone will have to follow.
           </ThemedText>
           <ThemedText style={styles.introLead}>Tina</ThemedText>
           <ThemedText style={styles.introText}>
-            We're not just building installs anymore. We're writing the
-            rulebook. Every campaign we pass makes the open way the default, and
-            the lobby has to keep up.
+            We&apos;re not just building installs anymore. We&apos;re writing
+            the rulebook. Every campaign we pass makes the open way the default,
+            and the lobby has to keep up.
           </ThemedText>
         </View>
 

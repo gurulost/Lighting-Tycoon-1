@@ -14,7 +14,10 @@ import {
   ProjectStageDefinition,
 } from "@/types/game";
 import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
-import { getProjectDepositCost, getProjectOfferRefreshCost } from "@/lib/projects";
+import {
+  getProjectDepositCost,
+  getProjectOfferRefreshCost,
+} from "@/lib/projects";
 import { getTuning } from "@/lib/tuning";
 import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
 
@@ -125,7 +128,11 @@ function AddonToggle({
       <View style={styles.addonHeader}>
         <ThemedText style={styles.addonTitle}>{label}</ThemedText>
         <View style={styles.addonCost}>
-          <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
+          <Feather
+            name="dollar-sign"
+            size={12}
+            color={GameColors.currency.cash}
+          />
           <ThemedText style={styles.addonCostText}>{cost}</ThemedText>
         </View>
       </View>
@@ -167,7 +174,7 @@ function ProjectOfferCard({
     >
       <View style={styles.offerHeader}>
         <View style={styles.offerTitleRow}>
-          <View style={[styles.offerIcon, { borderColor: `${tone.color}70` }]}> 
+          <View style={[styles.offerIcon, { borderColor: `${tone.color}70` }]}>
             <Feather name={tone.icon} size={16} color={tone.color} />
           </View>
           <View style={styles.offerTitleText}>
@@ -181,20 +188,30 @@ function ProjectOfferCard({
         </View>
         <View style={styles.stageCountChip}>
           <Feather name="layers" size={12} color={GameColors.text.secondary} />
-          <ThemedText style={styles.stageCountText}>{project.stages.length} stages</ThemedText>
+          <ThemedText style={styles.stageCountText}>
+            {project.stages.length} stages
+          </ThemedText>
         </View>
       </View>
 
-      <ThemedText style={styles.offerLocation}>{project.locationName}</ThemedText>
+      <ThemedText style={styles.offerLocation}>
+        {project.locationName}
+      </ThemedText>
       <ThemedText style={styles.offerSynopsis}>{project.synopsis}</ThemedText>
 
       <View style={styles.offerCosts}>
         <View style={styles.costChip}>
           <Feather name="shield" size={12} color={GameColors.currency.cash} />
-          <ThemedText style={styles.costChipText}>Deposit {depositCost}</ThemedText>
+          <ThemedText style={styles.costChipText}>
+            Deposit {depositCost}
+          </ThemedText>
         </View>
         <View style={styles.costChip}>
-          <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
+          <Feather
+            name="dollar-sign"
+            size={12}
+            color={GameColors.currency.cash}
+          />
           <ThemedText style={styles.costChipText}>Total {totalCost}</ThemedText>
         </View>
       </View>
@@ -234,10 +251,7 @@ function ProjectOfferCard({
         onPress={!disableAccept && canAfford ? onAccept : undefined}
       >
         <LinearGradient
-          colors={[
-            `${GameColors.ui.primary}30`,
-            `${GameColors.ui.primary}18`,
-          ]}
+          colors={[`${GameColors.ui.primary}30`, `${GameColors.ui.primary}18`]}
           style={styles.acceptButtonInner}
         >
           <Feather name="flag" size={16} color={GameColors.ui.primary} />
@@ -278,10 +292,17 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
     ) {
       dispatch({ type: "PROJECT_GENERATE_OFFERS" });
     }
-  }, [state.projectsUnlocked, state.projectOffers.length, state.activeProject, dispatch]);
+  }, [
+    state.projectsUnlocked,
+    state.projectOffers.length,
+    state.activeProject,
+    dispatch,
+  ]);
 
   React.useEffect(() => {
-    const offerIds = new Set(state.projectOffers.map((offer) => offer.projectId));
+    const offerIds = new Set(
+      state.projectOffers.map((offer) => offer.projectId),
+    );
     setAddonSelections((prev) => {
       const next: Record<string, AddonSelection> = {};
       Object.entries(prev).forEach(([key, value]) => {
@@ -311,12 +332,20 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
   const activeStage = activeDefinition
     ? activeDefinition.stages[activeProject?.stageIndex ?? 0]
     : undefined;
-  const completionScale = Math.max(0, tuning.projects.completionRewardMultiplier);
+  const completionScale = Math.max(
+    0,
+    tuning.projects.completionRewardMultiplier,
+  );
   const effectiveCompletionRewards = activeDefinition
     ? {
-        cash: activeDefinition.completionRewards.cashMultiplier * completionScale,
-        reputation: activeDefinition.completionRewards.reputationMultiplier * completionScale,
-        research: activeDefinition.completionRewards.researchMultiplier * completionScale,
+        cash:
+          activeDefinition.completionRewards.cashMultiplier * completionScale,
+        reputation:
+          activeDefinition.completionRewards.reputationMultiplier *
+          completionScale,
+        research:
+          activeDefinition.completionRewards.researchMultiplier *
+          completionScale,
       }
     : null;
   const completedStages = new Set(
@@ -342,7 +371,9 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
     ),
   );
   const milestoneThresholds = [3, 6, 9];
-  const nextMilestone = milestoneThresholds.find((value) => completedCount < value);
+  const nextMilestone = milestoneThresholds.find(
+    (value) => completedCount < value,
+  );
   const milestoneProgressLabel = nextMilestone
     ? `${completedCount}/${nextMilestone}`
     : "All milestones complete";
@@ -357,18 +388,27 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
   );
   const cancelRefund =
     activeProject && activeProject.depositPaid > 0
-      ? Math.max(0, Math.floor(activeProject.depositPaid * (1 - cancelPenaltyRate)))
+      ? Math.max(
+          0,
+          Math.floor(activeProject.depositPaid * (1 - cancelPenaltyRate)),
+        )
       : 0;
 
   const deadlineRemaining = activeProject?.stageDeadlineRemaining;
   const expeditorUsed =
-    activeProject?.expeditorUsedStages?.includes(activeProject.stageIndex ?? 0) ?? false;
+    activeProject?.expeditorUsedStages?.includes(
+      activeProject.stageIndex ?? 0,
+    ) ?? false;
   const rerollUsed =
-    activeProject?.rerolledStages?.includes(activeProject.stageIndex ?? 0) ?? false;
-  const canAffordExpeditor = state.cash >= tuning.projects.addonPermitExpeditorCost;
-  const canAffordLogistics = state.cash >= tuning.projects.addonSiteLogisticsCost;
+    activeProject?.rerolledStages?.includes(activeProject.stageIndex ?? 0) ??
+    false;
+  const canAffordExpeditor =
+    state.cash >= tuning.projects.addonPermitExpeditorCost;
+  const canAffordLogistics =
+    state.cash >= tuning.projects.addonSiteLogisticsCost;
   const canAffordOvertime = state.cash >= tuning.projects.addonOvertimeCrewCost;
-  const canAffordChangeOrder = state.cash >= tuning.projects.addonChangeOrderCost;
+  const canAffordChangeOrder =
+    state.cash >= tuning.projects.addonChangeOrderCost;
 
   return (
     <ModalShell
@@ -393,7 +433,9 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
           </View>
           <View style={styles.statChip}>
             <Feather name="layers" size={14} color={GameColors.ui.primary} />
-            <ThemedText style={styles.statValue}>{stageProgressLabel}</ThemedText>
+            <ThemedText style={styles.statValue}>
+              {stageProgressLabel}
+            </ThemedText>
             <ThemedText style={styles.statLabel}>Active</ThemedText>
           </View>
         </View>
@@ -430,7 +472,9 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
         {!state.projectsUnlocked ? (
           <View style={styles.lockedState}>
             <Feather name="lock" size={28} color={GameColors.text.disabled} />
-            <ThemedText style={styles.lockedTitle}>Empire Contracts Locked</ThemedText>
+            <ThemedText style={styles.lockedTitle}>
+              Empire Contracts Locked
+            </ThemedText>
             <ThemedText style={styles.lockedSubtitle}>
               Complete the Phase 2 goal order to unlock city-scale projects.
             </ThemedText>
@@ -438,23 +482,46 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
         ) : activeTab === "offers" ? (
           <View style={styles.offerSection}>
             <View style={styles.offerHeaderRow}>
-              <ThemedText style={styles.sectionTitle}>Available offers</ThemedText>
+              <ThemedText style={styles.sectionTitle}>
+                Available offers
+              </ThemedText>
               <Pressable
-                style={[styles.refreshButton, !canRefresh && styles.refreshButtonDisabled]}
-                onPress={canRefresh ? () => dispatch({ type: "PROJECT_REFRESH_OFFERS" }) : undefined}
+                style={[
+                  styles.refreshButton,
+                  !canRefresh && styles.refreshButtonDisabled,
+                ]}
+                onPress={
+                  canRefresh
+                    ? () => dispatch({ type: "PROJECT_REFRESH_OFFERS" })
+                    : undefined
+                }
               >
-                <Feather name="refresh-cw" size={14} color={GameColors.ui.primary} />
+                <Feather
+                  name="refresh-cw"
+                  size={14}
+                  color={GameColors.ui.primary}
+                />
                 <ThemedText style={styles.refreshLabel}>Refresh</ThemedText>
                 <View style={styles.refreshCost}>
-                  <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
-                  <ThemedText style={styles.refreshCostText}>{refreshCost}</ThemedText>
+                  <Feather
+                    name="dollar-sign"
+                    size={12}
+                    color={GameColors.currency.cash}
+                  />
+                  <ThemedText style={styles.refreshCostText}>
+                    {refreshCost}
+                  </ThemedText>
                 </View>
               </Pressable>
             </View>
 
             {offers.length === 0 ? (
               <View style={styles.emptyState}>
-                <Feather name="flag" size={28} color={GameColors.text.disabled} />
+                <Feather
+                  name="flag"
+                  size={28}
+                  color={GameColors.text.disabled}
+                />
                 <ThemedText style={styles.emptyTitle}>No offers yet</ThemedText>
                 <ThemedText style={styles.emptySubtitle}>
                   Check back after your next install for new contracts.
@@ -474,8 +541,12 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                     (selection.permitExpeditor
                       ? tuning.projects.addonPermitExpeditorCost
                       : 0) +
-                    (selection.siteLogistics ? tuning.projects.addonSiteLogisticsCost : 0) +
-                    (selection.overtimeCrew ? tuning.projects.addonOvertimeCrewCost : 0);
+                    (selection.siteLogistics
+                      ? tuning.projects.addonSiteLogisticsCost
+                      : 0) +
+                    (selection.overtimeCrew
+                      ? tuning.projects.addonOvertimeCrewCost
+                      : 0);
                   const totalCost = depositCost + addonCost;
                   const canAfford = state.cash >= totalCost;
                   return (
@@ -510,7 +581,9 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
             )}
 
             <View style={styles.sectionBlock}>
-              <ThemedText style={styles.sectionTitle}>Empire milestones</ThemedText>
+              <ThemedText style={styles.sectionTitle}>
+                Empire milestones
+              </ThemedText>
               <View style={styles.milestoneRow}>
                 {milestoneThresholds.map((threshold) => {
                   const achieved = completedCount >= threshold;
@@ -525,7 +598,11 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                       <Feather
                         name={achieved ? "check-circle" : "circle"}
                         size={12}
-                        color={achieved ? GameColors.ui.success : GameColors.text.secondary}
+                        color={
+                          achieved
+                            ? GameColors.ui.success
+                            : GameColors.text.secondary
+                        }
                       />
                       <ThemedText
                         style={[
@@ -551,7 +628,9 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
             </View>
 
             <View style={styles.sectionBlock}>
-              <ThemedText style={styles.sectionTitle}>Perks unlocked</ThemedText>
+              <ThemedText style={styles.sectionTitle}>
+                Perks unlocked
+              </ThemedText>
               {completedPerks.length === 0 ? (
                 <ThemedText style={styles.emptySubtitle}>
                   Finish your first project to unlock a legacy perk.
@@ -560,7 +639,11 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                 <View style={styles.perkList}>
                   {completedPerks.map((perk, index) => (
                     <View key={`${perk}-${index}`} style={styles.perkRow}>
-                      <Feather name="star" size={12} color={GameColors.currency.reputation} />
+                      <Feather
+                        name="star"
+                        size={12}
+                        color={GameColors.currency.reputation}
+                      />
                       <ThemedText style={styles.perkText}>{perk}</ThemedText>
                     </View>
                   ))}
@@ -572,8 +655,14 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
           <View style={styles.activeSection}>
             {!activeDefinition || !activeProject ? (
               <View style={styles.emptyState}>
-                <Feather name="flag" size={28} color={GameColors.text.disabled} />
-                <ThemedText style={styles.emptyTitle}>No active project</ThemedText>
+                <Feather
+                  name="flag"
+                  size={28}
+                  color={GameColors.text.disabled}
+                />
+                <ThemedText style={styles.emptyTitle}>
+                  No active project
+                </ThemedText>
                 <ThemedText style={styles.emptySubtitle}>
                   Accept an Empire Contract to begin.
                 </ThemedText>
@@ -586,29 +675,50 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                 >
                   <View style={styles.activeHeader}>
                     <View style={styles.activeHeaderLeft}>
-                      <Feather name="flag" size={18} color={GameColors.ui.primary} />
+                      <Feather
+                        name="flag"
+                        size={18}
+                        color={GameColors.ui.primary}
+                      />
                       <View>
-                        <ThemedText style={styles.activeTitle}>{activeDefinition.title}</ThemedText>
+                        <ThemedText style={styles.activeTitle}>
+                          {activeDefinition.title}
+                        </ThemedText>
                         <ThemedText style={styles.activeSubtitle}>
                           {activeDefinition.locationName}
                         </ThemedText>
                       </View>
                     </View>
                     <View style={styles.stageCountChip}>
-                      <Feather name="layers" size={12} color={GameColors.text.secondary} />
-                      <ThemedText style={styles.stageCountText}>{stageProgressLabel}</ThemedText>
+                      <Feather
+                        name="layers"
+                        size={12}
+                        color={GameColors.text.secondary}
+                      />
+                      <ThemedText style={styles.stageCountText}>
+                        {stageProgressLabel}
+                      </ThemedText>
                     </View>
                   </View>
 
                   <View style={styles.activeMetaRow}>
-                    <Feather name="user" size={13} color={GameColors.text.secondary} />
+                    <Feather
+                      name="user"
+                      size={13}
+                      color={GameColors.text.secondary}
+                    />
                     <ThemedText style={styles.activeMetaText}>
-                      {activeDefinition.client.name} · {activeDefinition.client.role}
+                      {activeDefinition.client.name} ·{" "}
+                      {activeDefinition.client.role}
                     </ThemedText>
                   </View>
 
                   <View style={styles.activeMetaRow}>
-                    <Feather name="dollar-sign" size={13} color={GameColors.currency.cash} />
+                    <Feather
+                      name="dollar-sign"
+                      size={13}
+                      color={GameColors.currency.cash}
+                    />
                     <ThemedText style={styles.activeMetaText}>
                       Deposit locked: {activeProject.depositPaid}
                     </ThemedText>
@@ -616,7 +726,11 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
 
                   {typeof deadlineRemaining === "number" ? (
                     <View style={styles.activeMetaRow}>
-                      <Feather name="clock" size={13} color={GameColors.ui.danger} />
+                      <Feather
+                        name="clock"
+                        size={13}
+                        color={GameColors.ui.danger}
+                      />
                       <ThemedText style={styles.activeMetaText}>
                         Installs remaining: {Math.max(0, deadlineRemaining)}
                       </ThemedText>
@@ -626,27 +740,49 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                   <View style={styles.activePerksRow}>
                     {activeProject.siteLogisticsUsed ? (
                       <View style={styles.activePerkChip}>
-                        <Feather name="truck" size={12} color={GameColors.ui.success} />
-                        <ThemedText style={styles.activePerkText}>Site logistics</ThemedText>
+                        <Feather
+                          name="truck"
+                          size={12}
+                          color={GameColors.ui.success}
+                        />
+                        <ThemedText style={styles.activePerkText}>
+                          Site logistics
+                        </ThemedText>
                       </View>
                     ) : null}
                     {activeProject.overtimeCrew ? (
                       <View style={styles.activePerkChip}>
-                        <Feather name="clock" size={12} color={GameColors.ui.warning} />
-                        <ThemedText style={styles.activePerkText}>Overtime crew</ThemedText>
+                        <Feather
+                          name="clock"
+                          size={12}
+                          color={GameColors.ui.warning}
+                        />
+                        <ThemedText style={styles.activePerkText}>
+                          Overtime crew
+                        </ThemedText>
                       </View>
                     ) : null}
-                    {activeProject.expeditorUsedStages?.includes(activeProject.stageIndex) ? (
+                    {activeProject.expeditorUsedStages?.includes(
+                      activeProject.stageIndex,
+                    ) ? (
                       <View style={styles.activePerkChip}>
-                        <Feather name="zap" size={12} color={GameColors.ui.primary} />
-                        <ThemedText style={styles.activePerkText}>Permit expeditor</ThemedText>
+                        <Feather
+                          name="zap"
+                          size={12}
+                          color={GameColors.ui.primary}
+                        />
+                        <ThemedText style={styles.activePerkText}>
+                          Permit expeditor
+                        </ThemedText>
                       </View>
                     ) : null}
                   </View>
                 </LinearGradient>
 
                 <View style={styles.sectionBlock}>
-                  <ThemedText style={styles.sectionTitle}>Stage plan</ThemedText>
+                  <ThemedText style={styles.sectionTitle}>
+                    Stage plan
+                  </ThemedText>
                   <View style={styles.stageList}>
                     {activeDefinition.stages.map((stage, index) => {
                       const isCurrent = index === activeProject.stageIndex;
@@ -666,10 +802,15 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                             </ThemedText>
                           </View>
                           <View style={styles.stageContent}>
-                            <ThemedText style={styles.stageTitle}>{stage.stageTitle}</ThemedText>
+                            <ThemedText style={styles.stageTitle}>
+                              {stage.stageTitle}
+                            </ThemedText>
                             <View style={styles.stageTags}>
                               {getStageTags(stage).map((tag) => (
-                                <TagChip key={`${tag.label}-${index}`} tag={tag} />
+                                <TagChip
+                                  key={`${tag.label}-${index}`}
+                                  tag={tag}
+                                />
                               ))}
                             </View>
                           </View>
@@ -680,7 +821,9 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                 </View>
 
                 <View style={styles.sectionBlock}>
-                  <ThemedText style={styles.sectionTitle}>Support options</ThemedText>
+                  <ThemedText style={styles.sectionTitle}>
+                    Support options
+                  </ThemedText>
                   <View style={styles.supportGrid}>
                     <AddonToggle
                       label="Permit Expeditor"
@@ -693,7 +836,10 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                         !canAffordExpeditor
                       }
                       onPress={() =>
-                        dispatch({ type: "PROJECT_ADDON_PURCHASE", addon: "permit_expeditor" })
+                        dispatch({
+                          type: "PROJECT_ADDON_PURCHASE",
+                          addon: "permit_expeditor",
+                        })
                       }
                     />
                     <AddonToggle
@@ -701,9 +847,14 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                       description="+2 Open supplier charges."
                       cost={tuning.projects.addonSiteLogisticsCost}
                       selected={!!activeProject.siteLogisticsUsed}
-                      disabled={!!activeProject.siteLogisticsUsed || !canAffordLogistics}
+                      disabled={
+                        !!activeProject.siteLogisticsUsed || !canAffordLogistics
+                      }
                       onPress={() =>
-                        dispatch({ type: "PROJECT_ADDON_PURCHASE", addon: "site_logistics" })
+                        dispatch({
+                          type: "PROJECT_ADDON_PURCHASE",
+                          addon: "site_logistics",
+                        })
                       }
                     />
                     <AddonToggle
@@ -711,9 +862,14 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                       description="+1 order slot for duration."
                       cost={tuning.projects.addonOvertimeCrewCost}
                       selected={!!activeProject.overtimeCrew}
-                      disabled={!!activeProject.overtimeCrew || !canAffordOvertime}
+                      disabled={
+                        !!activeProject.overtimeCrew || !canAffordOvertime
+                      }
                       onPress={() =>
-                        dispatch({ type: "PROJECT_ADDON_PURCHASE", addon: "overtime_crew" })
+                        dispatch({
+                          type: "PROJECT_ADDON_PURCHASE",
+                          addon: "overtime_crew",
+                        })
                       }
                     />
                     <AddonToggle
@@ -729,24 +885,55 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
 
                 {activeStage ? (
                   <View style={styles.sectionBlock}>
-                    <ThemedText style={styles.sectionTitle}>Completion bonus</ThemedText>
+                    <ThemedText style={styles.sectionTitle}>
+                      Completion bonus
+                    </ThemedText>
                     <View style={styles.rewardRow}>
                       <View style={styles.rewardChip}>
-                        <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
+                        <Feather
+                          name="dollar-sign"
+                          size={12}
+                          color={GameColors.currency.cash}
+                        />
                         <ThemedText style={styles.rewardText}>
-                          x{(effectiveCompletionRewards?.cash ?? activeDefinition.completionRewards.cashMultiplier).toFixed(1)} cash
+                          x
+                          {(
+                            effectiveCompletionRewards?.cash ??
+                            activeDefinition.completionRewards.cashMultiplier
+                          ).toFixed(1)}{" "}
+                          cash
                         </ThemedText>
                       </View>
                       <View style={styles.rewardChip}>
-                        <Feather name="star" size={12} color={GameColors.currency.reputation} />
+                        <Feather
+                          name="star"
+                          size={12}
+                          color={GameColors.currency.reputation}
+                        />
                         <ThemedText style={styles.rewardText}>
-                          x{(effectiveCompletionRewards?.reputation ?? activeDefinition.completionRewards.reputationMultiplier).toFixed(1)} rep
+                          x
+                          {(
+                            effectiveCompletionRewards?.reputation ??
+                            activeDefinition.completionRewards
+                              .reputationMultiplier
+                          ).toFixed(1)}{" "}
+                          rep
                         </ThemedText>
                       </View>
                       <View style={styles.rewardChip}>
-                        <Feather name="zap" size={12} color={GameColors.currency.research} />
+                        <Feather
+                          name="zap"
+                          size={12}
+                          color={GameColors.currency.research}
+                        />
                         <ThemedText style={styles.rewardText}>
-                          x{(effectiveCompletionRewards?.research ?? activeDefinition.completionRewards.researchMultiplier).toFixed(1)} research
+                          x
+                          {(
+                            effectiveCompletionRewards?.research ??
+                            activeDefinition.completionRewards
+                              .researchMultiplier
+                          ).toFixed(1)}{" "}
+                          research
                         </ThemedText>
                       </View>
                     </View>

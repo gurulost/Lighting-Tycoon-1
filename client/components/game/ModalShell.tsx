@@ -5,7 +5,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
-import { GameColors, Spacing, BorderRadius, ModalTokens, ModalTypography } from "@/constants/theme";
+import {
+  GameColors,
+  Spacing,
+  BorderRadius,
+  ModalTokens,
+  ModalTypography,
+} from "@/constants/theme";
 
 type ModalVariant = "full" | "card";
 
@@ -39,7 +45,9 @@ export function ModalShell({
   const insets = useSafeAreaInsets();
   const isCard = variant === "card";
 
-  const showHeader = Boolean(title || subtitle || icon || leading || onClose || headerRight);
+  const showHeader = Boolean(
+    title || subtitle || icon || leading || onClose || headerRight,
+  );
 
   const containerStyle = [
     styles.container,
@@ -57,7 +65,9 @@ export function ModalShell({
             {leading ? (
               leading
             ) : icon ? (
-              <View style={[styles.iconBadge, { borderColor: ModalTokens.border }]}>
+              <View
+                style={[styles.iconBadge, { borderColor: ModalTokens.border }]}
+              >
                 <Feather name={icon} size={20} color={iconColor} />
               </View>
             ) : null}
@@ -73,12 +83,19 @@ export function ModalShell({
             {onClose ? (
               <Pressable
                 onPress={closeDisabled ? undefined : onClose}
-                style={[styles.closeButton, closeDisabled && styles.closeButtonDisabled]}
+                style={[
+                  styles.closeButton,
+                  closeDisabled && styles.closeButtonDisabled,
+                ]}
               >
                 <Feather
                   name="x"
                   size={22}
-                  color={closeDisabled ? GameColors.text.disabled : GameColors.text.primary}
+                  color={
+                    closeDisabled
+                      ? GameColors.text.disabled
+                      : GameColors.text.primary
+                  }
                 />
               </Pressable>
             ) : null}

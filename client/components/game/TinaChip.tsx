@@ -4,7 +4,12 @@ import { ThemedText } from "@/components/ThemedText";
 import { AvatarImage } from "./AvatarImage";
 import { GameColors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 
-type TinaExpression = "portrait" | "confident" | "focused" | "delighted" | "concerned";
+type TinaExpression =
+  | "portrait"
+  | "confident"
+  | "focused"
+  | "delighted"
+  | "concerned";
 
 const TINA_PORTRAITS: Record<TinaExpression, number> = {
   portrait: require("../../../assets/images/tina/tina-portrait-128.webp"),
@@ -41,9 +46,7 @@ export function TinaChip({
         icon="smile"
         iconColor={GameColors.characters.tina}
       />
-      {showLabel ? (
-        <ThemedText style={styles.label}>{label}</ThemedText>
-      ) : null}
+      {showLabel ? <ThemedText style={styles.label}>{label}</ThemedText> : null}
     </View>
   );
 }

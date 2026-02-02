@@ -27,7 +27,8 @@ export function MergeMomentumModal({
   const levelIndex = threshold === 6 ? 1 : threshold === 10 ? 2 : 0;
   const qualityFloor = Math.min(10, 2 + levelIndex);
   const cooldownPercent = levelIndex === 0 ? 30 : levelIndex === 1 ? 45 : 60;
-  const refillTarget = state.suppliers.open.level > 0 ? "Open Workshop" : "Baron Depot";
+  const refillTarget =
+    state.suppliers.open.level > 0 ? "Open Workshop" : "Baron Depot";
 
   const handleChoose = (choice: MergeMomentumChoice) => {
     if (hapticsEnabled) {
@@ -46,25 +47,47 @@ export function MergeMomentumModal({
         >
           <View style={styles.choiceList}>
             <Pressable
-              style={[styles.choiceCard, { borderColor: GameColors.openStandard.primary + "55" }]}
+              style={[
+                styles.choiceCard,
+                { borderColor: GameColors.openStandard.primary + "55" },
+              ]}
               onPress={() => handleChoose("refill")}
             >
-              <View style={[styles.choiceIcon, { backgroundColor: GameColors.openStandard.primary + "20" }]}
-                >
-                <Feather name="battery-charging" size={18} color={GameColors.openStandard.primary} />
+              <View
+                style={[
+                  styles.choiceIcon,
+                  { backgroundColor: GameColors.openStandard.primary + "20" },
+                ]}
+              >
+                <Feather
+                  name="battery-charging"
+                  size={18}
+                  color={GameColors.openStandard.primary}
+                />
               </View>
               <View style={styles.choiceText}>
-                <ThemedText style={styles.choiceTitle}>Refill Charge</ThemedText>
-                <ThemedText style={styles.choiceSubtitle}>+1 {refillTarget} charge</ThemedText>
+                <ThemedText style={styles.choiceTitle}>
+                  Refill Charge
+                </ThemedText>
+                <ThemedText style={styles.choiceSubtitle}>
+                  +1 {refillTarget} charge
+                </ThemedText>
               </View>
             </Pressable>
 
             <Pressable
-              style={[styles.choiceCard, { borderColor: GameColors.ui.primary + "55" }]}
+              style={[
+                styles.choiceCard,
+                { borderColor: GameColors.ui.primary + "55" },
+              ]}
               onPress={() => handleChoose("cooldown")}
             >
-              <View style={[styles.choiceIcon, { backgroundColor: GameColors.ui.primary + "20" }]}
-                >
+              <View
+                style={[
+                  styles.choiceIcon,
+                  { backgroundColor: GameColors.ui.primary + "20" },
+                ]}
+              >
                 <Feather name="clock" size={18} color={GameColors.ui.primary} />
               </View>
               <View style={styles.choiceText}>
@@ -76,15 +99,28 @@ export function MergeMomentumModal({
             </Pressable>
 
             <Pressable
-              style={[styles.choiceCard, { borderColor: GameColors.ui.success + "55" }]}
+              style={[
+                styles.choiceCard,
+                { borderColor: GameColors.ui.success + "55" },
+              ]}
               onPress={() => handleChoose("quality")}
             >
-              <View style={[styles.choiceIcon, { backgroundColor: GameColors.ui.success + "20" }]}
-                >
-                <Feather name="trending-up" size={18} color={GameColors.ui.success} />
+              <View
+                style={[
+                  styles.choiceIcon,
+                  { backgroundColor: GameColors.ui.success + "20" },
+                ]}
+              >
+                <Feather
+                  name="trending-up"
+                  size={18}
+                  color={GameColors.ui.success}
+                />
               </View>
               <View style={styles.choiceText}>
-                <ThemedText style={styles.choiceTitle}>Quality Boost</ThemedText>
+                <ThemedText style={styles.choiceTitle}>
+                  Quality Boost
+                </ThemedText>
                 <ThemedText style={styles.choiceSubtitle}>
                   Next drop is at least Tier {qualityFloor}
                 </ThemedText>

@@ -16,4 +16,3 @@ export const withRepeat: RepeatFn = (...args) => {
   }
   return args[0];
 };
-

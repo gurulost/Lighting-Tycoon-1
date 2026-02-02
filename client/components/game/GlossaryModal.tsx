@@ -317,7 +317,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "station-workbench",
         title: "Workbench",
         summary: "Open suppliers.",
-        detail: "Each source has charges and cooldowns. After the tutorial, you can overdraw during cooldowns at a cost.",
+        detail:
+          "Each source has charges and cooldowns. After the tutorial, you can overdraw during cooldowns at a cost.",
         image: stationWorkbench,
       },
       {
@@ -345,7 +346,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "supplier-baron",
         title: "Baron Supply Depot",
         summary: "Fast locked supply.",
-        detail: "Raises Dependency; shipments can include waste. Overdraws cost cash and can add extra waste.",
+        detail:
+          "Raises Dependency; shipments can include waste. Overdraws cost cash and can add extra waste.",
         icon: "package",
         color: GameColors.locked.primary,
       },
@@ -362,7 +364,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "supplier-salvage",
         title: "Salvage Corner",
         summary: "Refurb supply source.",
-        detail: "Drops open parts, waste, or upgrade materials. Overdraws consume waste or cost cash if you're out.",
+        detail:
+          "Drops open parts, waste, or upgrade materials. Overdraws consume waste or cost cash if you're out.",
         icon: "refresh-cw",
         color: GameColors.ui.warning,
       },
@@ -1096,7 +1099,11 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
       <View style={styles.searchSection}>
         <View style={styles.searchHeaderRow}>
           <View style={styles.searchBar}>
-            <Feather name="search" size={16} color={GameColors.text.secondary} />
+            <Feather
+              name="search"
+              size={16}
+              color={GameColors.text.secondary}
+            />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -1108,7 +1115,10 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
               returnKeyType="search"
             />
             {query.length > 0 ? (
-              <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
+              <Pressable
+                onPress={() => setQuery("")}
+                style={styles.clearButton}
+              >
                 <Feather name="x" size={14} color={GameColors.text.secondary} />
               </Pressable>
             ) : null}
@@ -1144,8 +1154,13 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
                 return (
                   <Pressable
                     key={filter.key}
-                    onPress={() => setActiveFilter(filter.key as GlossaryFilter)}
-                    style={[styles.filterChip, active && styles.filterChipActive]}
+                    onPress={() =>
+                      setActiveFilter(filter.key as GlossaryFilter)
+                    }
+                    style={[
+                      styles.filterChip,
+                      active && styles.filterChipActive,
+                    ]}
                   >
                     <ThemedText
                       style={[

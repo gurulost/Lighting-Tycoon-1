@@ -69,7 +69,10 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
 
   return (
     <Pressable style={styles.overlay} onPress={handleDecline}>
-      <Pressable style={styles.container} onPress={(event) => event.stopPropagation()}>
+      <Pressable
+        style={styles.container}
+        onPress={(event) => event.stopPropagation()}
+      >
         <ModalShell
           variant="card"
           title="Bulb Baron Offer"
@@ -87,10 +90,16 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           headerRight={<TinaChip expression="confident" />}
         >
           <View style={styles.offerBox}>
-            <Feather name={offer.icon} size={20} color={GameColors.locked.primary} />
+            <Feather
+              name={offer.icon}
+              size={20}
+              color={GameColors.locked.primary}
+            />
             <View style={styles.offerBody}>
               <ThemedText style={styles.offerTitle}>{offer.title}</ThemedText>
-              <ThemedText style={styles.offerText}>{offer.description}</ThemedText>
+              <ThemedText style={styles.offerText}>
+                {offer.description}
+              </ThemedText>
             </View>
           </View>
 
@@ -104,7 +113,9 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
 
             <Pressable style={styles.declineButton} onPress={handleDecline}>
               <Feather name="shield" size={18} color={GameColors.ui.success} />
-              <ThemedText style={styles.declineText}>Decline (Open-Standard stash)</ThemedText>
+              <ThemedText style={styles.declineText}>
+                Decline (Open-Standard stash)
+              </ThemedText>
             </Pressable>
           </View>
         </ModalShell>

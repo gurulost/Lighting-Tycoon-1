@@ -31,16 +31,19 @@ export function PartDetailModal({
   const familyColor = isLocked
     ? GameColors.locked.primary
     : isWaste
-    ? GameColors.ui.warning
-    : isCompatible
-    ? GameColors.ui.success
-    : GameColors.openStandard.primary;
+      ? GameColors.ui.warning
+      : isCompatible
+        ? GameColors.ui.success
+        : GameColors.openStandard.primary;
 
   const leading = (
     <View
       style={[
         styles.iconBadge,
-        { backgroundColor: familyColor + "25", borderColor: familyColor + "40" },
+        {
+          backgroundColor: familyColor + "25",
+          borderColor: familyColor + "40",
+        },
       ]}
     >
       <Feather
@@ -63,7 +66,10 @@ export function PartDetailModal({
 
   return (
     <Pressable style={styles.overlay} onPress={onClose}>
-      <Pressable style={styles.container} onPress={(event) => event.stopPropagation()}>
+      <Pressable
+        style={styles.container}
+        onPress={(event) => event.stopPropagation()}
+      >
         <ModalShell
           variant="card"
           title={TIER_NAMES[part.tier]}
@@ -71,30 +77,40 @@ export function PartDetailModal({
             isLocked
               ? "Locked Component"
               : isWaste
-              ? "Waste Material"
-              : isCompatible
-              ? "Open-Compatible Component"
-              : "Open-Standard Component"
+                ? "Waste Material"
+                : isCompatible
+                  ? "Open-Compatible Component"
+                  : "Open-Standard Component"
           }
           leading={leading}
           onClose={onClose}
         >
           <View style={styles.content}>
             <View style={styles.detailRow}>
-              <Feather name="layers" size={16} color={GameColors.text.secondary} />
-              <ThemedText style={styles.detailText}>Tier {part.tier}</ThemedText>
+              <Feather
+                name="layers"
+                size={16}
+                color={GameColors.text.secondary}
+              />
+              <ThemedText style={styles.detailText}>
+                Tier {part.tier}
+              </ThemedText>
             </View>
 
             <View style={styles.detailRow}>
-              <Feather name="alert-triangle" size={16} color={GameColors.text.secondary} />
+              <Feather
+                name="alert-triangle"
+                size={16}
+                color={GameColors.text.secondary}
+              />
               <ThemedText style={styles.detailText}>
                 {isLocked
                   ? "+Dependency on merge"
                   : isWaste
-                  ? "Recycle or merge to reclaim space"
-                  : isCompatible
-                  ? "Counts for locked + compatible installs"
-                  : "Generates Research on merge"}
+                    ? "Recycle or merge to reclaim space"
+                    : isCompatible
+                      ? "Counts for locked + compatible installs"
+                      : "Generates Research on merge"}
               </ThemedText>
             </View>
 
@@ -114,12 +130,20 @@ export function PartDetailModal({
                 <Feather
                   name="unlock"
                   size={18}
-                  color={canUseFreedomController ? "#0F0F1F" : GameColors.text.disabled}
+                  color={
+                    canUseFreedomController
+                      ? "#0F0F1F"
+                      : GameColors.text.disabled
+                  }
                 />
                 <ThemedText
                   style={[
                     styles.freedomText,
-                    { color: canUseFreedomController ? "#0F0F1F" : GameColors.text.disabled },
+                    {
+                      color: canUseFreedomController
+                        ? "#0F0F1F"
+                        : GameColors.text.disabled,
+                    },
                   ]}
                 >
                   Use Freedom Controller

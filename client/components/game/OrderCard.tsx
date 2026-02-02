@@ -25,7 +25,10 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
 import { getPortraitSource } from "@/constants/characters";
-import { TrimLightStrip, TrimLightPattern } from "@/components/game/TrimLightStrip";
+import {
+  TrimLightStrip,
+  TrimLightPattern,
+} from "@/components/game/TrimLightStrip";
 import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
 
 interface OrderCardProps {
@@ -70,12 +73,18 @@ export function OrderCard({
   const urgentPulse = useSharedValue(0);
 
   const fulfillmentIndices = getFulfillmentIndices(order);
-  const rushExpired = Boolean(order.rushDeadline && timeRemaining !== null && timeRemaining <= 0);
+  const rushExpired = Boolean(
+    order.rushDeadline && timeRemaining !== null && timeRemaining <= 0,
+  );
   const canFulfill = fulfillmentIndices !== null && !rushExpired;
 
   const isPartValidForRequirement = (
     part: Part,
-    req: { tier: PartTier; family: "open" | "locked" | "any"; requiresCompatible?: boolean }
+    req: {
+      tier: PartTier;
+      family: "open" | "locked" | "any";
+      requiresCompatible?: boolean;
+    },
   ) => {
     if (part.family === "waste") return false;
     if (part.tier !== req.tier) return false;
@@ -97,12 +106,17 @@ export function OrderCard({
     return order.requirements.some((req) => isPartValidForRequirement(p, req));
   });
 
-  const totalRequired = order.requirements.reduce((sum, req) => sum + req.count, 0);
+  const totalRequired = order.requirements.reduce(
+    (sum, req) => sum + req.count,
+    0,
+  );
   const progressParts = [...state.board, ...state.backpack].filter(
-    (part): part is Part => !!part
+    (part): part is Part => !!part,
   );
   const satisfied = order.requirements.reduce((sum, req) => {
-    const matching = progressParts.filter((part) => isPartValidForRequirement(part, req));
+    const matching = progressParts.filter((part) =>
+      isPartValidForRequirement(part, req),
+    );
     return sum + Math.min(matching.length, req.count);
   }, 0);
   const rawProgress = totalRequired > 0 ? satisfied / totalRequired : 0;
@@ -112,16 +126,16 @@ export function OrderCard({
     order.type === "baron_certified" || order.type === "locked_required"
       ? "baron"
       : order.type === "premium"
-      ? "rainbow"
-      : order.type === "style_match"
-      ? "classic"
-      : "warmWhite";
+        ? "rainbow"
+        : order.type === "style_match"
+          ? "classic"
+          : "warmWhite";
 
   const orderSource = order.modifierIds?.includes("mentor_job")
     ? "mentor"
     : order.modifierIds?.includes("baron_contract")
-    ? "baron"
-    : null;
+      ? "baron"
+      : null;
   const orderSourcePortrait = orderSource
     ? getPortraitSource(orderSource, "md", "portrait")
     : null;
@@ -136,10 +150,10 @@ export function OrderCard({
       glowPulse.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 1000 }),
-          withTiming(0.4, { duration: 1000 })
+          withTiming(0.4, { duration: 1000 }),
         ),
         -1,
-        true
+        true,
       );
     } else {
       cancelAnimation(glowPulse);
@@ -161,10 +175,10 @@ export function OrderCard({
       urgentPulse.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 500 }),
-          withTiming(0.3, { duration: 500 })
+          withTiming(0.3, { duration: 500 }),
         ),
         -1,
-        true
+        true,
       );
     } else {
       cancelAnimation(urgentPulse);
@@ -229,26 +243,58 @@ export function OrderCard({
 
   const getGradientColors = (): [string, string, string] => {
     if (canFulfill) {
-      return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
+      return [
+        `${GameColors.ui.success}15`,
+        "#1A1A2E",
+        `${GameColors.ui.success}15`,
+      ];
     }
     if (order.type === "compatibility_required") {
-      return [`${GameColors.ui.success}15`, "#1A1A2E", `${GameColors.ui.success}15`];
+      return [
+        `${GameColors.ui.success}15`,
+        "#1A1A2E",
+        `${GameColors.ui.success}15`,
+      ];
     }
     if (order.type === "locked_required") {
-      return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
+      return [
+        `${GameColors.locked.primary}15`,
+        "#1A1A2E",
+        `${GameColors.locked.primary}15`,
+      ];
     }
     if (order.rushDeadline) {
-      return [`${GameColors.ui.danger}15`, "#1A1A2E", `${GameColors.ui.danger}15`];
+      return [
+        `${GameColors.ui.danger}15`,
+        "#1A1A2E",
+        `${GameColors.ui.danger}15`,
+      ];
     }
     switch (order.type) {
       case "baron_certified":
-        return [`${GameColors.locked.primary}15`, "#1A1A2E", `${GameColors.locked.primary}15`];
+        return [
+          `${GameColors.locked.primary}15`,
+          "#1A1A2E",
+          `${GameColors.locked.primary}15`,
+        ];
       case "premium":
-        return [`${GameColors.currency.cash}15`, "#1A1A2E", `${GameColors.currency.cash}15`];
+        return [
+          `${GameColors.currency.cash}15`,
+          "#1A1A2E",
+          `${GameColors.currency.cash}15`,
+        ];
       case "lab_request":
-        return [`${GameColors.currency.research}15`, "#1A1A2E", `${GameColors.currency.research}15`];
+        return [
+          `${GameColors.currency.research}15`,
+          "#1A1A2E",
+          `${GameColors.currency.research}15`,
+        ];
       case "style_match":
-        return [`${GameColors.ui.primary}15`, "#1A1A2E", `${GameColors.ui.primary}15`];
+        return [
+          `${GameColors.ui.primary}15`,
+          "#1A1A2E",
+          `${GameColors.ui.primary}15`,
+        ];
       default:
         return ["#1A1A2E", "#252542", "#1A1A2E"];
     }
@@ -285,35 +331,63 @@ export function OrderCard({
 
   const priorityBadge = (() => {
     if (order.isLockout) {
-      return { label: "LOCKOUT", color: GameColors.ui.danger, icon: "alert-triangle" as const };
+      return {
+        label: "LOCKOUT",
+        color: GameColors.ui.danger,
+        icon: "alert-triangle" as const,
+      };
     }
     if (order.modifierIds?.includes("council_ratify")) {
-      return { label: "COUNCIL", color: GameColors.currency.research, icon: "award" as const };
+      return {
+        label: "COUNCIL",
+        color: GameColors.currency.research,
+        icon: "award" as const,
+      };
     }
     if (order.rushDeadline) {
       const label = rushExpired
         ? "EXPIRED"
         : timeRemaining !== null
-        ? selected
-          ? `${formatTime(timeRemaining)} +${rushBonus}%`
-          : `${formatTime(timeRemaining)}`
-        : "RUSH";
+          ? selected
+            ? `${formatTime(timeRemaining)} +${rushBonus}%`
+            : `${formatTime(timeRemaining)}`
+          : "RUSH";
       return { label, color: GameColors.ui.danger, icon: "clock" as const };
     }
     if (order.modifierIds?.includes("project_rush")) {
-      return { label: "RUSH", color: GameColors.ui.danger, icon: "clock" as const };
+      return {
+        label: "RUSH",
+        color: GameColors.ui.danger,
+        icon: "clock" as const,
+      };
     }
     if (order.modifierIds?.includes("council_rush")) {
-      return { label: "RUSH", color: GameColors.ui.danger, icon: "clock" as const };
+      return {
+        label: "RUSH",
+        color: GameColors.ui.danger,
+        icon: "clock" as const,
+      };
     }
     if (order.type === "locked_required" || order.type === "baron_certified") {
-      return { label: "CERTIFIED", color: GameColors.locked.primary, icon: "lock" as const };
+      return {
+        label: "CERTIFIED",
+        color: GameColors.locked.primary,
+        icon: "lock" as const,
+      };
     }
     if (order.type === "compatibility_required") {
-      return { label: "COMPAT", color: GameColors.ui.success, icon: "shield" as const };
+      return {
+        label: "COMPAT",
+        color: GameColors.ui.success,
+        icon: "shield" as const,
+      };
     }
     if (order.isTutorial) {
-      return { label: "REQUIRED", color: GameColors.ui.primary, icon: "compass" as const };
+      return {
+        label: "REQUIRED",
+        color: GameColors.ui.primary,
+        icon: "compass" as const,
+      };
     }
     return null;
   })();
@@ -329,7 +403,11 @@ export function OrderCard({
     : null;
 
   const modifierBadges = (() => {
-    const badges: { label: string; color: string; icon: keyof typeof Feather.glyphMap }[] = [];
+    const badges: {
+      label: string;
+      color: string;
+      icon: keyof typeof Feather.glyphMap;
+    }[] = [];
     if (projectStageMeta) {
       badges.push({
         label: `Project Stage ${projectStageMeta.stageIndex + 1}`,
@@ -345,10 +423,21 @@ export function OrderCard({
       });
     }
     if (order.type === "locked_required" || order.type === "baron_certified") {
-      badges.push({ label: "Certified", color: GameColors.locked.primary, icon: "lock" });
+      badges.push({
+        label: "Certified",
+        color: GameColors.locked.primary,
+        icon: "lock",
+      });
     }
-    if (order.type === "compatibility_required" || order.requirements.some((r) => r.requiresCompatible)) {
-      badges.push({ label: "Compatible", color: GameColors.ui.success, icon: "shield" });
+    if (
+      order.type === "compatibility_required" ||
+      order.requirements.some((r) => r.requiresCompatible)
+    ) {
+      badges.push({
+        label: "Compatible",
+        color: GameColors.ui.success,
+        icon: "shield",
+      });
     }
     if (order.modifierIds?.includes("mentor_job")) {
       badges.push({
@@ -376,29 +465,54 @@ export function OrderCard({
       order.modifierIds?.includes("project_rush") ||
       order.modifierIds?.includes("council_rush")
     ) {
-      badges.push({ label: "Rush", color: GameColors.ui.danger, icon: "clock" });
+      badges.push({
+        label: "Rush",
+        color: GameColors.ui.danger,
+        icon: "clock",
+      });
     }
     if (order.type === "style_match") {
-      const family = order.requirements[0]?.family === "locked" ? "Locked Only" : "Open Only";
-      badges.push({ label: family, color: GameColors.ui.primary, icon: "layers" });
+      const family =
+        order.requirements[0]?.family === "locked"
+          ? "Locked Only"
+          : "Open Only";
+      badges.push({
+        label: family,
+        color: GameColors.ui.primary,
+        icon: "layers",
+      });
     }
     if (order.familyPreference) {
-      const prefLabel = order.familyPreference === "open" ? "Prefers Open" : "Prefers Locked";
+      const prefLabel =
+        order.familyPreference === "open" ? "Prefers Open" : "Prefers Locked";
       const color =
-        order.familyPreference === "open" ? GameColors.openStandard.primary : GameColors.locked.primary;
+        order.familyPreference === "open"
+          ? GameColors.openStandard.primary
+          : GameColors.locked.primary;
       badges.push({ label: prefLabel, color, icon: "heart" });
     }
     if (order.noSubstitutions) {
-      badges.push({ label: "Exact Tiers", color: GameColors.text.secondary, icon: "check-circle" });
+      badges.push({
+        label: "Exact Tiers",
+        color: GameColors.text.secondary,
+        icon: "check-circle",
+      });
     }
     if (order.ecoAuditBonusResearch) {
-      badges.push({ label: `Eco +${order.ecoAuditBonusResearch}`, color: GameColors.currency.research, icon: "zap" });
+      badges.push({
+        label: `Eco +${order.ecoAuditBonusResearch}`,
+        color: GameColors.currency.research,
+        icon: "zap",
+      });
     }
     return badges;
   })();
 
   const visibleBadges = selected ? modifierBadges : modifierBadges.slice(0, 2);
-  const hiddenBadgeCount = Math.max(0, modifierBadges.length - visibleBadges.length);
+  const hiddenBadgeCount = Math.max(
+    0,
+    modifierBadges.length - visibleBadges.length,
+  );
 
   const rewardEntries = [
     {
@@ -422,7 +536,10 @@ export function OrderCard({
   ].filter((entry) => entry.value > 0);
 
   const visibleRewards = selected ? rewardEntries : rewardEntries.slice(0, 2);
-  const hiddenRewardCount = Math.max(0, rewardEntries.length - visibleRewards.length);
+  const hiddenRewardCount = Math.max(
+    0,
+    rewardEntries.length - visibleRewards.length,
+  );
 
   const typeColor = getOrderTypeColor();
   const borderColor = canFulfill ? GameColors.ui.success : typeColor;
@@ -433,8 +550,12 @@ export function OrderCard({
   const layoutAnimation = reducedMotion
     ? undefined
     : Layout.springify().damping(18);
-  const enterAnim = reducedMotion ? FadeIn.duration(150) : FadeInDown.duration(300);
-  const exitAnim = reducedMotion ? FadeOut.duration(150) : FadeOutUp.duration(200);
+  const enterAnim = reducedMotion
+    ? FadeIn.duration(150)
+    : FadeInDown.duration(300);
+  const exitAnim = reducedMotion
+    ? FadeOut.duration(150)
+    : FadeOutUp.duration(200);
 
   return (
     <Pressable onPress={onSelect} disabled={!onSelect}>
@@ -446,281 +567,354 @@ export function OrderCard({
           styles.container,
           glowStyle,
           selected && styles.containerSelected,
-          { 
+          {
             shadowColor: canFulfill ? GameColors.ui.success : typeColor,
             borderColor: `${selectionColor}60`,
           },
         ]}
       >
         <LinearGradient colors={getGradientColors()} style={styles.gradient}>
-        <View style={styles.header}>
-          <View style={styles.titleRow}>
-            {orderSourcePortrait ? (
-              <AvatarImage
-                source={orderSourcePortrait}
-                size={24}
-                borderColor={orderSource === "mentor" ? GameColors.openStandard.primary : GameColors.locked.primary}
-                icon={orderSource === "mentor" ? "compass" : "briefcase"}
-                iconColor={
-                  orderSource === "mentor"
-                    ? GameColors.openStandard.primary
-                    : GameColors.locked.primary
-                }
-                contentFit="cover"
-              />
-            ) : null}
-            <LinearGradient
-              colors={[`${typeColor}40`, `${typeColor}20`, `${typeColor}40`]}
-              style={styles.typeIcon}
-            >
-              <Feather name={getOrderTypeIcon()} size={14} color={typeColor} />
-            </LinearGradient>
-            <ThemedText style={styles.title} numberOfLines={1}>
-              {order.title}
-            </ThemedText>
-          </View>
-          <View style={styles.headerRight}>
-            {projectBadge ? (
-              <Animated.View
-                style={[
-                  styles.statusChip,
-                  { borderColor: `${projectBadge.color}60`, backgroundColor: `${projectBadge.color}20` },
-                ]}
-              >
-                <Feather name={projectBadge.icon} size={11} color={projectBadge.color} />
-                <ThemedText
-                  style={[styles.statusChipText, { color: projectBadge.color }]}
-                  numberOfLines={1}
-                >
-                  {projectBadge.label}
-                </ThemedText>
-              </Animated.View>
-            ) : null}
-            {priorityBadge ? (
-              <Animated.View
-                style={[
-                  styles.statusChip,
-                  { borderColor: `${priorityBadge.color}60`, backgroundColor: `${priorityBadge.color}20` },
-                  order.rushDeadline ? urgentStyle : null,
-                ]}
-              >
-                <Feather name={priorityBadge.icon} size={11} color={priorityBadge.color} />
-                <ThemedText
-                  style={[styles.statusChipText, { color: priorityBadge.color }]}
-                  numberOfLines={1}
-                >
-                  {priorityBadge.label}
-                </ThemedText>
-              </Animated.View>
-            ) : null}
-            {dismissible ? (
-              <Pressable onPress={onDismiss} style={styles.dismissButton}>
-                <Feather name="x" size={16} color={GameColors.text.disabled} />
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.trimStrip}>
-          <TrimLightStrip
-            progress={visualProgress}
-            bulbs={14}
-            height={22}
-            pattern={trimPattern}
-            animated={canFulfill && !reducedMotion}
-            phase={trimPhase}
-            reducedMotion={reducedMotion}
-          />
-        </View>
-
-        {order.flavorText && showFlavor ? (
-          <ThemedText style={styles.flavorText}>{order.flavorText}</ThemedText>
-        ) : null}
-
-        <View style={styles.requirements}>
-          {order.requirements.map((req, index) => {
-            const matching = availableParts.filter((p) => isPartValidForRequirement(p, req));
-            const hasEnough = matching.length >= req.count;
-            const familyColor =
-              req.family === "open"
-                ? GameColors.openStandard.primary
-                : req.family === "locked"
-                ? GameColors.locked.primary
-                : GameColors.text.secondary;
-
-            const showFamily = selected && req.family !== "any";
-            const showCompat = selected && req.requiresCompatible;
-            const compatColor = GameColors.ui.success;
-
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.reqTile,
-                  {
-                    borderColor: hasEnough ? `${familyColor}60` : "#2A2A4A",
-                    backgroundColor: hasEnough ? `${familyColor}12` : "#1A1A2E",
-                  },
-                ]}
+          <View style={styles.header}>
+            <View style={styles.titleRow}>
+              {orderSourcePortrait ? (
+                <AvatarImage
+                  source={orderSourcePortrait}
+                  size={24}
+                  borderColor={
+                    orderSource === "mentor"
+                      ? GameColors.openStandard.primary
+                      : GameColors.locked.primary
+                  }
+                  icon={orderSource === "mentor" ? "compass" : "briefcase"}
+                  iconColor={
+                    orderSource === "mentor"
+                      ? GameColors.openStandard.primary
+                      : GameColors.locked.primary
+                  }
+                  contentFit="cover"
+                />
+              ) : null}
+              <LinearGradient
+                colors={[`${typeColor}40`, `${typeColor}20`, `${typeColor}40`]}
+                style={styles.typeIcon}
               >
                 <Feather
-                  name={TIER_ICONS[req.tier]}
+                  name={getOrderTypeIcon()}
                   size={14}
-                  color={hasEnough ? familyColor : GameColors.text.disabled}
+                  color={typeColor}
                 />
-                <ThemedText
+              </LinearGradient>
+              <ThemedText style={styles.title} numberOfLines={1}>
+                {order.title}
+              </ThemedText>
+            </View>
+            <View style={styles.headerRight}>
+              {projectBadge ? (
+                <Animated.View
                   style={[
-                    styles.reqTileText,
-                    { color: hasEnough ? GameColors.text.primary : GameColors.text.disabled },
+                    styles.statusChip,
+                    {
+                      borderColor: `${projectBadge.color}60`,
+                      backgroundColor: `${projectBadge.color}20`,
+                    },
                   ]}
                 >
-                  {req.count}x {TIER_NAMES[req.tier]}
-                </ThemedText>
-                {showFamily ? (
-                  <View style={[styles.reqFamilyPill, { borderColor: `${familyColor}50` }]}>
-                    <ThemedText style={[styles.reqFamilyText, { color: familyColor }]}>
-                      {req.family === "open"
-                        ? "Open"
-                        : order.type === "locked_required"
-                        ? "Locked/Compat"
-                        : "Locked"}
-                    </ThemedText>
-                  </View>
-                ) : null}
-                {showCompat ? (
-                  <View
-                    style={[styles.reqFamilyPill, { borderColor: `${compatColor}50` }]}
+                  <Feather
+                    name={projectBadge.icon}
+                    size={11}
+                    color={projectBadge.color}
+                  />
+                  <ThemedText
+                    style={[
+                      styles.statusChipText,
+                      { color: projectBadge.color },
+                    ]}
+                    numberOfLines={1}
                   >
-                    <ThemedText style={[styles.reqFamilyText, { color: compatColor }]}>
-                      Compat
-                    </ThemedText>
-                  </View>
-                ) : null}
-                {hasEnough ? (
-                  <View style={styles.checkContainer}>
-                    <Feather name="check" size={12} color={GameColors.ui.success} />
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-
-        {showBadges && (visibleBadges.length > 0 || hiddenBadgeCount > 0) ? (
-          <View style={styles.badgeRow}>
-            {visibleBadges.map((badge) => (
-              <View
-                key={badge.label}
-                style={[styles.modifierBadge, { borderColor: `${badge.color}40` }]}
-              >
-                <Feather name={badge.icon} size={11} color={badge.color} />
-                <ThemedText style={[styles.modifierBadgeText, { color: badge.color }]}>
-                  {badge.label}
-                </ThemedText>
-              </View>
-            ))}
-            {!selected && hiddenBadgeCount > 0 ? (
-              <View style={styles.moreBadge}>
-                <ThemedText style={styles.moreBadgeText}>+{hiddenBadgeCount} more</ThemedText>
-              </View>
-            ) : null}
+                    {projectBadge.label}
+                  </ThemedText>
+                </Animated.View>
+              ) : null}
+              {priorityBadge ? (
+                <Animated.View
+                  style={[
+                    styles.statusChip,
+                    {
+                      borderColor: `${priorityBadge.color}60`,
+                      backgroundColor: `${priorityBadge.color}20`,
+                    },
+                    order.rushDeadline ? urgentStyle : null,
+                  ]}
+                >
+                  <Feather
+                    name={priorityBadge.icon}
+                    size={11}
+                    color={priorityBadge.color}
+                  />
+                  <ThemedText
+                    style={[
+                      styles.statusChipText,
+                      { color: priorityBadge.color },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {priorityBadge.label}
+                  </ThemedText>
+                </Animated.View>
+              ) : null}
+              {dismissible ? (
+                <Pressable onPress={onDismiss} style={styles.dismissButton}>
+                  <Feather
+                    name="x"
+                    size={16}
+                    color={GameColors.text.disabled}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
-        ) : null}
 
-        {selected ? (
-          <View style={styles.trackingRow}>
-            <Feather name="eye" size={12} color={GameColors.ui.primary} />
-            <ThemedText style={styles.trackingText}>
-              Tracking parts on board + backpack
+          <View style={styles.trimStrip}>
+            <TrimLightStrip
+              progress={visualProgress}
+              bulbs={14}
+              height={22}
+              pattern={trimPattern}
+              animated={canFulfill && !reducedMotion}
+              phase={trimPhase}
+              reducedMotion={reducedMotion}
+            />
+          </View>
+
+          {order.flavorText && showFlavor ? (
+            <ThemedText style={styles.flavorText}>
+              {order.flavorText}
             </ThemedText>
-          </View>
-        ) : null}
-
-        <View
-          style={[
-            styles.rewardsContainer,
-            !showRewardsLabel && styles.rewardsContainerCompact,
-          ]}
-        >
-          {showRewardsLabel ? (
-            <ThemedText style={styles.rewardsLabel}>Rewards</ThemedText>
           ) : null}
-          <View style={styles.rewards}>
-            {visibleRewards.map((reward) => (
-              <LinearGradient
-                key={reward.key}
-                colors={[`${reward.color}20`, `${reward.color}10`]}
-                style={styles.rewardChip}
-              >
-                <Feather name={reward.icon} size={14} color={reward.color} />
-                <ThemedText style={[styles.rewardValue, { color: reward.color }]}>
-                  {reward.value}
-                </ThemedText>
-              </LinearGradient>
-            ))}
-            {!selected && hiddenRewardCount > 0 ? (
-              <View style={styles.moreBadge}>
-                <ThemedText style={styles.moreBadgeText}>+{hiddenRewardCount}</ThemedText>
-              </View>
-            ) : null}
-          </View>
-        </View>
 
-        <Pressable
-          onPress={() => {
-            if (canFulfill) {
-              SoundManager.play("order_complete");
-              if (hapticsEnabled) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              }
-              onFulfill();
-            } else {
-              SoundManager.play("error");
-              if (hapticsEnabled) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              }
-            }
-          }}
-          style={styles.fulfillButtonContainer}
-          testID={fulfillTestID}
-        >
-          <LinearGradient
-            colors={
-              canFulfill
-                ? [GameColors.ui.success, "#2ECC71", GameColors.ui.success]
-                : ["#2A2A4A", "#1F1F2E", "#2A2A4A"]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+          <View style={styles.requirements}>
+            {order.requirements.map((req, index) => {
+              const matching = availableParts.filter((p) =>
+                isPartValidForRequirement(p, req),
+              );
+              const hasEnough = matching.length >= req.count;
+              const familyColor =
+                req.family === "open"
+                  ? GameColors.openStandard.primary
+                  : req.family === "locked"
+                    ? GameColors.locked.primary
+                    : GameColors.text.secondary;
+
+              const showFamily = selected && req.family !== "any";
+              const showCompat = selected && req.requiresCompatible;
+              const compatColor = GameColors.ui.success;
+
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.reqTile,
+                    {
+                      borderColor: hasEnough ? `${familyColor}60` : "#2A2A4A",
+                      backgroundColor: hasEnough
+                        ? `${familyColor}12`
+                        : "#1A1A2E",
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={TIER_ICONS[req.tier]}
+                    size={14}
+                    color={hasEnough ? familyColor : GameColors.text.disabled}
+                  />
+                  <ThemedText
+                    style={[
+                      styles.reqTileText,
+                      {
+                        color: hasEnough
+                          ? GameColors.text.primary
+                          : GameColors.text.disabled,
+                      },
+                    ]}
+                  >
+                    {req.count}x {TIER_NAMES[req.tier]}
+                  </ThemedText>
+                  {showFamily ? (
+                    <View
+                      style={[
+                        styles.reqFamilyPill,
+                        { borderColor: `${familyColor}50` },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[styles.reqFamilyText, { color: familyColor }]}
+                      >
+                        {req.family === "open"
+                          ? "Open"
+                          : order.type === "locked_required"
+                            ? "Locked/Compat"
+                            : "Locked"}
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                  {showCompat ? (
+                    <View
+                      style={[
+                        styles.reqFamilyPill,
+                        { borderColor: `${compatColor}50` },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[styles.reqFamilyText, { color: compatColor }]}
+                      >
+                        Compat
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                  {hasEnough ? (
+                    <View style={styles.checkContainer}>
+                      <Feather
+                        name="check"
+                        size={12}
+                        color={GameColors.ui.success}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+
+          {showBadges && (visibleBadges.length > 0 || hiddenBadgeCount > 0) ? (
+            <View style={styles.badgeRow}>
+              {visibleBadges.map((badge) => (
+                <View
+                  key={badge.label}
+                  style={[
+                    styles.modifierBadge,
+                    { borderColor: `${badge.color}40` },
+                  ]}
+                >
+                  <Feather name={badge.icon} size={11} color={badge.color} />
+                  <ThemedText
+                    style={[styles.modifierBadgeText, { color: badge.color }]}
+                  >
+                    {badge.label}
+                  </ThemedText>
+                </View>
+              ))}
+              {!selected && hiddenBadgeCount > 0 ? (
+                <View style={styles.moreBadge}>
+                  <ThemedText style={styles.moreBadgeText}>
+                    +{hiddenBadgeCount} more
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {selected ? (
+            <View style={styles.trackingRow}>
+              <Feather name="eye" size={12} color={GameColors.ui.primary} />
+              <ThemedText style={styles.trackingText}>
+                Tracking parts on board + backpack
+              </ThemedText>
+            </View>
+          ) : null}
+
+          <View
             style={[
-              styles.fulfillButton,
-              { opacity: canFulfill ? 1 : 0.55 },
-              canFulfill && styles.fulfillButtonActive,
+              styles.rewardsContainer,
+              !showRewardsLabel && styles.rewardsContainerCompact,
             ]}
           >
-            {canFulfill ? <View style={styles.readyDot} /> : null}
-            <Feather
-              name="check-circle"
-              size={18}
-              color={canFulfill ? "#0F0F1F" : GameColors.text.disabled}
-            />
-            <ThemedText
+            {showRewardsLabel ? (
+              <ThemedText style={styles.rewardsLabel}>Rewards</ThemedText>
+            ) : null}
+            <View style={styles.rewards}>
+              {visibleRewards.map((reward) => (
+                <LinearGradient
+                  key={reward.key}
+                  colors={[`${reward.color}20`, `${reward.color}10`]}
+                  style={styles.rewardChip}
+                >
+                  <Feather name={reward.icon} size={14} color={reward.color} />
+                  <ThemedText
+                    style={[styles.rewardValue, { color: reward.color }]}
+                  >
+                    {reward.value}
+                  </ThemedText>
+                </LinearGradient>
+              ))}
+              {!selected && hiddenRewardCount > 0 ? (
+                <View style={styles.moreBadge}>
+                  <ThemedText style={styles.moreBadgeText}>
+                    +{hiddenRewardCount}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          <Pressable
+            onPress={() => {
+              if (canFulfill) {
+                SoundManager.play("order_complete");
+                if (hapticsEnabled) {
+                  Haptics.notificationAsync(
+                    Haptics.NotificationFeedbackType.Success,
+                  );
+                }
+                onFulfill();
+              } else {
+                SoundManager.play("error");
+                if (hapticsEnabled) {
+                  Haptics.notificationAsync(
+                    Haptics.NotificationFeedbackType.Error,
+                  );
+                }
+              }
+            }}
+            style={styles.fulfillButtonContainer}
+            testID={fulfillTestID}
+          >
+            <LinearGradient
+              colors={
+                canFulfill
+                  ? [GameColors.ui.success, "#2ECC71", GameColors.ui.success]
+                  : ["#2A2A4A", "#1F1F2E", "#2A2A4A"]
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
               style={[
-                styles.fulfillText,
-                { color: canFulfill ? "#0F0F1F" : GameColors.text.disabled },
+                styles.fulfillButton,
+                { opacity: canFulfill ? 1 : 0.55 },
+                canFulfill && styles.fulfillButtonActive,
               ]}
             >
-              Fulfill Order
+              {canFulfill ? <View style={styles.readyDot} /> : null}
+              <Feather
+                name="check-circle"
+                size={18}
+                color={canFulfill ? "#0F0F1F" : GameColors.text.disabled}
+              />
+              <ThemedText
+                style={[
+                  styles.fulfillText,
+                  { color: canFulfill ? "#0F0F1F" : GameColors.text.disabled },
+                ]}
+              >
+                Fulfill Order
+              </ThemedText>
+            </LinearGradient>
+          </Pressable>
+          {!canFulfill ? (
+            <ThemedText style={styles.ctaHint}>
+              {rushExpired ? "Rush expired" : "Missing parts"}
             </ThemedText>
-          </LinearGradient>
-        </Pressable>
-        {!canFulfill ? (
-          <ThemedText style={styles.ctaHint}>
-            {rushExpired ? "Rush expired" : "Missing parts"}
-          </ThemedText>
-        ) : null}
-      </LinearGradient>
-    </Animated.View>
+          ) : null}
+        </LinearGradient>
+      </Animated.View>
     </Pressable>
   );
 }

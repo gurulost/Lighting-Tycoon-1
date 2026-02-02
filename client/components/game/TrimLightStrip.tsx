@@ -11,7 +11,12 @@ import Animated, {
 import { withRepeat } from "@/lib/reanimated";
 
 export type TrimLightPattern = "warmWhite" | "classic" | "rainbow" | "baron";
-export type TrimLightAnimation = "twinkle" | "chase" | "wave" | "meteor" | "colorFade";
+export type TrimLightAnimation =
+  | "twinkle"
+  | "chase"
+  | "wave"
+  | "meteor"
+  | "colorFade";
 
 const PATTERNS: Record<TrimLightPattern, string[]> = {
   warmWhite: ["#FFE6B8"],
@@ -69,74 +74,78 @@ function Bulb({
   const bulbY = 13;
   const wireY = 6;
 
-  const animatedProps = useAnimatedProps(
-    () => {
-      if (!lit || !animated) {
-        return { opacity: lit ? 0.78 : 0.22 } as any;
+  const animatedProps = useAnimatedProps(() => {
+    if (!lit || !animated) {
+      return { opacity: lit ? 0.78 : 0.22 } as any;
+    }
+
+    const safeTotalBulbs = Math.max(1, totalBulbs);
+    const normalizedIndex = index / Math.max(1, safeTotalBulbs - 1);
+    let opacity = 0.78;
+
+    switch (animationMode) {
+      case "chase": {
+        // Lights chase along the strip - 3 bulbs lit at a time
+        const chasePos = (t.value * safeTotalBulbs) % safeTotalBulbs;
+        const dist = Math.abs(index - chasePos);
+        const wrappedDist = Math.min(dist, safeTotalBulbs - dist);
+        const chaseWidth = 3;
+        const intensity = Math.max(0, 1 - wrappedDist / chaseWidth);
+        opacity = 0.3 + 0.7 * intensity;
+        break;
       }
-
-      const safeTotalBulbs = Math.max(1, totalBulbs);
-      const normalizedIndex = index / Math.max(1, safeTotalBulbs - 1);
-      let opacity = 0.78;
-
-      switch (animationMode) {
-        case "chase": {
-          // Lights chase along the strip - 3 bulbs lit at a time
-          const chasePos = (t.value * safeTotalBulbs) % safeTotalBulbs;
-          const dist = Math.abs(index - chasePos);
-          const wrappedDist = Math.min(dist, safeTotalBulbs - dist);
-          const chaseWidth = 3;
-          const intensity = Math.max(0, 1 - wrappedDist / chaseWidth);
-          opacity = 0.3 + 0.7 * intensity;
-          break;
-        }
-        case "wave": {
-          // Smooth brightness wave propagates across
-          const wavePhase = t.value * Math.PI * 2 - normalizedIndex * Math.PI * 2;
-          const wave = 0.5 + 0.5 * Math.sin(wavePhase);
-          opacity = 0.4 + 0.6 * wave;
-          break;
-        }
-        case "meteor": {
-          // Bright head with fading tail
-          const meteorPos = t.value * (safeTotalBulbs + 4) - 2;
-          const tailLength = 5;
-          const distBehind = meteorPos - index;
-          if (distBehind >= 0 && distBehind <= tailLength) {
-            const tailIntensity = 1 - distBehind / tailLength;
-            opacity = 0.3 + 0.7 * tailIntensity * tailIntensity;
-          } else if (distBehind < 0 && distBehind > -1) {
-            opacity = 0.9;
-          } else {
-            opacity = 0.25;
-          }
-          break;
-        }
-        case "colorFade": {
-          // All lights pulse together
-          const pulse = 0.5 + 0.5 * Math.sin(t.value * Math.PI * 2);
-          opacity = 0.5 + 0.5 * pulse;
-          break;
-        }
-        case "twinkle":
-        default: {
-          // Original twinkle effect
-          const phase = index * 0.9;
-          const s = Math.sin(t.value * Math.PI * 2 + phase);
-          const twinkle = 0.5 + 0.5 * s;
-          opacity = 0.78 + 0.18 * twinkle;
-          break;
-        }
+      case "wave": {
+        // Smooth brightness wave propagates across
+        const wavePhase = t.value * Math.PI * 2 - normalizedIndex * Math.PI * 2;
+        const wave = 0.5 + 0.5 * Math.sin(wavePhase);
+        opacity = 0.4 + 0.6 * wave;
+        break;
       }
+      case "meteor": {
+        // Bright head with fading tail
+        const meteorPos = t.value * (safeTotalBulbs + 4) - 2;
+        const tailLength = 5;
+        const distBehind = meteorPos - index;
+        if (distBehind >= 0 && distBehind <= tailLength) {
+          const tailIntensity = 1 - distBehind / tailLength;
+          opacity = 0.3 + 0.7 * tailIntensity * tailIntensity;
+        } else if (distBehind < 0 && distBehind > -1) {
+          opacity = 0.9;
+        } else {
+          opacity = 0.25;
+        }
+        break;
+      }
+      case "colorFade": {
+        // All lights pulse together
+        const pulse = 0.5 + 0.5 * Math.sin(t.value * Math.PI * 2);
+        opacity = 0.5 + 0.5 * pulse;
+        break;
+      }
+      case "twinkle":
+      default: {
+        // Original twinkle effect
+        const phase = index * 0.9;
+        const s = Math.sin(t.value * Math.PI * 2 + phase);
+        const twinkle = 0.5 + 0.5 * s;
+        opacity = 0.78 + 0.18 * twinkle;
+        break;
+      }
+    }
 
-      return { opacity: clamp01(opacity) } as any;
-    },
-    [lit, animated, animationMode, totalBulbs]
-  );
+    return { opacity: clamp01(opacity) } as any;
+  }, [lit, animated, animationMode, totalBulbs]);
 
   return (
     <G>
-      <Line x1={x} y1={wireY} x2={x} y2={bulbY - r - 2} stroke={WIRE} strokeWidth={1} />
+      <Line
+        x1={x}
+        y1={wireY}
+        x2={x}
+        y2={bulbY - r - 2}
+        stroke={WIRE}
+        strokeWidth={1}
+      />
 
       <Rect
         x={x - r * 0.85}
@@ -170,7 +179,10 @@ function Bulb({
 }
 
 // Animation durations per mode (ms)
-export const TRIM_LIGHT_ANIMATION_DURATIONS: Record<TrimLightAnimation, number> = {
+export const TRIM_LIGHT_ANIMATION_DURATIONS: Record<
+  TrimLightAnimation,
+  number
+> = {
   twinkle: 2200,
   chase: 1200,
   wave: 1800,
@@ -226,7 +238,7 @@ export function TrimLightStrip({
     internalPhase.value = withRepeat(
       withTiming(1, { duration, easing: Easing.linear }),
       -1,
-      false
+      false,
     );
     return () => {
       cancelAnimation(internalPhase);
@@ -241,7 +253,14 @@ export function TrimLightStrip({
 
   return (
     <Svg width={width} height={height} viewBox={`0 0 ${viewW} ${viewH}`}>
-      <Line x1={startX} y1={6} x2={endX} y2={6} stroke={WIRE} strokeWidth={1.6} />
+      <Line
+        x1={startX}
+        y1={6}
+        x2={endX}
+        y2={6}
+        stroke={WIRE}
+        strokeWidth={1.6}
+      />
 
       {Array.from({ length: bulbs }).map((_, i) => {
         const x = startX + ((endX - startX) * i) / denom;

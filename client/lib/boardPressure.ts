@@ -12,7 +12,8 @@ export function countFreeSlots(state: BoardPressureState): number {
   let count = 0;
   for (let i = 0; i < state.boardSize; i += 1) {
     if (state.stationSlots.includes(i)) continue;
-    if (state.blockedSlots.includes(i) && !state.unlockedSlots.includes(i)) continue;
+    if (state.blockedSlots.includes(i) && !state.unlockedSlots.includes(i))
+      continue;
     if (state.board[i] === null) count += 1;
   }
   return count;

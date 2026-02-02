@@ -32,9 +32,24 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
       iconColor={GameColors.text.primary}
       headerRight={
         <View style={styles.castStrip}>
-          <AvatarImage source={tinaPortrait} size={24} borderColor="#2A2A4A" icon="smile" />
-          <AvatarImage source={mentorPortrait} size={24} borderColor="#2A2A4A" icon="user" />
-          <AvatarImage source={baronPortrait} size={24} borderColor="#2A2A4A" icon="briefcase" />
+          <AvatarImage
+            source={tinaPortrait}
+            size={24}
+            borderColor="#2A2A4A"
+            icon="smile"
+          />
+          <AvatarImage
+            source={mentorPortrait}
+            size={24}
+            borderColor="#2A2A4A"
+            icon="user"
+          />
+          <AvatarImage
+            source={baronPortrait}
+            size={24}
+            borderColor="#2A2A4A"
+            icon="briefcase"
+          />
         </View>
       }
       onClose={onClose}
@@ -48,8 +63,14 @@ export function StoryLogModal({ onClose }: StoryLogModalProps) {
       >
         {entries.length === 0 ? (
           <View style={styles.emptyState}>
-            <Feather name="message-circle" size={32} color={GameColors.text.disabled} />
-            <ThemedText style={styles.emptyText}>No story beats yet.</ThemedText>
+            <Feather
+              name="message-circle"
+              size={32}
+              color={GameColors.text.disabled}
+            />
+            <ThemedText style={styles.emptyText}>
+              No story beats yet.
+            </ThemedText>
           </View>
         ) : (
           entries.map((entry, index) => {

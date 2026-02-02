@@ -34,7 +34,11 @@ export type NormalizedCouncilPerkEffects = {
   openSupplierChargeCapAdd: number;
   openSupplierCooldownMult: number;
   projectDepositMult: number;
-  projectCompletionRewardMult: { cash: number; reputation: number; research: number };
+  projectCompletionRewardMult: {
+    cash: number;
+    reputation: number;
+    research: number;
+  };
   lobbyPressureThresholdShift: number;
   hearingPenaltyMult: number;
   hearingPayToClearCostMult: number;
@@ -91,16 +95,14 @@ export function getCouncilPerkEffects(
           : next.openOnlyDropTier2ChanceMin;
     }
     effects.openOnlyResearchBonusAdd += next.openOnlyResearchBonusAdd ?? 0;
-    effects.openOnlyPressureDecayBonus +=
-      next.openOnlyPressureDecayBonus ?? 0;
+    effects.openOnlyPressureDecayBonus += next.openOnlyPressureDecayBonus ?? 0;
     effects.compatOrderWeightMult *= next.compatOrderWeightMult ?? 1;
     effects.compatRewardMult = mergeRewardMult(
       effects.compatRewardMult,
       next.compatRewardMult,
     );
     effects.compatDifficultyBonus += next.compatDifficultyBonus ?? 0;
-    effects.ecoAuditResearchBonusMult *=
-      next.ecoAuditResearchBonusMult ?? 1;
+    effects.ecoAuditResearchBonusMult *= next.ecoAuditResearchBonusMult ?? 1;
     effects.ecoAuditRewardMult = mergeRewardMult(
       effects.ecoAuditRewardMult,
       next.ecoAuditRewardMult,
@@ -111,7 +113,8 @@ export function getCouncilPerkEffects(
     );
     if (next.recycleRewardMult) {
       effects.recycleRewardMult = {
-        cash: effects.recycleRewardMult.cash * (next.recycleRewardMult.cash ?? 1),
+        cash:
+          effects.recycleRewardMult.cash * (next.recycleRewardMult.cash ?? 1),
         research:
           effects.recycleRewardMult.research *
           (next.recycleRewardMult.research ?? 1),
@@ -124,7 +127,8 @@ export function getCouncilPerkEffects(
       effects.projectCompletionRewardMult,
       next.projectCompletionRewardMult,
     );
-    effects.lobbyPressureThresholdShift += next.lobbyPressureThresholdShift ?? 0;
+    effects.lobbyPressureThresholdShift +=
+      next.lobbyPressureThresholdShift ?? 0;
     effects.hearingPenaltyMult *= next.hearingPenaltyMult ?? 1;
     effects.hearingPayToClearCostMult *= next.hearingPayToClearCostMult ?? 1;
     effects.unlockMunicipalGrants ||= !!next.unlockMunicipalGrants;

@@ -56,7 +56,9 @@ export function MissionStrip({
               <Feather
                 name="target"
                 size={14}
-                color={locked ? GameColors.text.disabled : GameColors.ui.primary}
+                color={
+                  locked ? GameColors.text.disabled : GameColors.ui.primary
+                }
               />
             </View>
             <ThemedText style={styles.headerTitle}>Goals</ThemedText>
@@ -65,8 +67,8 @@ export function MissionStrip({
             {locked
               ? "Locked"
               : collapsed
-              ? `${missions.length} active`
-              : `${visibleCount}/${maxVisible}`}
+                ? `${missions.length} active`
+                : `${visibleCount}/${maxVisible}`}
           </ThemedText>
         </View>
 
@@ -102,7 +104,12 @@ export function MissionStrip({
                       contentFit="cover"
                     />
                   ) : (
-                    <View style={[styles.giverIcon, { borderColor: `${giver.color}80` }]}>
+                    <View
+                      style={[
+                        styles.giverIcon,
+                        { borderColor: `${giver.color}80` },
+                      ]}
+                    >
                       <Feather
                         name={giver.icon as keyof typeof Feather.glyphMap}
                         size={14}
@@ -122,7 +129,10 @@ export function MissionStrip({
                     <View style={styles.progressTrack}>
                       <LinearGradient
                         colors={[`${giver.color}80`, giver.color]}
-                        style={[styles.progressFill, { width: `${progress * 100}%` }]}
+                        style={[
+                          styles.progressFill,
+                          { width: `${progress * 100}%` },
+                        ]}
                       />
                     </View>
                   </View>
