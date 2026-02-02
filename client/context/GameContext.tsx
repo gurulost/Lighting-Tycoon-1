@@ -6338,7 +6338,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (alternatives.length === 0) return state;
       const variant =
         alternatives[Math.floor(Math.random() * alternatives.length)];
-      const rerollCount = (activeProject.rerolledStages || []).length + 1;
+      const rerollCount =
+        (activeProject.rerolledStages || []).filter(
+          (value) => value === stageIndex,
+        ).length + 1;
       const nextOrder = buildProjectStageOrder(
         state,
         project,
