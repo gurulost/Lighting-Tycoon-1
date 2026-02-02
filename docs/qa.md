@@ -81,7 +81,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Permit Expeditor adds +2 installs to deadline once per stage.
   - Site Logistics grants +2 Open supplier charges.
   - Overtime Crew grants +1 order slot for the project duration.
-  - Change Order rerolls the stage order once.
+  - Change Order swaps a stage constraint once.
 - Cancel project:
   - Contract cancels, deposit refund is reduced, and active project clears.
 

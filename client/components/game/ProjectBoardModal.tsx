@@ -318,6 +318,21 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
     activeDefinition && activeProject
       ? `Stage ${activeProject.stageIndex + 1}/${activeDefinition.stages.length}`
       : "No active project";
+  const completedProjects = state.projectsCompleted
+    .map((id) => PROJECT_DEFINITION_BY_ID.get(id))
+    .filter((project): project is ProjectDefinition => Boolean(project));
+  const completedPerks = Array.from(
+    new Set(
+      completedProjects
+        .map((project) => project.permanentPerk)
+        .filter((perk): perk is string => Boolean(perk)),
+    ),
+  );
+  const milestoneThresholds = [3, 6, 9];
+  const nextMilestone = milestoneThresholds.find((value) => completedCount < value);
+  const milestoneProgressLabel = nextMilestone
+    ? `${completedCount}/${nextMilestone}`
+    : "All milestones complete";
 
   const progressRate =
     activeDefinition && activeProject
@@ -479,6 +494,65 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                 })}
               </View>
             )}
+
+            <View style={styles.sectionBlock}>
+              <ThemedText style={styles.sectionTitle}>Empire milestones</ThemedText>
+              <View style={styles.milestoneRow}>
+                {milestoneThresholds.map((threshold) => {
+                  const achieved = completedCount >= threshold;
+                  return (
+                    <View
+                      key={`milestone-${threshold}`}
+                      style={[
+                        styles.milestoneChip,
+                        achieved && styles.milestoneChipActive,
+                      ]}
+                    >
+                      <Feather
+                        name={achieved ? "check-circle" : "circle"}
+                        size={12}
+                        color={achieved ? GameColors.ui.success : GameColors.text.secondary}
+                      />
+                      <ThemedText
+                        style={[
+                          styles.milestoneText,
+                          achieved && styles.milestoneTextActive,
+                        ]}
+                      >
+                        {threshold} projects · +1 slot
+                      </ThemedText>
+                    </View>
+                  );
+                })}
+              </View>
+              {nextMilestone ? (
+                <ThemedText style={styles.milestoneProgress}>
+                  Next milestone: {milestoneProgressLabel}
+                </ThemedText>
+              ) : (
+                <ThemedText style={styles.milestoneProgress}>
+                  {milestoneProgressLabel}
+                </ThemedText>
+              )}
+            </View>
+
+            <View style={styles.sectionBlock}>
+              <ThemedText style={styles.sectionTitle}>Perks unlocked</ThemedText>
+              {completedPerks.length === 0 ? (
+                <ThemedText style={styles.emptySubtitle}>
+                  Finish your first project to unlock a legacy perk.
+                </ThemedText>
+              ) : (
+                <View style={styles.perkList}>
+                  {completedPerks.map((perk, index) => (
+                    <View key={`${perk}-${index}`} style={styles.perkRow}>
+                      <Feather name="star" size={12} color={GameColors.currency.reputation} />
+                      <ThemedText style={styles.perkText}>{perk}</ThemedText>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
         ) : (
           <View style={styles.activeSection}>
@@ -630,7 +704,7 @@ export function ProjectBoardModal({ onClose }: { onClose: () => void }) {
                     />
                     <AddonToggle
                       label="Change Order"
-                      description="Reroll stage order once."
+                      description="Swap stage constraint once."
                       cost={tuning.projects.addonChangeOrderCost}
                       selected={false}
                       disabled={rerollUsed || !canAffordChangeOrder}
@@ -802,6 +876,36 @@ const styles = StyleSheet.create({
   offerList: {
     gap: Spacing.lg,
   },
+  milestoneRow: {
+    gap: Spacing.sm,
+  },
+  milestoneChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#151525",
+  },
+  milestoneChipActive: {
+    borderColor: `${GameColors.ui.success}60`,
+    backgroundColor: `${GameColors.ui.success}12`,
+  },
+  milestoneText: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
+    fontWeight: "600",
+  },
+  milestoneTextActive: {
+    color: GameColors.ui.success,
+  },
+  milestoneProgress: {
+    fontSize: 11,
+    color: GameColors.text.secondary,
+  },
   offerCard: {
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
@@ -965,6 +1069,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
     textAlign: "center",
+  },
+  perkList: {
+    gap: Spacing.sm,
+  },
+  perkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#151525",
+  },
+  perkText: {
+    fontSize: 12,
+    color: GameColors.text.primary,
   },
   activeSection: {
     gap: Spacing.lg,

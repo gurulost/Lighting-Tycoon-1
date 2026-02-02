@@ -47,7 +47,7 @@ Tina intent: I’m not just keeping the shop alive; I’m building landmarks. St
 - Each stage is a normal order tagged `project_stage` and cannot be refreshed/dismissed.
 - Action deadlines count down by non-project fulfillments (no real-time timers).
 - Failure penalties: lose deposit, add Baron pressure, or temporary rep debuff.
-- Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (reroll stage order once).
+- Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (swap a stage constraint once).
 - Completion grants large cash/research/rep and advances Empire milestones.
 - Empire milestones: completing 3/6/9 projects grants +1 base order slot each time.
 

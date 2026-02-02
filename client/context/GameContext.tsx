@@ -118,7 +118,6 @@ type GameAction =
       };
     }
   | { type: "PROJECT_CANCEL" }
-  | { type: "PROJECT_STAGE_ADVANCE" }
   | { type: "PROJECT_STAGE_FAIL" }
   | {
       type: "PROJECT_ADDON_PURCHASE";
@@ -741,7 +740,7 @@ function getProjectStageDeadline(
 }
 
 function canOfferProject(project: ProjectDefinition, state: GameState) {
-  if (state.gamePhase !== 2) return false;
+  if (state.gamePhase < project.unlock.phaseMin) return false;
   if (state.reputationTier < project.unlock.minRepTier) return false;
   const completedCount = state.projectsCompleted.length;
   if (
@@ -760,18 +759,25 @@ function generateProjectOffers(state: GameState, count = 3): ProjectOffer[] {
   );
   if (candidates.length === 0) return [];
   const offers: ProjectOffer[] = [];
-  const usedIds = new Set<string>();
-  let attempts = 0;
-  while (offers.length < count && attempts < count * 6) {
-    attempts += 1;
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    if (!pick || usedIds.has(pick.id)) continue;
-    usedIds.add(pick.id);
+  const available = [...candidates];
+  while (offers.length < count && available.length > 0) {
+    const weighted = available.map((project) => ({
+      ...project,
+      weight: project.offerWeight ?? 1,
+    }));
+    const pick = pickWeightedTemplate(weighted);
+    if (!pick) break;
     offers.push({
       projectId: pick.id,
       seed: Math.floor(Math.random() * 1000000),
       generatedAt: now,
     });
+    const removeIndex = available.findIndex((project) => project.id === pick.id);
+    if (removeIndex >= 0) {
+      available.splice(removeIndex, 1);
+    } else {
+      break;
+    }
   }
   return offers;
 }
@@ -1559,8 +1565,15 @@ function getProjectBaseRecipe(
   rng: () => number,
 ) {
   const [rawMin, rawMax] = stage.orderSpec.targetTierRange;
-  const minTier = Math.max(1, Math.min(rawMin, rawMax));
-  const maxTier = Math.min(10, Math.max(rawMin, rawMax));
+  const difficultyBonus = stage.orderSpec.difficultyBonus ?? 0;
+  const minTier = Math.max(
+    1,
+    Math.min(rawMin, rawMax) + Math.floor(difficultyBonus),
+  );
+  const maxTier = Math.min(
+    10,
+    Math.max(rawMin, rawMax) + Math.floor(difficultyBonus),
+  );
   const candidates = BASE_RECIPES.filter((recipe) => {
     const recipeMax = Math.max(...recipe.requirements.map((req) => req.tier));
     return recipeMax >= minTier && recipeMax <= maxTier;
@@ -1598,25 +1611,63 @@ function applyProjectStageRequirements(
   return { requirements: next, type };
 }
 
+type ProjectModifierVariant = {
+  ecoAudit: boolean;
+  rush: boolean;
+  noSubstitutions: boolean;
+};
+
+function getProjectStageModifierVariants(
+  stage: ProjectStageDefinition,
+): ProjectModifierVariant[] {
+  const base: ProjectModifierVariant = {
+    ecoAudit: !!stage.orderSpec.ecoAudit,
+    rush: !!stage.orderSpec.rush,
+    noSubstitutions: !!stage.orderSpec.noSubstitutions,
+  };
+  const candidates: ProjectModifierVariant[] = [
+    base,
+    { ecoAudit: true, rush: false, noSubstitutions: false },
+    { ecoAudit: false, rush: true, noSubstitutions: false },
+    { ecoAudit: false, rush: false, noSubstitutions: true },
+    { ecoAudit: false, rush: false, noSubstitutions: false },
+  ];
+  const unique = new Map<string, ProjectModifierVariant>();
+  for (const variant of candidates) {
+    const key = `${Number(variant.ecoAudit)}-${Number(variant.rush)}-${Number(
+      variant.noSubstitutions,
+    )}`;
+    unique.set(key, variant);
+  }
+  return Array.from(unique.values());
+}
+
 function buildProjectStageOrder(
   state: GameState,
   project: ProjectDefinition,
   stage: ProjectStageDefinition,
   seed: number,
   rerollCount = 0,
+  modifierVariant?: ProjectModifierVariant,
 ): Order {
   const seedKey = hashString(`${seed}:${project.id}:${stage.stageIndex}:${rerollCount}`);
   const rng = createSeededRng(seedKey);
   const baseRecipe = getProjectBaseRecipe(stage, rng);
-  const derived = applyProjectStageRequirements(baseRecipe.requirements, stage);
+  const spec = modifierVariant
+    ? { ...stage.orderSpec, ...modifierVariant }
+    : stage.orderSpec;
+  const derived = applyProjectStageRequirements(
+    baseRecipe.requirements,
+    { ...stage, orderSpec: spec },
+  );
 
   const rewardModifierIds: string[] = [];
-  if (stage.orderSpec.requiresOpenOnly) rewardModifierIds.push("mod_style_open");
-  if (stage.orderSpec.requiresCompatibility)
+  if (spec.requiresOpenOnly) rewardModifierIds.push("mod_style_open");
+  if (spec.requiresCompatibility)
     rewardModifierIds.push("mod_compatible");
-  if (stage.orderSpec.ecoAudit) rewardModifierIds.push("mod_eco_audit");
-  if (stage.orderSpec.rush) rewardModifierIds.push("mod_rush_60");
-  if (stage.orderSpec.noSubstitutions) rewardModifierIds.push("mod_no_sub");
+  if (spec.ecoAudit) rewardModifierIds.push("mod_eco_audit");
+  if (spec.rush) rewardModifierIds.push("mod_rush_60");
+  if (spec.noSubstitutions) rewardModifierIds.push("mod_no_sub");
 
   const baseRewards = computeCustomOrderRewards({
     requirements: derived.requirements,
@@ -1639,21 +1690,18 @@ function buildProjectStageOrder(
     rewards.research += stage.stageRewards.researchBonusFlat;
   }
 
-  const ecoAuditBonus =
-    stage.orderSpec.ecoAudit
-      ? 15
-      : undefined;
-  const rushDeadline = stage.orderSpec.rush ? 60000 : undefined;
+  const ecoAuditBonus = spec.ecoAudit ? 15 : undefined;
+  const rushDeadline = spec.rush ? 60000 : undefined;
 
   const modifierIds = [
     "project_stage",
     getProjectStageTag(project.id, stage.stageIndex),
   ];
-  if (stage.orderSpec.requiresOpenOnly) modifierIds.push("project_open_only");
-  if (stage.orderSpec.requiresCompatibility)
+  if (spec.requiresOpenOnly) modifierIds.push("project_open_only");
+  if (spec.requiresCompatibility)
     modifierIds.push("project_compatibility");
-  if (stage.orderSpec.ecoAudit) modifierIds.push("project_eco_audit");
-  if (stage.orderSpec.rush) modifierIds.push("project_rush");
+  if (spec.ecoAudit) modifierIds.push("project_eco_audit");
+  if (spec.rush) modifierIds.push("project_rush");
 
   return withTunedRewards({
     id: generateId(),
@@ -1667,7 +1715,7 @@ function buildProjectStageOrder(
     ecoAuditBonusResearch: ecoAuditBonus,
     rushDeadline,
     rushStartTime: rushDeadline ? Date.now() : undefined,
-    noSubstitutions: stage.orderSpec.noSubstitutions || false,
+    noSubstitutions: spec.noSubstitutions || false,
   });
 }
 
@@ -4347,6 +4395,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let projectStageBeatId: string | null = null;
       let projectCompleteBeatId: string | null = null;
       let projectUnlockBeatId: string | null = null;
+      let projectOfferBeatId: string | null = null;
       let projectStageFailed = false;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
@@ -4833,6 +4882,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             { ...state, projectsCompleted: nextProjectsCompleted },
             3,
           );
+          if (
+            nextProjectOffers.length > 0 &&
+            !state.storySeen["project_offer_generic"]
+          ) {
+            projectOfferBeatId = "project_offer_generic";
+          }
           projectCompleteBeatId = project.narrativeBeats?.complete || null;
         } else {
           const nextStageIndex = stage.stageIndex + 1;
@@ -4945,6 +5000,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextProjectsUnlocked = true;
         if (nextProjectOffers.length === 0) {
           nextProjectOffers = generateProjectOffers(state, 3);
+        }
+        if (
+          nextProjectOffers.length > 0 &&
+          !state.storySeen["project_offer_generic"]
+        ) {
+          projectOfferBeatId = "project_offer_generic";
         }
         projectUnlockBeatId = "mentor_empire_contracts";
       }
@@ -5116,6 +5177,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               active.project.narrativeBeats.fail,
             );
           }
+          if (
+            nextState.projectOffers.length > 0 &&
+            !state.storySeen["project_offer_generic"]
+          ) {
+            nextState = queueStoryBeat(nextState, "project_offer_generic");
+          }
         }
       } else {
         if (projectStageBeatId) {
@@ -5126,6 +5193,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         if (projectUnlockBeatId) {
           nextState = queueStoryBeat(nextState, projectUnlockBeatId);
+        }
+        if (projectOfferBeatId) {
+          nextState = queueStoryBeat(nextState, projectOfferBeatId);
         }
       }
 
@@ -5815,10 +5885,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "PROJECT_GENERATE_OFFERS": {
       if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
-      return {
+      const offers = generateProjectOffers(state, 3);
+      let nextState: GameState = {
         ...state,
-        projectOffers: generateProjectOffers(state, 3),
+        projectOffers: offers,
       };
+      if (
+        offers.length > 0 &&
+        !state.storySeen["project_offer_generic"]
+      ) {
+        nextState = queueStoryBeat(nextState, "project_offer_generic");
+      }
+      return nextState;
     }
 
     case "PROJECT_REFRESH_OFFERS": {
@@ -5832,12 +5910,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: refreshCost,
         reason: "project_offer_refresh",
       });
-      return {
+      const offers = generateProjectOffers(state, 3);
+      let nextState: GameState = {
         ...state,
         cash: state.cash - refreshCost,
-        projectOffers: generateProjectOffers(state, 3),
+        projectOffers: offers,
         undoSnapshot: undefined,
       };
+      if (
+        offers.length > 0 &&
+        !state.storySeen["project_offer_generic"]
+      ) {
+        nextState = queueStoryBeat(nextState, "project_offer_generic");
+      }
+      return nextState;
     }
 
     case "PROJECT_ACCEPT": {
@@ -5886,7 +5972,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           open: {
             ...state.suppliers.open,
             chargesRemaining: state.suppliers.open.chargesRemaining + 2,
-            overdrawCount: 0,
           },
         };
       }
@@ -5972,6 +6057,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (beatId) {
         nextState = queueStoryBeat(nextState, beatId);
       }
+      if (
+        nextState.projectOffers.length > 0 &&
+        !state.storySeen["project_offer_generic"]
+      ) {
+        nextState = queueStoryBeat(nextState, "project_offer_generic");
+      }
       captureEvent("project_cancel", {
         projectId: project.id,
         refund,
@@ -6005,6 +6096,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const beatId = active.project.narrativeBeats?.fail;
       if (beatId) {
         nextState = queueStoryBeat(nextState, beatId);
+      }
+      if (
+        nextState.projectOffers.length > 0 &&
+        !state.storySeen["project_offer_generic"]
+      ) {
+        nextState = queueStoryBeat(nextState, "project_offer_generic");
       }
       captureEvent("project_stage_fail", {
         projectId: active.project.id,
@@ -6124,6 +6221,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         order.modifierIds?.includes(getProjectStageTag(project.id, stageIndex)),
       );
       if (!existingOrder) return state;
+      const variants = getProjectStageModifierVariants(stage);
+      const baseKey = `${Number(!!stage.orderSpec.ecoAudit)}-${Number(
+        !!stage.orderSpec.rush,
+      )}-${Number(!!stage.orderSpec.noSubstitutions)}`;
+      const alternatives = variants.filter((variant) => {
+        const key = `${Number(variant.ecoAudit)}-${Number(variant.rush)}-${Number(
+          variant.noSubstitutions,
+        )}`;
+        return key !== baseKey;
+      });
+      if (alternatives.length === 0) return state;
+      const variant =
+        alternatives[Math.floor(Math.random() * alternatives.length)];
       const rerollCount = (activeProject.rerolledStages || []).length + 1;
       const nextOrder = buildProjectStageOrder(
         state,
@@ -6131,12 +6241,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         stage,
         activeProject.seed,
         rerollCount,
+        variant,
       );
       const remainingOrders = state.orders.filter(
         (order) => order.id !== existingOrder.id,
       );
       const nextOrders = [...remainingOrders, nextOrder];
       usedStages.add(stageIndex);
+      const nextHighlightedOrderId =
+        state.highlightedOrderId === existingOrder.id
+          ? nextOrder.id
+          : state.highlightedOrderId;
       captureEvent("project_change_order", {
         projectId: project.id,
         stageIndex,
@@ -6151,6 +6266,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         cash: state.cash - cost,
         orders: nextOrders,
         orderMetrics: updateOrderMetrics(state, nextOrder),
+        highlightedOrderId: nextHighlightedOrderId,
         activeProject: {
           ...activeProject,
           rerolledStages: Array.from(usedStages),
@@ -7823,7 +7939,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const projectsUnlocked =
         typeof projectsUnlockedRaw === "boolean"
           ? projectsUnlockedRaw
-          : gamePhase === 2 && phase2GoalSeen;
+          : gamePhase === 2 && !hasPhase2GoalOrder && !phase2GoalPending;
       const projectOffers = Array.isArray(action.state.projectOffers)
         ? (action.state.projectOffers as ProjectOffer[]).filter(
             (offer) =>

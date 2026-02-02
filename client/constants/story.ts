@@ -228,7 +228,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     id: "project_offer_generic",
     speaker: "mentor",
     line1: "Empire contract offers are live. Big deposits, bigger leverage.",
-    onceOnly: false,
+    onceOnly: true,
     portrait: "focused",
     category: "mentor_tip",
   },

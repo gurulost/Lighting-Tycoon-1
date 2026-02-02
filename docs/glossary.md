@@ -82,4 +82,4 @@ Use this as a quick reference for every icon, badge, and system.
 - Deposit: large upfront cash sink required to accept a contract.
 - Project Stages: protected orders that must be completed in sequence.
 - Action Deadlines: countdown of non-project installs; failing it triggers penalties.
-- Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (reroll stage order once).
+- Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (swap a stage constraint once).
