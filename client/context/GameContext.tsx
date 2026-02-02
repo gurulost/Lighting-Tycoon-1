@@ -1691,7 +1691,7 @@ function buildProjectStageOrder(
   }
 
   const ecoAuditBonus = spec.ecoAudit ? 15 : undefined;
-  const rushDeadline = spec.rush ? 60000 : undefined;
+  const rushDeadline = undefined;
 
   const modifierIds = [
     "project_stage",
@@ -1736,18 +1736,31 @@ function stripProjectOrders(orders: Order[]) {
 }
 
 function removeProjectSiteLogisticsCharges(
-  suppliers: GameState["suppliers"],
+  state: GameState,
   activeProject?: ActiveProject,
 ) {
   const bonus = activeProject?.siteLogisticsBonusCharges ?? 0;
-  if (bonus <= 0) return suppliers;
-  const nextCharges = Math.max(0, suppliers.open.chargesRemaining - bonus);
-  const nextOverdrawCount = nextCharges > 0 ? 0 : suppliers.open.overdrawCount;
+  if (bonus <= 0) return state.suppliers;
+  const openSupplier = state.suppliers.open;
+  const nextCharges = Math.max(0, openSupplier.chargesRemaining - bonus);
+  const nextOverdrawCount = nextCharges > 0 ? 0 : openSupplier.overdrawCount;
+  let nextCooldownEndsAt = openSupplier.cooldownEndsAt;
+  if (
+    openSupplier.level > 0 &&
+    openSupplier.chargesRemaining > 0 &&
+    nextCharges === 0 &&
+    openSupplier.cooldownEndsAt <= Date.now()
+  ) {
+    const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+    const config = getEffectiveSupplierConfig("open", openSupplier.level, speedLevel);
+    nextCooldownEndsAt = Date.now() + config.cooldownMs;
+  }
   return {
-    ...suppliers,
+    ...state.suppliers,
     open: {
-      ...suppliers.open,
+      ...openSupplier,
       chargesRemaining: nextCharges,
+      cooldownEndsAt: nextCooldownEndsAt,
       overdrawCount: nextOverdrawCount,
     },
   };
@@ -4922,7 +4935,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           });
 
           nextSuppliers = removeProjectSiteLogisticsCharges(
-            nextSuppliers,
+            { ...state, suppliers: nextSuppliers },
             state.activeProject,
           );
           updatedOrders = stripProjectOrders(updatedOrders);
@@ -5223,7 +5236,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             orders,
             highlightedOrderId: nextHighlightedOrderId,
             suppliers: removeProjectSiteLogisticsCharges(
-              nextState.suppliers,
+              nextState,
               nextState.activeProject,
             ),
             activeProject: undefined,
@@ -6110,7 +6123,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? state.highlightedOrderId
           : undefined;
       const nextSuppliers = removeProjectSiteLogisticsCharges(
-        state.suppliers,
+        state,
         activeProject,
       );
       const nextStateBase: GameState = {
@@ -6160,7 +6173,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? state.highlightedOrderId
           : undefined;
       const nextSuppliers = removeProjectSiteLogisticsCharges(
-        state.suppliers,
+        state,
         state.activeProject,
       );
       const nextStateBase: GameState = {
@@ -8531,7 +8544,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               ? restoredState.highlightedOrderId
               : undefined;
           const nextSuppliers = removeProjectSiteLogisticsCharges(
-            restoredState.suppliers,
+            restoredState,
             restoredState.activeProject,
           );
           restoredState = {
@@ -8591,7 +8604,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   ? restoredState.highlightedOrderId
                   : undefined;
               const nextSuppliers = removeProjectSiteLogisticsCharges(
-                restoredState.suppliers,
+                restoredState,
                 restoredState.activeProject,
               );
               restoredState = {

@@ -48,6 +48,7 @@ Tina intent: I’m not just keeping the shop alive; I’m building landmarks. Th
 - Action deadlines count down by non-project fulfillments (no real-time timers).
 - Failure penalties: lose deposit, add Baron pressure, or temporary rep debuff.
 - Failure refunds: pressure/rep penalties return the deposit; lose-deposit returns only the remainder.
+- Rush stages are non-timed; urgency is handled by action deadlines instead of real-time expiry.
 - Add-ons: Permit Expeditor (+2 installs), Site Logistics (+2 Open charges), Overtime Crew (+1 order slot), Change Order (swap a stage constraint once).
 - Site Logistics charges are scoped to the active project and removed when the project ends.
 - Completion grants large cash/research/rep and advances Empire milestones.

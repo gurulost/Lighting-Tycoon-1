@@ -193,7 +193,8 @@ export function OrderCard({
   const getOrderTypeColor = () => {
     if (order.type === "locked_required") return GameColors.locked.primary;
     if (order.type === "compatibility_required") return GameColors.ui.success;
-    if (order.rushDeadline) return GameColors.ui.danger;
+    if (order.rushDeadline || order.modifierIds?.includes("project_rush"))
+      return GameColors.ui.danger;
     switch (order.type) {
       case "premium":
         return GameColors.currency.cash;
@@ -296,6 +297,9 @@ export function OrderCard({
         : "RUSH";
       return { label, color: GameColors.ui.danger, icon: "clock" as const };
     }
+    if (order.modifierIds?.includes("project_rush")) {
+      return { label: "RUSH", color: GameColors.ui.danger, icon: "clock" as const };
+    }
     if (order.type === "locked_required" || order.type === "baron_certified") {
       return { label: "CERTIFIED", color: GameColors.locked.primary, icon: "lock" as const };
     }
@@ -354,7 +358,7 @@ export function OrderCard({
         icon: "book-open",
       });
     }
-    if (order.rushDeadline) {
+    if (order.rushDeadline || order.modifierIds?.includes("project_rush")) {
       badges.push({ label: "Rush", color: GameColors.ui.danger, icon: "clock" });
     }
     if (order.type === "style_match") {
