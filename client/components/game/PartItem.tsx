@@ -21,10 +21,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
-import {
-  TrimLightStrip,
-  TrimLightAnimation,
-} from "@/components/game/TrimLightStrip";
+import { TrimLightStrip } from "@/components/game/TrimLightStrip";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
@@ -63,19 +60,6 @@ const PART_SPRITES: Record<
   8: { open: partStackOpen, locked: partStackLocked },
   9: { open: partGridOpen, locked: partGridLocked },
   10: { open: partKingdomOpen, locked: partKingdomLocked },
-};
-
-const TIER_NAMES: Record<PartTier, string> = {
-  1: "Clip",
-  2: "Track",
-  3: "Segment",
-  4: "Kit",
-  5: "Premium",
-  6: "Array",
-  7: "Spine",
-  8: "Stack",
-  9: "Grid",
-  10: "Kingdom",
 };
 
 interface PartItemProps {
@@ -179,7 +163,7 @@ export function PartItem({
       withTiming(1.5, { duration: 100 }),
       withTiming(0, { duration: 400 }),
     );
-  }, []);
+  }, [dragPreview, reducedMotion, scale, spawnGlow]);
 
   // Ambient glow pulse
   React.useEffect(() => {
@@ -519,7 +503,7 @@ export function MergeAnimation({
         }
       }),
     );
-  }, []);
+  }, [localOpacity, onComplete, rotation, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],

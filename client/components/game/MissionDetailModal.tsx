@@ -45,11 +45,11 @@ function MissionCard({
 }) {
   const giver = getMissionGiverMeta(mission.giver);
   const progress = Math.min(1, mission.progress / mission.target);
-  const rewardChips: Array<{
+  const rewardChips: {
     icon: keyof typeof Feather.glyphMap;
     color: string;
     label: string;
-  }> = [];
+  }[] = [];
 
   if (mission.reward.cash) {
     rewardChips.push({

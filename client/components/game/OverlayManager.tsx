@@ -79,7 +79,7 @@ export function OverlayManager({
     if (!primary) return;
     const waitMs = Math.max(0, Date.now() - primary.createdAt);
     onTelemetry?.(waitMs);
-  }, [primary?.id, primary?.createdAt, onTelemetry]);
+  }, [primary, primary?.id, primary?.createdAt, onTelemetry]);
   const secondary = useMemo(() => {
     if (!primary) return undefined;
     const allowed = OVERLAY_COEXISTENCE[primary.type] ?? [];
@@ -111,6 +111,7 @@ export function OverlayManager({
     const timeout = setTimeout(() => onDismiss(primary.id), ttl - elapsed);
     return () => clearTimeout(timeout);
   }, [
+    primary,
     primary?.id,
     primary?.sticky,
     primary?.type,
@@ -132,6 +133,7 @@ export function OverlayManager({
     const timeout = setTimeout(() => onDismiss(secondary.id), ttl - elapsed);
     return () => clearTimeout(timeout);
   }, [
+    secondary,
     secondary?.id,
     secondary?.sticky,
     secondary?.type,

@@ -69,7 +69,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 2,
     title: "Step Up",
-    description: "Merge two Tracks into a Segment. Higher tiers unlock better orders.",
+    description:
+      "Merge two Tracks into a Segment. Higher tiers unlock better orders.",
     icon: "shuffle",
     highlight: "board",
     color: GameColors.openStandard.primary,

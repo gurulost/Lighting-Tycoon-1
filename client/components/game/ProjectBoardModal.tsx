@@ -223,9 +223,7 @@ function ProjectOfferCard({
       {onViewDossier ? (
         <Pressable style={styles.dossierButton} onPress={onViewDossier}>
           <Feather name="book" size={12} color={GameColors.ui.primary} />
-          <ThemedText style={styles.dossierButtonText}>
-            View dossier
-          </ThemedText>
+          <ThemedText style={styles.dossierButtonText}>View dossier</ThemedText>
         </Pressable>
       ) : null}
 
@@ -484,7 +482,11 @@ export function ProjectBoardModal({
           {(["offers", "active", "trophies"] as TabKey[]).map((tab) => {
             const selected = activeTab === tab;
             const label =
-              tab === "offers" ? "Offers" : tab === "active" ? "Active" : "Trophies";
+              tab === "offers"
+                ? "Offers"
+                : tab === "active"
+                  ? "Active"
+                  : "Trophies";
             const disabled = tab === "active" && !activeProject;
             return (
               <Pressable
@@ -684,30 +686,27 @@ export function ProjectBoardModal({
                 </ThemedText>
               ) : (
                 <View style={styles.perkList}>
-                {completedPerks.map((perk, index) => (
-                  <View
-                    key={`${perk.name}-${index}`}
-                    style={styles.perkRow}
-                  >
-                    <Feather
-                      name="star"
-                      size={12}
-                      color={GameColors.currency.reputation}
-                    />
-                    <View style={styles.perkTextBlock}>
-                      <ThemedText style={styles.perkText}>
-                        {perk.name}
-                      </ThemedText>
-                      {perk.description ? (
-                        <ThemedText style={styles.perkDescription}>
-                          {perk.description}
+                  {completedPerks.map((perk, index) => (
+                    <View key={`${perk.name}-${index}`} style={styles.perkRow}>
+                      <Feather
+                        name="star"
+                        size={12}
+                        color={GameColors.currency.reputation}
+                      />
+                      <View style={styles.perkTextBlock}>
+                        <ThemedText style={styles.perkText}>
+                          {perk.name}
                         </ThemedText>
-                      ) : null}
+                        {perk.description ? (
+                          <ThemedText style={styles.perkDescription}>
+                            {perk.description}
+                          </ThemedText>
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
-                ))}
-              </View>
-            )}
+                  ))}
+                </View>
+              )}
             </View>
           </View>
         ) : activeTab === "trophies" ? (
@@ -717,11 +716,7 @@ export function ProjectBoardModal({
                 Trophy cabinet
               </ThemedText>
               <View style={styles.trophyCountChip}>
-                <Feather
-                  name="award"
-                  size={12}
-                  color={GameColors.ui.success}
-                />
+                <Feather name="award" size={12} color={GameColors.ui.success} />
                 <ThemedText style={styles.trophyCountText}>
                   {completedCount}/{trophyProjects.length}
                 </ThemedText>

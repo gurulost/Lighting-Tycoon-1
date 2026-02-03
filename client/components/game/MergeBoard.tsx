@@ -16,7 +16,6 @@ import {
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withSequence,
   withTiming,
   FadeIn,
@@ -365,30 +364,32 @@ export function MergeBoard({
   const gridHeight = GRID_ROWS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
   const stationScale = 1.08;
   const stationOffset = Math.max(Spacing.xs, Math.round(tileSize * 0.08));
-  const stationTransforms: Record<number, { transform: ViewStyle["transform"] }> =
-    {
-      [WORKBENCH_SLOT]: {
-        transform: [
-          { translateX: -stationOffset },
-          { translateY: -stationOffset },
-          { scale: stationScale },
-        ],
-      },
-      [ORDER_INBOX_SLOT]: {
-        transform: [
-          { translateX: stationOffset },
-          { translateY: -stationOffset },
-          { scale: stationScale },
-        ],
-      },
-      [RD_BENCH_SLOT]: {
-        transform: [
-          { translateX: -stationOffset },
-          { translateY: stationOffset },
-          { scale: stationScale },
-        ],
-      },
-    };
+  const stationTransforms: Record<
+    number,
+    { transform: ViewStyle["transform"] }
+  > = {
+    [WORKBENCH_SLOT]: {
+      transform: [
+        { translateX: -stationOffset },
+        { translateY: -stationOffset },
+        { scale: stationScale },
+      ],
+    },
+    [ORDER_INBOX_SLOT]: {
+      transform: [
+        { translateX: stationOffset },
+        { translateY: -stationOffset },
+        { scale: stationScale },
+      ],
+    },
+    [RD_BENCH_SLOT]: {
+      transform: [
+        { translateX: -stationOffset },
+        { translateY: stationOffset },
+        { scale: stationScale },
+      ],
+    },
+  };
   const desiredBackpackSlotSize = Math.round(tileSize * 0.8);
   const maxBackpackSlotSize = Math.floor(
     (gridWidth - (backpackSlotCount - 1) * backpackGap) / backpackSlotCount,
@@ -1134,6 +1135,7 @@ export function MergeBoard({
       movePart,
       hapticsEnabled,
       reducedMotion,
+      playMergeSound,
       recycleLayout,
       backpackSlotRects,
       gridLayout,
@@ -1764,10 +1766,7 @@ export function MergeBoard({
         {onUndo ? (
           <View style={styles.undoSection}>
             <Pressable
-              style={[
-                styles.undoButton,
-                !canUndo && styles.undoButtonDisabled,
-              ]}
+              style={[styles.undoButton, !canUndo && styles.undoButtonDisabled]}
               onPress={canUndo ? onUndo : undefined}
             >
               <Feather

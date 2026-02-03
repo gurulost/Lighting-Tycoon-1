@@ -152,7 +152,7 @@ export function DependencyMeter({
       cancelAnimation(warningPulse);
       cancelAnimation(pulseScale);
     };
-  }, [value, reducedMotion, warningPulse, pulseScale]);
+  }, [value, reducedMotion, warningPulse, pulseScale, baronOpacity, prevValue]);
 
   useEffect(() => {
     progressRef.current = smoothProgress;
@@ -200,7 +200,7 @@ export function DependencyMeter({
         animationRef.current = null;
       }
     };
-  }, [value]);
+  }, [value, reducedMotion]);
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
@@ -327,7 +327,10 @@ export function DependencyMeter({
               {Math.round(value)}%
             </ThemedText>
             <ThemedText
-              style={[styles.valueDivider, compact && styles.valueDividerCompact]}
+              style={[
+                styles.valueDivider,
+                compact && styles.valueDividerCompact,
+              ]}
             >
               ·
             </ThemedText>

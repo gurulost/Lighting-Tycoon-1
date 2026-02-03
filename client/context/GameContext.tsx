@@ -1014,8 +1014,7 @@ function updateProjectRevealQueue(
   offers: ProjectOffer[],
 ): string[] {
   const nextQueue = queue.filter(
-    (projectId) =>
-      !seen[projectId] && PROJECT_DEFINITION_BY_ID.has(projectId),
+    (projectId) => !seen[projectId] && PROJECT_DEFINITION_BY_ID.has(projectId),
   );
   offers.forEach((offer) => {
     if (seen[offer.projectId]) return;
@@ -3059,7 +3058,9 @@ function placePartOnBoardOrBackpack(
   return { board: [...board], backpack: [...backpack], placed: false };
 }
 
-function getTutorialLockedMergeStatus(state: GameState): {
+function getTutorialLockedMergeStatus(
+  state: Pick<GameState, "board" | "backpack">,
+): {
   targetTier: PartTier;
   needsLocked: boolean;
   needsOpen: boolean;
@@ -5106,7 +5107,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const isLockoutOrder =
         order.isLockout || order.id === state.lockoutOrderId;
       let nextLockoutPhase = state.lockoutPhase;
-      let nextLockoutActive = state.lockoutActive;
       let nextLockoutChoice = state.lockoutChoice;
       let nextLockoutOrderId = state.lockoutOrderId;
       let nextLabRemaining = state.lockoutLabOrdersRemaining;
@@ -5829,11 +5829,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           projectOfferRefreshMode === "force" ||
           (projectOfferRefreshMode === "if_empty" &&
             nextProjectOffers.length === 0);
-          if (shouldRefresh) {
-            const repAfterRewards = state.reputation + repReward;
-            const neighborhoodAfterRewards =
-              getNeighborhoodByRep(repAfterRewards);
-            const offersState: GameState = {
+        if (shouldRefresh) {
+          const repAfterRewards = state.reputation + repReward;
+          const neighborhoodAfterRewards =
+            getNeighborhoodByRep(repAfterRewards);
+          const offersState: GameState = {
             ...state,
             gamePhase: nextGamePhase,
             reputation: repAfterRewards,
@@ -5843,17 +5843,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             projectsUnlocked: nextProjectsUnlocked,
             activeProject: nextActiveProject,
           };
-            nextProjectOffers = generateProjectOffers(offersState, 3);
-            nextProjectRevealQueue = updateProjectRevealQueue(
-              nextProjectRevealQueue,
-              state.projectRevealSeen,
-              nextProjectOffers,
-            );
-            if (
-              nextProjectOffers.length > 0 &&
-              !state.storySeen["project_offer_generic"] &&
-              !projectOfferBeatId
-            ) {
+          nextProjectOffers = generateProjectOffers(offersState, 3);
+          nextProjectRevealQueue = updateProjectRevealQueue(
+            nextProjectRevealQueue,
+            state.projectRevealSeen,
+            nextProjectOffers,
+          );
+          if (
+            nextProjectOffers.length > 0 &&
+            !state.storySeen["project_offer_generic"] &&
+            !projectOfferBeatId
+          ) {
             projectOfferBeatId = "project_offer_generic";
           }
         }
@@ -8642,7 +8642,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
       } else if (state.tutorialStep === 2) {
-        hint = "Merge two Tracks into a Segment. Higher tiers unlock better orders.";
+        hint =
+          "Merge two Tracks into a Segment. Higher tiers unlock better orders.";
         const tracks = state.board.filter((p) => p?.tier === 2).length;
         if (tracks < 2) {
           const spawned = spawnTutorialPart(state, 2);
@@ -10318,7 +10319,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     prevBaronOfferAvailableRef.current = state.baronOfferAvailable;
     prevLockoutActiveRef.current = state.lockoutActive;
     prevMissionIdsRef.current = state.missions.map((mission) => mission.id);
-    const freeSlots = countFreeSlots(state);
+    const freeSlots = countFreeSlots({
+      board: state.board,
+      boardSize: state.boardSize,
+      stationSlots: state.stationSlots,
+      blockedSlots: state.blockedSlots,
+      unlockedSlots: state.unlockedSlots,
+    });
     prevFreeSlotsRef.current = freeSlots;
     const boardPressureBand = getBoardPressureBand(freeSlots);
     prevPressureBandRef.current = boardPressureBand;
@@ -10369,7 +10376,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, startSession]);
+  }, [hydrated, startSession, tuningPayload, tuningVariant]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
@@ -10457,7 +10464,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
-    const freeSlots = countFreeSlots(state);
+    const freeSlots = countFreeSlots({
+      board: state.board,
+      boardSize: state.boardSize,
+      stationSlots: state.stationSlots,
+      blockedSlots: state.blockedSlots,
+      unlockedSlots: state.unlockedSlots,
+    });
     if (freeSlots === 0 && prevFreeSlotsRef.current > 0) {
       captureEvent("board_full", {
         freeSlots,
@@ -10465,13 +10478,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       });
     }
     prevFreeSlotsRef.current = freeSlots;
-  }, [hydrated, state.board, state.boardSize]);
+  }, [
+    hydrated,
+    state.board,
+    state.boardSize,
+    state.stationSlots,
+    state.blockedSlots,
+    state.unlockedSlots,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
-    const freeSlots = countFreeSlots(state);
+    const freeSlots = countFreeSlots({
+      board: state.board,
+      boardSize: state.boardSize,
+      stationSlots: state.stationSlots,
+      blockedSlots: state.blockedSlots,
+      unlockedSlots: state.unlockedSlots,
+    });
     const boardPressureBand = getBoardPressureBand(freeSlots);
-    const effectiveMaxOrders = getEffectiveMaxOrders(state);
+    const effectiveMaxOrders =
+      state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
     const orderSpawnPaused =
       state.tutorialComplete &&
       state.firstSessionComplete &&
@@ -10489,11 +10516,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [
     hydrated,
     state.board,
+    state.boardSize,
+    state.stationSlots,
+    state.blockedSlots,
+    state.unlockedSlots,
     state.orders.length,
     state.firstSessionComplete,
     state.tutorialComplete,
     state.lockoutActive,
     state.activeProject?.overtimeCrew,
+    state.maxOrders,
   ]);
 
   useEffect(() => {
@@ -10573,7 +10605,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
-    const freeSlots = countFreeSlots(state);
+    const freeSlots = countFreeSlots({
+      board: state.board,
+      boardSize: state.boardSize,
+      stationSlots: state.stationSlots,
+      blockedSlots: state.blockedSlots,
+      unlockedSlots: state.unlockedSlots,
+    });
     const band = getBoardPressureBand(freeSlots);
     if (band !== prevPressureBandRef.current) {
       captureEvent("board_pressure_band", {
@@ -10583,7 +10621,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       });
       prevPressureBandRef.current = band;
     }
-  }, [hydrated, state.board, state.boardSize]);
+  }, [
+    hydrated,
+    state.board,
+    state.boardSize,
+    state.stationSlots,
+    state.blockedSlots,
+    state.unlockedSlots,
+  ]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
@@ -10752,7 +10797,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state.tutorialComplete) return;
     if (state.tutorialStep !== 6) return;
-    const status = getTutorialLockedMergeStatus(state);
+    const status = getTutorialLockedMergeStatus({
+      board: state.board,
+      backpack: state.backpack,
+    });
     if (!status.needsLocked && !status.needsOpen) return;
     dispatch({ type: "ENSURE_TUTORIAL_LOCKED_SAMPLE" });
   }, [state.tutorialComplete, state.tutorialStep, state.board, state.backpack]);

@@ -243,14 +243,15 @@ export default function GameScreen() {
     hydrated,
   } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [projectDossierId, setProjectDossierId] = useState<string | null>(
-    null,
-  );
+  const [projectDossierId, setProjectDossierId] = useState<string | null>(null);
   const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
     null,
   );
-  const overlayQueue = state.overlayQueue || [];
+  const overlayQueue = useMemo(
+    () => state.overlayQueue ?? [],
+    [state.overlayQueue],
+  );
   const pendingProjectRevealId = state.projectRevealQueue?.[0] ?? null;
   const revealEligible =
     !!pendingProjectRevealId &&
@@ -338,7 +339,7 @@ export default function GameScreen() {
       if (getFulfillmentIndices(order)) count += 1;
     });
     return count;
-  }, [state.orders, state.board, getFulfillmentIndices]);
+  }, [state.orders, getFulfillmentIndices]);
   const isCompactLayout = screenHeight > 0 && screenHeight < 740;
   const isCompactScreen = screenHeight > 0 && screenHeight < 800;
   const topCondensed = hudCollapsed || isCompactScreen;

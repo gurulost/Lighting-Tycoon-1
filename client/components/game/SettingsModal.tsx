@@ -261,7 +261,11 @@ export function SettingsModal({
                 ]}
                 style={styles.settingIcon}
               >
-                <Feather name="trash-2" size={20} color={GameColors.ui.danger} />
+                <Feather
+                  name="trash-2"
+                  size={20}
+                  color={GameColors.ui.danger}
+                />
               </LinearGradient>
               <View style={styles.settingContent}>
                 <ThemedText style={styles.settingLabel}>
@@ -314,10 +318,7 @@ export function SettingsModal({
       </Pressable>
 
       {resetChallengeVisible ? (
-        <Pressable
-          style={styles.resetOverlay}
-          onPress={closeResetChallenge}
-        >
+        <Pressable style={styles.resetOverlay} onPress={closeResetChallenge}>
           <Pressable
             style={styles.resetContainer}
             onPress={(e) => e.stopPropagation()}
@@ -332,7 +333,8 @@ export function SettingsModal({
             >
               <View style={styles.resetContent}>
                 <ThemedText style={styles.resetPrompt}>
-                  To confirm, answer: {resetChallenge.a} + {resetChallenge.b} = ?
+                  To confirm, answer: {resetChallenge.a} + {resetChallenge.b} =
+                  ?
                 </ThemedText>
                 <TextInput
                   value={resetAnswer}

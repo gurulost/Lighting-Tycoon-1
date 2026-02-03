@@ -52,6 +52,9 @@ function InstallMomentCelebration({
   const scale = useSharedValue(0.98);
   const phase = useSharedValue(0);
   const latestKey = React.useRef<number>(0);
+  const momentKey = moment?.key ?? null;
+  const momentPattern = moment?.pattern;
+  const momentAnimationMode = moment?.animationMode;
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -71,17 +74,17 @@ function InstallMomentCelebration({
       scale.value = 0.98;
     };
 
-    if (!moment) {
+    if (momentKey === null) {
       reset();
       return;
     }
 
-    latestKey.current = moment.key;
+    latestKey.current = momentKey;
     reset();
     translateY.value = 14;
 
     if (reducedMotion) {
-      onComplete(moment.key);
+      onComplete(momentKey);
       return;
     }
 
@@ -94,8 +97,8 @@ function InstallMomentCelebration({
       withDelay(
         holdDuration,
         withTiming(0, { duration: outDuration }, (finished) => {
-          if (finished && latestKey.current === moment.key) {
-            runOnJS(onComplete)(moment.key);
+          if (finished && latestKey.current === momentKey) {
+            runOnJS(onComplete)(momentKey);
           }
         }),
       ),
@@ -108,22 +111,22 @@ function InstallMomentCelebration({
       withTiming(1, { duration: inDuration + 40 }),
       withDelay(holdDuration, withTiming(0.98, { duration: outDuration })),
     );
-  }, [moment?.key, reducedMotion, onComplete, opacity, translateY, scale]);
+  }, [momentKey, reducedMotion, onComplete, opacity, translateY, scale]);
 
   React.useEffect(() => {
-    if (!moment || reducedMotion) {
+    if (momentKey === null || reducedMotion) {
       cancelAnimation(phase);
       phase.value = 0;
       return;
     }
     const duration =
-      TRIM_LIGHT_ANIMATION_DURATIONS[moment.animationMode] ?? 2000;
+      TRIM_LIGHT_ANIMATION_DURATIONS[momentAnimationMode ?? "twinkle"] ?? 2000;
     phase.value = withRepeat(withTiming(1, { duration }), -1, false);
     return () => {
       cancelAnimation(phase);
       phase.value = 0;
     };
-  }, [moment?.key, moment?.animationMode, reducedMotion, phase]);
+  }, [momentKey, momentAnimationMode, reducedMotion, phase]);
 
   if (!moment) return null;
 
@@ -139,9 +142,9 @@ function InstallMomentCelebration({
       <Animated.View style={styles.installGlowBurst}>
         <LinearGradient
           colors={[
-            moment.pattern === "baron"
+            momentPattern === "baron"
               ? "#A855F780"
-              : moment.pattern === "rainbow"
+              : momentPattern === "rainbow"
                 ? "#FF6B6B80"
                 : "#00D9FF80",
             "transparent",

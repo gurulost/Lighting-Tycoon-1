@@ -6,8 +6,6 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
-  interpolate,
-  Extrapolation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -75,7 +73,7 @@ function CurrencyItem({
       );
     }
     prevValue.value = value;
-  }, [value]);
+  }, [value, reducedMotion, glowOpacity, prevValue, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

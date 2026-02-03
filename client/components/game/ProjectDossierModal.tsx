@@ -92,6 +92,11 @@ export function ProjectDossierModal({
   const { state } = useGame();
   const project = PROJECT_DEFINITION_BY_ID.get(projectId);
   const tuning = getTuning();
+  const narrativeParagraphs = useMemo(() => {
+    if (!project) return [];
+    const body = project.introNarrative || project.synopsis;
+    return body.split("\n\n").map((line) => line.trim());
+  }, [project]);
 
   if (!project) {
     return (
@@ -133,10 +138,14 @@ export function ProjectDossierModal({
     depositMultiplier,
   );
 
-  const completionScale = Math.max(0, tuning.projects.completionRewardMultiplier);
+  const completionScale = Math.max(
+    0,
+    tuning.projects.completionRewardMultiplier,
+  );
   const completionRewards = {
     cash: project.completionRewards.cashMultiplier * completionScale,
-    reputation: project.completionRewards.reputationMultiplier * completionScale,
+    reputation:
+      project.completionRewards.reputationMultiplier * completionScale,
     research: project.completionRewards.researchMultiplier * completionScale,
   };
 
@@ -153,11 +162,6 @@ export function ProjectDossierModal({
         : eligible
           ? "Eligible"
           : "Locked";
-
-  const narrativeParagraphs = useMemo(() => {
-    const body = project.introNarrative || project.synopsis;
-    return body.split("\n\n").map((line) => line.trim());
-  }, [project]);
 
   return (
     <ModalShell
@@ -222,7 +226,10 @@ export function ProjectDossierModal({
             </ThemedText>
           ) : null}
           {narrativeParagraphs.map((paragraph, index) => (
-            <ThemedText key={`${project.id}-brief-${index}`} style={styles.body}>
+            <ThemedText
+              key={`${project.id}-brief-${index}`}
+              style={styles.body}
+            >
               {paragraph}
             </ThemedText>
           ))}
@@ -232,13 +239,22 @@ export function ProjectDossierModal({
           <ThemedText style={styles.sectionTitle}>Contract terms</ThemedText>
           <View style={styles.termRow}>
             <View style={styles.termChip}>
-              <Feather name="shield" size={12} color={GameColors.currency.cash} />
+              <Feather
+                name="shield"
+                size={12}
+                color={GameColors.currency.cash}
+              />
               <ThemedText style={styles.termText}>
-                Deposit {activeProject ? activeProject.depositPaid : depositCost}
+                Deposit{" "}
+                {activeProject ? activeProject.depositPaid : depositCost}
               </ThemedText>
             </View>
             <View style={styles.termChip}>
-              <Feather name="layers" size={12} color={GameColors.text.secondary} />
+              <Feather
+                name="layers"
+                size={12}
+                color={GameColors.text.secondary}
+              />
               <ThemedText style={styles.termText}>
                 {project.stages.length} stages
               </ThemedText>
@@ -329,19 +345,31 @@ export function ProjectDossierModal({
           <ThemedText style={styles.sectionTitle}>Completion bonus</ThemedText>
           <View style={styles.rewardRow}>
             <View style={styles.rewardChip}>
-              <Feather name="dollar-sign" size={12} color={GameColors.currency.cash} />
+              <Feather
+                name="dollar-sign"
+                size={12}
+                color={GameColors.currency.cash}
+              />
               <ThemedText style={styles.rewardText}>
                 x{completionRewards.cash.toFixed(1)} cash
               </ThemedText>
             </View>
             <View style={styles.rewardChip}>
-              <Feather name="star" size={12} color={GameColors.currency.reputation} />
+              <Feather
+                name="star"
+                size={12}
+                color={GameColors.currency.reputation}
+              />
               <ThemedText style={styles.rewardText}>
                 x{completionRewards.reputation.toFixed(1)} rep
               </ThemedText>
             </View>
             <View style={styles.rewardChip}>
-              <Feather name="zap" size={12} color={GameColors.currency.research} />
+              <Feather
+                name="zap"
+                size={12}
+                color={GameColors.currency.research}
+              />
               <ThemedText style={styles.rewardText}>
                 x{completionRewards.research.toFixed(1)} research
               </ThemedText>
@@ -362,7 +390,11 @@ export function ProjectDossierModal({
                   priority="normal"
                 />
               ) : (
-                <Feather name="award" size={20} color={GameColors.text.secondary} />
+                <Feather
+                  name="award"
+                  size={20}
+                  color={GameColors.text.secondary}
+                />
               )}
             </View>
             <View style={styles.trophyTextBlock}>
