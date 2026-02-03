@@ -260,6 +260,7 @@ export function DependencyMeter({
   const showExtras = !compact;
   const stripPattern: TrimLightPattern =
     value >= 60 ? "baron" : value >= 30 ? "classic" : "warmWhite";
+  const showPressureChip = !compact;
 
   return (
     <Animated.View
@@ -291,7 +292,11 @@ export function DependencyMeter({
                 color={getStatusColor()}
               />
             </View>
-            <ThemedText style={[styles.label, compact && styles.labelCompact]}>
+            <ThemedText
+              style={[styles.label, compact && styles.labelCompact]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               Dependency
             </ThemedText>
           </View>
@@ -321,7 +326,11 @@ export function DependencyMeter({
             >
               {Math.round(value)}%
             </ThemedText>
-            <ThemedText style={styles.valueDivider}>·</ThemedText>
+            <ThemedText
+              style={[styles.valueDivider, compact && styles.valueDividerCompact]}
+            >
+              ·
+            </ThemedText>
             <View style={styles.pressureValue}>
               <Feather
                 name="briefcase"
@@ -425,28 +434,30 @@ export function DependencyMeter({
             </View>
           </View>
 
-          <View
-            pointerEvents="none"
-            style={[
-              styles.pressureChip,
-              { bottom: pressureStripHeight + pressureStripGap },
-            ]}
-          >
-            <Feather
-              name="feather"
-              size={pressureChipFontSize}
-              color={GameColors.text.secondary}
-            />
-            <ThemedText
+          {showPressureChip ? (
+            <View
+              pointerEvents="none"
               style={[
-                styles.pressureChipText,
-                { fontSize: pressureChipFontSize },
+                styles.pressureChip,
+                { bottom: pressureStripHeight + pressureStripGap },
               ]}
-              numberOfLines={1}
             >
-              Open-only -P
-            </ThemedText>
-          </View>
+              <Feather
+                name="feather"
+                size={pressureChipFontSize}
+                color={GameColors.text.secondary}
+              />
+              <ThemedText
+                style={[
+                  styles.pressureChipText,
+                  { fontSize: pressureChipFontSize },
+                ]}
+                numberOfLines={1}
+              >
+                Open-only -P
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
 
         {showExtras ? (
@@ -533,7 +544,9 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
   statusContainerCompact: {
-    gap: Spacing.xs,
+    gap: 4,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   status: {
     fontSize: 13,
@@ -547,7 +560,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   percentageCompact: {
-    fontSize: 11,
+    fontSize: 10,
   },
   trackContainer: {
     position: "relative",
@@ -656,12 +669,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    flexShrink: 1,
   },
   valueDivider: {
     fontSize: 11,
     fontWeight: "700",
     color: GameColors.text.disabled,
     marginHorizontal: 4,
+  },
+  valueDividerCompact: {
+    marginHorizontal: 2,
   },
   baronContainer: {
     position: "absolute",

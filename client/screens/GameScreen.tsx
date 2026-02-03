@@ -52,6 +52,8 @@ import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
 import { OverlayItem, OVERLAY_PRIORITY } from "@/types/overlay";
 
+const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
+
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
 const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
 const stationInboxImage = require("../../assets/images/station-inbox.webp");
@@ -275,6 +277,9 @@ export default function GameScreen() {
     null,
   );
   const [topStackLayout, setTopStackLayout] = useState<LayoutRect | null>(null);
+  const [topActionsLayout, setTopActionsLayout] = useState<LayoutRect | null>(
+    null,
+  );
   const [boardContainerLayout, setBoardContainerLayout] =
     useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
@@ -282,6 +287,9 @@ export default function GameScreen() {
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
+  const missionAssignRef = useRef<string[]>(
+    state.missions.map((mission) => mission.id),
+  );
   const baronShipmentRef = useRef(state.lastBaronShipmentId);
   const cooldownHintRef = useRef(state.lastCooldownHintId);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -423,9 +431,13 @@ export default function GameScreen() {
 
   useEffect(() => {
     const nextTargets: Partial<Record<TutorialTarget, LayoutRect>> = {};
-    const applyOffset = (rect: LayoutRect, offset?: LayoutRect | null) => ({
-      x: rect.x + (offset?.x ?? 0),
-      y: rect.y + (offset?.y ?? 0),
+    const applyOffset = (
+      rect: LayoutRect,
+      offset?: LayoutRect | null,
+      extraOffset?: LayoutRect | null,
+    ) => ({
+      x: rect.x + (offset?.x ?? 0) + (extraOffset?.x ?? 0),
+      y: rect.y + (offset?.y ?? 0) + (extraOffset?.y ?? 0),
       width: rect.width,
       height: rect.height,
     });
@@ -446,6 +458,7 @@ export default function GameScreen() {
       nextTargets.glossary = applyOffset(
         relativeTargets.glossary,
         topBarLayout,
+        topActionsLayout,
       );
     }
     if (relativeTargets.orders) {
@@ -459,7 +472,13 @@ export default function GameScreen() {
     }
 
     setTutorialTargets({ ...nextTargets, ...absoluteTargets });
-  }, [relativeTargets, topBarLayout, bottomBarLayout, absoluteTargets]);
+  }, [
+    relativeTargets,
+    topBarLayout,
+    topActionsLayout,
+    bottomBarLayout,
+    absoluteTargets,
+  ]);
   const enqueueOverlay = useCallback(
     (item: OverlayItem) => {
       dispatch({ type: "ENQUEUE_OVERLAY", item });
@@ -690,7 +709,7 @@ export default function GameScreen() {
     if (state.lastCooldownHintId !== cooldownHintRef.current) {
       cooldownHintRef.current = state.lastCooldownHintId;
       showToast(
-        "Unlock Salvage to find materials for the Open Workshop.",
+        "Supplier cooling down? You can overdraw at a cost, or unlock Open Workshop or Salvage for relief.",
         2600,
       );
     }
@@ -747,6 +766,20 @@ export default function GameScreen() {
     }
     missionRewardRef.current = state.lastMissionRewardId;
   }, [state.lastMissionRewardId, state.lastMissionReward, showToast, dispatch]);
+
+  useEffect(() => {
+    const prev = new Set(missionAssignRef.current);
+    const newMissions = state.missions.filter(
+      (mission) => !prev.has(mission.id),
+    );
+    const tutorialMission = newMissions.find(
+      (mission) => mission.templateId === TUTORIAL_GOAL_TEMPLATE_ID,
+    );
+    if (tutorialMission) {
+      showToast(`New goal: ${tutorialMission.label}`, 2400);
+    }
+    missionAssignRef.current = state.missions.map((mission) => mission.id);
+  }, [state.missions, showToast]);
 
   useEffect(() => {
     if (!state.activeStoryBeatId) {
@@ -829,7 +862,7 @@ export default function GameScreen() {
           4: "Order complete — cash + reputation earned. Reputation unlocks neighborhoods.",
           5: "Space upgraded — more room, faster merges.",
           6: "Choice made — speed vs independence.",
-          7: "Tutorial complete — finish 2 more orders.",
+          7: "Tutorial complete — finish 2 more installs. Need help? Tap ? for Glossary.",
         };
         const message = toastMap[nextStep];
         if (message) {
@@ -991,7 +1024,14 @@ export default function GameScreen() {
               reducedMotion={state.settings.reducedMotion}
             />
           </View>
-          <View style={styles.topActions}>
+          <View
+            style={styles.topActions}
+            onLayout={(event) => {
+              const layout = event?.nativeEvent?.layout;
+              if (!layout) return;
+              setTopActionsLayout(layout);
+            }}
+          >
             <Pressable
               style={styles.settingsButton}
               onPress={() => setActiveModal("story")}
@@ -1212,6 +1252,8 @@ export default function GameScreen() {
           onDragStateChange={setIsDragging}
           onPartLongPress={(index) => setSelectedPartIndex(index)}
           onStationLayout={handleStationLayout}
+          onUndo={undoLastMove}
+          canUndo={canUndoNow}
           tutorialFocus={
             !state.tutorialComplete && state.tutorialStep === 0
               ? "workbench"
@@ -1307,33 +1349,6 @@ export default function GameScreen() {
           </View>
         ) : null}
       </LinearGradient>
-
-      <View style={[styles.undoContainer, { bottom: insets.bottom + 120 }]}>
-        <Pressable
-          style={[styles.undoButton, !canUndoNow && styles.undoButtonDisabled]}
-          onPress={canUndoNow ? undoLastMove : undefined}
-        >
-          <Feather
-            name="rotate-ccw"
-            size={16}
-            color={
-              canUndoNow ? GameColors.text.primary : GameColors.text.disabled
-            }
-          />
-          <ThemedText
-            style={[
-              styles.undoText,
-              {
-                color: canUndoNow
-                  ? GameColors.text.primary
-                  : GameColors.text.disabled,
-              },
-            ]}
-          >
-            Undo
-          </ThemedText>
-        </Pressable>
-      </View>
 
       <OverlayManager
         queue={overlayQueue}
@@ -1717,6 +1732,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#FFF",
+    lineHeight: 12,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   pauseBadge: {
     position: "absolute",
@@ -1750,27 +1769,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     color: GameColors.ui.success,
-  },
-  undoContainer: {
-    position: "absolute",
-    left: Spacing.lg,
-  },
-  undoButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    backgroundColor: "#1A1A2E",
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-  },
-  undoButtonDisabled: {
-    opacity: 0.5,
-  },
-  undoText: {
-    fontSize: 12,
-    fontWeight: "600",
   },
 });
