@@ -673,10 +673,22 @@ export function MergeBoard({
     if (!onStationLayout || !gridLayout) return;
     const row = Math.floor(WORKBENCH_SLOT / GRID_COLS);
     const col = WORKBENCH_SLOT % GRID_COLS;
-    const x = gridLayout.x + col * (tileSize + Spacing.tileGap);
-    const y = gridLayout.y + row * (tileSize + Spacing.tileGap);
-    onStationLayout({ workbench: { x, y, width: tileSize, height: tileSize } });
-  }, [gridLayout, onStationLayout, tileSize]);
+    const scaleSize = tileSize * stationScale;
+    const scaleInset = (scaleSize - tileSize) / 2;
+    const x =
+      gridLayout.x +
+      col * (tileSize + Spacing.tileGap) -
+      stationOffset -
+      scaleInset;
+    const y =
+      gridLayout.y +
+      row * (tileSize + Spacing.tileGap) -
+      stationOffset -
+      scaleInset;
+    onStationLayout({
+      workbench: { x, y, width: scaleSize, height: scaleSize },
+    });
+  }, [gridLayout, onStationLayout, tileSize, stationOffset, stationScale]);
 
   const measureBackpack = useCallback(() => {
     backpackRef.current?.measureInWindow((x, y, width, height) => {
@@ -1451,8 +1463,11 @@ export function MergeBoard({
               style={[
                 styles.gridLineVertical,
                 {
-                  left: i * (tileSize + Spacing.tileGap) - 1,
-                  height: GRID_ROWS * (tileSize + Spacing.tileGap),
+                  left:
+                    i === GRID_COLS
+                      ? gridWidth - 1
+                      : i * (tileSize + Spacing.tileGap) - 1,
+                  height: gridHeight,
                 },
               ]}
             />
@@ -1463,75 +1478,15 @@ export function MergeBoard({
               style={[
                 styles.gridLineHorizontal,
                 {
-                  top: i * (tileSize + Spacing.tileGap) - 1,
-                  width: GRID_COLS * (tileSize + Spacing.tileGap),
+                  top:
+                    i === GRID_ROWS
+                      ? gridHeight - 1
+                      : i * (tileSize + Spacing.tileGap) - 1,
+                  width: gridWidth,
                 },
               ]}
             />
           ))}
-        </View>
-        <View
-          pointerEvents="none"
-          style={[
-            styles.gridFrame,
-            {
-              width: gridWidth,
-              height: gridHeight,
-            },
-          ]}
-        >
-          {(() => {
-            const frameCutout = tileSize + Spacing.tileGap;
-            const frameThickness = 2;
-            return (
-              <>
-                <View
-                  style={[
-                    styles.gridFrameLine,
-                    {
-                      left: frameCutout,
-                      top: 0,
-                      width: gridWidth - 2 * frameCutout,
-                      height: frameThickness,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.gridFrameLine,
-                    {
-                      left: 0,
-                      top: frameCutout,
-                      width: frameThickness,
-                      height: gridHeight - 2 * frameCutout,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.gridFrameLine,
-                    {
-                      right: 0,
-                      top: frameCutout,
-                      width: frameThickness,
-                      height: gridHeight - frameCutout,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.gridFrameLine,
-                    {
-                      left: frameCutout,
-                      bottom: 0,
-                      width: gridWidth - frameCutout,
-                      height: frameThickness,
-                    },
-                  ]}
-                />
-              </>
-            );
-          })()}
         </View>
         <View
           style={[
@@ -1544,6 +1499,75 @@ export function MergeBoard({
           onLayout={handleGridLayout}
         >
           {tiles}
+        </View>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.gridFrame,
+            (() => {
+              const frameOffset = 2;
+              return {
+                width: gridWidth + frameOffset * 2,
+                height: gridHeight + frameOffset * 2,
+                top: Spacing.md - frameOffset,
+                left: Spacing.md - frameOffset,
+              };
+            })(),
+          ]}
+        >
+          {(() => {
+            const frameCutout = tileSize + Spacing.tileGap;
+            const frameThickness = 2;
+            const frameOffset = 2;
+            return (
+              <>
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      left: frameOffset + frameCutout,
+                      top: 0,
+                      width: gridWidth - 2 * frameCutout,
+                      height: frameThickness,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      left: 0,
+                      top: frameOffset + frameCutout,
+                      width: frameThickness,
+                      height: gridHeight - 2 * frameCutout,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      right: 0,
+                      top: frameOffset + frameCutout,
+                      width: frameThickness,
+                      height: gridHeight - frameCutout + frameOffset,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      left: frameOffset + frameCutout,
+                      bottom: 0,
+                      width: gridWidth - frameCutout + frameOffset,
+                      height: frameThickness,
+                    },
+                  ]}
+                />
+              </>
+            );
+          })()}
         </View>
         {mergeEffect ? (
           <View
