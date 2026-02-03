@@ -28,7 +28,8 @@ type HighlightTarget =
   | "upgrades"
   | "dependency"
   | "currency"
-  | "workbench";
+  | "workbench"
+  | "glossary";
 
 interface LayoutRect {
   x: number;
@@ -49,9 +50,9 @@ interface TutorialStep {
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 0,
-    title: "Tap a Supplier",
+    title: "First Parts",
     description:
-      "Tap the Workbench, then tap Baron Supply Depot twice. Charges refill over time.",
+      "Tap Workbench → Baron Supply Depot twice. Goal: land your first install.",
     icon: "tool",
     highlight: "workbench",
     color: GameColors.ui.primary,
@@ -60,41 +61,42 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: 1,
     title: "First Merge",
     description:
-      "Mentor: Parts climb tiers. Drag one Clip onto another to make a Track.",
+      "Drag one Clip onto another to make a Track. Tracks are your first install part.",
     icon: "layers",
     highlight: "board",
     color: GameColors.openStandard.primary,
   },
   {
     id: 2,
-    title: "Second Merge",
-    description: "Merge two Tracks into a Segment to unlock better orders.",
+    title: "Step Up",
+    description: "Merge two Tracks into a Segment. Higher tiers unlock better orders.",
     icon: "shuffle",
     highlight: "board",
     color: GameColors.openStandard.primary,
   },
   {
     id: 3,
-    title: "Complete an Order",
+    title: "First Install",
     description:
-      "Customer wants clean glow. Open Orders and fulfill the Starter Install.",
+      "Open Orders and fulfill the Starter Install. Orders pay cash + rep. Rep unlocks neighborhoods.",
     icon: "inbox",
     highlight: "orders",
     color: GameColors.currency.reputation,
   },
   {
     id: 4,
-    title: "Upgrade Your Space",
-    description: "Mentor: Space is oxygen. Spend coins to unlock a new slot.",
+    title: "Make Room",
+    description:
+      "Buy the Space upgrade to unlock a new slot. More space = faster merges.",
     icon: "grid",
     highlight: "upgrades",
     color: GameColors.currency.cash,
   },
   {
     id: 5,
-    title: "The Baron’s Offer",
+    title: "Baron’s Offer",
     description:
-      "Dependency starts maxed. Open installs lower it. Baron offers speed with lock-in; open-only installs reduce Pressure.",
+      "Speed now or independence later. Dependency tracks lock-in risk; locked parts raise it.",
     icon: "lock",
     highlight: "dependency",
     color: GameColors.locked.primary,
@@ -103,18 +105,18 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: 6,
     title: "Locked vs Open",
     description:
-      "Merge locked + open. It stays locked and reinforces Dependency. Open parts are your escape.",
+      "Merge locked + open: it stays locked. Locked raises Dependency; open keeps you free.",
     icon: "shield",
     highlight: "board",
     color: GameColors.locked.primary,
   },
   {
     id: 7,
-    title: "You're Ready!",
+    title: "You’re Ready",
     description:
-      "Unlock R&D for the Open Workshop. You can overdraw suppliers during cooldowns at a cost, so keep cash and space ready.",
+      "Merge → fulfill → earn → upgrade → grow. Build your empire with 2 more installs. Need help? Tap Glossary anytime.",
     icon: "star",
-    highlight: null,
+    highlight: "glossary",
     color: GameColors.ui.success,
   },
 ];

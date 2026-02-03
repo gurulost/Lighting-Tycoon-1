@@ -4,48 +4,72 @@ This document defines the onboarding flow and first-session pacing.
 
 ---
 
-## Tutorial Steps (0–6)
-**Step 0 — Tap Workbench**
-- Open Suppliers (Workbench), then tap Baron Supply Depot twice to spawn two Clips
+## Tutorial Steps (0–7)
+**Story Hook (pre-step, skippable)**
+- Story beat: `tina_intro` (first customer + empire + break free)
+- Story beat: `dependency_100` (Baron: standards/compliance)
+
+**Step 0 — First Parts**
+- Goal: land your first install
+- Parts are your inventory; orders pay the bills
+- Tap Workbench, then tap Baron Supply Depot twice to spawn two Clips
 - Charges refill over time
-- Story beat: `tina_intro`
 
 **Step 1 — First Merge**
 - Merge Clips -> Track
+- Tracks are the first install part
+- Story beat: `tutorial_merge_1`
 
-**Step 2 — Second Merge**
+**Step 2 — Step Up**
 - Merge Tracks -> Segment
+- Higher tiers unlock better orders
 - Tutorial order spawns
+- Story beat: `tutorial_merge_2`
 
-**Step 3 — Fulfill Order**
+**Step 3 — First Install**
 - Open Orders panel
 - Fulfill Starter Install
+- Orders pay cash + reputation
+- Reputation unlocks neighborhoods
+- Story beats: `tutorial_order`, `tina_customer_reply`
 
-**Step 4 — Upgrade Space**
+**Step 4 — Make Room**
 - Purchase Space upgrade `space_1`
+- More space = faster merges
+- Story beat: `tutorial_upgrade`
+- Story beat: `baron_offer_prompt`
 
-**Step 5 — Baron Offer**
-- Accept or decline the Baron offer (speed vs lock-in)
+**Step 5 — Baron’s Offer**
+- Accept or decline the Baron offer (speed vs independence)
+- Dependency meter shows lock-in risk; locked parts raise it
+- Story beat: `tutorial_baron_choice`
 
 **Step 6 — Locked vs Open**
-- Merge locked + open to see it stay locked and reinforce Dependency
+- Merge locked + open to see it stay locked and raise Dependency
+- Open parts keep you free
+- Story beat: `tutorial_locked_merge`
 
-**Step 7 — Completion**
+**Step 7 — Ready + Glossary**
 - Tutorial complete
+- Next goal: complete 2 more installs
+- Mission strip: “Complete 2 more installs”
+- Tease: R&D unlocks the Open Workshop later
+- Callout: Glossary explains anything anytime
+- Story beat: `tutorial_ready`
 
 Guardrails:
 - No hard fails
 - Clear hint messaging when stuck
 - Overdraw is disabled until tutorial complete
+- Overdraw hint appears on first post-tutorial cooldown
 
 ---
 
 ## First Session Track (3–5 minutes)
 Goals:
+- Complete 3 orders total (2 after tutorial)
 - Merge to Smart Kit
-- Complete 3–5 orders
-- See Baron offer twice
-- See dependency feedback (no crackdown yet)
+- See dependency feedback once (no crackdown yet)
 
 ### Forced Drops
 - `FIRST_SESSION_FORCED_DROPS = [2, 2, 3, 3]`

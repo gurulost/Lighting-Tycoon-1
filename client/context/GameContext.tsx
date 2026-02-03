@@ -1078,6 +1078,7 @@ const MAX_WASTE_TIER: PartTier = 3;
 const SAVE_VERSION = 1;
 const STORAGE_KEY = "lighting_tycoon_state_v1";
 const STORAGE_BACKUP_KEY = "lighting_tycoon_state_v1_backup";
+const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
 const STORY_QUEUE_PERSIST_CATEGORIES = new Set([
   "tutorial",
   "system",
@@ -1445,6 +1446,21 @@ function createMissionFromTemplate(
     chainId: template.chainId,
     chainIndex: template.chainIndex,
     chainLength: template.chainLength,
+  };
+}
+
+function createTutorialGoalMission(state: GameState): Mission {
+  return {
+    id: generateId(),
+    templateId: TUTORIAL_GOAL_TEMPLATE_ID,
+    giver: "mentor",
+    type: "complete_order",
+    label: "Complete 2 more installs",
+    description: "Keep momentum. Two more installs to open the path.",
+    target: 2,
+    progress: 0,
+    reward: applyMissionRewardTuning({ cash: 30, reputation: 6 }),
+    completed: false,
   };
 }
 
@@ -2814,7 +2830,7 @@ function getInitialState(): GameState {
   const board: (Part | null)[] = Array(INITIAL_BOARD_SIZE).fill(null);
   const startingNeighborhood = getNeighborhoodByRep(0);
 
-  return {
+  const baseState: GameState = {
     board,
     boardSize: INITIAL_BOARD_SIZE,
     unlockedSlots: [],
@@ -2962,6 +2978,12 @@ function getInitialState(): GameState {
     lastMissionRewardId: 0,
     lastMissionReward: null,
   };
+  let nextState = baseState;
+  if (nextState.dependency >= 100) {
+    nextState = queueStoryBeat(nextState, "dependency_100");
+  }
+  nextState = queueStoryBeat(nextState, "tina_intro");
+  return nextState;
 }
 
 function findEmptySlot(
@@ -3885,10 +3907,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
-        nextState = queueStoryBeat(nextState, "tina_intro");
         if (state.dependency >= 100) {
           nextState = queueStoryBeat(nextState, "dependency_100");
         }
+        nextState = queueStoryBeat(nextState, "tina_intro");
       }
       if (
         typeof spawnedTier === "number" &&
@@ -8427,14 +8449,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
+      const maxActive = getMaxActiveMissions();
+      if (maxActive > 0) {
+        const hasTutorialGoal = nextState.missions.some(
+          (mission) => mission.templateId === TUTORIAL_GOAL_TEMPLATE_ID,
+        );
+        if (!hasTutorialGoal) {
+          const tutorialGoal = createTutorialGoalMission(nextState);
+          const missions = [tutorialGoal, ...nextState.missions].slice(
+            0,
+            maxActive,
+          );
+          nextState = { ...nextState, missions };
+        }
+      }
       nextState = ensureMissions(nextState);
+      if (!action.skipped) {
+        nextState = queueStoryBeat(nextState, "tutorial_ready");
+      }
       return nextState;
     }
 
     case "RESUME_TUTORIAL": {
       if (!state.tutorialComplete) return state;
       const now = Date.now();
-      return {
+      const nextStorySeen = { ...state.storySeen };
+      delete nextStorySeen.tina_intro;
+      delete nextStorySeen.dependency_100;
+      let nextState: GameState = {
         ...state,
         tutorialComplete: false,
         tutorialReplay: true,
@@ -8449,7 +8491,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             [state.tutorialStep]: now,
           },
         },
+        storySeen: nextStorySeen,
       };
+      if (nextState.dependency >= 100) {
+        nextState = queueStoryBeat(nextState, "dependency_100");
+      }
+      nextState = queueStoryBeat(nextState, "tina_intro");
+      return nextState;
     }
 
     case "RESET_GAME": {
@@ -8462,7 +8510,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "RESET_TUTORIAL": {
       const now = Date.now();
-      return {
+      const nextStorySeen = { ...state.storySeen };
+      delete nextStorySeen.tina_intro;
+      delete nextStorySeen.dependency_100;
+      let nextState: GameState = {
         ...state,
         tutorialStep: 0,
         tutorialComplete: false,
@@ -8548,7 +8599,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         missionHistory: [],
         lastMissionRewardId: 0,
         lastMissionReward: null,
+        storySeen: nextStorySeen,
       };
+      if (nextState.dependency >= 100) {
+        nextState = queueStoryBeat(nextState, "dependency_100");
+      }
+      nextState = queueStoryBeat(nextState, "tina_intro");
+      return nextState;
     }
 
     case "TUTORIAL_NUDGE": {
@@ -8576,7 +8633,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
       } else if (state.tutorialStep === 1) {
-        hint = "Drag one Clip onto another to merge.";
+        hint = "Drag one Clip onto another to make a Track.";
         const clips = state.board.filter((p) => p?.tier === 1).length;
         if (clips < 2) {
           const spawned = spawnTutorialPart(state, 1);
@@ -8585,7 +8642,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
       } else if (state.tutorialStep === 2) {
-        hint = "Merge two Tracks into a Segment.";
+        hint = "Merge two Tracks into a Segment. Higher tiers unlock better orders.";
         const tracks = state.board.filter((p) => p?.tier === 2).length;
         if (tracks < 2) {
           const spawned = spawnTutorialPart(state, 2);
@@ -8594,7 +8651,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
       } else if (state.tutorialStep === 3) {
-        hint = "Open the Orders panel and fulfill the Starter Install.";
+        hint =
+          "Open Orders and fulfill the Starter Install. Orders pay cash + rep. Rep unlocks neighborhoods.";
         if (!state.tutorialOrderId) {
           const tutorialOrder = createTutorialOrder();
           const trimmedOrders =
@@ -8616,7 +8674,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextCash = spaceUpgrade.cost;
         }
       } else if (state.tutorialStep === 5) {
-        hint = "Accept or decline the Baron’s offer to continue.";
+        hint = "Speed now or independence later. Accept or decline the offer.";
       } else if (state.tutorialStep === 6) {
         const status = getTutorialLockedMergeStatus(state);
         if (status.needsLocked || status.needsOpen) {
