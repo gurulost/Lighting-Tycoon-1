@@ -159,6 +159,7 @@ type GameAction =
   | { type: "ENSURE_TUTORIAL_LOCKED_SAMPLE" }
   | { type: "COMPLETE_TUTORIAL"; skipped?: boolean }
   | { type: "RESUME_TUTORIAL" }
+  | { type: "RESET_GAME" }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
   | { type: "SKIP_MISSION"; missionId: string }
@@ -8448,6 +8449,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             [state.tutorialStep]: now,
           },
         },
+      };
+    }
+
+    case "RESET_GAME": {
+      const nextState = getInitialState();
+      return {
+        ...nextState,
+        settings: { ...nextState.settings, ...state.settings },
       };
     }
 
