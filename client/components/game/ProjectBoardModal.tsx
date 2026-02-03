@@ -731,7 +731,10 @@ export function ProjectBoardModal({
             <View style={styles.trophyGrid}>
               {trophyProjects.map((project) => {
                 const unlocked = state.projectsCompleted.includes(project.id);
-                const trophySource = getProjectTrophyImage(project.trophyIcon);
+                const trophySource = getProjectTrophyImage(
+                  project.trophyIcon,
+                  "sm",
+                );
                 return (
                   <Pressable
                     key={`trophy-${project.id}`}

@@ -106,8 +106,8 @@ export function ProjectDossierModal({
     );
   }
 
-  const heroImage = getProjectCardImage(project.projectCardIcon);
-  const trophyImage = getProjectTrophyImage(project.trophyIcon);
+  const heroImage = getProjectCardImage(project.projectCardIcon, "md");
+  const trophyImage = getProjectTrophyImage(project.trophyIcon, "sm");
   const activeProject =
     state.activeProject?.projectId === project.id ? state.activeProject : null;
   const completed = state.projectsCompleted.includes(project.id);
