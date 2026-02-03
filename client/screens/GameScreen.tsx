@@ -107,7 +107,8 @@ type TutorialTarget =
   | "upgrades"
   | "dependency"
   | "currency"
-  | "workbench";
+  | "workbench"
+  | "glossary";
 
 interface LayoutRect {
   x: number;
@@ -441,6 +442,12 @@ export default function GameScreen() {
         topBarLayout,
       );
     }
+    if (relativeTargets.glossary) {
+      nextTargets.glossary = applyOffset(
+        relativeTargets.glossary,
+        topBarLayout,
+      );
+    }
     if (relativeTargets.orders) {
       nextTargets.orders = applyOffset(relativeTargets.orders, bottomBarLayout);
     }
@@ -463,6 +470,12 @@ export default function GameScreen() {
   const dismissOverlay = useCallback(
     (id: string) => {
       dispatch({ type: "DISMISS_OVERLAY", id });
+    },
+    [dispatch],
+  );
+  const handleOverlayTelemetry = useCallback(
+    (maxWaitMs: number) => {
+      dispatch({ type: "UPDATE_OVERLAY_TELEMETRY", maxWaitMs });
     },
     [dispatch],
   );
@@ -810,13 +823,13 @@ export default function GameScreen() {
         showToast("Space already unlocked — moving on.");
       } else {
         const toastMap: Record<number, string> = {
-          1: "Nice! Parts on the board.",
-          2: "Great merge!",
-          3: "Segment built.",
-          4: "Order complete — Clips build Tracks; higher tiers unlock better jobs.",
-          5: "Space upgraded.",
-          6: "Choice made.",
-          7: "Locked merge complete.",
+          1: "First parts down. First install soon.",
+          2: "Track built — your first install part.",
+          3: "Segment built — better orders unlocked.",
+          4: "Order complete — cash + reputation earned. Reputation unlocks neighborhoods.",
+          5: "Space upgraded — more room, faster merges.",
+          6: "Choice made — speed vs independence.",
+          7: "Tutorial complete — finish 2 more orders.",
         };
         const message = toastMap[nextStep];
         if (message) {
@@ -997,6 +1010,7 @@ export default function GameScreen() {
             <Pressable
               style={styles.settingsButton}
               onPress={() => setActiveModal("glossary")}
+              onLayout={setTarget("glossary")}
             >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
@@ -1331,9 +1345,7 @@ export default function GameScreen() {
         onStoryPress={handleStoryPress}
         onStoryDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
         momentLockActive={momentLockActive}
-        onTelemetry={(maxWaitMs) =>
-          dispatch({ type: "UPDATE_OVERLAY_TELEMETRY", maxWaitMs })
-        }
+        onTelemetry={handleOverlayTelemetry}
       />
 
       <Modal
