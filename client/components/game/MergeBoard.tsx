@@ -5,7 +5,14 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import { View, StyleSheet, Dimensions, Pressable } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  Pressable,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -77,6 +84,8 @@ interface MergeBoardProps {
   onStationLongPress?: (station: "workbench" | "orders" | "rd") => void;
   onUtilityLongPress?: (utility: "backpack" | "recycle") => void;
   onPartLongPress?: (index: number) => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
   tutorialFocus?: "workbench" | "orders" | "rd" | null;
   onDragStateChange?: (isDragging: boolean) => void;
   onStationLayout?: (
@@ -97,6 +106,7 @@ function AnimatedStation({
   tileSize,
   accentColor,
   testID,
+  containerStyle,
 }: {
   children: React.ReactNode;
   isActive: boolean;
@@ -107,6 +117,7 @@ function AnimatedStation({
   tileSize: number;
   accentColor: string;
   testID?: string;
+  containerStyle?: StyleProp<ViewStyle>;
 }) {
   const pulseAnim = useSharedValue(0);
 
@@ -151,6 +162,7 @@ function AnimatedStation({
       onLongPress={onLongPress}
       delayLongPress={350}
       testID={testID}
+      style={containerStyle}
     >
       <Animated.View
         style={[
@@ -177,6 +189,8 @@ export function MergeBoard({
   onStationLongPress,
   onUtilityLongPress,
   onPartLongPress,
+  onUndo,
+  canUndo = false,
   tutorialFocus,
   onDragStateChange,
   onStationLayout,
@@ -348,6 +362,33 @@ export function MergeBoard({
     }
   }
   const gridWidth = GRID_COLS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
+  const gridHeight = GRID_ROWS * (tileSize + Spacing.tileGap) - Spacing.tileGap;
+  const stationScale = 1.08;
+  const stationOffset = Math.max(Spacing.xs, Math.round(tileSize * 0.08));
+  const stationTransforms: Record<number, { transform: ViewStyle["transform"] }> =
+    {
+      [WORKBENCH_SLOT]: {
+        transform: [
+          { translateX: -stationOffset },
+          { translateY: -stationOffset },
+          { scale: stationScale },
+        ],
+      },
+      [ORDER_INBOX_SLOT]: {
+        transform: [
+          { translateX: stationOffset },
+          { translateY: -stationOffset },
+          { scale: stationScale },
+        ],
+      },
+      [RD_BENCH_SLOT]: {
+        transform: [
+          { translateX: -stationOffset },
+          { translateY: stationOffset },
+          { scale: stationScale },
+        ],
+      },
+    };
   const desiredBackpackSlotSize = Math.round(tileSize * 0.8);
   const maxBackpackSlotSize = Math.floor(
     (gridWidth - (backpackSlotCount - 1) * backpackGap) / backpackSlotCount,
@@ -632,10 +673,22 @@ export function MergeBoard({
     if (!onStationLayout || !gridLayout) return;
     const row = Math.floor(WORKBENCH_SLOT / GRID_COLS);
     const col = WORKBENCH_SLOT % GRID_COLS;
-    const x = gridLayout.x + col * (tileSize + Spacing.tileGap);
-    const y = gridLayout.y + row * (tileSize + Spacing.tileGap);
-    onStationLayout({ workbench: { x, y, width: tileSize, height: tileSize } });
-  }, [gridLayout, onStationLayout, tileSize]);
+    const scaleSize = tileSize * stationScale;
+    const scaleInset = (scaleSize - tileSize) / 2;
+    const x =
+      gridLayout.x +
+      col * (tileSize + Spacing.tileGap) -
+      stationOffset -
+      scaleInset;
+    const y =
+      gridLayout.y +
+      row * (tileSize + Spacing.tileGap) -
+      stationOffset -
+      scaleInset;
+    onStationLayout({
+      workbench: { x, y, width: scaleSize, height: scaleSize },
+    });
+  }, [gridLayout, onStationLayout, tileSize, stationOffset, stationScale]);
 
   const measureBackpack = useCallback(() => {
     backpackRef.current?.measureInWindow((x, y, width, height) => {
@@ -1243,106 +1296,121 @@ export function MergeBoard({
   const renderStation = (index: number) => {
     if (index === WORKBENCH_SLOT) {
       return (
-        <AnimatedStation
+        <View
           key={index}
-          isActive
-          forcePulse={tutorialFocus === "workbench"}
-          testID="workbench-station"
-          onPress={() => {
-            if (hapticsEnabled) {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
-            onWorkbenchPress();
-          }}
-          onLongPress={() => onStationLongPress?.("workbench")}
-          reducedMotion={reducedMotion}
-          tileSize={tileSize}
-          accentColor={GameColors.ui.primary}
+          style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
-          <LinearGradient
-            colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
-            style={styles.stationGradient}
+          <AnimatedStation
+            isActive
+            forcePulse={tutorialFocus === "workbench"}
+            testID="workbench-station"
+            onPress={() => {
+              if (hapticsEnabled) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+              onWorkbenchPress();
+            }}
+            onLongPress={() => onStationLongPress?.("workbench")}
+            reducedMotion={reducedMotion}
+            tileSize={tileSize}
+            accentColor={GameColors.ui.primary}
+            containerStyle={stationTransforms[WORKBENCH_SLOT]}
           >
-            <Image
-              source={stationWorkbench}
-              style={styles.stationIcon}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-            />
-          </LinearGradient>
-        </AnimatedStation>
+            <LinearGradient
+              colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
+              style={styles.stationGradient}
+            >
+              <Image
+                source={stationWorkbench}
+                style={styles.stationIcon}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+              />
+            </LinearGradient>
+          </AnimatedStation>
+        </View>
       );
     }
 
     if (index === ORDER_INBOX_SLOT) {
       return (
-        <AnimatedStation
+        <View
           key={index}
-          isActive={state.orders.length > 0}
-          forcePulse={tutorialFocus === "orders"}
-          testID="orders-station"
-          onPress={onOrderInboxPress}
-          onLongPress={() => onStationLongPress?.("orders")}
-          reducedMotion={reducedMotion}
-          tileSize={tileSize}
-          accentColor={GameColors.currency.reputation}
+          style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
-          <LinearGradient
-            colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
-            style={styles.stationGradient}
+          <AnimatedStation
+            isActive={state.orders.length > 0}
+            forcePulse={tutorialFocus === "orders"}
+            testID="orders-station"
+            onPress={onOrderInboxPress}
+            onLongPress={() => onStationLongPress?.("orders")}
+            reducedMotion={reducedMotion}
+            tileSize={tileSize}
+            accentColor={GameColors.currency.reputation}
+            containerStyle={stationTransforms[ORDER_INBOX_SLOT]}
           >
-            <Image
-              source={stationInbox}
-              style={styles.stationIcon}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-            />
-            {state.orders.length > 0 ? (
-              <View style={styles.badge}>
-                <ThemedText style={styles.badgeText}>
-                  {state.orders.length}
-                </ThemedText>
-              </View>
-            ) : null}
-          </LinearGradient>
-        </AnimatedStation>
+            <LinearGradient
+              colors={["#1A1A2E", "#00D9FF10", "#1A1A2E"]}
+              style={styles.stationGradient}
+            >
+              <Image
+                source={stationInbox}
+                style={styles.stationIcon}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+              />
+              {state.orders.length > 0 ? (
+                <View style={styles.badge}>
+                  <ThemedText style={styles.badgeText}>
+                    {state.orders.length}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </LinearGradient>
+          </AnimatedStation>
+        </View>
       );
     }
 
     if (index === RD_BENCH_SLOT) {
       const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
       return (
-        <AnimatedStation
+        <View
           key={index}
-          isActive={rdUnlocked && state.research > 0}
-          forcePulse={tutorialFocus === "rd"}
-          onPress={rdUnlocked ? onRDBenchPress : () => {}}
-          onLongPress={() => onStationLongPress?.("rd")}
-          reducedMotion={reducedMotion}
-          tileSize={tileSize}
-          accentColor={GameColors.currency.research}
+          style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
-          <LinearGradient
-            colors={["#1A1A2E", "#9D4EDD10", "#1A1A2E"]}
-            style={styles.stationGradient}
+          <AnimatedStation
+            isActive={rdUnlocked && state.research > 0}
+            forcePulse={tutorialFocus === "rd"}
+            onPress={rdUnlocked ? onRDBenchPress : () => {}}
+            onLongPress={() => onStationLongPress?.("rd")}
+            reducedMotion={reducedMotion}
+            tileSize={tileSize}
+            accentColor={GameColors.currency.research}
+            containerStyle={stationTransforms[RD_BENCH_SLOT]}
           >
-            <Image
-              source={stationRd}
-              style={[styles.stationIcon, { opacity: rdUnlocked ? 1 : 0.4 }]}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-            />
-            {!rdUnlocked ? (
-              <View style={styles.lockOverlay}>
-                <Feather
-                  name="lock"
-                  size={12}
-                  color={GameColors.text.disabled}
-                />
-              </View>
-            ) : null}
-          </LinearGradient>
-        </AnimatedStation>
+            <LinearGradient
+              colors={["#1A1A2E", "#9D4EDD10", "#1A1A2E"]}
+              style={styles.stationGradient}
+            >
+              <Image
+                source={stationRd}
+                style={[styles.stationIcon, { opacity: rdUnlocked ? 1 : 0.4 }]}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+              />
+              {!rdUnlocked ? (
+                <View style={styles.lockOverlay}>
+                  <Feather
+                    name="lock"
+                    size={12}
+                    color={GameColors.text.disabled}
+                  />
+                </View>
+              ) : null}
+            </LinearGradient>
+          </AnimatedStation>
+        </View>
       );
     }
 
@@ -1395,8 +1463,11 @@ export function MergeBoard({
               style={[
                 styles.gridLineVertical,
                 {
-                  left: i * (tileSize + Spacing.tileGap) - 1,
-                  height: GRID_ROWS * (tileSize + Spacing.tileGap),
+                  left:
+                    i === GRID_COLS
+                      ? gridWidth - 1
+                      : i * (tileSize + Spacing.tileGap) - 1,
+                  height: gridHeight,
                 },
               ]}
             />
@@ -1407,8 +1478,11 @@ export function MergeBoard({
               style={[
                 styles.gridLineHorizontal,
                 {
-                  top: i * (tileSize + Spacing.tileGap) - 1,
-                  width: GRID_COLS * (tileSize + Spacing.tileGap),
+                  top:
+                    i === GRID_ROWS
+                      ? gridHeight - 1
+                      : i * (tileSize + Spacing.tileGap) - 1,
+                  width: gridWidth,
                 },
               ]}
             />
@@ -1425,6 +1499,75 @@ export function MergeBoard({
           onLayout={handleGridLayout}
         >
           {tiles}
+        </View>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.gridFrame,
+            (() => {
+              const frameOffset = 2;
+              return {
+                width: gridWidth + frameOffset * 2,
+                height: gridHeight + frameOffset * 2,
+                top: Spacing.md - frameOffset,
+                left: Spacing.md - frameOffset,
+              };
+            })(),
+          ]}
+        >
+          {(() => {
+            const frameCutout = tileSize + Spacing.tileGap;
+            const frameThickness = 2;
+            const frameOffset = 2;
+            return (
+              <>
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      left: frameOffset + frameCutout,
+                      top: 0,
+                      width: gridWidth - 2 * frameCutout,
+                      height: frameThickness,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      left: 0,
+                      top: frameOffset + frameCutout,
+                      width: frameThickness,
+                      height: gridHeight - 2 * frameCutout,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      right: 0,
+                      top: frameOffset + frameCutout,
+                      width: frameThickness,
+                      height: gridHeight - frameCutout + frameOffset,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.gridFrameLine,
+                    {
+                      left: frameOffset + frameCutout,
+                      bottom: 0,
+                      width: gridWidth - frameCutout + frameOffset,
+                      height: frameThickness,
+                    },
+                  ]}
+                />
+              </>
+            );
+          })()}
         </View>
         {mergeEffect ? (
           <View
@@ -1618,6 +1761,37 @@ export function MergeBoard({
             })}
           </Animated.View>
         </View>
+        {onUndo ? (
+          <View style={styles.undoSection}>
+            <Pressable
+              style={[
+                styles.undoButton,
+                !canUndo && styles.undoButtonDisabled,
+              ]}
+              onPress={canUndo ? onUndo : undefined}
+            >
+              <Feather
+                name="rotate-ccw"
+                size={14}
+                color={
+                  canUndo ? GameColors.text.primary : GameColors.text.disabled
+                }
+              />
+              <ThemedText
+                style={[
+                  styles.undoText,
+                  {
+                    color: canUndo
+                      ? GameColors.text.primary
+                      : GameColors.text.disabled,
+                  },
+                ]}
+              >
+                Undo
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
         <View style={styles.recycleSection}>
           <Pressable
             onLongPress={() => onUtilityLongPress?.("recycle")}
@@ -1705,8 +1879,6 @@ const styles = StyleSheet.create({
   boardBackground: {
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
-    borderWidth: 2,
-    borderColor: "#2A2A4A",
     position: "relative",
     overflow: "visible",
   },
@@ -1721,6 +1893,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: Spacing.md,
     left: Spacing.md,
+  },
+  gridFrame: {
+    position: "absolute",
+    top: Spacing.md,
+    left: Spacing.md,
+  },
+  gridFrameLine: {
+    position: "absolute",
+    backgroundColor: "#2A2A4A",
   },
   gridLineVertical: {
     position: "absolute",
@@ -1809,6 +1990,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  stationSlot: {
+    overflow: "visible",
+    zIndex: 5,
+    elevation: 5,
+  },
   stationGradient: {
     flex: 1,
     justifyContent: "center",
@@ -1861,9 +2047,34 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     gap: Spacing.md,
     overflow: "visible",
+  },
+  undoSection: {
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  undoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    backgroundColor: "#1A1A2E",
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+  },
+  undoButtonDisabled: {
+    opacity: 0.5,
+  },
+  undoText: {
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 12,
+    includeFontPadding: false,
   },
   backpackSection: {
     flex: 1,

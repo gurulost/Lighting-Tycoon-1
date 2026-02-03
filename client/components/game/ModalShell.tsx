@@ -83,6 +83,8 @@ export function ModalShell({
             {onClose ? (
               <Pressable
                 onPress={closeDisabled ? undefined : onClose}
+                hitSlop={8}
+                pressRetentionOffset={12}
                 style={[
                   styles.closeButton,
                   closeDisabled && styles.closeButtonDisabled,

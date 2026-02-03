@@ -1096,119 +1096,126 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
       iconColor={GameColors.ui.primary}
       onClose={onClose}
     >
-      <View style={styles.searchSection}>
-        <View style={styles.searchHeaderRow}>
-          <View style={styles.searchBar}>
-            <Feather
-              name="search"
-              size={16}
-              color={GameColors.text.secondary}
-            />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search glossary"
-              placeholderTextColor={GameColors.text.disabled}
-              style={styles.searchInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {query.length > 0 ? (
-              <Pressable
-                onPress={() => setQuery("")}
-                style={styles.clearButton}
-              >
-                <Feather name="x" size={14} color={GameColors.text.secondary} />
-              </Pressable>
-            ) : null}
-          </View>
-          <Pressable
-            onPress={() => setControlsCollapsed((prev) => !prev)}
-            style={styles.collapseButton}
-          >
-            <Feather
-              name={controlsCollapsed ? "chevrons-down" : "chevrons-up"}
-              size={18}
-              color={GameColors.text.secondary}
-            />
-          </Pressable>
-        </View>
-
-        {!controlsCollapsed ? (
-          <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filtersRow}
-            >
-              {[
-                { key: "all", label: "All" },
-                { key: "pinned", label: "Pinned" },
-                { key: "basics", label: TIER_LABELS.basics },
-                { key: "core", label: TIER_LABELS.core },
-                { key: "advanced", label: TIER_LABELS.advanced },
-                { key: "endgame", label: TIER_LABELS.endgame },
-              ].map((filter) => {
-                const active = activeFilter === filter.key;
-                return (
-                  <Pressable
-                    key={filter.key}
-                    onPress={() =>
-                      setActiveFilter(filter.key as GlossaryFilter)
-                    }
-                    style={[
-                      styles.filterChip,
-                      active && styles.filterChipActive,
-                    ]}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.filterChipText,
-                        active && styles.filterChipTextActive,
-                      ]}
-                    >
-                      {filter.label}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {showIndex ? (
-              <View style={styles.indexGroup}>
-                <ThemedText style={styles.indexTitle}>Jump to</ThemedText>
-                {groupedSections.map((group) => (
-                  <View key={group.tier} style={styles.indexGroupBlock}>
-                    <ThemedText style={styles.indexGroupTitle}>
-                      {group.title}
-                    </ThemedText>
-                    <View style={styles.indexChipRow}>
-                      {group.sections.map((section) => (
-                        <Pressable
-                          key={section.id}
-                          onPress={() => handleJumpTo(section.id)}
-                          style={styles.indexChip}
-                        >
-                          <ThemedText style={styles.indexChipText}>
-                            {section.title}
-                          </ThemedText>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </>
-        ) : null}
-      </View>
-
       <SectionList
         ref={listRef}
         sections={listSections}
         keyExtractor={(item) => item.section.id}
         style={styles.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={
+          <View style={styles.searchSection}>
+            <View style={styles.searchHeaderRow}>
+              <View style={styles.searchBar}>
+                <Feather
+                  name="search"
+                  size={16}
+                  color={GameColors.text.secondary}
+                />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search glossary"
+                  placeholderTextColor={GameColors.text.disabled}
+                  style={styles.searchInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+                {query.length > 0 ? (
+                  <Pressable
+                    onPress={() => setQuery("")}
+                    style={styles.clearButton}
+                  >
+                    <Feather
+                      name="x"
+                      size={14}
+                      color={GameColors.text.secondary}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+              <Pressable
+                onPress={() => setControlsCollapsed((prev) => !prev)}
+                style={styles.collapseButton}
+              >
+                <Feather
+                  name={controlsCollapsed ? "chevrons-down" : "chevrons-up"}
+                  size={18}
+                  color={GameColors.text.secondary}
+                />
+              </Pressable>
+            </View>
+
+            {!controlsCollapsed ? (
+              <>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filtersRow}
+                >
+                  {[
+                    { key: "all", label: "All" },
+                    { key: "pinned", label: "Pinned" },
+                    { key: "basics", label: TIER_LABELS.basics },
+                    { key: "core", label: TIER_LABELS.core },
+                    { key: "advanced", label: TIER_LABELS.advanced },
+                    { key: "endgame", label: TIER_LABELS.endgame },
+                  ].map((filter) => {
+                    const active = activeFilter === filter.key;
+                    return (
+                      <Pressable
+                        key={filter.key}
+                        onPress={() =>
+                          setActiveFilter(filter.key as GlossaryFilter)
+                        }
+                        style={[
+                          styles.filterChip,
+                          active && styles.filterChipActive,
+                        ]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.filterChipText,
+                            active && styles.filterChipTextActive,
+                          ]}
+                        >
+                          {filter.label}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                {showIndex ? (
+                  <View style={styles.indexGroup}>
+                    <ThemedText style={styles.indexTitle}>Jump to</ThemedText>
+                    {groupedSections.map((group) => (
+                      <View key={group.tier} style={styles.indexGroupBlock}>
+                        <ThemedText style={styles.indexGroupTitle}>
+                          {group.title}
+                        </ThemedText>
+                        <View style={styles.indexChipRow}>
+                          {group.sections.map((section) => (
+                            <Pressable
+                              key={section.id}
+                              onPress={() => handleJumpTo(section.id)}
+                              style={styles.indexChip}
+                            >
+                              <ThemedText style={styles.indexChipText}>
+                                {section.title}
+                              </ThemedText>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        }
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Spacing["4xl"] + insets.bottom },
@@ -1350,13 +1357,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing["4xl"],
     gap: Spacing.lg,
   },
   searchSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
     gap: Spacing.md,
   },

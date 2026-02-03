@@ -639,6 +639,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#0F0F1F",
+    lineHeight: 12,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   familyIndicator: {
     position: "absolute",
@@ -660,6 +664,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 0.2,
+    lineHeight: 10,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   familyTextLocked: {
     color: "#FFF",
@@ -684,6 +692,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
     color: "#0F0F1F",
+    lineHeight: 10,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   mergeAnimation: {
     borderRadius: BorderRadius.md,

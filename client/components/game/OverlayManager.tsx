@@ -44,6 +44,17 @@ export function OverlayManager({
   const nowRef = useRef(Date.now());
   nowRef.current = Date.now();
 
+  const resolveOverlayTtl = (item?: OverlayItem) => {
+    if (!item) return null;
+    const payloadDuration = item.payload?.durationMs;
+    const ttl =
+      typeof payloadDuration === "number"
+        ? payloadDuration
+        : OVERLAY_AUTO_DISMISS_MS[item.type];
+    if (typeof ttl !== "number" || ttl <= 0) return null;
+    return ttl;
+  };
+
   const sorted = useMemo(() => {
     const now = nowRef.current;
     return queue
@@ -89,23 +100,45 @@ export function OverlayManager({
 
   useEffect(() => {
     if (!primary) return undefined;
-    const ttl =
-      (primary.payload?.durationMs as number | undefined) ??
-      OVERLAY_AUTO_DISMISS_MS[primary.type];
-    if (primary.sticky || !ttl) return undefined;
-    const timeout = setTimeout(() => onDismiss(primary.id), ttl);
+    if (primary.sticky) return undefined;
+    const ttl = resolveOverlayTtl(primary);
+    if (!ttl) return undefined;
+    const elapsed = Date.now() - primary.createdAt;
+    if (elapsed >= ttl) {
+      onDismiss(primary.id);
+      return undefined;
+    }
+    const timeout = setTimeout(() => onDismiss(primary.id), ttl - elapsed);
     return () => clearTimeout(timeout);
-  }, [primary?.id, primary?.sticky, primary?.type, onDismiss]);
+  }, [
+    primary?.id,
+    primary?.sticky,
+    primary?.type,
+    primary?.createdAt,
+    primary?.payload?.durationMs,
+    onDismiss,
+  ]);
 
   useEffect(() => {
     if (!secondary) return undefined;
-    const ttl =
-      (secondary.payload?.durationMs as number | undefined) ??
-      OVERLAY_AUTO_DISMISS_MS[secondary.type];
-    if (secondary.sticky || !ttl) return undefined;
-    const timeout = setTimeout(() => onDismiss(secondary.id), ttl);
+    if (secondary.sticky) return undefined;
+    const ttl = resolveOverlayTtl(secondary);
+    if (!ttl) return undefined;
+    const elapsed = Date.now() - secondary.createdAt;
+    if (elapsed >= ttl) {
+      onDismiss(secondary.id);
+      return undefined;
+    }
+    const timeout = setTimeout(() => onDismiss(secondary.id), ttl - elapsed);
     return () => clearTimeout(timeout);
-  }, [secondary?.id, secondary?.sticky, secondary?.type, onDismiss]);
+  }, [
+    secondary?.id,
+    secondary?.sticky,
+    secondary?.type,
+    secondary?.createdAt,
+    secondary?.payload?.durationMs,
+    onDismiss,
+  ]);
 
   const renderOverlay = (item: OverlayItem, slot: "primary" | "secondary") => {
     if (item.type === "story") {

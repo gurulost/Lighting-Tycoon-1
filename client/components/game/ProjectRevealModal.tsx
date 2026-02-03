@@ -32,7 +32,7 @@ export function ProjectRevealModal({
     ? PROJECT_DEFINITION_BY_ID.get(projectId)
     : undefined;
   const imageSource = project
-    ? getProjectCardImage(project.projectCardIcon)
+    ? getProjectCardImage(project.projectCardIcon, "lg")
     : undefined;
 
   const narrativeParagraphs = useMemo(() => {

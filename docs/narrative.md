@@ -24,7 +24,7 @@
 - Story Log: re-readable archive.
 
 ## Trigger Map (high level)
-- Tutorial steps: tutorial_merge_1/2, tutorial_order, tutorial_upgrade, tutorial_baron_choice.
+- Tutorial steps: tutorial_merge_1/2, tutorial_order, tutorial_upgrade, tutorial_baron_choice, tutorial_locked_merge, tutorial_ready.
 - Dependency thresholds (downward crossings): dependency_80/60/40/20, plus intro beat dependency_100.
 - Neighborhood unlocks: neighborhood_starter/hoa/downtown/certified/lockout/liberation.
 - Lockout flow: lockout_begin, lockout_choice_baron/lab, lockout_resolve_baron/freedom.
