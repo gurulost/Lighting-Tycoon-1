@@ -1,6 +1,3 @@
-Here’s the full corrected file content you can paste in:
-
-```ts
 import { ImageSourcePropType } from "react-native";
 
 export type ProjectImageSize = "lg" | "md" | "sm";
@@ -90,10 +87,10 @@ export const PROJECT_TROPHY_IMAGES: Record<string, SizedImageSet> = {
     md: require("../../assets/images/trophies/trophy_expo_laurel-512.webp"),
     sm: require("../../assets/images/trophies/trophy_expo_laurel-256.webp"),
   },
-  trophy_glassspire_plaque: {
-    lg: require("../../assets/images/trophies/trophy_glassspire_plaque.webp"),
-    md: require("../../assets/images/trophies/trophy_glassspire_plaque-512.webp"),
-    sm: require("../../assets/images/trophies/trophy_glassspire_plaque-256.webp"),
+  trophy_glasspire_plaque: {
+    lg: require("../../assets/images/trophies/trophy_glasspire_plaque.webp"),
+    md: require("../../assets/images/trophies/trophy_glasspire_plaque-512.webp"),
+    sm: require("../../assets/images/trophies/trophy_glasspire_plaque-256.webp"),
   },
   trophy_halftime: {
     lg: require("../../assets/images/trophies/trophy_halftime.webp"),
@@ -136,4 +133,3 @@ export function getProjectTrophyImage(
   if (!entry) return undefined;
   return entry[size] ?? entry.lg;
 }
-```

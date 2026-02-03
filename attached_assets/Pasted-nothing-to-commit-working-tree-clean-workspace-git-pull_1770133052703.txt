@@ -1,0 +1,120 @@
+nothing to commit, working tree clean
+~/workspace$ git pull
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint:
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint:
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+~/workspace$ git pull --no-rebase
+Auto-merging client/constants/projectAssets.ts
+fatal: Could not read from '.git/MERGE_MSG': No such file or directory
+~/workspace$ git pull --no-rebase
+Auto-merging client/constants/projectAssets.ts
+hint: Waiting for your editor to close the 
+Merge made by the 'ort' strategy.
+ ..._airport_runway-256.webp | Bin 0 -> 22520 bytes
+ ..._airport_runway-512.webp | Bin 0 -> 81572 bytes
+ ...ldrens_hospital-256.webp | Bin 0 -> 22916 bytes
+ ...ldrens_hospital-512.webp | Bin 0 -> 84554 bytes
+ ...ival_main_stage-256.webp | Bin 0 -> 26764 bytes
+ ...ival_main_stage-512.webp | Bin 0 -> 102556 bytes
+ ...d_harbor_beacon-256.webp | Bin 0 -> 21404 bytes
+ ...d_harbor_beacon-512.webp | Bin 0 -> 90668 bytes
+ ...ernational_expo-256.webp | Bin 0 -> 26184 bytes
+ ...ernational_expo-512.webp | Bin 0 -> 95888 bytes
+ ...etro_wayfinding-256.webp | Bin 0 -> 24286 bytes
+ ...etro_wayfinding-512.webp | Bin 0 -> 91568 bytes
+ ..._museum_exhibit-256.webp | Bin 0 -> 23252 bytes
+ ..._museum_exhibit-512.webp | Bin 0 -> 89526 bytes
+ ..._neon_city_grid-256.webp | Bin 0 -> 22842 bytes
+ ..._neon_city_grid-512.webp | Bin 0 -> 90240 bytes
+ ...d_skyline_tower-256.webp | Bin 0 -> 20764 bytes
+ ...d_skyline_tower-512.webp | Bin 0 -> 81978 bytes
+ ...tadium_halftime-256.webp | Bin 0 -> 26570 bytes
+ ...tadium_halftime-512.webp | Bin 0 -> 96160 bytes
+ ..._backstage_pass-256.webp | Bin 0 -> 19838 bytes
+ ..._backstage_pass-512.webp | Bin 0 -> 79314 bytes
+ ...rophy_city_grid-256.webp | Bin 0 -> 15910 bytes
+ ...rophy_city_grid-512.webp | Bin 0 -> 56232 bytes
+ ...clearance_badge-256.webp | Bin 0 -> 14428 bytes
+ ...clearance_badge-512.webp | Bin 0 -> 49288 bytes
+ ...hy_curator_seal-256.webp | Bin 0 -> 25770 bytes
+ ...hy_curator_seal-512.webp | Bin 0 -> 96874 bytes
+ ...phy_expo_laurel-256.webp | Bin 0 -> 23808 bytes
+ ...phy_expo_laurel-512.webp | Bin 0 -> 90996 bytes
+ ...lasspire_plaque-256.webp | Bin 0 -> 12852 bytes
+ ...lasspire_plaque-512.webp | Bin 0 -> 49606 bytes
+ ...trophy_halftime-256.webp | Bin 0 -> 24214 bytes
+ ...trophy_halftime-512.webp | Bin 0 -> 90262 bytes
+ ..._harbor_lantern-256.webp | Bin 0 -> 18660 bytes
+ ..._harbor_lantern-512.webp | Bin 0 -> 72016 bytes
+ ...phy_metro_badge-256.webp | Bin 0 -> 23872 bytes
+ ...phy_metro_badge-512.webp | Bin 0 -> 89996 bytes
+ ...ghtlight_ribbon-256.webp | Bin 0 -> 14080 bytes
+ ...ghtlight_ribbon-512.webp | Bin 0 -> 52718 bytes
+ .../DependencyMeter.tsx     |  71 +-
+ .../game/GlossaryModal.tsx  | 224 ++--
+ .../game/MergeBoard.tsx     | 395 +++++--
+ .../game/ModalShell.tsx     |   2 +
+ .../game/OverlayManager.tsx |  57 +-
+ .../game/PartItem.tsx       |  12 +
+ .../ProjectBoardModal.tsx   |   5 +-
+ .../ProjectDossierModal.tsx |   4 +-
+ .../ProjectRevealModal.tsx  |   2 +-
+ .../game/SettingsModal.tsx  | 225 +++-
+ .../TutorialOverlay.tsx     |  34 +-
+ client/constants/story.ts   |  29 +-
+ .../context/GameContext.tsx |  83 +-
+ .../screens/GameScreen.tsx  | 141 +--
+ docs/narrative.md           |   2 +-
+ docs/tutorial.md            |  52 +-
+ 56 files changed, 979 insertions(+), 359 deletions(-)
+ create mode 100644 assets/images/projects/project_card_airport_runway-256.webp
+ create mode 100644 assets/images/projects/project_card_airport_runway-512.webp
+ create mode 100644 assets/images/projects/project_card_childrens_hospital-256.webp
+ create mode 100644 assets/images/projects/project_card_childrens_hospital-512.webp
+ create mode 100644 assets/images/projects/project_card_festival_main_stage-256.webp
+ create mode 100644 assets/images/projects/project_card_festival_main_stage-512.webp
+ create mode 100644 assets/images/projects/project_card_harbor_beacon-256.webp
+ create mode 100644 assets/images/projects/project_card_harbor_beacon-512.webp
+ create mode 100644 assets/images/projects/project_card_international_expo-256.webp
+ create mode 100644 assets/images/projects/project_card_international_expo-512.webp
+ create mode 100644 assets/images/projects/project_card_metro_wayfinding-256.webp
+ create mode 100644 assets/images/projects/project_card_metro_wayfinding-512.webp
+ create mode 100644 assets/images/projects/project_card_museum_exhibit-256.webp
+ create mode 100644 assets/images/projects/project_card_museum_exhibit-512.webp
+ create mode 100644 assets/images/projects/project_card_neon_city_grid-256.webp
+ create mode 100644 assets/images/projects/project_card_neon_city_grid-512.webp
+ create mode 100644 assets/images/projects/project_card_skyline_tower-256.webp
+ create mode 100644 assets/images/projects/project_card_skyline_tower-512.webp
+ create mode 100644 assets/images/projects/project_card_stadium_halftime-256.webp
+ create mode 100644 assets/images/projects/project_card_stadium_halftime-512.webp
+ create mode 100644 assets/images/trophies/trophy_backstage_pass-256.webp
+ create mode 100644 assets/images/trophies/trophy_backstage_pass-512.webp
+ create mode 100644 assets/images/trophies/trophy_city_grid-256.webp
+ create mode 100644 assets/images/trophies/trophy_city_grid-512.webp
+ create mode 100644 assets/images/trophies/trophy_clearance_badge-256.webp
+ create mode 100644 assets/images/trophies/trophy_clearance_badge-512.webp
+ create mode 100644 assets/images/trophies/trophy_curator_seal-256.webp
+ create mode 100644 assets/images/trophies/trophy_curator_seal-512.webp
+ create mode 100644 assets/images/trophies/trophy_expo_laurel-256.webp
+ create mode 100644 assets/images/trophies/trophy_expo_laurel-512.webp
+ create mode 100644 assets/images/trophies/trophy_glasspire_plaque-256.webp
+ create mode 100644 assets/images/trophies/trophy_glasspire_plaque-512.webp
+ create mode 100644 assets/images/trophies/trophy_halftime-256.webp
+ create mode 100644 assets/images/trophies/trophy_halftime-512.webp
+ create mode 100644 assets/images/trophies/trophy_harbor_lantern-256.webp
+ create mode 100644 assets/images/trophies/trophy_harbor_lantern-512.webp
+ create mode 100644 assets/images/trophies/trophy_metro_badge-256.webp
+ create mode 100644 assets/images/trophies/trophy_metro_badge-512.webp
+ create mode 100644 assets/images/trophies/trophy_nightlight_ribbon-256.webp
+ create mode 100644 assets/images/trophies/trophy_nightlight_ribbon-512.webp
+~/workspace$ 
