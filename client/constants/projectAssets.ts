@@ -19,7 +19,7 @@ export const PROJECT_TROPHY_IMAGES: Record<string, ImageSourcePropType> = {
   trophy_clearance_badge: require("../../assets/images/trophies/trophy_clearance_badge.webp"),
   trophy_curator_seal: require("../../assets/images/trophies/trophy_curator_seal.webp"),
   trophy_expo_laurel: require("../../assets/images/trophies/trophy_expo_laurel.webp"),
-  trophy_glassspire_plaque: require("../../assets/images/trophies/trophy_glassspire_plaque.webp"),
+  trophy_glasspire_plaque: require("../../assets/images/trophies/trophy_glasspire_plaque.webp"),
   trophy_halftime: require("../../assets/images/trophies/trophy_halftime.webp"),
   trophy_harbor_lantern: require("../../assets/images/trophies/trophy_harbor_lantern.webp"),
   trophy_metro_badge: require("../../assets/images/trophies/trophy_metro_badge.webp"),

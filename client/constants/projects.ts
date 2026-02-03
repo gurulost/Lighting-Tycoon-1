@@ -318,8 +318,8 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
       "The Glassspire tower is a skyline signature; every flaw is a headline. Liaison Sato is buying certainty as much as light. Tina commits to a facade that earns industry myth status.",
     projectCardIcon: "project_card_skyline_tower",
     clientPortrait: "portrait_liaison_sato",
-    trophyIcon: "trophy_glassspire_plaque",
-    trophyName: "Glassspire Plaque",
+    trophyIcon: "trophy_glasspire_plaque",
+    trophyName: "Glasspire Plaque",
     locationBackdrop: "backdrop_glassspire_tower",
     unlock: { phaseMin: 2, minRepTier: 6 },
     deposit: { formulaKey: "mid" },
@@ -373,7 +373,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     permanentPerk: "Prestige Clientele",
     perkDescription:
       "Prestige Clientele: +5% cash from compatibility-required orders.",
-    trophyId: "trophy_glassspire_plaque",
+    trophyId: "trophy_glasspire_plaque",
     narrativeBeats: NARRATIVE_GENERIC,
   },
   {
