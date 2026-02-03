@@ -493,9 +493,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.sm,
+    flexWrap: "wrap",
   },
   headerCompact: {
     marginBottom: Spacing.xs,
@@ -504,6 +504,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
+    flexShrink: 1,
+    minWidth: 0,
   },
   statusIcon: {
     width: 24,
@@ -516,6 +518,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: GameColors.text.secondary,
+    flexShrink: 1,
+    minWidth: 0,
   },
   labelCompact: {
     fontSize: 11,
@@ -525,6 +529,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.sm,
     flexShrink: 1,
+    minWidth: 0,
+    marginLeft: "auto",
   },
   statusContainerCompact: {
     gap: Spacing.xs,
