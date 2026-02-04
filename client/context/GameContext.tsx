@@ -1123,7 +1123,7 @@ function filterStoryQueue(queue: string[]): string[] {
       : false;
   });
   if (filtered.length <= PERSISTED_STORY_QUEUE_LIMIT) return filtered;
-  return filtered.slice(-PERSISTED_STORY_QUEUE_LIMIT);
+  return filtered.slice(0, PERSISTED_STORY_QUEUE_LIMIT);
 }
 
 function looksLikeGameState(raw: unknown): raw is GameState {
