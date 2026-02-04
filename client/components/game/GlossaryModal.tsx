@@ -137,7 +137,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "The Story",
         summary: "Locked speed vs open freedom.",
         detail:
-          "The Baron tempts you with certified parts; open standards lead to liberation.",
+          "The Baron tempts you with certified parts. To beat Phase 1, go Open and break the audit.",
         icon: "book-open",
         color: GameColors.ui.primary,
       },

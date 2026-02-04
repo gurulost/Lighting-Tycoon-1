@@ -302,6 +302,7 @@ export function OrdersModal({
   const effectiveMaxOrders =
     state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const showProjectsButton = state.gamePhase === 2;
+  const showPhase1Objective = state.gamePhase === 1 && state.tutorialComplete;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
@@ -634,6 +635,15 @@ export function OrdersModal({
             </ThemedText>
           </View>
         </View>
+
+        {showPhase1Objective ? (
+          <View style={styles.phaseObjectiveCard}>
+            <Feather name="flag" size={14} color={GameColors.ui.primary} />
+            <ThemedText style={styles.phaseObjectiveText}>
+              Goal: Go Open, drop Dependency below 20, break the audit.
+            </ThemedText>
+          </View>
+        ) : null}
 
         {isTutorialOrdersStep ? (
           <OnboardingCallout
@@ -1484,6 +1494,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${GameColors.ui.primary}40`,
     backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  phaseObjectiveCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}30`,
+    backgroundColor: `${GameColors.ui.primary}08`,
+  },
+  phaseObjectiveText: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+    flexShrink: 1,
   },
   helpCopy: {
     flex: 1,

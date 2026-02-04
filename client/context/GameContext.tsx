@@ -176,6 +176,7 @@ type GameAction =
   | { type: "LOCKOUT_CHOOSE_LAB" }
   | { type: "SPAWN_ORDER" }
   | { type: "RESOLVE_LOCKOUT"; choice: "baron" | "freedom" }
+  | { type: "PLAYTEST_SKIP_PHASE2" }
   | { type: "LOAD_STATE"; state: GameState };
 
 type SupplierTapMode = "tap" | "overdraw";
@@ -8654,7 +8655,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           nextCash = spaceUpgrade.cost;
         }
       } else if (state.tutorialStep === 5) {
-        hint = "Speed now or independence later. Accept or decline the offer.";
+        hint = "Speed now or freedom later. If you want to win, go Open.";
       } else if (state.tutorialStep === 6) {
         const status = getTutorialLockedMergeStatus(state);
         if (status.needsLocked || status.needsOpen) {
@@ -9101,6 +9102,67 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
       }
+    }
+
+    case "PLAYTEST_SKIP_PHASE2": {
+      if (state.gamePhase === 2 || state.liberationComplete) return state;
+      const stripLabRequests =
+        state.lockoutActive && state.lockoutChoice === "lab";
+      const filteredOrders = state.orders.filter((order) => {
+        if (order.isLockout) return false;
+        if (stripLabRequests && order.type === "lab_request") return false;
+        return true;
+      });
+      const phase2Order = createPhase2GoalOrder(state);
+      const insertResult = insertStoryOrder(
+        state,
+        filteredOrders,
+        phase2Order,
+      );
+      const nextOrders = insertResult.inserted
+        ? insertResult.orders
+        : filteredOrders;
+      const baseHighlightedOrderId = filteredOrders.some(
+        (order) => order.id === state.highlightedOrderId,
+      )
+        ? state.highlightedOrderId
+        : undefined;
+      const nextHighlightedOrderId = insertResult.inserted
+        ? insertResult.highlightedOrderId
+        : baseHighlightedOrderId;
+      const nextOrderMetrics = insertResult.inserted
+        ? updateOrderMetrics(state, phase2Order)
+        : state.orderMetrics;
+      let nextState: GameState = {
+        ...state,
+        gamePhase: 2,
+        liberationComplete: true,
+        liberationCompletedAt: Date.now(),
+        dependency: 0,
+        baronPressure: 0,
+        lockoutActive: false,
+        lockoutPhase: 0,
+        lockoutOrderId: undefined,
+        lockoutLabOrdersRemaining: 0,
+        lockoutLabOrdersTarget: 0,
+        lockoutChoice: undefined,
+        orders: nextOrders,
+        highlightedOrderId: nextHighlightedOrderId,
+        orderMetrics: nextOrderMetrics,
+        phase2GoalPending: !insertResult.inserted,
+        projectsUnlocked: false,
+        freedomControllerCount: Math.max(0, state.freedomControllerCount - 1),
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+      nextState = queueStoryBeat(nextState, "freedom_first_use");
+      nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
+      nextState = queueStoryBeat(nextState, "liberation_victory");
+      nextState = queueStoryBeat(nextState, "tina_phase2");
+      if (insertResult.inserted) {
+        nextState = queueStoryBeat(nextState, "phase2_goal");
+      }
+      return nextState;
     }
 
     case "LOAD_STATE": {
@@ -10179,6 +10241,7 @@ interface GameContextValue {
   unlockRDNode: (nodeId: string) => void;
   craftFreedomController: () => void;
   useFreedomController: (partIndex: number) => void;
+  skipToPhase2: () => void;
   canMerge: (fromIndex: number, toIndex: number) => boolean;
   getFulfillmentIndices: (order: Order) => number[] | null;
   undoLastMove: () => void;
@@ -10890,6 +10953,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "USE_FREEDOM_CONTROLLER", partIndex });
   }, []);
 
+  const skipToPhase2 = useCallback(() => {
+    dispatch({ type: "PLAYTEST_SKIP_PHASE2" });
+  }, []);
+
   const undoLastMove = useCallback(() => {
     dispatch({ type: "UNDO_LAST_MOVE" });
   }, []);
@@ -10943,6 +11010,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         unlockRDNode,
         craftFreedomController,
         useFreedomController,
+        skipToPhase2,
         canMerge,
         getFulfillmentIndices,
         undoLastMove,

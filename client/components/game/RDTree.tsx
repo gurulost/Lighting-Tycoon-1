@@ -187,7 +187,8 @@ function RDNodeCard({
 }
 
 export function RDTree({ onCraftFreedomController }: RDTreeProps) {
-  const { state, unlockRDNode, craftFreedomController } = useGame();
+  const { state, unlockRDNode, craftFreedomController, skipToPhase2 } =
+    useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const insets = useSafeAreaInsets();
 
@@ -206,6 +207,15 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
   };
 
   const canCraft = state.rdNodes["freedom_build"] && state.research >= 300;
+  const canSkipPhase2 = state.gamePhase !== 2 && !state.liberationComplete;
+
+  const handleSkipPhase2 = () => {
+    if (!canSkipPhase2) return;
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    skipToPhase2();
+  };
 
   return (
     <ScrollView
@@ -318,6 +328,38 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           </Pressable>
         </View>
       )}
+
+      <View style={styles.playtestSection}>
+        <ThemedText style={styles.playtestLabel}>Playtest</ThemedText>
+        <ThemedText style={styles.playtestDescription}>
+          Skip to Phase 2 state (as if Phase 1 just ended).
+        </ThemedText>
+        <Pressable
+          onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
+          style={[
+            styles.playtestButton,
+            !canSkipPhase2 && styles.playtestButtonDisabled,
+          ]}
+        >
+          <Feather
+            name="skip-forward"
+            size={14}
+            color={
+              canSkipPhase2
+                ? GameColors.text.secondary
+                : GameColors.text.disabled
+            }
+          />
+          <ThemedText
+            style={[
+              styles.playtestButtonText,
+              !canSkipPhase2 && styles.playtestButtonTextDisabled,
+            ]}
+          >
+            Skip to Phase 2
+          </ThemedText>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -476,5 +518,48 @@ const styles = StyleSheet.create({
   craftButtonText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  playtestSection: {
+    marginTop: Spacing["3xl"],
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: `${GameColors.text.disabled}30`,
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  playtestLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.text.disabled,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  playtestDescription: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+    textAlign: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  playtestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: `${GameColors.text.disabled}50`,
+    backgroundColor: GameColors.ui.surface,
+  },
+  playtestButtonDisabled: {
+    opacity: 0.45,
+  },
+  playtestButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  playtestButtonTextDisabled: {
+    color: GameColors.text.disabled,
   },
 });
