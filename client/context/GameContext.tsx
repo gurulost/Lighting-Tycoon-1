@@ -169,6 +169,8 @@ type GameAction =
   | { type: "CLAIM_MERGE_MOMENTUM"; choice: MergeMomentumChoice }
   | { type: "SHOW_STORY_BEAT"; beatId: string }
   | { type: "DISMISS_STORY_BEAT" }
+  | { type: "COLLAPSE_STORY_QUEUE"; keepCount?: number }
+  | { type: "MARK_STORY_VIEWED"; timestamp?: number }
   | { type: "LOCKOUT_ADVANCE" }
   | { type: "LOCKOUT_CHOOSE_BARON" }
   | { type: "LOCKOUT_CHOOSE_LAB" }
@@ -2961,6 +2963,7 @@ function getInitialState(): GameState {
     mergeMomentumDropFloor: undefined,
     storyQueue: [],
     storyLog: [],
+    storyLastViewedAt: 0,
     storySeen: {},
     activeStoryBeatId: undefined,
     lastStoryShownAt: 0,
@@ -2989,6 +2992,13 @@ function getInitialState(): GameState {
   };
   let nextState = baseState;
   nextState = queueStoryBeat(nextState, "tina_intro");
+  const introTimestamp =
+    nextState.storyLog.length > 0
+      ? nextState.storyLog[nextState.storyLog.length - 1]?.timestamp
+      : undefined;
+  if (typeof introTimestamp === "number") {
+    nextState = { ...nextState, storyLastViewedAt: introTimestamp };
+  }
   return nextState;
 }
 
@@ -8998,6 +9008,27 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "COLLAPSE_STORY_QUEUE": {
+      const keepCount =
+        typeof action.keepCount === "number"
+          ? Math.max(0, Math.floor(action.keepCount))
+          : 1;
+      if (state.storyQueue.length <= keepCount) return state;
+      return {
+        ...state,
+        storyQueue: state.storyQueue.slice(0, keepCount),
+      };
+    }
+
+    case "MARK_STORY_VIEWED": {
+      const timestamp =
+        typeof action.timestamp === "number" ? action.timestamp : Date.now();
+      return {
+        ...state,
+        storyLastViewedAt: Math.max(state.storyLastViewedAt, timestamp),
+      };
+    }
+
     case "RESOLVE_LOCKOUT": {
       captureEvent("lockout_resolve", {
         choice: action.choice,
@@ -9187,6 +9218,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           : 0;
       const overlayQueue = base.overlayQueue;
       const overlayTelemetry = base.overlayTelemetry;
+      const storyLastViewedAt =
+        typeof action.state.storyLastViewedAt === "number" &&
+        Number.isFinite(action.state.storyLastViewedAt)
+          ? Math.max(0, action.state.storyLastViewedAt)
+          : 0;
       const baronChoice =
         action.state.baronChoice === "accepted" ||
         action.state.baronChoice === "declined"
@@ -9861,6 +9897,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? action.state.reputationTier
             : NEIGHBORHOODS.findIndex((n) => n.id === computedNeighborhood.id),
         lastCriticalEventId,
+        storyLastViewedAt,
         overlayQueue,
         overlayTelemetry,
       };
