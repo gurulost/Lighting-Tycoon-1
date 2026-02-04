@@ -43,6 +43,7 @@ export function OverlayManager({
 }: OverlayManagerProps) {
   const nowRef = useRef(Date.now());
   nowRef.current = Date.now();
+  const lastTelemetryIdRef = useRef<string | null>(null);
 
   const resolveOverlayTtl = (item?: OverlayItem) => {
     if (!item) return null;
@@ -76,10 +77,15 @@ export function OverlayManager({
 
   const primary = sorted[0]?.item;
   useEffect(() => {
-    if (!primary) return;
+    if (!primary) {
+      lastTelemetryIdRef.current = null;
+      return;
+    }
+    if (lastTelemetryIdRef.current === primary.id) return;
+    lastTelemetryIdRef.current = primary.id;
     const waitMs = Math.max(0, Date.now() - primary.createdAt);
     onTelemetry?.(waitMs);
-  }, [primary, primary?.id, primary?.createdAt, onTelemetry]);
+  }, [primary?.id, primary?.createdAt, onTelemetry]);
   const secondary = useMemo(() => {
     if (!primary) return undefined;
     const allowed = OVERLAY_COEXISTENCE[primary.type] ?? [];

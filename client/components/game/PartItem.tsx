@@ -474,6 +474,15 @@ export function MergeAnimation({
   const scale = useSharedValue(0);
   const localOpacity = useSharedValue(1);
   const rotation = useSharedValue(0);
+  const onCompleteRef = React.useRef(onComplete);
+
+  React.useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  const handleComplete = React.useCallback(() => {
+    onCompleteRef.current?.();
+  }, []);
 
   const isOpen = family === "open";
   const isWaste = family === "waste";
@@ -499,11 +508,16 @@ export function MergeAnimation({
       400,
       withTiming(0, { duration: 200 }, (finished) => {
         if (finished) {
-          runOnJS(onComplete)();
+          runOnJS(handleComplete)();
         }
       }),
     );
-  }, [localOpacity, onComplete, rotation, scale]);
+    return () => {
+      cancelAnimation(scale);
+      cancelAnimation(rotation);
+      cancelAnimation(localOpacity);
+    };
+  }, [handleComplete, localOpacity, rotation, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],
