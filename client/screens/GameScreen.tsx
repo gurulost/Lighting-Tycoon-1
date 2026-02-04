@@ -52,6 +52,7 @@ import { TutorialOverlay } from "@/components/game/TutorialOverlay";
 import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
+import { getCouncilUnlockInfo } from "@/lib/council";
 import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
@@ -349,8 +350,34 @@ export default function GameScreen() {
     !state.lockoutActive &&
     state.orders.length < effectiveMaxOrders &&
     boardPressureBand === "red";
-  const showCouncilButton = state.council.unlocked;
+  const councilUnlockInfo = useMemo(
+    () => getCouncilUnlockInfo(state),
+    [state.council.unlocked, state.projectsCompleted, state.reputationTier],
+  );
+  const showCouncilButton = state.gamePhase === 2;
   const councilBadge = state.council.activeHearing ? 1 : 0;
+  const councilTooltipMessage = useMemo(() => {
+    if (state.council.unlocked) return councilUnlockInfo.copy;
+    const lines = [councilUnlockInfo.copy];
+    if (councilUnlockInfo.minProjects > 0) {
+      lines.push(
+        `Projects ${councilUnlockInfo.projectsProgress}/${councilUnlockInfo.minProjects}`,
+      );
+    }
+    if (councilUnlockInfo.minRepTier > 0) {
+      lines.push(
+        `Rep Tier ${councilUnlockInfo.repProgress}/${councilUnlockInfo.minRepTier}`,
+      );
+    }
+    if (councilUnlockInfo.capstoneTitle) {
+      lines.push(
+        `Capstone ${
+          councilUnlockInfo.capstoneComplete ? "Complete" : "Pending"
+        }`,
+      );
+    }
+    return lines.join("\n");
+  }, [councilUnlockInfo, state.council.unlocked]);
   const unreadStoryCount = useMemo(() => {
     if (state.storyLog.length === 0) return 0;
     return state.storyLog.reduce(
@@ -1483,6 +1510,8 @@ export default function GameScreen() {
             label="Council"
             color={GameColors.currency.research}
             onPress={() => setActiveModal("council")}
+            onDisabledPress={() => showToast(councilTooltipMessage, 3200)}
+            disabled={!state.council.unlocked}
             badge={councilBadge}
             compact={isCompactLayout}
             reducedMotion={state.settings.reducedMotion}

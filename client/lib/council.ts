@@ -1,5 +1,6 @@
 import { COUNCIL_PERKS } from "@/constants/councilPerks";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
+import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
 import { GameState } from "@/types/game";
 import { getTuning } from "@/lib/tuning";
 import type { CouncilPerkEffects } from "@/constants/councilPerks";
@@ -214,5 +215,63 @@ export function getCouncilHearingPenalty(
     projectDepositMult: scaleMult(penalty.projectDepositMult ?? 1, scale) ?? 1,
     compatOrderWeightMult:
       scaleMult(penalty.compatOrderWeightMult ?? 1, scale) ?? 1,
+  };
+}
+
+export type CouncilUnlockInfo = {
+  isUnlocked: boolean;
+  minProjects: number;
+  minRepTier: number;
+  capstoneTitle?: string;
+  capstoneComplete: boolean;
+  projectsProgress: number;
+  repProgress: number;
+  copy: string;
+};
+
+export function getCouncilUnlockInfo(state: GameState): CouncilUnlockInfo {
+  const tuning = getTuning();
+  const minProjects = Math.max(
+    0,
+    Math.floor(tuning.council.unlockMinProjectsCompleted ?? 0),
+  );
+  const minRepTier = Math.max(
+    0,
+    Math.floor(tuning.council.unlockMinRepTier ?? 0),
+  );
+  const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
+  const capstone = capstoneId
+    ? PROJECT_DEFINITION_BY_ID.get(capstoneId)
+    : undefined;
+  const capstoneTitle = capstone?.title;
+  const capstoneComplete =
+    !!capstoneId && state.projectsCompleted.includes(capstoneId);
+  const projectsProgress =
+    minProjects > 0
+      ? Math.min(state.projectsCompleted.length, minProjects)
+      : state.projectsCompleted.length;
+  const repProgress =
+    minRepTier > 0
+      ? Math.min(state.reputationTier, minRepTier)
+      : state.reputationTier;
+  const hasNumericGoals = minProjects > 0 || minRepTier > 0;
+  const lockedCopy = capstoneTitle
+    ? hasNumericGoals
+      ? `Unlock by completing ${capstoneTitle} or reaching the goals below.`
+      : `Unlock by completing ${capstoneTitle}.`
+    : "Unlock by reaching the goals below.";
+  const copy = state.council.unlocked
+    ? "Standards Council unlocked. Open it from the bottom bar to start a campaign."
+    : lockedCopy;
+
+  return {
+    isUnlocked: state.council.unlocked,
+    minProjects,
+    minRepTier,
+    capstoneTitle,
+    capstoneComplete,
+    projectsProgress,
+    repProgress,
+    copy,
   };
 }

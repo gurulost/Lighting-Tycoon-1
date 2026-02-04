@@ -46,6 +46,7 @@ import {
   TINA_BEATS,
 } from "@/constants/story";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
+import { getReputationTier } from "@/constants/reputation";
 import { getLockoutLabRequestTarget } from "@/constants/lockout";
 import {
   ORDER_LIBRARY,
@@ -697,6 +698,41 @@ function queueStoryBeat(state: GameState, beatId: string): GameState {
     storyLog: trimmedStoryLog,
     storySeen: { ...state.storySeen, [beatId]: true },
   };
+}
+
+function enqueueOverlayState(state: GameState, item: OverlayItem): GameState {
+  const now = Date.now();
+  const normalized = {
+    ...item,
+    createdAt: typeof item.createdAt === "number" ? item.createdAt : now,
+  } as OverlayItem;
+  if (!Object.prototype.hasOwnProperty.call(OVERLAY_PRIORITY, normalized.type)) {
+    return state;
+  }
+  if (
+    normalized.dedupeKey &&
+    state.overlayQueue.some((entry) => entry.dedupeKey === normalized.dedupeKey)
+  ) {
+    return state;
+  }
+  if (state.overlayQueue.some((entry) => entry.id === normalized.id)) {
+    return state;
+  }
+  const nextQueue = [...state.overlayQueue, normalized];
+  if (nextQueue.length <= OVERLAY_QUEUE_MAX) {
+    return { ...state, overlayQueue: nextQueue };
+  }
+  const nonSticky = nextQueue.filter((entry) => !entry.sticky);
+  if (nonSticky.length > 0) {
+    const oldest = nonSticky.reduce((oldestItem, entry) =>
+      entry.createdAt < oldestItem.createdAt ? entry : oldestItem,
+    );
+    return {
+      ...state,
+      overlayQueue: nextQueue.filter((entry) => entry.id !== oldest.id),
+    };
+  }
+  return { ...state, overlayQueue: nextQueue.slice(1) };
 }
 
 function canQueueAmbientBeat(state: GameState) {
@@ -1542,15 +1578,20 @@ function applyMissionReward(state: GameState, mission: Mission): GameState {
   };
 
   const nextNeighborhood = getNeighborhoodByRep(nextState.reputation);
-  if (nextNeighborhood.id !== nextState.currentNeighborhoodId) {
+  const nextRepTier = getReputationTier(nextState.reputation);
+  const neighborhoodChanged =
+    nextNeighborhood.id !== nextState.currentNeighborhoodId;
+  if (
+    neighborhoodChanged || nextRepTier !== nextState.reputationTier
+  ) {
     nextState = {
       ...nextState,
       currentNeighborhoodId: nextNeighborhood.id,
-      reputationTier: NEIGHBORHOODS.findIndex(
-        (n) => n.id === nextNeighborhood.id,
-      ),
+      reputationTier: nextRepTier,
     };
-    nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+    if (neighborhoodChanged) {
+      nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+    }
   }
 
   return nextState;
@@ -3202,41 +3243,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return queueStoryBeat(state, action.beatId);
     }
     case "ENQUEUE_OVERLAY": {
-      const now = Date.now();
-      const item = {
-        ...action.item,
-        createdAt:
-          typeof action.item.createdAt === "number"
-            ? action.item.createdAt
-            : now,
-      } as OverlayItem;
-      if (!Object.prototype.hasOwnProperty.call(OVERLAY_PRIORITY, item.type)) {
-        return state;
-      }
-      if (
-        item.dedupeKey &&
-        state.overlayQueue.some((entry) => entry.dedupeKey === item.dedupeKey)
-      ) {
-        return state;
-      }
-      if (state.overlayQueue.some((entry) => entry.id === item.id)) {
-        return state;
-      }
-      const nextQueue = [...state.overlayQueue, item];
-      if (nextQueue.length <= OVERLAY_QUEUE_MAX) {
-        return { ...state, overlayQueue: nextQueue };
-      }
-      const nonSticky = nextQueue.filter((entry) => !entry.sticky);
-      if (nonSticky.length > 0) {
-        const oldest = nonSticky.reduce((oldestItem, entry) =>
-          entry.createdAt < oldestItem.createdAt ? entry : oldestItem,
-        );
-        return {
-          ...state,
-          overlayQueue: nextQueue.filter((entry) => entry.id !== oldest.id),
-        };
-      }
-      return { ...state, overlayQueue: nextQueue.slice(1) };
+      return enqueueOverlayState(state, action.item);
     }
     case "DISMISS_OVERLAY": {
       if (state.overlayQueue.length === 0) return state;
@@ -4406,6 +4413,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         type: "merge",
         count: 1,
       });
+      const nextNeighborhood = getNeighborhoodByRep(nextState.reputation);
+      const nextRepTier = getReputationTier(nextState.reputation);
+      const neighborhoodChanged =
+        nextNeighborhood.id !== nextState.currentNeighborhoodId;
+      if (neighborhoodChanged || nextRepTier !== nextState.reputationTier) {
+        nextState = {
+          ...nextState,
+          currentNeighborhoodId: nextNeighborhood.id,
+          reputationTier: nextRepTier,
+        };
+        if (neighborhoodChanged) {
+          nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+        }
+      }
       return nextState;
     }
 
@@ -4797,6 +4818,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let projectCompleteBeatId: string | null = null;
       let projectUnlockBeatId: string | null = null;
       let projectOfferBeatId: string | null = null;
+      let councilUnlockHintBeatId: string | null = null;
       let councilUnlockedNow = false;
       let councilHearingTriggeredId: string | null = null;
       let councilHearingClearedId: string | null = null;
@@ -5382,6 +5404,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             [project.id]: Date.now(),
           };
 
+          if (nextProjectsCompleted.length === 3 && !state.council.unlocked) {
+            councilUnlockHintBeatId = "mentor_council_path";
+          }
+
           const milestoneThresholds = [3, 6, 9];
           milestoneThresholds.forEach((threshold) => {
             const key = `milestone_${threshold}`;
@@ -5467,11 +5493,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!nextCouncil.unlocked) {
         const repAfterRewards = state.reputation + repReward;
         const neighborhoodAfterRewards = getNeighborhoodByRep(repAfterRewards);
+        const repTierAfterRewards = getReputationTier(repAfterRewards);
         const unlockState: GameState = {
           ...state,
           projectsCompleted: nextProjectsCompleted,
           reputation: repAfterRewards,
-          reputationTier: getNeighborhoodIndex(neighborhoodAfterRewards.id),
+          reputationTier: repTierAfterRewards,
         };
         if (canUnlockCouncil(unlockState)) {
           nextCouncil = {
@@ -5841,11 +5868,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           const repAfterRewards = state.reputation + repReward;
           const neighborhoodAfterRewards =
             getNeighborhoodByRep(repAfterRewards);
+          const repTierAfterRewards = getReputationTier(repAfterRewards);
           const offersState: GameState = {
             ...state,
             gamePhase: nextGamePhase,
             reputation: repAfterRewards,
-            reputationTier: getNeighborhoodIndex(neighborhoodAfterRewards.id),
+            reputationTier: repTierAfterRewards,
             currentNeighborhoodId: neighborhoodAfterRewards.id,
             projectsCompleted: nextProjectsCompleted,
             projectsUnlocked: nextProjectsUnlocked,
@@ -5916,9 +5944,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (councilUnlockedNow) {
         captureEvent("council_unlock", {
           projectsCompleted: nextProjectsCompleted.length,
-          reputationTier: getNeighborhoodIndex(
-            getNeighborhoodByRep(state.reputation + repReward).id,
-          ),
+          reputationTier: getReputationTier(state.reputation + repReward),
         });
       }
       if (councilPilotCompletedId) {
@@ -6114,6 +6140,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (projectCompleteBeatId) {
           nextState = queueStoryBeat(nextState, projectCompleteBeatId);
         }
+        if (councilUnlockHintBeatId) {
+          nextState = queueStoryBeat(nextState, councilUnlockHintBeatId);
+        }
         if (projectUnlockBeatId) {
           nextState = queueStoryBeat(nextState, projectUnlockBeatId);
         }
@@ -6124,6 +6153,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (councilUnlockedNow) {
         nextState = queueStoryBeat(nextState, "council_unlock");
+        nextState = enqueueOverlayState(nextState, {
+          id: `unlock:phase3:${Date.now()}`,
+          type: "unlock_banner",
+          dedupeKey: "phase3_unlock",
+          payload: {
+            title: "Phase 3 unlocked",
+            message:
+              "Standards Council is open. Open it from the bottom bar to draft standards.",
+          },
+        });
       }
       if (councilHearingTriggeredId) {
         nextState = queueStoryBeat(nextState, "council_hearing");
@@ -6194,15 +6233,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       const nextNeighborhood = getNeighborhoodByRep(nextState.reputation);
-      if (nextNeighborhood.id !== nextState.currentNeighborhoodId) {
+      const nextRepTier = getReputationTier(nextState.reputation);
+      const neighborhoodChanged =
+        nextNeighborhood.id !== nextState.currentNeighborhoodId;
+      if (neighborhoodChanged || nextRepTier !== nextState.reputationTier) {
         nextState = {
           ...nextState,
           currentNeighborhoodId: nextNeighborhood.id,
-          reputationTier: NEIGHBORHOODS.findIndex(
-            (n) => n.id === nextNeighborhood.id,
-          ),
+          reputationTier: nextRepTier,
         };
-        nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+        if (neighborhoodChanged) {
+          nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+        }
       }
       if (
         state.tutorialComplete &&
@@ -7523,11 +7565,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         hearingId: hearing.id,
         method: "pay",
       });
-      return {
+      const nextReputation = state.reputation + Math.floor(bonusRep);
+      let nextState: GameState = {
         ...state,
         cash: state.cash - cashCost + Math.floor(bonusCash),
         research: state.research - researchCost + Math.floor(bonusResearch),
-        reputation: state.reputation + Math.floor(bonusRep),
+        reputation: nextReputation,
         council: {
           ...state.council,
           activeHearing: undefined,
@@ -7536,6 +7579,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         },
         undoSnapshot: undefined,
       };
+      const nextNeighborhood = getNeighborhoodByRep(nextReputation);
+      const nextRepTier = getReputationTier(nextReputation);
+      const neighborhoodChanged =
+        nextNeighborhood.id !== nextState.currentNeighborhoodId;
+      if (neighborhoodChanged || nextRepTier !== nextState.reputationTier) {
+        nextState = {
+          ...nextState,
+          currentNeighborhoodId: nextNeighborhood.id,
+          reputationTier: nextRepTier,
+        };
+        if (neighborhoodChanged) {
+          nextState = queueStoryBeat(nextState, nextNeighborhood.storyBeatId);
+        }
+      }
+      return nextState;
     }
 
     case "COUNCIL_USE_MUNICIPAL_GRANT": {
@@ -8803,12 +8861,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case "UNDO_LAST_MOVE": {
       if (!state.undoSnapshot) return state;
       if (Date.now() < state.undoCooldownUntil) return state;
+      const snapshotReputation = state.undoSnapshot.reputation;
+      const nextNeighborhood = getNeighborhoodByRep(snapshotReputation);
+      const nextRepTier = getReputationTier(snapshotReputation);
       return {
         ...state,
         board: [...state.undoSnapshot.board],
         backpack: [...state.undoSnapshot.backpack],
         cash: state.undoSnapshot.cash,
-        reputation: state.undoSnapshot.reputation,
+        reputation: snapshotReputation,
         research: state.undoSnapshot.research,
         dependency: state.undoSnapshot.dependency,
         baronPressure: state.undoSnapshot.baronPressure,
@@ -8821,6 +8882,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mergeMomentumLevel: state.undoSnapshot.mergeMomentumLevel,
         mergeMomentumPending: state.undoSnapshot.mergeMomentumPending,
         mergeMomentumDropFloor: state.undoSnapshot.mergeMomentumDropFloor,
+        currentNeighborhoodId: nextNeighborhood.id,
+        reputationTier: nextRepTier,
         undoSnapshot: undefined,
         undoCooldownUntil: Date.now() + 15000,
       };
@@ -9167,11 +9230,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "LOAD_STATE": {
       const base = getInitialState();
-      const computedNeighborhood = getNeighborhoodByRep(
+      const resolvedReputation =
         typeof action.state.reputation === "number"
           ? action.state.reputation
-          : base.reputation,
-      );
+          : base.reputation;
+      const computedNeighborhood = getNeighborhoodByRep(resolvedReputation);
+      const computedReputationTier = getReputationTier(resolvedReputation);
       const hasValidNeighborhood =
         typeof action.state.currentNeighborhoodId === "string" &&
         NEIGHBORHOODS.some((n) => n.id === action.state.currentNeighborhoodId);
@@ -9844,6 +9908,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         },
         boardSize: restoredBoardSize,
         board: sanitizedBoard,
+        reputation: resolvedReputation,
         dependency: restoredDependency,
         baronPressure,
         baronSupplySpawnsRemaining,
@@ -9954,10 +10019,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentNeighborhoodId: hasValidNeighborhood
           ? action.state.currentNeighborhoodId
           : computedNeighborhood.id,
-        reputationTier:
-          typeof action.state.reputationTier === "number"
-            ? action.state.reputationTier
-            : NEIGHBORHOODS.findIndex((n) => n.id === computedNeighborhood.id),
+        reputationTier: computedReputationTier,
         lastCriticalEventId,
         storyLastViewedAt,
         overlayQueue,

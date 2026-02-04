@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons";
 
 import { StoryToast } from "@/components/game/StoryToast";
 import { TrimLightStrip } from "@/components/game/TrimLightStrip";
@@ -198,6 +199,38 @@ export function OverlayManager({
       );
     }
 
+    if (item.type === "unlock_banner") {
+      const title =
+        (item.payload?.title as string) ?? "Phase 3 unlocked";
+      const message =
+        (item.payload?.message as string) ??
+        "Standards Council is open. Draft standards to shape the city.";
+      return (
+        <View
+          key={item.id}
+          style={[styles.unlockSlot, { bottom: bottomInset + 140 }]}
+          pointerEvents="none"
+        >
+          <LinearGradient
+            colors={["#0F2A3D", "#0F2435", "#101626"]}
+            style={styles.unlockCard}
+          >
+            <View style={styles.unlockHeader}>
+              <View style={styles.unlockIcon}>
+                <Feather
+                  name="award"
+                  size={14}
+                  color={GameColors.currency.research}
+                />
+              </View>
+              <ThemedText style={styles.unlockTitle}>{title}</ThemedText>
+            </View>
+            <ThemedText style={styles.unlockMessage}>{message}</ThemedText>
+          </LinearGradient>
+        </View>
+      );
+    }
+
     if (item.type === "toast" || item.type === "system_hint") {
       const message = (item.payload?.message as string) ?? "";
       return (
@@ -309,6 +342,52 @@ const styles = StyleSheet.create({
     color: GameColors.text.primary,
     fontWeight: "600",
     textAlign: "center",
+  },
+  unlockSlot: {
+    position: "absolute",
+    left: Spacing.lg,
+    right: Spacing.lg,
+    alignItems: "center",
+  },
+  unlockCard: {
+    width: "92%",
+    maxWidth: 380,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: "#2A3C52",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+    shadowColor: "#00D9FF",
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  unlockHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  unlockIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: `${GameColors.currency.research}55`,
+    backgroundColor: `${GameColors.currency.research}18`,
+  },
+  unlockTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: GameColors.text.primary,
+  },
+  unlockMessage: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+    lineHeight: 16,
   },
   momentLockBlocker: {
     position: "absolute",

@@ -24,7 +24,11 @@ import {
   getProjectOfferRefreshCost,
 } from "@/lib/projects";
 import { getTuning } from "@/lib/tuning";
-import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
+import {
+  getCouncilPerkEffects,
+  getCouncilHearingPenalty,
+  getCouncilUnlockInfo,
+} from "@/lib/council";
 
 type TabKey = "offers" | "active" | "trophies";
 
@@ -447,6 +451,15 @@ export function ProjectBoardModal({
   const canAffordOvertime = state.cash >= tuning.projects.addonOvertimeCrewCost;
   const canAffordChangeOrder =
     state.cash >= tuning.projects.addonChangeOrderCost;
+  const councilUnlockInfo = getCouncilUnlockInfo(state);
+  const councilUnlockMinProjects = councilUnlockInfo.minProjects;
+  const councilUnlockMinRepTier = councilUnlockInfo.minRepTier;
+  const councilCapstoneTitle = councilUnlockInfo.capstoneTitle;
+  const councilCapstoneComplete = councilUnlockInfo.capstoneComplete;
+  const councilProjectsProgress = councilUnlockInfo.projectsProgress;
+  const councilRepProgress = councilUnlockInfo.repProgress;
+  const showCouncilGate = state.projectsUnlocked;
+  const councilGateCopy = councilUnlockInfo.copy;
 
   return (
     <ModalShell
@@ -511,6 +524,76 @@ export function ProjectBoardModal({
             );
           })}
         </View>
+
+        {showCouncilGate ? (
+          <View style={styles.councilGateCard}>
+            <View style={styles.councilGateHeader}>
+              <View style={styles.councilGateTitleRow}>
+                <Feather
+                  name="award"
+                  size={16}
+                  color={GameColors.currency.research}
+                />
+                <ThemedText style={styles.councilGateTitle}>
+                  Standards Council
+                </ThemedText>
+              </View>
+              <View
+                style={[
+                  styles.councilGateStatus,
+                  state.council.unlocked && styles.councilGateStatusUnlocked,
+                ]}
+              >
+                <ThemedText style={styles.councilGateStatusText}>
+                  {state.council.unlocked ? "Unlocked" : "Locked"}
+                </ThemedText>
+              </View>
+            </View>
+            <ThemedText style={styles.councilGateCopy}>
+              {councilGateCopy}
+            </ThemedText>
+            {!state.council.unlocked ? (
+              <View style={styles.councilGateProgress}>
+                {councilUnlockMinProjects > 0 ? (
+                  <View style={styles.councilGatePill}>
+                    <Feather
+                      name="layers"
+                      size={12}
+                      color={GameColors.ui.primary}
+                    />
+                    <ThemedText style={styles.councilGatePillText}>
+                      Projects {councilProjectsProgress}/{councilUnlockMinProjects}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {councilUnlockMinRepTier > 0 ? (
+                  <View style={styles.councilGatePill}>
+                    <Feather
+                      name="trending-up"
+                      size={12}
+                      color={GameColors.currency.research}
+                    />
+                    <ThemedText style={styles.councilGatePillText}>
+                      Rep Tier {councilRepProgress}/{councilUnlockMinRepTier}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {councilCapstoneTitle ? (
+                  <View style={styles.councilGatePill}>
+                    <Feather
+                      name="flag"
+                      size={12}
+                      color={GameColors.ui.success}
+                    />
+                    <ThemedText style={styles.councilGatePillText}>
+                      Capstone {councilCapstoneComplete ? "Complete" : "Pending"}
+                    </ThemedText>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {!state.projectsUnlocked ? (
           <View style={styles.lockedState}>
@@ -1175,6 +1258,70 @@ const styles = StyleSheet.create({
     color: GameColors.ui.primary,
   },
   tabLabelDisabled: {
+    color: GameColors.text.secondary,
+  },
+  councilGateCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#141424",
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  councilGateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  councilGateTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  councilGateTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  councilGateStatus: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.text.disabled}50`,
+    backgroundColor: `${GameColors.text.disabled}12`,
+  },
+  councilGateStatusUnlocked: {
+    borderColor: `${GameColors.ui.success}60`,
+    backgroundColor: `${GameColors.ui.success}18`,
+  },
+  councilGateStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+  },
+  councilGateCopy: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+  },
+  councilGateProgress: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  councilGatePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  councilGatePillText: {
+    fontSize: 11,
     color: GameColors.text.secondary,
   },
   lockedState: {

@@ -4,7 +4,8 @@ export type OverlayType =
   | "tutorial_tip"
   | "toast"
   | "milestone"
-  | "system_hint";
+  | "system_hint"
+  | "unlock_banner";
 
 export interface OverlayItem {
   id: string;
@@ -22,6 +23,7 @@ export const OVERLAY_PRIORITY: Record<OverlayType, number> = {
   toast: 50,
   milestone: 40,
   system_hint: 30,
+  unlock_banner: 60,
 };
 
 export const OVERLAY_QUEUE_MAX = 8;
@@ -32,19 +34,22 @@ export const OVERLAY_AUTO_DISMISS_MS: Partial<Record<OverlayType, number>> = {
   toast: 2200,
   milestone: 1800,
   system_hint: 2400,
+  unlock_banner: 3600,
 };
 
 export const OVERLAY_SECONDARY_TYPES: OverlayType[] = [
   "toast",
   "milestone",
   "system_hint",
+  "unlock_banner",
 ];
 
 export const OVERLAY_COEXISTENCE: Record<OverlayType, OverlayType[]> = {
   lockout: [],
-  story: ["toast", "milestone", "system_hint"],
+  story: ["toast", "milestone", "system_hint", "unlock_banner"],
   tutorial_tip: ["toast", "system_hint"],
   toast: [],
   milestone: [],
   system_hint: [],
+  unlock_banner: [],
 };

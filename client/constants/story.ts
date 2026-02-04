@@ -260,6 +260,16 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     category: "mentor_tip",
     priority: "high",
   },
+  mentor_council_path: {
+    id: "mentor_council_path",
+    speaker: "mentor",
+    line1: "Standards Council is next. Finish the capstone or stack six contracts.",
+    line2: "Keep your reputation tier climbing to open the door.",
+    onceOnly: true,
+    portrait: "confident",
+    category: "mentor_tip",
+    priority: "high",
+  },
   project_offer_generic: {
     id: "project_offer_generic",
     speaker: "mentor",

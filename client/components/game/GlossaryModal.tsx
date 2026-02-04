@@ -91,7 +91,7 @@ const SECTION_ORDER: Record<GlossaryTier, string[]> = {
     "order-badges",
   ],
   advanced: ["merge-momentum", "boosts", "freedom-tech"],
-  endgame: ["compliance", "projects"],
+  endgame: ["compliance", "projects", "council"],
 };
 const getSectionSortIndex = (tier: GlossaryTier, id: string) => {
   const list = SECTION_ORDER[tier] ?? [];
@@ -773,6 +773,40 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
           "Site Logistics adds Open supplier charges; Overtime Crew adds an order slot; Change Order rerolls constraints.",
         icon: "truck",
         color: GameColors.ui.success,
+      },
+    ],
+  },
+  {
+    id: "council",
+    title: "Standards Council",
+    tier: "endgame",
+    items: [
+      {
+        id: "council-unlock",
+        title: "Council Unlock",
+        summary: "Phase 3 governance layer.",
+        detail:
+          "Unlocked after the Expo capstone or 6 contracts plus a high reputation tier. Draft standards, run pilots, and ratify rules.",
+        icon: "award",
+        color: GameColors.currency.research,
+      },
+      {
+        id: "council-campaigns",
+        title: "Campaigns",
+        summary: "Draft → Pilot → Ratify.",
+        detail:
+          "Invest cash + research, complete objectives during play, then finish a protected showcase order.",
+        icon: "layers",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "council-pressure",
+        title: "Lobby Pressure",
+        summary: "Risk meter that triggers hearings.",
+        detail:
+          "Pressure rises with Council progress. Hearings apply temporary penalties until cleared.",
+        icon: "alert-triangle",
+        color: GameColors.ui.warning,
       },
     ],
   },

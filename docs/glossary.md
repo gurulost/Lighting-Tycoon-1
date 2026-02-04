@@ -86,6 +86,7 @@ Use this as a quick reference for every icon, badge, and system.
 
 ## Standards Council (Phase 3)
 - Council: the post-empire progression layer where Tina writes industry standards.
+- Unlock: complete the Expo capstone or finish 6 contracts with a high reputation tier.
 - Campaigns: three-step tracks (Draft -> Pilot -> Ratify) that grant permanent perks.
 - Draft: invest cash + research to start a standard.
 - Pilot: fulfill specific install objectives during normal play.
