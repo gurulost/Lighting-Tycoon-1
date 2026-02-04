@@ -106,6 +106,8 @@ function AnimatedStation({
   accentColor,
   testID,
   containerStyle,
+  containerRef,
+  onLayout,
 }: {
   children: React.ReactNode;
   isActive: boolean;
@@ -117,6 +119,8 @@ function AnimatedStation({
   accentColor: string;
   testID?: string;
   containerStyle?: StyleProp<ViewStyle>;
+  containerRef?: React.Ref<View>;
+  onLayout?: (event: any) => void;
 }) {
   const pulseAnim = useSharedValue(0);
 
@@ -157,11 +161,13 @@ function AnimatedStation({
 
   return (
     <Pressable
+      ref={containerRef}
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
       testID={testID}
       style={containerStyle}
+      onLayout={onLayout}
     >
       <Animated.View
         style={[
@@ -198,6 +204,7 @@ export function MergeBoard({
   boardContainerLayout,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
+  const workbenchRef = useRef<View>(null);
   const hapticsEnabled = state.settings.hapticsEnabled;
   const reducedMotion = state.settings.reducedMotion;
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
@@ -670,8 +677,23 @@ export function MergeBoard({
     [measureGrid],
   );
 
+  const measureWorkbench = useCallback(() => {
+    if (!onStationLayout || !workbenchRef.current) return;
+    requestAnimationFrame(() => {
+      workbenchRef.current?.measureInWindow((x, y, width, height) => {
+        if (!width || !height) return;
+        onStationLayout({ workbench: { x, y, width, height } });
+      });
+    });
+  }, [onStationLayout]);
+
   useEffect(() => {
-    if (!onStationLayout || !gridLayout) return;
+    if (!onStationLayout) return;
+    if (workbenchRef.current) {
+      measureWorkbench();
+      return;
+    }
+    if (!gridLayout) return;
     const row = Math.floor(WORKBENCH_SLOT / GRID_COLS);
     const col = WORKBENCH_SLOT % GRID_COLS;
     const scaleSize = tileSize * stationScale;
@@ -689,7 +711,14 @@ export function MergeBoard({
     onStationLayout({
       workbench: { x, y, width: scaleSize, height: scaleSize },
     });
-  }, [gridLayout, onStationLayout, tileSize, stationOffset, stationScale]);
+  }, [
+    gridLayout,
+    measureWorkbench,
+    onStationLayout,
+    tileSize,
+    stationOffset,
+    stationScale,
+  ]);
 
   const measureBackpack = useCallback(() => {
     backpackRef.current?.measureInWindow((x, y, width, height) => {
@@ -1306,6 +1335,8 @@ export function MergeBoard({
             isActive
             forcePulse={tutorialFocus === "workbench"}
             testID="workbench-station"
+            containerRef={workbenchRef}
+            onLayout={measureWorkbench}
             onPress={() => {
               if (hapticsEnabled) {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

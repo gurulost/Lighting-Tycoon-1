@@ -203,6 +203,28 @@ export function TutorialOverlay({
     currentStep?.highlight && targets
       ? targets[currentStep.highlight]
       : undefined;
+  const highlightPadding = 6;
+  const highlightInset = 8;
+  const highlightBox = highlightRect
+    ? (() => {
+        const left = Math.max(highlightInset, highlightRect.x - highlightPadding);
+        const top = Math.max(highlightInset, highlightRect.y - highlightPadding);
+        const right = Math.min(
+          SCREEN_WIDTH - highlightInset,
+          highlightRect.x + highlightRect.width + highlightPadding,
+        );
+        const bottom = Math.min(
+          SCREEN_HEIGHT - highlightInset,
+          highlightRect.y + highlightRect.height + highlightPadding,
+        );
+        return {
+          left,
+          top,
+          width: Math.max(0, right - left),
+          height: Math.max(0, bottom - top),
+        };
+      })()
+    : null;
   const holePadding = 10;
   const holeRect = highlightRect
     ? (() => {
@@ -334,7 +356,7 @@ export function TutorialOverlay({
         ) : null}
       </Pressable>
 
-      {highlightRect ? (
+      {highlightBox ? (
         <Animated.View
           style={[
             styles.highlight,
@@ -342,10 +364,10 @@ export function TutorialOverlay({
             {
               borderColor: `${currentStep.color}CC`,
               shadowColor: currentStep.color,
-              left: Math.max(8, highlightRect.x - 6),
-              top: Math.max(8, highlightRect.y - 6),
-              width: Math.min(SCREEN_WIDTH - 16, highlightRect.width + 12),
-              height: Math.min(SCREEN_HEIGHT - 16, highlightRect.height + 12),
+              left: highlightBox.left,
+              top: highlightBox.top,
+              width: highlightBox.width,
+              height: highlightBox.height,
               pointerEvents: "none",
             },
           ]}
