@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 describe("withRepeat", () => {
   afterEach(() => {
     jest.resetModules();
