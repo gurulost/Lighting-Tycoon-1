@@ -10,6 +10,8 @@ describe("withRepeat", () => {
       withRepeat: withRepeatMock,
     }));
 
+    // Use CommonJS require here to avoid Node's experimental vm modules requirement.
+    // The module is loaded after the mock is registered.
     jest.isolateModules(() => {
       const { withRepeat } =
         require("@/lib/reanimated") as typeof import("@/lib/reanimated");
@@ -22,6 +24,8 @@ describe("withRepeat", () => {
   it("falls back to the first argument when reanimated is unavailable", () => {
     jest.doMock("react-native-reanimated", () => ({}));
 
+    // Use CommonJS require here to avoid Node's experimental vm modules requirement.
+    // The module is loaded after the mock is registered.
     jest.isolateModules(() => {
       const { withRepeat } =
         require("@/lib/reanimated") as typeof import("@/lib/reanimated");

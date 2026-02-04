@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { OrderCard } from "./OrderCard";
 import { ModalShell } from "./ModalShell";
+import { OnboardingCallout } from "./OnboardingCallout";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
@@ -262,6 +263,8 @@ export function OrdersModal({
 }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
+  const isTutorialOrdersStep =
+    !state.tutorialComplete && state.tutorialStep === 3;
   const marketingOrders = 3;
   const marketingMax = 9;
   const scoutSpawnsOpen = 6;
@@ -620,6 +623,16 @@ export function OrdersModal({
             </ThemedText>
           </View>
         </View>
+
+        {isTutorialOrdersStep ? (
+          <OnboardingCallout
+            speaker="mentor"
+            tone="info"
+            message={
+              "Let’s do one clean install. You need a Segment (Tier 3).\nOpen “Starter Install”, then tap Fulfill when you’re ready."
+            }
+          />
+        ) : null}
 
         {showOrdersHint ? (
           <Pressable

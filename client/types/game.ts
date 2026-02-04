@@ -432,6 +432,7 @@ export interface GameState {
 
   storyQueue: string[];
   storyLog: { id: string; timestamp: number }[];
+  storyLastViewedAt: number;
   storySeen: Record<string, boolean>;
   activeStoryBeatId?: string;
   lastStoryShownAt: number;

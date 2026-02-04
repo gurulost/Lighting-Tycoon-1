@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { UpgradeCard } from "./UpgradeCard";
 import { ModalShell } from "./ModalShell";
+import { OnboardingCallout } from "./OnboardingCallout";
 import { useGame } from "@/context/GameContext";
 import { UPGRADE_DEFINITIONS } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
@@ -32,6 +33,8 @@ export function UpgradesModal({
 }: UpgradesModalProps) {
   const insets = useSafeAreaInsets();
   const { state, purchaseUpgrade } = useGame();
+  const isTutorialSpaceStep =
+    Boolean(tutorialOnlyUpgradeId) && !state.tutorialComplete;
   const visibleUpgrades = tutorialOnlyUpgradeId
     ? UPGRADE_DEFINITIONS.filter((u) => u.id === tutorialOnlyUpgradeId)
     : UPGRADE_DEFINITIONS;
@@ -61,6 +64,27 @@ export function UpgradesModal({
         <ThemedText style={styles.cashLabel}>Available</ThemedText>
       </LinearGradient>
 
+      {isTutorialSpaceStep ? (
+        <>
+          <OnboardingCallout
+            speaker="tina"
+            tone="success"
+            compact
+            message={
+              "You got it. No flicker, just glow.\nCash keeps us open. Reputation opens neighborhoods."
+            }
+          />
+          <OnboardingCallout
+            speaker="mentor"
+            tone="info"
+            compact
+            message={
+              "Now buy Space to unlock Slot 1. More room means faster merges.\nBackpack unlocks too—stash overflow when the board gets tight."
+            }
+          />
+        </>
+      ) : null}
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -73,7 +97,7 @@ export function UpgradesModal({
           <View style={styles.tutorialBanner}>
             <Feather name="compass" size={16} color={GameColors.ui.primary} />
             <ThemedText style={styles.tutorialBannerText}>
-              Tutorial: Unlock Slot 1 to expand your board.
+              Tutorial: Purchase Space to unlock Slot 1.
             </ThemedText>
           </View>
         ) : null}

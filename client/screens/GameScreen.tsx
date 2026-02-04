@@ -285,6 +285,7 @@ export default function GameScreen() {
     useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
   const boardContainerRef = useRef<View>(null);
+  const dependencyTargetRef = useRef<View>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
@@ -295,8 +296,6 @@ export default function GameScreen() {
   const cooldownHintRef = useRef(state.lastCooldownHintId);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockExpiresAtRef = useRef(0);
-  const tutorialStepRef = useRef(state.tutorialStep);
-  const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
   const highlightedOrderRef = useRef<string | undefined>(
     state.highlightedOrderId,
   );
@@ -319,6 +318,14 @@ export default function GameScreen() {
     boardPressureBand === "red";
   const showCouncilButton = state.council.unlocked;
   const councilBadge = state.council.activeHearing ? 1 : 0;
+  const unreadStoryCount = useMemo(() => {
+    if (state.storyLog.length === 0) return 0;
+    return state.storyLog.reduce(
+      (count, entry) =>
+        entry.timestamp > state.storyLastViewedAt ? count + 1 : count,
+      0,
+    );
+  }, [state.storyLog, state.storyLastViewedAt]);
   const tutorialSkipped =
     state.tutorialComplete && state.tutorialMetrics.skipped;
   const overlayDebugTop = useMemo(() => {
@@ -353,6 +360,18 @@ export default function GameScreen() {
         : "Audit: choose a response";
 
   const closeModal = () => setActiveModal(null);
+  const openStoryLog = useCallback(() => {
+    setActiveModal("story");
+    const latestTimestamp =
+      state.storyLog.length > 0
+        ? state.storyLog[state.storyLog.length - 1]?.timestamp
+        : undefined;
+    dispatch({
+      type: "MARK_STORY_VIEWED",
+      timestamp:
+        typeof latestTimestamp === "number" ? latestTimestamp : Date.now(),
+    });
+  }, [dispatch, state.storyLog]);
   const markProjectRevealSeen = useCallback(
     (projectId: string) => {
       const isOffered = state.projectOffers.some(
@@ -429,6 +448,30 @@ export default function GameScreen() {
     },
     [],
   );
+  const measureDependencyTarget = useCallback(() => {
+    if (!dependencyTargetRef.current) return;
+    requestAnimationFrame(() => {
+      dependencyTargetRef.current?.measureInWindow((x, y, width, height) => {
+        if (!width || !height) return;
+        setAbsoluteTargets((prev) => {
+          const previous = prev.dependency;
+          if (
+            previous &&
+            previous.x === x &&
+            previous.y === y &&
+            previous.width === width &&
+            previous.height === height
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            dependency: { x, y, width, height },
+          };
+        });
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const nextTargets: Partial<Record<TutorialTarget, LayoutRect>> = {};
@@ -445,9 +488,6 @@ export default function GameScreen() {
 
     if (relativeTargets.board) {
       nextTargets.board = applyOffset(relativeTargets.board);
-    }
-    if (relativeTargets.dependency) {
-      nextTargets.dependency = applyOffset(relativeTargets.dependency);
     }
     if (relativeTargets.currency) {
       nextTargets.currency = applyOffset(
@@ -532,9 +572,9 @@ export default function GameScreen() {
   const handleStoryPress = useCallback(() => {
     if (!state.activeStoryBeatId) return;
     if (momentLockActive) return;
-    setActiveModal("story");
+    openStoryLog();
     dispatch({ type: "DISMISS_STORY_BEAT" });
-  }, [state.activeStoryBeatId, dispatch, momentLockActive]);
+  }, [state.activeStoryBeatId, dispatch, momentLockActive, openStoryLog]);
   const selectedPart =
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
   const showLockoutModal =
@@ -542,6 +582,13 @@ export default function GameScreen() {
     (state.lockoutPhase === 1 ||
       state.lockoutPhase === 3 ||
       !state.lockoutChoice);
+  const storyBlocked =
+    activeModal !== null ||
+    state.baronOfferAvailable ||
+    showLockoutModal ||
+    selectedPartIndex !== null ||
+    isDragging;
+  const storyBlockedRef = useRef(storyBlocked);
   const showProjectReveal =
     revealEligible &&
     !projectDossierId &&
@@ -844,44 +891,35 @@ export default function GameScreen() {
   }, [state.orders, showToast]);
 
   useEffect(() => {
-    const hadSpaceUpgrade = spaceUpgradeRef.current;
-    const hasSpaceUpgrade = (state.upgrades["space_1"] || 0) > 0;
-    if (state.tutorialComplete) {
-      tutorialStepRef.current = state.tutorialStep;
-      spaceUpgradeRef.current = hasSpaceUpgrade;
-      return;
-    }
-    if (state.tutorialStep !== tutorialStepRef.current) {
-      const nextStep = state.tutorialStep;
-      if (nextStep === 5 && hadSpaceUpgrade) {
-        showToast("Space already unlocked — moving on.");
-      } else {
-        const toastMap: Record<number, string> = {
-          1: "First parts down. First install soon.",
-          2: "Track built — your first install part.",
-          3: "Segment built — better orders unlocked.",
-          4: "Order complete — cash + reputation earned. Reputation unlocks neighborhoods.",
-          5: "Space upgraded — more room, faster merges.",
-          6: "Choice made — speed vs independence.",
-          7: "Tutorial complete — finish 2 more installs. Need help? Tap ? for Glossary.",
-        };
-        const message = toastMap[nextStep];
-        if (message) {
-          showToast(message);
-        }
-      }
-      tutorialStepRef.current = nextStep;
-    }
-    spaceUpgradeRef.current = hasSpaceUpgrade;
-  }, [state.tutorialStep, state.tutorialComplete, state.upgrades, showToast]);
+    const wasBlocked = storyBlockedRef.current;
+    storyBlockedRef.current = storyBlocked;
+    if (!wasBlocked || storyBlocked) return;
+    if (state.storyQueue.length === 0) return;
+    const keepCount = state.activeStoryBeatId ? 0 : 1;
+    if (state.storyQueue.length <= keepCount) return;
+    const digestCount = state.storyQueue.length - keepCount;
+    dispatch({ type: "COLLAPSE_STORY_QUEUE", keepCount });
+    showToast(
+      digestCount === 1
+        ? "Story Log updated (1 new)."
+        : `Story Log updated (${digestCount} new).`,
+      2400,
+    );
+  }, [
+    storyBlocked,
+    state.storyQueue.length,
+    state.activeStoryBeatId,
+    showToast,
+    dispatch,
+  ]);
 
   useEffect(() => {
     if (!state.activeStoryBeatId && state.storyQueue.length > 0) {
       const now = Date.now();
       const nextBeatId = state.storyQueue[0];
       const nextBeat = nextBeatId ? STORY_BEATS[nextBeatId] : null;
-      const cooldownSatisfied =
-        nextBeat?.priority === "high" || now - state.lastStoryShownAt >= 30000;
+      const minGapMs = nextBeat?.priority === "high" ? 4500 : 30000;
+      const cooldownSatisfied = now - state.lastStoryShownAt >= minGapMs;
       if (
         cooldownSatisfied &&
         !activeModal &&
@@ -1033,10 +1071,7 @@ export default function GameScreen() {
               setTopActionsLayout(layout);
             }}
           >
-            <Pressable
-              style={styles.settingsButton}
-              onPress={() => setActiveModal("story")}
-            >
+            <Pressable style={styles.settingsButton} onPress={openStoryLog}>
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
                 style={styles.settingsGradient}
@@ -1047,6 +1082,20 @@ export default function GameScreen() {
                   color={GameColors.text.secondary}
                 />
               </LinearGradient>
+              {unreadStoryCount > 0 ? (
+                <View style={styles.storyBadgeWrap} pointerEvents="none">
+                  <LinearGradient
+                    colors={["#00D9FF", "#4DFF88"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.storyBadge}
+                  >
+                    <ThemedText style={styles.storyBadgeText}>
+                      {unreadStoryCount > 9 ? "9+" : unreadStoryCount}
+                    </ThemedText>
+                  </LinearGradient>
+                </View>
+              ) : null}
             </Pressable>
             <Pressable
               style={styles.settingsButton}
@@ -1122,7 +1171,7 @@ export default function GameScreen() {
             }
             delayLongPress={350}
           >
-            <View onLayout={setTarget("dependency")}>
+            <View ref={dependencyTargetRef} onLayout={measureDependencyTarget}>
               <DependencyMeter
                 value={state.dependency}
                 baronPressure={state.baronPressure}
@@ -1588,6 +1637,33 @@ const styles = StyleSheet.create({
   settingsButton: {
     borderRadius: 22,
     overflow: "hidden",
+  },
+  storyBadgeWrap: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+  },
+  storyBadge: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(10,10,20,0.65)",
+    shadowColor: "#00D9FF",
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  storyBadgeText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "900",
+    color: "#0A0A14",
+    letterSpacing: 0.2,
   },
   settingsButtonDisabled: {
     opacity: 0.6,
