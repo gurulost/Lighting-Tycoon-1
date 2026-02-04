@@ -296,8 +296,6 @@ export default function GameScreen() {
   const cooldownHintRef = useRef(state.lastCooldownHintId);
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockExpiresAtRef = useRef(0);
-  const tutorialStepRef = useRef(state.tutorialStep);
-  const spaceUpgradeRef = useRef((state.upgrades["space_1"] || 0) > 0);
   const highlightedOrderRef = useRef<string | undefined>(
     state.highlightedOrderId,
   );
@@ -866,44 +864,12 @@ export default function GameScreen() {
   }, [state.orders, showToast]);
 
   useEffect(() => {
-    const hadSpaceUpgrade = spaceUpgradeRef.current;
-    const hasSpaceUpgrade = (state.upgrades["space_1"] || 0) > 0;
-    if (state.tutorialComplete) {
-      tutorialStepRef.current = state.tutorialStep;
-      spaceUpgradeRef.current = hasSpaceUpgrade;
-      return;
-    }
-    if (state.tutorialStep !== tutorialStepRef.current) {
-      const nextStep = state.tutorialStep;
-      if (nextStep === 5 && hadSpaceUpgrade) {
-        showToast("Space already unlocked — moving on.");
-      } else {
-        const toastMap: Record<number, string> = {
-          1: "First parts down. First install soon.",
-          2: "Track built — your first install part.",
-          3: "Segment built — better orders unlocked.",
-          4: "Order complete — cash + reputation earned. Reputation unlocks neighborhoods.",
-          5: "Space upgraded — more room, faster merges.",
-          6: "Choice made — speed vs independence.",
-          7: "Tutorial complete — finish 2 more installs. Need help? Tap ? for Glossary.",
-        };
-        const message = toastMap[nextStep];
-        if (message) {
-          showToast(message);
-        }
-      }
-      tutorialStepRef.current = nextStep;
-    }
-    spaceUpgradeRef.current = hasSpaceUpgrade;
-  }, [state.tutorialStep, state.tutorialComplete, state.upgrades, showToast]);
-
-  useEffect(() => {
     if (!state.activeStoryBeatId && state.storyQueue.length > 0) {
       const now = Date.now();
       const nextBeatId = state.storyQueue[0];
       const nextBeat = nextBeatId ? STORY_BEATS[nextBeatId] : null;
-      const cooldownSatisfied =
-        nextBeat?.priority === "high" || now - state.lastStoryShownAt >= 30000;
+      const minGapMs = nextBeat?.priority === "high" ? 4500 : 30000;
+      const cooldownSatisfied = now - state.lastStoryShownAt >= minGapMs;
       if (
         cooldownSatisfied &&
         !activeModal &&

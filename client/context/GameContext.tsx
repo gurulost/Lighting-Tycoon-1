@@ -675,12 +675,22 @@ function queueStoryBeat(state: GameState, beatId: string): GameState {
       ? nextStoryLog.slice(-MAX_STORY_LOG_ENTRIES)
       : nextStoryLog;
 
+  const nextQueue = (() => {
+    if (beat.priority !== "high") return [...state.storyQueue, beatId];
+    const firstNonHighIndex = state.storyQueue.findIndex(
+      (queuedId) => STORY_BEATS[queuedId]?.priority !== "high",
+    );
+    if (firstNonHighIndex === -1) return [...state.storyQueue, beatId];
+    return [
+      ...state.storyQueue.slice(0, firstNonHighIndex),
+      beatId,
+      ...state.storyQueue.slice(firstNonHighIndex),
+    ];
+  })();
+
   return {
     ...state,
-    storyQueue:
-      beat.priority === "high"
-        ? [beatId, ...state.storyQueue]
-        : [...state.storyQueue, beatId],
+    storyQueue: nextQueue,
     storyLog: trimmedStoryLog,
     storySeen: { ...state.storySeen, [beatId]: true },
   };
@@ -1079,7 +1089,6 @@ const STORAGE_KEY = "lighting_tycoon_state_v1";
 const STORAGE_BACKUP_KEY = "lighting_tycoon_state_v1_backup";
 const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
 const STORY_QUEUE_PERSIST_CATEGORIES = new Set([
-  "tutorial",
   "system",
   "discovery",
   "mission",
@@ -1107,6 +1116,7 @@ function filterStoryQueue(queue: string[]): string[] {
   const filtered = queue.filter((beatId) => {
     const beat = STORY_BEATS[beatId];
     if (!beat) return false;
+    if (beat.category === "tutorial") return false;
     if (beat.priority === "high") return true;
     return beat.category
       ? STORY_QUEUE_PERSIST_CATEGORIES.has(beat.category)
@@ -2978,9 +2988,6 @@ function getInitialState(): GameState {
     lastMissionReward: null,
   };
   let nextState = baseState;
-  if (nextState.dependency >= 100) {
-    nextState = queueStoryBeat(nextState, "dependency_100");
-  }
   nextState = queueStoryBeat(nextState, "tina_intro");
   return nextState;
 }
@@ -3908,9 +3915,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (isTutorial && state.tutorialStep === 0 && nextSpawnCount === 1) {
-        if (state.dependency >= 100) {
-          nextState = queueStoryBeat(nextState, "dependency_100");
-        }
         nextState = queueStoryBeat(nextState, "tina_intro");
       }
       if (
@@ -4090,14 +4094,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
       let tutorialBonusCash = 0;
       let tutorialBonusRep = 0;
-      let tutorialStoryBeat: string | null = null;
 
       if (isTutorial && state.tutorialStep === 1 && newTier === 2) {
         tutorialUpdate = advanceTutorialStep(state, 2);
         const spawned = spawnTutorialPart({ ...state, board: newBoard }, 2);
         tutorialBoard = spawned.board;
         tutorialBonusCash = 5;
-        tutorialStoryBeat = "tutorial_merge_1";
       }
 
       if (isTutorial && state.tutorialStep === 2 && newTier === 3) {
@@ -4110,7 +4112,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : state.orders;
         tutorialOrders = [...trimmedOrders, tutorialOrder];
         tutorialBonusRep = 2;
-        tutorialStoryBeat = "tutorial_merge_2";
       }
 
       if (
@@ -4119,7 +4120,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         fromPart.family !== toPart.family
       ) {
         tutorialUpdate = advanceTutorialStep(state, 7);
-        tutorialStoryBeat = "tutorial_locked_merge";
       }
 
       let nextOrders = tutorialOrders || state.orders;
@@ -4373,9 +4373,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       nextState = maybeQueueBaronPressureBeat(nextState, dependencyOutcome);
       if (gainedMomentumTip) {
         nextState = queueStoryBeat(nextState, "tina_momentum_tip");
-      }
-      if (tutorialStoryBeat) {
-        nextState = queueStoryBeat(nextState, tutorialStoryBeat);
       }
       if (discoveryBeats.length > 0) {
         discoveryBeats.forEach((beatId) => {
@@ -6159,10 +6156,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (shouldQueueSecondOffer) {
         nextState = queueStoryBeat(nextState, "baron_offer_return");
       }
-      if (tutorialAdvanceAfterOrder) {
-        nextState = queueStoryBeat(nextState, "tutorial_order");
-        nextState = queueStoryBeat(nextState, "tina_customer_reply");
-      }
 
       const canQueueAmbient =
         state.tutorialComplete &&
@@ -6364,12 +6357,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
       if (upgrade.effect === "unlock_rd") {
         nextState = queueStoryBeat(nextState, "rd_unlock");
-      }
-      if (tutorialAdvance) {
-        nextState = queueStoryBeat(nextState, "tutorial_upgrade");
-      }
-      if (tutorialAdvance && !state.baronOfferSeen) {
-        nextState = queueStoryBeat(nextState, "baron_offer_prompt");
       }
       if (!state.backpackUnlocked) {
         nextState = queueStoryBeat(nextState, "backpack_unlocked");
@@ -7656,14 +7643,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
-        nextState = queueStoryBeat(nextState, "baron_offer");
-        nextState = queueStoryBeat(nextState, "baron_contract_live");
+        if (!tutorialAdvance) {
+          nextState = queueStoryBeat(nextState, "baron_offer");
+          nextState = queueStoryBeat(nextState, "baron_contract_live");
+        }
         if (state.tutorialComplete) {
           nextState = queueStoryBeat(nextState, "baron_offer_accept");
           nextState = queueStoryBeat(nextState, "tina_baron_accept");
-        }
-        if (tutorialAdvance) {
-          nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
         }
         if (dependencyStory) {
           nextState = queueStoryBeat(nextState, dependencyStory);
@@ -7770,13 +7756,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
-        nextState = queueStoryBeat(nextState, "baron_offer");
+        if (!tutorialAdvance) {
+          nextState = queueStoryBeat(nextState, "baron_offer");
+        }
         if (state.tutorialComplete) {
           nextState = queueStoryBeat(nextState, "baron_offer_accept");
           nextState = queueStoryBeat(nextState, "tina_baron_accept");
-        }
-        if (tutorialAdvance) {
-          nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
         }
         if (dependencyStory) {
           nextState = queueStoryBeat(nextState, dependencyStory);
@@ -7903,13 +7888,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
-      nextState = queueStoryBeat(nextState, "baron_offer");
+      if (!tutorialAdvance) {
+        nextState = queueStoryBeat(nextState, "baron_offer");
+      }
       if (state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "baron_offer_accept");
         nextState = queueStoryBeat(nextState, "tina_baron_accept");
-      }
-      if (tutorialAdvance) {
-        nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
       }
       if (dependencyStory) {
         nextState = queueStoryBeat(nextState, dependencyStory);
@@ -7990,13 +7974,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
-      nextState = queueStoryBeat(nextState, "baron_offer");
+      if (!tutorialAdvance) {
+        nextState = queueStoryBeat(nextState, "baron_offer");
+      }
       if (state.tutorialComplete) {
         nextState = queueStoryBeat(nextState, "baron_offer_decline");
         nextState = queueStoryBeat(nextState, "tina_baron_decline");
-      }
-      if (tutorialAdvance) {
-        nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
       }
       nextState = applyMissionProgress(nextState, {
         type: "decline_baron_offer",
@@ -8252,10 +8235,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
-      nextState = queueStoryBeat(nextState, "tutorial_upgrade");
-      if (!state.baronOfferSeen) {
-        nextState = queueStoryBeat(nextState, "baron_offer_prompt");
-      }
       return nextState;
     }
 
@@ -8297,7 +8276,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
-      nextState = queueStoryBeat(nextState, "tutorial_baron_choice");
       return nextState;
     }
 
@@ -8314,7 +8292,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
-      nextState = queueStoryBeat(nextState, "baron_offer_prompt");
       return nextState;
     }
 
@@ -8475,7 +8452,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const now = Date.now();
       const nextStorySeen = { ...state.storySeen };
       delete nextStorySeen.tina_intro;
-      delete nextStorySeen.dependency_100;
       let nextState: GameState = {
         ...state,
         tutorialComplete: false,
@@ -8493,9 +8469,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         },
         storySeen: nextStorySeen,
       };
-      if (nextState.dependency >= 100) {
-        nextState = queueStoryBeat(nextState, "dependency_100");
-      }
       nextState = queueStoryBeat(nextState, "tina_intro");
       return nextState;
     }
@@ -8512,7 +8485,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const now = Date.now();
       const nextStorySeen = { ...state.storySeen };
       delete nextStorySeen.tina_intro;
-      delete nextStorySeen.dependency_100;
       let nextState: GameState = {
         ...state,
         tutorialStep: 0,
@@ -8601,9 +8573,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastMissionReward: null,
         storySeen: nextStorySeen,
       };
-      if (nextState.dependency >= 100) {
-        nextState = queueStoryBeat(nextState, "dependency_100");
-      }
       nextState = queueStoryBeat(nextState, "tina_intro");
       return nextState;
     }

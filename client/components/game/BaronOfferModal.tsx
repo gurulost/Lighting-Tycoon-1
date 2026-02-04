@@ -6,6 +6,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { AvatarImage } from "./AvatarImage";
 import { TinaChip } from "./TinaChip";
+import { OnboardingCallout } from "./OnboardingCallout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 import SoundManager from "@/audio/SoundManager";
@@ -21,6 +22,8 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const offerType = state.baronOfferType ?? "crate";
+  const isTutorialOffer = !state.tutorialComplete && state.tutorialStep === 5;
+  const showMentorCallout = isTutorialOffer || !state.baronOfferSeen;
 
   const offerDetails = {
     crate: {
@@ -76,7 +79,7 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
         <ModalShell
           variant="card"
           title="Bulb Baron Offer"
-          subtitle='"Certified parts. Faster merges. Just a tiny signature."'
+          subtitle='"Certified parts. Faster merges. Don’t overthink it."'
           leading={
             <AvatarImage
               source={baronPortrait}
@@ -89,6 +92,20 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           }
           headerRight={<TinaChip expression="confident" />}
         >
+          {showMentorCallout ? (
+            <OnboardingCallout
+              speaker="mentor"
+              tone="warning"
+              compact
+              inset={false}
+              message={
+                isTutorialOffer
+                  ? "Read carefully. This is speed now, lock‑in later.\nLocked parts push Dependency up; open keeps you flexible."
+                  : "Quick scan: the Baron sells speed. The cost is leverage.\nIf you want flexibility, stay open."
+              }
+            />
+          ) : null}
+
           <View style={styles.offerBox}>
             <Feather
               name={offer.icon}
