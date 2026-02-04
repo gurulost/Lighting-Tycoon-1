@@ -76,16 +76,18 @@ export function OverlayManager({
   }, [queue]);
 
   const primary = sorted[0]?.item;
+  const primaryId = primary?.id;
+  const primaryCreatedAt = primary?.createdAt;
   useEffect(() => {
-    if (!primary) {
+    if (!primaryId || typeof primaryCreatedAt !== "number") {
       lastTelemetryIdRef.current = null;
       return;
     }
-    if (lastTelemetryIdRef.current === primary.id) return;
-    lastTelemetryIdRef.current = primary.id;
-    const waitMs = Math.max(0, Date.now() - primary.createdAt);
+    if (lastTelemetryIdRef.current === primaryId) return;
+    lastTelemetryIdRef.current = primaryId;
+    const waitMs = Math.max(0, Date.now() - primaryCreatedAt);
     onTelemetry?.(waitMs);
-  }, [primary?.id, primary?.createdAt, onTelemetry]);
+  }, [primaryId, primaryCreatedAt, onTelemetry]);
   const secondary = useMemo(() => {
     if (!primary) return undefined;
     const allowed = OVERLAY_COEXISTENCE[primary.type] ?? [];

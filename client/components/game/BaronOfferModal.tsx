@@ -73,16 +73,34 @@ function OfferActionButton({
 
   const titleColor = isLocked ? "#0F0F1F" : GameColors.openStandard.primary;
   const iconColor = isLocked ? "#0F0F1F" : GameColors.openStandard.primary;
+  const accessibilityLabel = chips.length
+    ? `${title} (${chips.join(", ")})`
+    : title;
 
   return (
     <Pressable
       onPress={onPress}
-      style={styles.actionPressable}
+      style={({ pressed }) => [
+        styles.actionPressable,
+        pressed && styles.actionPressablePressed,
+      ]}
       hitSlop={6}
       pressRetentionOffset={8}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
     >
-      <LinearGradient colors={borderColors} style={styles.actionBorder}>
-        <LinearGradient colors={surfaceColors} style={styles.actionSurface}>
+      <LinearGradient
+        colors={borderColors}
+        start={{ x: 0.08, y: 0 }}
+        end={{ x: 0.92, y: 1 }}
+        style={styles.actionBorder}
+      >
+        <LinearGradient
+          colors={surfaceColors}
+          start={{ x: 0.12, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.actionSurface}
+        >
           <View style={styles.actionRow}>
             <View style={styles.actionSide}>
               <View
@@ -366,6 +384,10 @@ const styles = StyleSheet.create({
     borderRadius: ACTION_RADIUS,
     overflow: "hidden",
   },
+  actionPressablePressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.96,
+  },
   actionBorder: {
     borderRadius: ACTION_RADIUS,
     padding: 1,
@@ -401,8 +423,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionIconBadgeLocked: {
-    backgroundColor: "rgba(15,15,31,0.18)",
-    borderColor: "rgba(15,15,31,0.20)",
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(15,15,31,0.18)",
   },
   actionIconBadgeOpen: {
     backgroundColor: "rgba(15,15,31,0.28)",
@@ -427,8 +449,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionChipLocked: {
-    backgroundColor: "rgba(15,15,31,0.16)",
-    borderColor: "rgba(15,15,31,0.20)",
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(15,15,31,0.18)",
   },
   actionChipOpen: {
     backgroundColor: `${GameColors.openStandard.primary}16`,
