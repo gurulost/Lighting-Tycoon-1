@@ -85,7 +85,7 @@ export function OverlayManager({
     lastTelemetryIdRef.current = primary.id;
     const waitMs = Math.max(0, Date.now() - primary.createdAt);
     onTelemetry?.(waitMs);
-  }, [primary?.id, primary?.createdAt, onTelemetry]);
+  }, [primary, onTelemetry]);
   const secondary = useMemo(() => {
     if (!primary) return undefined;
     const allowed = OVERLAY_COEXISTENCE[primary.type] ?? [];

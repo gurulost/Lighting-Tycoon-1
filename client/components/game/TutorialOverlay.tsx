@@ -207,8 +207,14 @@ export function TutorialOverlay({
   const highlightInset = 8;
   const highlightBox = highlightRect
     ? (() => {
-        const left = Math.max(highlightInset, highlightRect.x - highlightPadding);
-        const top = Math.max(highlightInset, highlightRect.y - highlightPadding);
+        const left = Math.max(
+          highlightInset,
+          highlightRect.x - highlightPadding,
+        );
+        const top = Math.max(
+          highlightInset,
+          highlightRect.y - highlightPadding,
+        );
         const right = Math.min(
           SCREEN_WIDTH - highlightInset,
           highlightRect.x + highlightRect.width + highlightPadding,
