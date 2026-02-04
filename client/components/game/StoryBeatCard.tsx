@@ -148,10 +148,12 @@ export function StoryBeatCard({
   const Wrapper = onPress ? Pressable : View;
   return (
     <Wrapper {...(onPress ? { onPress } : {})}>
-      <LinearGradient
-        colors={[`${color}22`, "#1A1A2E", `${color}12`]}
-        style={[styles.card, isLog ? styles.cardLog : null]}
-      >
+      <View style={[styles.card, isLog ? styles.cardLog : null]}>
+        <LinearGradient
+          colors={[`${color}22`, "#1A1A2E", `${color}12`]}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
         <View style={styles.headerRow}>
           <View style={styles.speakerRow}>
             <Feather
@@ -171,7 +173,10 @@ export function StoryBeatCard({
             ) : null}
             {onDismiss ? (
               <Pressable
-                onPress={onDismiss}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onDismiss();
+                }}
                 hitSlop={8}
                 style={styles.cardDismiss}
               >
@@ -218,7 +223,13 @@ export function StoryBeatCard({
               </ThemedText>
             ) : null}
             {onOpenLog && !isLog ? (
-              <Pressable onPress={onOpenLog} style={styles.logHint}>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onOpenLog();
+                }}
+                style={styles.logHint}
+              >
                 <Feather
                   name="book-open"
                   size={12}
@@ -231,7 +242,7 @@ export function StoryBeatCard({
             ) : null}
           </View>
         </View>
-      </LinearGradient>
+      </View>
     </Wrapper>
   );
 }
@@ -242,6 +253,8 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderWidth: 1,
     borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+    overflow: "hidden",
     gap: Spacing.sm,
   },
   cardLog: {

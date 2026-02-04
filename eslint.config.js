@@ -9,4 +9,10 @@ module.exports = defineConfig([
   {
     ignores: ["dist/*"],
   },
+  {
+    files: ["tests/**/*.{js,jsx,ts,tsx}", "**/*.test.{js,jsx,ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ]);

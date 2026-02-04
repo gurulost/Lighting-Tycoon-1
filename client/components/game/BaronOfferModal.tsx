@@ -2,10 +2,12 @@ import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { AvatarImage } from "./AvatarImage";
 import { TinaChip } from "./TinaChip";
+import { OnboardingCallout } from "./OnboardingCallout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 import SoundManager from "@/audio/SoundManager";
@@ -17,10 +19,151 @@ interface BaronOfferModalProps {
   onDecline: () => void;
 }
 
+const ACTION_RADIUS = BorderRadius.md;
+const ACTION_INNER_RADIUS = ACTION_RADIUS - 2;
+
+function splitParenChips(text: string): { heading: string; chips: string[] } {
+  const match = text.match(/^(.*?)\s*\((.*)\)\s*$/);
+  if (!match) {
+    return { heading: text.trim(), chips: [] };
+  }
+
+  const heading = match[1]?.trim() ?? text.trim();
+  const chips = (match[2] ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return { heading, chips };
+}
+
+function OfferActionButton({
+  tone,
+  icon,
+  title,
+  chips,
+  onPress,
+}: {
+  tone: "locked" | "open";
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  chips: string[];
+  onPress: () => void;
+}) {
+  const isLocked = tone === "locked";
+
+  const borderColors: readonly [string, string, string] = isLocked
+    ? [
+        `${GameColors.locked.accent}B0`,
+        `${GameColors.locked.primary}E0`,
+        `${GameColors.locked.accent}A0`,
+      ]
+    : [
+        `${GameColors.openStandard.primary}B0`,
+        `${GameColors.ui.primary}A0`,
+        `${GameColors.openStandard.primary}90`,
+      ];
+
+  const surfaceColors: readonly [string, string, string] = isLocked
+    ? ["#FFDC9E", GameColors.locked.primary, "#FF9A2F"]
+    : [
+        `${GameColors.openStandard.primary}16`,
+        `${GameColors.ui.primary}10`,
+        `${GameColors.ui.surfaceElevated}F2`,
+      ];
+
+  const titleColor = isLocked ? "#0F0F1F" : GameColors.openStandard.primary;
+  const iconColor = isLocked ? "#0F0F1F" : GameColors.openStandard.primary;
+  const accessibilityLabel = chips.length
+    ? `${title} (${chips.join(", ")})`
+    : title;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.actionPressable,
+        pressed && styles.actionPressablePressed,
+      ]}
+      hitSlop={6}
+      pressRetentionOffset={8}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <LinearGradient
+        colors={borderColors}
+        start={{ x: 0.08, y: 0 }}
+        end={{ x: 0.92, y: 1 }}
+        style={styles.actionBorder}
+      >
+        <LinearGradient
+          colors={surfaceColors}
+          start={{ x: 0.12, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.actionSurface}
+        >
+          <View style={styles.actionRow}>
+            <View style={styles.actionSide}>
+              <View
+                style={[
+                  styles.actionIconBadge,
+                  isLocked
+                    ? styles.actionIconBadgeLocked
+                    : styles.actionIconBadgeOpen,
+                ]}
+              >
+                <Feather name={icon} size={18} color={iconColor} />
+              </View>
+            </View>
+
+            <View style={styles.actionCenter}>
+              <ThemedText style={[styles.actionTitle, { color: titleColor }]}>
+                {title}
+              </ThemedText>
+              {chips.length ? (
+                <View style={styles.actionChips}>
+                  {chips.map((chip, index) => (
+                    <View
+                      key={`${chip}-${index}`}
+                      style={[
+                        styles.actionChip,
+                        isLocked
+                          ? styles.actionChipLocked
+                          : styles.actionChipOpen,
+                      ]}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.actionChipText,
+                          {
+                            color: isLocked
+                              ? "#0F0F1F"
+                              : GameColors.text.primary,
+                          },
+                        ]}
+                      >
+                        {chip}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.actionSide} />
+          </View>
+        </LinearGradient>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
 export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const offerType = state.baronOfferType ?? "crate";
+  const isTutorialOffer = !state.tutorialComplete && state.tutorialStep === 5;
+  const showMentorCallout = isTutorialOffer || !state.baronOfferSeen;
 
   const offerDetails = {
     crate: {
@@ -67,6 +210,9 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
     onDecline();
   };
 
+  const acceptAction = splitParenChips(offer.acceptText);
+  const declineAction = splitParenChips("Decline (Open-Standard stash)");
+
   return (
     <Pressable style={styles.overlay} onPress={handleDecline}>
       <Pressable
@@ -76,7 +222,7 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
         <ModalShell
           variant="card"
           title="Bulb Baron Offer"
-          subtitle='"Certified parts. Faster merges. Just a tiny signature."'
+          subtitle='"Certified parts. Faster merges. Don’t overthink it."'
           leading={
             <AvatarImage
               source={baronPortrait}
@@ -89,34 +235,79 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
           }
           headerRight={<TinaChip expression="confident" />}
         >
-          <View style={styles.offerBox}>
-            <Feather
-              name={offer.icon}
-              size={20}
-              color={GameColors.locked.primary}
+          {showMentorCallout ? (
+            <OnboardingCallout
+              speaker="mentor"
+              tone="warning"
+              compact
+              inset={false}
+              message={
+                isTutorialOffer
+                  ? "Read carefully. This is speed now, lock‑in later.\nLocked parts push Dependency up; open keeps you flexible."
+                  : "Quick scan: the Baron sells speed. The cost is leverage.\nIf you want flexibility, stay open."
+              }
             />
-            <View style={styles.offerBody}>
-              <ThemedText style={styles.offerTitle}>{offer.title}</ThemedText>
+          ) : null}
+
+          <LinearGradient
+            colors={[
+              `${GameColors.locked.accent}55`,
+              `${GameColors.locked.primary}40`,
+              `${GameColors.locked.accent}35`,
+            ]}
+            start={{ x: 0.12, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={styles.offerFrame}
+          >
+            <View style={styles.offerCard}>
+              <View style={styles.offerHeader}>
+                <View style={styles.offerIconBadge}>
+                  <Feather
+                    name={offer.icon}
+                    size={20}
+                    color={GameColors.locked.primary}
+                  />
+                </View>
+                <View style={styles.offerHeaderText}>
+                  <ThemedText style={styles.offerTitle}>
+                    {offer.title}
+                  </ThemedText>
+                  <ThemedText style={styles.offerKicker}>
+                    Certified supply terms enclosed
+                  </ThemedText>
+                </View>
+                <View style={styles.certifiedPill}>
+                  <Feather
+                    name="award"
+                    size={12}
+                    color={GameColors.locked.primary}
+                  />
+                  <ThemedText style={styles.certifiedPillText}>
+                    CERTIFIED
+                  </ThemedText>
+                </View>
+              </View>
               <ThemedText style={styles.offerText}>
                 {offer.description}
               </ThemedText>
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={styles.choices}>
-            <Pressable style={styles.acceptButton} onPress={handleAccept}>
-              <Feather name={offer.icon} size={18} color="#0F0F1F" />
-              <ThemedText style={styles.acceptText}>
-                {offer.acceptText}
-              </ThemedText>
-            </Pressable>
-
-            <Pressable style={styles.declineButton} onPress={handleDecline}>
-              <Feather name="shield" size={18} color={GameColors.ui.success} />
-              <ThemedText style={styles.declineText}>
-                Decline (Open-Standard stash)
-              </ThemedText>
-            </Pressable>
+            <OfferActionButton
+              tone="locked"
+              icon={offer.icon}
+              title={acceptAction.heading}
+              chips={acceptAction.chips}
+              onPress={handleAccept}
+            />
+            <OfferActionButton
+              tone="open"
+              icon="shield"
+              title={declineAction.heading}
+              chips={declineAction.chips}
+              onPress={handleDecline}
+            />
           </View>
         </ModalShell>
       </Pressable>
@@ -127,79 +318,166 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.78)",
     justifyContent: "center",
     alignItems: "center",
     padding: Spacing.lg,
   },
   container: {
     width: "100%",
-    maxWidth: 420,
+    maxWidth: 520,
   },
-  offerBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: Spacing.sm,
-    backgroundColor: GameColors.locked.primary + "15",
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: GameColors.locked.primary + "30",
+  offerFrame: {
+    borderRadius: BorderRadius.lg,
+    padding: 1,
     marginBottom: Spacing.lg,
   },
-  offerBody: {
+  offerCard: {
+    borderRadius: BorderRadius.lg - 2,
+    padding: Spacing.lg,
+    backgroundColor: "#151525",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    gap: Spacing.sm,
+  },
+  offerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  offerIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,184,77,0.14)",
+    borderWidth: 1,
+    borderColor: `${GameColors.locked.primary}55`,
+  },
+  offerHeaderText: {
     flex: 1,
-    gap: 6,
+    gap: 2,
   },
   offerTitle: {
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: "700",
     color: GameColors.text.primary,
   },
+  offerKicker: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  certifiedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: "rgba(255,184,77,0.10)",
+    borderWidth: 1,
+    borderColor: `${GameColors.locked.primary}55`,
+  },
+  certifiedPillText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+    color: GameColors.locked.primary,
+  },
   offerText: {
-    flex: 1,
     fontSize: 13,
+    lineHeight: 18,
     color: GameColors.text.secondary,
   },
   choices: {
     gap: Spacing.md,
   },
-  acceptButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    backgroundColor: GameColors.locked.primary,
+  actionPressable: {
+    borderRadius: ACTION_RADIUS,
+    overflow: "hidden",
+  },
+  actionPressablePressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.96,
+  },
+  actionBorder: {
+    borderRadius: ACTION_RADIUS,
+    padding: 1,
+  },
+  actionSurface: {
+    borderRadius: ACTION_INNER_RADIUS,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    backgroundColor: "#151525",
   },
-  acceptText: {
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  actionSide: {
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: Spacing.sm,
+  },
+  actionIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  actionIconBadgeLocked: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(15,15,31,0.18)",
+  },
+  actionIconBadgeOpen: {
+    backgroundColor: "rgba(15,15,31,0.28)",
+    borderColor: `${GameColors.openStandard.primary}55`,
+  },
+  actionTitle: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#0F0F1F",
-    flexShrink: 1,
-    flexWrap: "wrap",
+    lineHeight: 18,
+    fontWeight: "800",
     textAlign: "center",
   },
-  declineButton: {
+  actionChips: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    backgroundColor: GameColors.ui.surface,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: GameColors.ui.success + "40",
-  },
-  declineText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: GameColors.ui.success,
-    flexShrink: 1,
     flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  actionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  actionChipLocked: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(15,15,31,0.18)",
+  },
+  actionChipOpen: {
+    backgroundColor: `${GameColors.openStandard.primary}16`,
+    borderColor: `${GameColors.openStandard.primary}35`,
+  },
+  actionChipText: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "700",
+    letterSpacing: 0.2,
     textAlign: "center",
   },
 });

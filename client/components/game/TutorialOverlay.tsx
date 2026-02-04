@@ -207,8 +207,14 @@ export function TutorialOverlay({
   const highlightInset = 8;
   const highlightBox = highlightRect
     ? (() => {
-        const left = Math.max(highlightInset, highlightRect.x - highlightPadding);
-        const top = Math.max(highlightInset, highlightRect.y - highlightPadding);
+        const left = Math.max(
+          highlightInset,
+          highlightRect.x - highlightPadding,
+        );
+        const top = Math.max(
+          highlightInset,
+          highlightRect.y - highlightPadding,
+        );
         const right = Math.min(
           SCREEN_WIDTH - highlightInset,
           highlightRect.x + highlightRect.width + highlightPadding,
@@ -448,7 +454,9 @@ export function TutorialOverlay({
                   styles.description,
                   compactMode ? styles.descriptionCompact : null,
                 ]}
-                numberOfLines={compactMode ? 2 : undefined}
+                numberOfLines={compactMode ? 3 : undefined}
+                adjustsFontSizeToFit={compactMode}
+                minimumFontScale={0.85}
               >
                 {currentStep.description}
               </ThemedText>
@@ -552,18 +560,21 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     position: "absolute",
-    top: 60,
-    right: Spacing.lg,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "#1A1A2E",
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: "#2A2A4A",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 6,
   },
   skipText: {
     fontSize: 13,
-    color: GameColors.text.secondary,
+    color: GameColors.text.primary,
     fontWeight: "600",
   },
   skipHint: {
@@ -713,10 +724,12 @@ const styles = StyleSheet.create({
   stepIndicator: {
     position: "absolute",
     bottom: 40,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "#1A1A2E",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
   },
   stepText: {
     fontSize: 13,
