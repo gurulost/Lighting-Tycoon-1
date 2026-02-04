@@ -1,4 +1,5 @@
 import React from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import { View, StyleSheet, Pressable } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ interface MissionStripProps {
   onLockedPress?: () => void;
   compact?: boolean;
   collapsed?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function MissionStrip({
@@ -25,6 +27,7 @@ export function MissionStrip({
   onLockedPress,
   compact = false,
   collapsed = false,
+  style,
 }: MissionStripProps) {
   const maxVisible = compact || collapsed ? 1 : 2;
   const activeMissions = missions.slice(0, maxVisible);
@@ -48,6 +51,7 @@ export function MissionStrip({
           styles.container,
           compact && styles.containerCompact,
           locked && styles.containerLocked,
+          style,
         ]}
       >
         <View style={styles.header}>

@@ -5,7 +5,14 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { View, StyleSheet, Modal, Pressable, AppState } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Modal,
+  Pressable,
+  AppState,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -234,6 +241,7 @@ function BottomButton({
 
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const {
     state,
     dispatch,
@@ -343,6 +351,45 @@ export default function GameScreen() {
   const isCompactLayout = screenHeight > 0 && screenHeight < 740;
   const isCompactScreen = screenHeight > 0 && screenHeight < 800;
   const topCondensed = hudCollapsed || isCompactScreen;
+  const safeWidth = Math.max(0, windowWidth - insets.left - insets.right);
+  const isNarrowTopBar = safeWidth > 0 && safeWidth < 520;
+  const isTightTopBar = safeWidth > 0 && safeWidth < 450;
+  const isUltraNarrowTopBar = safeWidth > 0 && safeWidth < 350;
+
+  const topBarPaddingX = isUltraNarrowTopBar ? 8 : Spacing.lg;
+  const topBarGap = isUltraNarrowTopBar ? 4 : isNarrowTopBar ? 6 : 12;
+  const topActionsGap = isNarrowTopBar ? 4 : Spacing.sm;
+  const topActionSize = 44;
+  const topActionIconSize = 20;
+  const helpIconSize = 26;
+  const currencyDensity = isTightTopBar
+    ? "tiny"
+    : isNarrowTopBar
+      ? "compact"
+      : "regular";
+  const showHudToggle = !isCompactScreen && safeWidth >= 390;
+  const topActionRadius = topActionSize / 2;
+  const topActionButtonStyle = [
+    styles.settingsButton,
+    { borderRadius: topActionRadius },
+  ];
+  const topActionGradientSizeStyle = {
+    width: topActionSize,
+    height: topActionSize,
+    borderRadius: topActionRadius,
+  };
+  const topBarStyle = [
+    styles.topBar,
+    {
+      gap: topBarGap,
+      paddingLeft: topBarPaddingX + insets.left,
+      paddingRight: topBarPaddingX + insets.right,
+    },
+  ];
+  const topStackSideMarginStyle = {
+    marginLeft: topBarPaddingX + insets.left,
+    marginRight: topBarPaddingX + insets.right,
+  };
   const lockoutLabTarget =
     state.lockoutLabOrdersTarget || getLockoutLabRequestsBase();
   const lockoutProgressLabel =
@@ -990,18 +1037,19 @@ export default function GameScreen() {
         }}
       >
         <View
-          style={styles.topBar}
+          style={topBarStyle}
           onLayout={(event) => {
             const layout = event?.nativeEvent?.layout;
             if (!layout) return;
             setTopBarLayout(layout);
           }}
         >
-          <View onLayout={setTarget("currency")}>
+          <View style={styles.currencyWrap} onLayout={setTarget("currency")}>
             <CurrencyDisplay
               cash={state.cash}
               reputation={state.reputation}
               research={state.research}
+              density={currencyDensity}
               onCashPress={
                 !state.tutorialComplete && state.tutorialStep < 4
                   ? undefined
@@ -1026,7 +1074,7 @@ export default function GameScreen() {
             />
           </View>
           <View
-            style={styles.topActions}
+            style={[styles.topActions, { gap: topActionsGap }]}
             onLayout={(event) => {
               const layout = event?.nativeEvent?.layout;
               if (!layout) return;
@@ -1034,83 +1082,103 @@ export default function GameScreen() {
             }}
           >
             <Pressable
-              style={styles.settingsButton}
+              style={topActionButtonStyle}
               onPress={() => setActiveModal("story")}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Story log"
             >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={styles.settingsGradient}
+                style={[styles.settingsGradient, topActionGradientSizeStyle]}
               >
                 <Feather
                   name="book-open"
-                  size={20}
+                  size={topActionIconSize}
                   color={GameColors.text.secondary}
                 />
               </LinearGradient>
             </Pressable>
-            <Pressable
-              style={styles.settingsButton}
-              onPress={() => setActiveModal("glossary")}
+            <View
               onLayout={setTarget("glossary")}
+              style={[
+                styles.helpButtonWrap,
+                { borderRadius: topActionRadius },
+              ]}
             >
-              <LinearGradient
-                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={styles.settingsGradient}
+              <Pressable
+                style={topActionButtonStyle}
+                onPress={() => setActiveModal("glossary")}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Help and glossary"
               >
-                <Feather
-                  name="help-circle"
-                  size={20}
-                  color={GameColors.text.secondary}
-                />
-              </LinearGradient>
-            </Pressable>
+                <LinearGradient
+                  colors={["#062A35", "#0C5B72", "#062A35"]}
+                  style={[
+                    styles.settingsGradient,
+                    styles.helpGradient,
+                    topActionGradientSizeStyle,
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Feather
+                    name="help-circle"
+                    size={helpIconSize}
+                    color={GameColors.ui.primary}
+                  />
+                </LinearGradient>
+              </Pressable>
+            </View>
             <Pressable
-              style={styles.settingsButton}
+              style={topActionButtonStyle}
               onPress={() => setActiveModal("settings")}
               testID="settings-button"
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
             >
               <LinearGradient
                 colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={styles.settingsGradient}
+                style={[styles.settingsGradient, topActionGradientSizeStyle]}
               >
                 <Feather
                   name="settings"
-                  size={20}
+                  size={topActionIconSize}
                   color={GameColors.text.secondary}
                 />
               </LinearGradient>
             </Pressable>
-            <Pressable
-              style={[
-                styles.settingsButton,
-                isCompactScreen && styles.settingsButtonDisabled,
-              ]}
-              onPress={
-                isCompactScreen
-                  ? undefined
-                  : () => setHudCollapsed((prev) => !prev)
-              }
-            >
-              <LinearGradient
-                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={styles.settingsGradient}
+            {showHudToggle ? (
+              <Pressable
+                style={topActionButtonStyle}
+                onPress={() => setHudCollapsed((prev) => !prev)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={topCondensed ? "Expand HUD" : "Collapse HUD"}
               >
-                <Feather
-                  name={topCondensed ? "chevrons-down" : "chevrons-up"}
-                  size={20}
-                  color={
-                    isCompactScreen
-                      ? GameColors.text.disabled
-                      : GameColors.text.secondary
-                  }
-                />
-              </LinearGradient>
-            </Pressable>
+                <LinearGradient
+                  colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                  style={[styles.settingsGradient, topActionGradientSizeStyle]}
+                >
+                  <Feather
+                    name={topCondensed ? "chevrons-down" : "chevrons-up"}
+                    size={topActionIconSize}
+                    color={GameColors.text.secondary}
+                  />
+                </LinearGradient>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
         <View
-          style={[styles.statusRow, topCondensed && styles.statusRowCompact]}
+          style={[
+            styles.statusRow,
+            topStackSideMarginStyle,
+            topCondensed && styles.statusRowCompact,
+          ]}
         >
           <Pressable
             style={styles.statusItem}
@@ -1145,6 +1213,7 @@ export default function GameScreen() {
           <View
             style={[
               styles.lockoutHintRow,
+              topStackSideMarginStyle,
               topCondensed && styles.lockoutHintRowCompact,
             ]}
           >
@@ -1173,10 +1242,14 @@ export default function GameScreen() {
           }
           compact={topCondensed}
           collapsed={topCondensed}
+          style={topStackSideMarginStyle}
         />
 
         {tutorialSkipped ? (
-          <Pressable style={styles.resumeBanner} onPress={handleResumeTutorial}>
+          <Pressable
+            style={[styles.resumeBanner, topStackSideMarginStyle]}
+            onPress={handleResumeTutorial}
+          >
             <View style={styles.resumeBannerContent}>
               <Feather
                 name="play-circle"
@@ -1576,30 +1649,38 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  currencyWrap: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   topActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    flexShrink: 0,
   },
   settingsButton: {
-    borderRadius: 22,
     overflow: "hidden",
   },
-  settingsButtonDisabled: {
-    opacity: 0.6,
-  },
   settingsGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#2A2A4A",
+  },
+  helpButtonWrap: {
+    shadowColor: GameColors.ui.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  helpGradient: {
+    borderColor: `${GameColors.ui.primary}70`,
+    borderWidth: 1.5,
   },
   boardContainer: {
     flex: 1,
