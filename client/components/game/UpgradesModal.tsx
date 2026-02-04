@@ -111,14 +111,18 @@ export function UpgradesModal({
           return (
             <View key={category.id} style={styles.categorySection}>
               <View style={styles.categoryHeader}>
-                <Feather
-                  name={category.icon}
-                  size={18}
-                  color={GameColors.text.secondary}
-                />
-                <ThemedText style={styles.categoryName}>
-                  {category.name}
-                </ThemedText>
+                <View style={styles.categoryHeaderDivider} />
+                <View style={styles.categoryHeaderPill}>
+                  <Feather
+                    name={category.icon}
+                    size={20}
+                    color={GameColors.text.secondary}
+                  />
+                  <ThemedText style={styles.categoryName}>
+                    {category.name}
+                  </ThemedText>
+                </View>
+                <View style={styles.categoryHeaderDivider} />
               </View>
 
               {upgrades.map((upgrade) => (
@@ -187,12 +191,32 @@ const styles = StyleSheet.create({
   categoryHeader: {
     flexDirection: "row",
     alignItems: "center",
+    width: "100%",
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  categoryHeaderDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#2A2A4A",
+    opacity: 0.65,
+  },
+  categoryHeaderPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#141426",
   },
   categoryName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: GameColors.text.secondary,
+    fontSize: 18,
+    fontWeight: "800",
+    color: GameColors.text.primary,
+    letterSpacing: 0.2,
   },
 });

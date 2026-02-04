@@ -376,12 +376,23 @@ export function OrdersModal({
     canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
-  const hasFulfillableOrder = React.useMemo(
-    () => state.orders.some((order) => Boolean(getFulfillmentIndices(order))),
-    [state.orders, getFulfillmentIndices],
-  );
+  const ordersSummary = React.useMemo(() => {
+    const fulfillable: Order[] = [];
+    const waiting: Order[] = [];
+    for (const order of state.orders) {
+      if (getFulfillmentIndices(order) !== null) {
+        fulfillable.push(order);
+      } else {
+        waiting.push(order);
+      }
+    }
+    return {
+      readyCount: fulfillable.length,
+      sorted: [...fulfillable, ...waiting],
+    };
+  }, [state.orders, getFulfillmentIndices]);
   const orderTrimPhase = useSharedPhase({
-    active: hasFulfillableOrder,
+    active: ordersSummary.readyCount > 0,
     duration: TRIM_LIGHT_ANIMATION_DURATIONS.twinkle,
     reducedMotion: state.settings.reducedMotion,
   });
@@ -729,18 +740,99 @@ export function OrdersModal({
                 Boosts higher-tier orders for the next {marketingOrders} orders.
               </ThemedText>
             )}
+          </View>
+        ) : null}
 
+        <View style={styles.ordersList}>
+          <View style={styles.ordersHeader}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeaderDivider} />
+              <View style={styles.sectionHeaderPill}>
+                <Feather
+                  name="package"
+                  size={16}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.sectionHeaderText}>
+                  Incoming orders
+                </ThemedText>
+              </View>
+              <View style={styles.sectionHeaderDivider} />
+            </View>
+
+            <View style={styles.ordersPill}>
+              <Feather
+                name="check-circle"
+                size={12}
+                color={
+                  ordersSummary.readyCount > 0
+                    ? GameColors.ui.success
+                    : GameColors.text.secondary
+                }
+              />
+              <ThemedText style={styles.ordersPillText}>
+                {ordersSummary.readyCount} ready
+              </ThemedText>
+            </View>
+          </View>
+
+          {state.orders.length > 0 ? (
+            ordersSummary.sorted.map((order, index) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onFulfill={() => handleFulfillOrder(order.id)}
+                onDismiss={() => handleDismissOrder(order.id)}
+                onSelect={() =>
+                  dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })
+                }
+                selected={state.highlightedOrderId === order.id}
+                trimPhase={orderTrimPhase}
+                fulfillTestID={`order-fulfill-${index}`}
+                dismissible={isRefreshable(order)}
+              />
+            ))
+          ) : (
+            <Animated.View entering={emptyEnterAnim} style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <Feather
+                  name="inbox"
+                  size={48}
+                  color={GameColors.text.disabled}
+                />
+              </View>
+              <ThemedText style={styles.emptyTitle}>No Orders Yet</ThemedText>
+              <ThemedText style={styles.emptyDescription}>
+                New orders will appear automatically. Keep merging parts to be
+                ready!
+              </ThemedText>
+              <View style={styles.tipContainer}>
+                <Feather name="info" size={14} color={GameColors.ui.primary} />
+                <ThemedText style={styles.tipText}>
+                  Tip: Orders arrive faster as your reputation grows
+                </ThemedText>
+              </View>
+            </Animated.View>
+          )}
+        </View>
+
+        {state.tutorialComplete ? (
+          <View style={styles.boostsSection}>
             {canUseBoosts ? (
               <View style={styles.boostStack}>
-                <View style={styles.boostHeader}>
-                  <Feather
-                    name="compass"
-                    size={14}
-                    color={GameColors.ui.primary}
-                  />
-                  <ThemedText style={styles.boostHeaderText}>
-                    Tactical Boosts
-                  </ThemedText>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionHeaderDivider} />
+                  <View style={styles.sectionHeaderPill}>
+                    <Feather
+                      name="compass"
+                      size={16}
+                      color={GameColors.ui.primary}
+                    />
+                    <ThemedText style={styles.sectionHeaderText}>
+                      Tactical Boosts
+                    </ThemedText>
+                  </View>
+                  <View style={styles.sectionHeaderDivider} />
                 </View>
 
                 <View style={styles.boostCard}>
@@ -1019,9 +1111,17 @@ export function OrdersModal({
         ) : null}
 
         <View style={styles.legendCard}>
-          <View style={styles.legendHeader}>
-            <Feather name="type" size={14} color={GameColors.text.secondary} />
-            <ThemedText style={styles.legendTitle}>Legend</ThemedText>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderDivider} />
+            <View style={styles.sectionHeaderPill}>
+              <Feather
+                name="type"
+                size={16}
+                color={GameColors.text.secondary}
+              />
+              <ThemedText style={styles.sectionHeaderText}>Legend</ThemedText>
+            </View>
+            <View style={styles.sectionHeaderDivider} />
           </View>
           <ThemedText style={styles.legendSubtitle}>
             Order hints + tile badges
@@ -1054,57 +1154,6 @@ export function OrdersModal({
               ))}
             </View>
           </View>
-        </View>
-
-        <View style={styles.ordersList}>
-          {state.orders.length > 0 ? (
-            state.orders.map((order, index) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onFulfill={() => handleFulfillOrder(order.id)}
-                onDismiss={() => handleDismissOrder(order.id)}
-                onSelect={() =>
-                  dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })
-                }
-                selected={state.highlightedOrderId === order.id}
-                trimPhase={orderTrimPhase}
-                fulfillTestID={`order-fulfill-${index}`}
-                dismissible={
-                  !order.isTutorial &&
-                  !order.isLockout &&
-                  !(state.lockoutActive && order.type === "lab_request") &&
-                  !order.modifierIds?.includes("first_session") &&
-                  !order.modifierIds?.includes("tier5_showcase") &&
-                  !order.modifierIds?.includes("tier10_showcase") &&
-                  !order.modifierIds?.includes("threshold_story") &&
-                  !order.modifierIds?.includes("project_stage") &&
-                  !order.modifierIds?.includes("council_ratify")
-                }
-              />
-            ))
-          ) : (
-            <Animated.View entering={emptyEnterAnim} style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <Feather
-                  name="inbox"
-                  size={48}
-                  color={GameColors.text.disabled}
-                />
-              </View>
-              <ThemedText style={styles.emptyTitle}>No Orders Yet</ThemedText>
-              <ThemedText style={styles.emptyDescription}>
-                New orders will appear automatically. Keep merging parts to be
-                ready!
-              </ThemedText>
-              <View style={styles.tipContainer}>
-                <Feather name="info" size={14} color={GameColors.ui.primary} />
-                <ThemedText style={styles.tipText}>
-                  Tip: Orders arrive faster as your reputation grows
-                </ThemedText>
-              </View>
-            </Animated.View>
-          )}
         </View>
       </ScrollView>
     </ModalShell>
@@ -1278,19 +1327,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#141426",
     gap: Spacing.sm,
   },
-  legendHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  legendTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
   legendSubtitle: {
     fontSize: 12,
     color: GameColors.text.secondary,
+    textAlign: "center",
   },
   legendGroup: {
     gap: Spacing.xs,
@@ -1346,17 +1386,6 @@ const styles = StyleSheet.create({
   boostStack: {
     marginTop: Spacing.sm,
     gap: Spacing.sm,
-  },
-  boostHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.xs,
-  },
-  boostHeaderText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: GameColors.text.primary,
   },
   boostCard: {
     padding: Spacing.sm,
@@ -1422,6 +1451,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
@@ -1478,6 +1508,63 @@ const styles = StyleSheet.create({
   ordersList: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
+  },
+  ordersHeader: {
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  ordersPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  ordersPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+    letterSpacing: 0.2,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    gap: Spacing.sm,
+  },
+  sectionHeaderDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#2A2A4A",
+    opacity: 0.65,
+  },
+  sectionHeaderPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    backgroundColor: "#1A1A2E",
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: GameColors.text.primary,
+    letterSpacing: 0.2,
+  },
+  boostsSection: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   emptyState: {
     alignItems: "center",
