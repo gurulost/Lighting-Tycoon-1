@@ -285,6 +285,7 @@ export default function GameScreen() {
     useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
   const boardContainerRef = useRef<View>(null);
+  const dependencyTargetRef = useRef<View>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
   const missionRewardRef = useRef(state.lastMissionRewardId);
@@ -429,6 +430,30 @@ export default function GameScreen() {
     },
     [],
   );
+  const measureDependencyTarget = useCallback(() => {
+    if (!dependencyTargetRef.current) return;
+    requestAnimationFrame(() => {
+      dependencyTargetRef.current?.measureInWindow((x, y, width, height) => {
+        if (!width || !height) return;
+        setAbsoluteTargets((prev) => {
+          const previous = prev.dependency;
+          if (
+            previous &&
+            previous.x === x &&
+            previous.y === y &&
+            previous.width === width &&
+            previous.height === height
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            dependency: { x, y, width, height },
+          };
+        });
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const nextTargets: Partial<Record<TutorialTarget, LayoutRect>> = {};
@@ -445,9 +470,6 @@ export default function GameScreen() {
 
     if (relativeTargets.board) {
       nextTargets.board = applyOffset(relativeTargets.board);
-    }
-    if (relativeTargets.dependency) {
-      nextTargets.dependency = applyOffset(relativeTargets.dependency);
     }
     if (relativeTargets.currency) {
       nextTargets.currency = applyOffset(
@@ -1122,7 +1144,7 @@ export default function GameScreen() {
             }
             delayLongPress={350}
           >
-            <View onLayout={setTarget("dependency")}>
+            <View ref={dependencyTargetRef} onLayout={measureDependencyTarget}>
               <DependencyMeter
                 value={state.dependency}
                 baronPressure={state.baronPressure}
