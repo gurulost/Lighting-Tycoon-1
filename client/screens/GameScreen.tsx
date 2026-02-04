@@ -119,6 +119,31 @@ interface LayoutRect {
   height: number;
 }
 
+function layoutRectEqual(a: LayoutRect, b: LayoutRect) {
+  return (
+    a.x === b.x &&
+    a.y === b.y &&
+    a.width === b.width &&
+    a.height === b.height
+  );
+}
+
+function tutorialTargetMapEqual(
+  a: Partial<Record<TutorialTarget, LayoutRect>>,
+  b: Partial<Record<TutorialTarget, LayoutRect>>,
+) {
+  const aKeys = Object.keys(a) as TutorialTarget[];
+  const bKeys = Object.keys(b) as TutorialTarget[];
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    const aRect = a[key];
+    const bRect = b[key];
+    if (!aRect || !bRect) return false;
+    if (!layoutRectEqual(aRect, bRect)) return false;
+  }
+  return true;
+}
+
 interface BottomButtonProps {
   icon: keyof typeof Feather.glyphMap;
   label: string;
@@ -400,10 +425,22 @@ export default function GameScreen() {
       const layout = event?.nativeEvent?.layout;
       if (!layout) return;
       const { x, y, width, height } = layout;
-      setRelativeTargets((prev) => ({
-        ...prev,
-        [key]: { x, y, width, height },
-      }));
+      setRelativeTargets((prev) => {
+        const prevRect = prev[key];
+        if (
+          prevRect &&
+          prevRect.x === x &&
+          prevRect.y === y &&
+          prevRect.width === width &&
+          prevRect.height === height
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [key]: { x, y, width, height },
+        };
+      });
     };
   const handleStationLayout = useCallback(
     (stations: Partial<Record<"workbench", LayoutRect>>) => {
@@ -472,7 +509,10 @@ export default function GameScreen() {
       );
     }
 
-    setTutorialTargets({ ...nextTargets, ...absoluteTargets });
+    const next = { ...nextTargets, ...absoluteTargets };
+    setTutorialTargets((prev) =>
+      tutorialTargetMapEqual(prev, next) ? prev : next,
+    );
   }, [
     relativeTargets,
     topBarLayout,
@@ -500,17 +540,6 @@ export default function GameScreen() {
     [dispatch],
   );
 
-  const dismissOverlaysByType = useCallback(
-    (type: OverlayItem["type"]) => {
-      const ids = overlayQueue
-        .filter((entry) => entry.type === type)
-        .map((entry) => entry.id);
-      if (ids.length === 0) return;
-      ids.forEach((id) => dispatch({ type: "DISMISS_OVERLAY", id }));
-    },
-    [dispatch, overlayQueue],
-  );
-
   const showToast = useCallback(
     (message: string, durationMs = 1800) => {
       enqueueOverlay({
@@ -525,7 +554,10 @@ export default function GameScreen() {
 
   const measureBoardContainer = useCallback(() => {
     boardContainerRef.current?.measureInWindow((x, y, width, height) => {
-      setBoardContainerLayout({ x, y, width, height });
+      const rect = { x, y, width, height };
+      setBoardContainerLayout((prev) =>
+        prev && layoutRectEqual(prev, rect) ? prev : rect,
+      );
     });
   }, []);
 
@@ -910,19 +942,34 @@ export default function GameScreen() {
   }, [state.activeStoryBeatId]);
 
   useEffect(() => {
-    if (!state.activeStoryBeatId) {
-      dismissOverlaysByType("story");
+    const desiredBeatId = state.activeStoryBeatId;
+    const desiredOverlayId = desiredBeatId ? `story:${desiredBeatId}` : null;
+
+    const storyOverlays = overlayQueue.filter((entry) => entry.type === "story");
+
+    if (!desiredOverlayId) {
+      storyOverlays.forEach((entry) => dismissOverlay(entry.id));
       return;
     }
-    dismissOverlaysByType("story");
-    enqueueOverlay({
-      id: `story:${state.activeStoryBeatId}`,
-      type: "story",
-      createdAt: Date.now(),
-      sticky: true,
-      payload: { beatId: state.activeStoryBeatId },
-    });
-  }, [state.activeStoryBeatId, dismissOverlaysByType, enqueueOverlay]);
+
+    const hasDesired = storyOverlays.some(
+      (entry) => entry.id === desiredOverlayId,
+    );
+    const extraneous = storyOverlays.filter(
+      (entry) => entry.id !== desiredOverlayId,
+    );
+    extraneous.forEach((entry) => dismissOverlay(entry.id));
+
+    if (!hasDesired) {
+      enqueueOverlay({
+        id: desiredOverlayId,
+        type: "story",
+        createdAt: Date.now(),
+        sticky: true,
+        payload: { beatId: desiredBeatId },
+      });
+    }
+  }, [state.activeStoryBeatId, overlayQueue, dismissOverlay, enqueueOverlay]);
 
   useEffect(() => {
     if (state.tutorialComplete) return;
@@ -986,7 +1033,9 @@ export default function GameScreen() {
         onLayout={(event) => {
           const layout = event?.nativeEvent?.layout;
           if (!layout) return;
-          setTopStackLayout(layout);
+          setTopStackLayout((prev) =>
+            prev && layoutRectEqual(prev, layout) ? prev : layout,
+          );
         }}
       >
         <View
@@ -994,7 +1043,9 @@ export default function GameScreen() {
           onLayout={(event) => {
             const layout = event?.nativeEvent?.layout;
             if (!layout) return;
-            setTopBarLayout(layout);
+            setTopBarLayout((prev) =>
+              prev && layoutRectEqual(prev, layout) ? prev : layout,
+            );
           }}
         >
           <View onLayout={setTarget("currency")}>
@@ -1030,7 +1081,9 @@ export default function GameScreen() {
             onLayout={(event) => {
               const layout = event?.nativeEvent?.layout;
               if (!layout) return;
-              setTopActionsLayout(layout);
+              setTopActionsLayout((prev) =>
+                prev && layoutRectEqual(prev, layout) ? prev : layout,
+              );
             }}
           >
             <Pressable
@@ -1278,7 +1331,9 @@ export default function GameScreen() {
         onLayout={(event) => {
           const layout = event?.nativeEvent?.layout;
           if (!layout) return;
-          setBottomBarLayout(layout);
+          setBottomBarLayout((prev) =>
+            prev && layoutRectEqual(prev, layout) ? prev : layout,
+          );
         }}
       >
         <BottomButton

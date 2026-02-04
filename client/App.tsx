@@ -42,7 +42,13 @@ function App() {
   }, []);
 
   const content = (
-    <ErrorBoundary>
+    <ErrorBoundary
+      onError={(error, componentStack) => {
+        Sentry.captureException(error, {
+          extra: { componentStack },
+        });
+      }}
+    >
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <GestureHandlerRootView style={styles.root}>
