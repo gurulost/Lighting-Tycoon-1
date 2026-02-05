@@ -44,6 +44,7 @@ export function NeighborhoodBadge({
         : current.id === "liberation"
           ? "classic"
           : "warmWhite";
+  const titleText = compact ? current.shortName || current.name : current.name;
   const bulbCount = compact ? 10 : 12;
   const stripHeight = compact ? 14 : 18;
   const iconSize = compact ? 22 : 28;
@@ -78,12 +79,13 @@ export function NeighborhoodBadge({
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={compact ? 0.78 : 0.85}
+          maxFontSizeMultiplier={1}
           ellipsizeMode="tail"
         >
-          {current.name}
+          {titleText}
         </ThemedText>
         {!compact ? (
-          <ThemedText style={styles.tierLabel}>
+          <ThemedText style={styles.tierLabel} maxFontSizeMultiplier={1}>
             Tier {currentIndex + 1}/{NEIGHBORHOODS.length}
           </ThemedText>
         ) : null}
@@ -104,6 +106,11 @@ export function NeighborhoodBadge({
         </View>
         <ThemedText
           style={[styles.progressText, compact && styles.progressTextCompact]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={compact ? 0.8 : 0.9}
+          maxFontSizeMultiplier={1}
+          ellipsizeMode="tail"
         >
           {next ? `${reputation}/${nextRep} Rep` : "All unlocked"}
         </ThemedText>
@@ -124,9 +131,11 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginHorizontal: 0,
     marginTop: 0,
+    height: 64,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: BorderRadius.sm,
+    justifyContent: "space-between",
   },
   header: {
     flexDirection: "row",

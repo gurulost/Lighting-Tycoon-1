@@ -30,6 +30,9 @@ jobs:
       - name: Typecheck
         run: npm run check:types
 
+      - name: Telemetry Audit
+        run: npm run telemetry:audit
+
       - name: Format
         run: npm run check:format
 

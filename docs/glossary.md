@@ -47,7 +47,8 @@ Use this as a quick reference for every icon, badge, and system.
 
 ## Tactical Boosts
 - Supplier Scout: spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.
-- Mentor Workshop Clinic: spend cash to boost the next merges with extra research and lower dependency.
+- Mentor Workshop Clinic: spend cash so open merges grant extra research. Consumes on any merge. Mutually exclusive with Mentor Independence Session.
+- Mentor Independence Session: spend cash so open merges reduce Dependency. Consumes on any merge, unavailable in Phase 2, and mutually exclusive with Mentor Workshop Clinic.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 
 ## Currencies

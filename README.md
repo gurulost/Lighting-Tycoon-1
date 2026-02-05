@@ -20,6 +20,7 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 - `npm run server:dev` - run the API server (optional)
 - `npm run check:types` - TypeScript typecheck
 - `npm run lint` - lint
+- `npm run telemetry:audit` - verify telemetry catalog/code/docs consistency
 - `npm run format` - format code
 - `npm test` - run unit/component tests
 - `npm run test:e2e` - run Playwright web E2E tests

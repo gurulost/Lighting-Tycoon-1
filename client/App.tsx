@@ -10,7 +10,7 @@ import * as Sentry from "@sentry/react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { PostHogProvider } from "posthog-react-native";
-import { posthog } from "@/lib/telemetry";
+import { getTelemetryConfigStatus, posthog } from "@/lib/telemetry";
 
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -38,6 +38,14 @@ Sentry.init({
 
 function App() {
   useEffect(() => {
+    if (__DEV__) {
+      const telemetry = getTelemetryConfigStatus();
+      if (!telemetry.enabled) {
+        console.info(
+          `[telemetry] PostHog disabled (platform=${telemetry.platform}, keyPresent=${telemetry.apiKeyPresent}).`,
+        );
+      }
+    }
     posthog?.reloadFeatureFlags();
   }, []);
 

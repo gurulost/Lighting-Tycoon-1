@@ -69,8 +69,9 @@ export function SettingsModal({
   debugOverlayEnabled,
   onToggleDebugOverlay,
 }: SettingsModalProps) {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, skipToPhase2 } = useGame();
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
+  const canSkipPhase2 = state.gamePhase !== 2 && !state.liberationComplete;
   const [resetChallengeVisible, setResetChallengeVisible] = useState(false);
   const [resetAnswer, setResetAnswer] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -136,6 +137,25 @@ export function SettingsModal({
     dispatch({ type: "RESET_GAME" });
     closeResetChallenge();
     onClose();
+  };
+
+  const handleSkipPhase2 = () => {
+    if (!canSkipPhase2) return;
+    Alert.alert(
+      "Playtest: Skip to Phase 2",
+      "This applies a Phase 2 playtest bootstrap so you can validate projects and late-game flows from a fresh save.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Skip Now",
+          style: "destructive",
+          onPress: () => {
+            skipToPhase2();
+            onClose();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -278,6 +298,38 @@ export function SettingsModal({
             </Pressable>
 
             <Pressable
+              style={[
+                styles.actionRow,
+                !canSkipPhase2 && styles.actionRowDisabled,
+              ]}
+              onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
+            >
+              <LinearGradient
+                colors={[
+                  `${GameColors.currency.research}30`,
+                  `${GameColors.currency.research}10`,
+                ]}
+                style={styles.settingIcon}
+              >
+                <Feather
+                  name="skip-forward"
+                  size={20}
+                  color={GameColors.currency.research}
+                />
+              </LinearGradient>
+              <View style={styles.settingContent}>
+                <ThemedText style={styles.settingLabel}>
+                  Playtest: Skip to Phase 2
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  {canSkipPhase2
+                    ? "Bootstrap a fresh save into a Phase 2-ready state"
+                    : "Already in Phase 2"}
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            <Pressable
               style={styles.actionRow}
               onPress={() => {
                 onOpenGlossary?.();
@@ -408,6 +460,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  actionRowDisabled: {
+    opacity: 0.45,
   },
   settingIcon: {
     width: 44,

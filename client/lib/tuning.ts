@@ -20,6 +20,8 @@ export type TuningConfig = {
     supplierScoutCostStep: number;
     mentorClinicCostBase: number;
     mentorClinicCostStep: number;
+    mentorIndependenceCostBase: number;
+    mentorIndependenceCostStep: number;
     warrantyStampCostBase: number;
     warrantyStampCostStep: number;
     upgradeCostMultiplier: number;
@@ -47,7 +49,9 @@ export type TuningConfig = {
     clinicMerges: number;
     clinicMaxStack: number;
     clinicOpenResearchBonus: number;
-    clinicOpenDependencyDelta: number;
+    independenceMerges: number;
+    independenceMaxStack: number;
+    independenceOpenDependencyDelta: number;
     warrantyOrders: number;
     warrantyMaxStack: number;
     warrantyRefundLockedRate: number;
@@ -245,8 +249,10 @@ const DEFAULT_TUNING: TuningConfig = {
     marketingCostStep: 40,
     supplierScoutCostBase: 90,
     supplierScoutCostStep: 30,
-    mentorClinicCostBase: 120,
-    mentorClinicCostStep: 40,
+    mentorClinicCostBase: 90,
+    mentorClinicCostStep: 30,
+    mentorIndependenceCostBase: 140,
+    mentorIndependenceCostStep: 45,
     warrantyStampCostBase: 150,
     warrantyStampCostStep: 45,
     upgradeCostMultiplier: 1,
@@ -274,12 +280,14 @@ const DEFAULT_TUNING: TuningConfig = {
     clinicMerges: 10,
     clinicMaxStack: 20,
     clinicOpenResearchBonus: 1,
-    clinicOpenDependencyDelta: -1,
+    independenceMerges: 10,
+    independenceMaxStack: 20,
+    independenceOpenDependencyDelta: -1,
     warrantyOrders: 3,
     warrantyMaxStack: 6,
     warrantyRefundLockedRate: 0.85,
     warrantyRefundOpenRate: 0.9,
-    warrantyContractCashBonus: 0.55,
+    warrantyContractCashBonus: 0.45,
   },
   baron: {
     contractOrders: 3,

@@ -16,6 +16,11 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
 import { getEffectiveSupplierConfig } from "@/constants/suppliers";
 import type { SupplierId } from "@/types/game";
+import {
+  formatCooldownSeconds,
+  getCooldownRemainingMs,
+  getCooldownRemainingSeconds,
+} from "@/lib/cooldown";
 
 interface SupplierModalProps {
   visible: boolean;
@@ -185,9 +190,9 @@ export function SupplierModal({
                   speedLevel,
                   { baronEarlyRelief },
                 );
-                const cooldownRemaining = Math.max(
-                  0,
-                  supplier.cooldownEndsAt - now,
+                const cooldownRemaining = getCooldownRemainingMs(
+                  supplier.cooldownEndsAt,
+                  now,
                 );
                 const charges = supplier.chargesRemaining;
                 const tapStatus = getSupplierTapStatus(supplierId, now);
@@ -202,7 +207,12 @@ export function SupplierModal({
                   : isOverdraw
                     ? "Overdraw"
                     : isCooling
-                      ? `Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`
+                      ? `Cooldown ${formatCooldownSeconds(
+                          getCooldownRemainingSeconds(
+                            supplier.cooldownEndsAt,
+                            now,
+                          ),
+                        )}s`
                       : "Tap";
                 const overdrawCost = tapStatus.cost;
                 let overdrawLabel: string | null = null;
@@ -233,7 +243,9 @@ export function SupplierModal({
                   }
                   if (overdrawCost.overheatMs > 0) {
                     parts.push(
-                      `+${Math.ceil(overdrawCost.overheatMs / 1000)}s cooldown`,
+                      `+${formatCooldownSeconds(
+                        overdrawCost.overheatMs / 1000,
+                      )}s cooldown`,
                     );
                   }
                   if (parts.length > 0) {

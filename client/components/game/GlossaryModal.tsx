@@ -552,9 +552,19 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "boost-clinic",
         title: "Mentor Workshop Clinic",
         summary: "Boost the next open merges.",
-        detail: "Grants extra research and reduces Dependency.",
+        detail:
+          "Open merges grant extra research. Consumes on any merge. Mutually exclusive with the independence session.",
         icon: "activity",
         color: GameColors.currency.research,
+      },
+      {
+        id: "boost-independence",
+        title: "Mentor Independence Session",
+        summary: "Reduce Dependency on open merges.",
+        detail:
+          "Open merges reduce Dependency by 1. Consumes on any merge, is unavailable in Phase 2, and is mutually exclusive with the clinic.",
+        icon: "trending-down",
+        color: GameColors.openStandard.primary,
       },
       {
         id: "boost-warranty",

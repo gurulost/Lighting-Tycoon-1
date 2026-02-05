@@ -346,7 +346,7 @@ export function TutorialOverlay({
       <Pressable
         style={[
           styles.skipButton,
-          { top: insets.top + Spacing.md, right: insets.right + Spacing.lg },
+          { top: insets.top + Spacing.md, left: insets.left + Spacing.lg },
         ]}
         onPress={handleSkip}
         onLongPress={handleSkipImmediate}

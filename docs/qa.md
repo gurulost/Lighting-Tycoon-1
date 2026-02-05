@@ -160,13 +160,19 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Baron supply modifiers:
   - Accept a Baron crate or rush offer and verify the bonus locked roll for the next N non-forced spawns.
   - Confirm counters only decrement on non-forced spawns with successful placement.
-- Before first session completion, clinic/warranty remain disabled with a clear hint.
+- Before first session completion, clinic/independence/warranty remain disabled with a clear hint.
 - Mentor Workshop Clinic:
-  - Activate clinic. Verify next open merges grant +1 research and reduce dependency by 1.
+  - Activate clinic. Verify next open merges grant +1 research.
   - Counter decrements on every merge, then expires at 0.
+- Mentor Independence Session:
+  - Activate independence session. Verify next open merges reduce Dependency by 1.
+  - Counter decrements on every merge, then expires at 0.
+  - Verify the clinic cannot be started while independence is active (and vice versa).
+  - In Phase 2, verify the independence session cannot be activated.
+  - In Phase 2, verify dependency-reduction upgrades are marked obsolete and cannot be purchased.
 - Baron Warranty Stamp:
   - Refund Relief: fulfill a wrong-family preference order and confirm a softer penalty.
-  - Contract Edge: with an active Baron contract, confirm higher cash bonus.
+  - Contract Edge: with an active Baron contract, confirm the +45% cash bonus.
   - Verify Contract Edge is unavailable when no active contract is running.
   - Counter decrements only on non-tutorial, non-lockout, non-lab orders.
 

@@ -458,6 +458,7 @@ export function MergeBoard({
   const baronCooldownDelta = useCooldownDeltaFeedback({
     cooldownEndsAt: baronSupplier.cooldownEndsAt,
     chargesRemaining: baronSupplier.chargesRemaining,
+    overdrawCount: baronSupplier.overdrawCount,
     isCooling: baronCooldown.isActive,
     isPanelOpen: suppliersOpen,
   });
@@ -819,6 +820,18 @@ export function MergeBoard({
     isStationSlot,
     isSlotBlocked,
   ]);
+  const highlightedSlotSet = useMemo(
+    () => new Set(highlightedSlots),
+    [highlightedSlots],
+  );
+  const orderHighlightSlotSet = useMemo(
+    () => new Set(orderHighlightSlots),
+    [orderHighlightSlots],
+  );
+  const backpackHighlightSlotSet = useMemo(
+    () => new Set(backpackHighlightSlots),
+    [backpackHighlightSlots],
+  );
 
   const measureContainer = useCallback(
     (onMeasured?: (layout: LayoutRect) => void) => {
@@ -1378,8 +1391,8 @@ export function MergeBoard({
     const part = state.board[index];
     const isBlocked = isSlotBlocked(index);
     const isStation = isStationSlot(index);
-    const isHighlighted = highlightedSlots.includes(index);
-    const isOrderHighlighted = orderHighlightSlots.includes(index);
+    const isHighlighted = highlightedSlotSet.has(index);
+    const isOrderHighlighted = orderHighlightSlotSet.has(index);
     const ghostTier = ghostSlotMap[index];
     const isDragged =
       dragSource?.source === "board" && dragSource.index === index;
@@ -1903,8 +1916,7 @@ export function MergeBoard({
             ]}
           >
             {state.backpack.map((part, index) => {
-              const isBackpackHighlighted =
-                backpackHighlightSlots.includes(index);
+              const isBackpackHighlighted = backpackHighlightSlotSet.has(index);
               const isBackpackDragged =
                 dragSource?.source === "backpack" && dragSource.index === index;
               return (

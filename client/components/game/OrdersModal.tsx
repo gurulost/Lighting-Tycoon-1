@@ -308,8 +308,7 @@ export function OrdersModal({
     state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const showProjectsButton = state.gamePhase === 2;
   const showPhase1Objective = state.gamePhase === 1 && state.tutorialComplete;
-  const showPhase2Objective =
-    state.gamePhase === 2 && !state.projectsUnlocked;
+  const showPhase2Objective = state.gamePhase === 2 && !state.projectsUnlocked;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
@@ -325,10 +324,16 @@ export function OrdersModal({
   const clinicAtCap = clinicRemaining >= clinicMax;
   const independenceAtCap = independenceRemaining >= independenceMax;
   const warrantyAtCap = warrantyRemaining >= warrantyMax;
+  const clinicBlockedByIndependence = independenceActive;
+  const independenceBlockedByClinic = clinicActive;
+  const independenceObsoleteInPhase2 =
+    state.liberationComplete || state.gamePhase === 2;
   const canUseBoosts = state.tutorialComplete;
   const canUseClinic = state.tutorialComplete && state.firstSessionComplete;
   const canUseIndependence =
-    state.tutorialComplete && state.firstSessionComplete;
+    state.tutorialComplete &&
+    state.firstSessionComplete &&
+    !independenceObsoleteInPhase2;
   const canUseWarranty = state.tutorialComplete && state.firstSessionComplete;
   const [showScoutOptions, setShowScoutOptions] = React.useState(false);
   const [showWarrantyOptions, setShowWarrantyOptions] = React.useState(false);
@@ -384,20 +389,22 @@ export function OrdersModal({
     state.tutorialComplete && state.cash >= marketingCost && !marketingAtCap;
   const canStartScout = canUseBoosts && state.cash >= scoutCost && !scoutAtCap;
   const canStartClinic =
-    canUseClinic && state.cash >= clinicCost && !clinicAtCap;
+    canUseClinic &&
+    state.cash >= clinicCost &&
+    !clinicAtCap &&
+    !clinicBlockedByIndependence;
   const canStartIndependence =
     canUseIndependence &&
     state.cash >= independenceCost &&
-    !independenceAtCap;
+    !independenceAtCap &&
+    !independenceBlockedByClinic;
   const canStartWarranty =
     canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
   const phase2GoalOrder = React.useMemo(
     () =>
-      state.orders.find((order) =>
-        order.modifierIds?.includes("phase2_goal"),
-      ),
+      state.orders.find((order) => order.modifierIds?.includes("phase2_goal")),
     [state.orders],
   );
   const phase2GoalHint = phase2GoalOrder
@@ -1065,14 +1072,17 @@ export function OrdersModal({
                       />
                       <ThemedText style={styles.boostStatusText}>
                         Active · {clinicRemaining} merge
-                        {clinicRemaining === 1 ? "" : "s"} left
+                        {clinicRemaining === 1 ? "" : "s"} left · consumes on
+                        any merge
                       </ThemedText>
                     </View>
                   ) : (
                     <ThemedText style={styles.boostHint}>
-                      {canUseClinic
-                        ? `Next ${clinicMerges} merges: open merges grant +1 research.`
-                        : "Finish your first session to unlock the clinic."}
+                      {!canUseClinic
+                        ? "Finish your first session to unlock the clinic."
+                        : clinicBlockedByIndependence
+                          ? "Finish the Independence Session before starting the clinic."
+                          : `Next ${clinicMerges} merges: open merges grant +1 research. Consumes on any merge.`}
                     </ThemedText>
                   )}
                 </View>
@@ -1085,7 +1095,9 @@ export function OrdersModal({
                         !canStartIndependence && styles.refreshButtonDisabled,
                       ]}
                       onPress={
-                        canStartIndependence ? handleStartIndependence : undefined
+                        canStartIndependence
+                          ? handleStartIndependence
+                          : undefined
                       }
                     >
                       <Feather
@@ -1122,14 +1134,19 @@ export function OrdersModal({
                       />
                       <ThemedText style={styles.boostStatusText}>
                         Active · {independenceRemaining} merge
-                        {independenceRemaining === 1 ? "" : "s"} left
+                        {independenceRemaining === 1 ? "" : "s"} left · consumes
+                        on any merge
                       </ThemedText>
                     </View>
                   ) : (
                     <ThemedText style={styles.boostHint}>
-                      {canUseIndependence
-                        ? `Next ${independenceMerges} merges: open merges reduce dependency by 1.`
-                        : "Finish your first session to unlock the independence session."}
+                      {!state.tutorialComplete || !state.firstSessionComplete
+                        ? "Finish your first session to unlock the independence session."
+                        : independenceObsoleteInPhase2
+                          ? "Phase 2: Dependency is frozen, so the independence session is unavailable."
+                          : independenceBlockedByClinic
+                            ? "Finish the Mentor Workshop Clinic before starting the independence session."
+                            : `Next ${independenceMerges} merges: open merges reduce Dependency by 1. Consumes on any merge.`}
                     </ThemedText>
                   )}
                 </View>

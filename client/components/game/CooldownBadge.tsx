@@ -4,60 +4,42 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/ThemedText";
 import { BorderRadius, Fonts, GameColors } from "@/constants/theme";
+import { formatCooldownSeconds, type CooldownUrgency } from "@/lib/cooldown";
 
 type CooldownBadgeProps = {
-  cooldownEndsAt: number;
+  seconds: number;
   active: boolean;
+  urgency: CooldownUrgency;
   tileSize: number;
   accentColor?: string;
   dimmed?: boolean;
   deltaSeconds?: number | null;
-  onExpire?: () => void;
 };
 
 export function CooldownBadge({
-  cooldownEndsAt,
+  seconds,
   active,
+  urgency,
   tileSize,
   accentColor = GameColors.locked.primary,
   dimmed = false,
   deltaSeconds,
-  onExpire,
 }: CooldownBadgeProps) {
-  const [now, setNow] = React.useState(() => Date.now());
-  const notifiedEndsAt = React.useRef<number | null>(null);
+  if (!active) return null;
 
-  React.useEffect(() => {
-    if (!active) {
-      setNow(Date.now());
-      notifiedEndsAt.current = null;
-      return;
-    }
-    setNow(Date.now());
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [active, cooldownEndsAt]);
-
-  const remainingMs = Math.max(0, cooldownEndsAt - now);
-  React.useEffect(() => {
-    if (!active || remainingMs > 0 || !onExpire) return;
-    if (cooldownEndsAt <= 0) return;
-    if (notifiedEndsAt.current === cooldownEndsAt) return;
-    notifiedEndsAt.current = cooldownEndsAt;
-    onExpire();
-  }, [active, remainingMs, cooldownEndsAt, onExpire]);
-
-  if (!active || remainingMs <= 0) return null;
-
-  const safeSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-  const label = `${safeSeconds}`;
+  const safeSeconds = Math.max(0, Math.ceil(seconds));
+  const label = formatCooldownSeconds(safeSeconds);
   const digitCount = label.length;
   const width = Math.round(tileSize * 0.62);
   const height = Math.round(tileSize * 0.36);
   const baseFontSize = Math.round(tileSize * 0.32);
   const deltaFontSize = Math.max(9, Math.round(tileSize * 0.16));
+  const urgencyColor =
+    urgency === "critical"
+      ? GameColors.ui.danger
+      : urgency === "warning"
+        ? GameColors.ui.warning
+        : accentColor;
   const fontSize =
     digitCount <= 2
       ? baseFontSize
@@ -75,8 +57,8 @@ export function CooldownBadge({
           {
             width,
             height,
-            borderColor: `${accentColor}AA`,
-            shadowColor: accentColor,
+            borderColor: `${urgencyColor}AA`,
+            shadowColor: urgencyColor,
           },
           dimmed && styles.badgeDimmed,
         ]}
@@ -88,7 +70,7 @@ export function CooldownBadge({
               fontSize,
               letterSpacing,
               color: GameColors.text.primary,
-              textShadowColor: `${accentColor}66`,
+              textShadowColor: `${urgencyColor}66`,
             },
             dimmed && styles.timerTextDimmed,
           ]}
@@ -100,7 +82,7 @@ export function CooldownBadge({
             style={[
               styles.deltaPill,
               {
-                borderColor: `${accentColor}AA`,
+                borderColor: `${urgencyColor}AA`,
                 backgroundColor: "#0F0F1FCC",
               },
             ]}
@@ -108,7 +90,7 @@ export function CooldownBadge({
             <ThemedText
               style={[
                 styles.deltaText,
-                { color: accentColor, fontSize: deltaFontSize },
+                { color: urgencyColor, fontSize: deltaFontSize },
               ]}
             >
               +{deltaSeconds}s

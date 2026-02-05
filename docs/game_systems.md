@@ -86,6 +86,7 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
 - Pressure cashes out into higher lockout lab request targets
 - Post-liberation (Phase 2) freezes Dependency at 0 and weights compatibility-required orders higher
 - Phase 2: Baron Pressure applies a reward tax to cash + research (40+ = -10%, 70+ = -20%)
+- Phase 2: dependency-reduction effects are unavailable (Mentor Independence Session and dependency-reduction upgrades)
 
 ## R&D
 - Research is earned primarily via Open play
@@ -94,7 +95,9 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
 
 ## Tactical Boosts (Post-Session)
 - Supplier Scout: spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.
-- Mentor Workshop Clinic: spend cash to enhance the next merges with extra research and lower dependency.
+- Mentor Workshop Clinic: spend cash so open merges grant extra research; consumes on any merge.
+- Mentor Independence Session: spend cash so open merges reduce Dependency; consumes on any merge and is unavailable in Phase 2.
+- Mentor Clinic and Independence Session are mutually exclusive while active.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 
 ## Lockout Event

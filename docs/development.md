@@ -24,6 +24,9 @@ For local development outside Replit, use:
 ```bash
 export DATABASE_URL="postgres://user:pass@localhost:5432/lighting_tycoon"
 export EXPO_PUBLIC_DOMAIN="localhost:5000"
+# Optional telemetry (PostHog)
+export EXPO_PUBLIC_POSTHOG_KEY="phc_..."
+export EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
 ```
 
 Note: the client currently prefixes `https://` when building the API base URL. If
@@ -77,6 +80,7 @@ This uses Drizzle to push the schema from `shared/schema.ts` into the database.
 npm run lint
 npm run check:types
 npm run check:format
+npm run telemetry:audit
 ```
 
 ## Troubleshooting

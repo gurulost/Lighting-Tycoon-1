@@ -3,6 +3,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Application from "expo-application";
 import PostHog from "posthog-react-native";
 import type { JsonType, PostHogEventProperties } from "@posthog/core";
+import {
+  TELEMETRY_EVENT_CATALOG,
+  TELEMETRY_EVENT_NAME_SET,
+} from "@/lib/telemetryCatalog";
+import type {
+  TelemetryEventName,
+  TelemetryEventNameWithOptionalProperties,
+  TelemetryEventNameWithRequiredProperties,
+  TelemetryEventPayload,
+} from "@/lib/telemetryCatalog";
 
 const apiKey = process.env.EXPO_PUBLIC_POSTHOG_KEY?.trim();
 const host =
@@ -23,6 +33,19 @@ export const posthog =
       })
     : null;
 
+export function isTelemetryEnabled() {
+  return !!posthog;
+}
+
+export function getTelemetryConfigStatus() {
+  return {
+    enabled: !!posthog,
+    apiKeyPresent: !!apiKey,
+    host,
+    platform: Platform.OS,
+  };
+}
+
 function toPostHogProperties(
   properties?: Record<string, unknown>,
 ): PostHogEventProperties | undefined {
@@ -35,10 +58,44 @@ function toPostHogProperties(
   return cleaned;
 }
 
+type TelemetryProperties = Record<string, unknown>;
+
+export function captureEvent<
+  E extends TelemetryEventNameWithRequiredProperties,
+>(name: E, properties: TelemetryEventPayload<E>): void;
+export function captureEvent<
+  E extends TelemetryEventNameWithOptionalProperties,
+>(name: E, properties?: TelemetryProperties): void;
 export function captureEvent(
-  name: string,
-  properties?: Record<string, unknown>,
+  name: TelemetryEventName,
+  properties?: TelemetryProperties,
 ) {
+  if (!TELEMETRY_EVENT_NAME_SET.has(name)) {
+    if (__DEV__) {
+      console.warn(`[telemetry] Unknown event name: ${name}`);
+    }
+    return;
+  }
+
+  const required = TELEMETRY_EVENT_CATALOG[name].requiredProperties;
+  if (required.length > 0) {
+    const source = properties || {};
+    const missing = required.filter(
+      (key) =>
+        !Object.prototype.hasOwnProperty.call(source, key) ||
+        source[key] === undefined,
+    );
+    if (missing.length > 0) {
+      if (__DEV__) {
+        console.warn(
+          `[telemetry] Missing required properties for ${name}: ${missing.join(
+            ", ",
+          )}`,
+        );
+      }
+      return;
+    }
+  }
   posthog?.capture(name, toPostHogProperties(properties));
 }
 

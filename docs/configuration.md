@@ -22,3 +22,4 @@ This document lists environment variables used by the client and server.
 - When using Replit, the `expo:dev` script sets `EXPO_PUBLIC_DOMAIN` automatically.
 - `.env.example` is a template only; the app does not auto-load `.env` files, so export vars in your shell.
 - Live balancing uses the PostHog feature flag `tuning_config`; see `docs/tuning.md`.
+- Run `npm run telemetry:audit` before merging telemetry changes to keep code, catalog, and docs aligned.

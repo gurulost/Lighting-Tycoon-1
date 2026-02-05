@@ -211,16 +211,25 @@ Unlocked after tutorial (Supplier Scout) and after first session completion (oth
 - Consumption: only on non-forced spawns
 
 **Mentor Workshop Clinic**
-- Cost: `120 + reputationTier * 40`
+- Cost: `90 + reputationTier * 30`
 - Duration: 10 merges (stack to 20)
-- Effect: open merges gain `+1 research` and `-1 dependency`
+- Effect: open merges gain `+1 research`
+- Consumption: any merge (open, locked, or waste)
+
+**Mentor Independence Session**
+- Cost: `140 + reputationTier * 45`
+- Duration: 10 merges (stack to 20)
+- Effect: open merges reduce Dependency by 1
+- Consumption: any merge (open, locked, or waste)
+- Note: Clinic and Independence Session are mutually exclusive while active.
+- Phase 2 note: unavailable because Dependency is frozen at 0.
 
 **Baron Warranty Stamp**
 - Cost: `150 + reputationTier * 45`
 - Duration: 3 orders (stack to 6)
 - Modes:
   - Refund Relief: wrong-family penalty rates become `0.85` (locked pref) or `0.90` (open pref)
-  - Contract Edge: Baron contract cash bonus becomes `+0.55` (requires active contract)
+  - Contract Edge: Baron contract cash bonus becomes `+0.45` (requires active contract)
 - Consumption: non-tutorial, non-lockout, non-lab orders
 
 ---

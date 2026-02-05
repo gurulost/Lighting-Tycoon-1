@@ -53,7 +53,10 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
     ),
   );
   const canAfford = state.cash >= cost;
-  const canPurchase = !isMaxed && canAfford;
+  const dependencyUpgradeObsolete =
+    upgrade.effect.startsWith("dependency_reduce_") &&
+    (state.liberationComplete || state.gamePhase === 2);
+  const canPurchase = !isMaxed && canAfford && !dependencyUpgradeObsolete;
 
   const categoryColor =
     CATEGORY_COLORS[upgrade.category] || GameColors.text.secondary;
@@ -68,6 +71,7 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   }, [hapticsEnabled, onPurchase]);
 
   const handlePress = () => {
+    if (dependencyUpgradeObsolete) return;
     if (canPurchase) {
       handlePurchase();
       scale.value = withSequence(
@@ -102,6 +106,11 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
           <ThemedText style={styles.description}>
             {upgrade.description}
           </ThemedText>
+          {dependencyUpgradeObsolete ? (
+            <ThemedText style={styles.obsoleteNote}>
+              Phase 2: Dependency is frozen at 0, so this upgrade has no effect.
+            </ThemedText>
+          ) : null}
         </View>
       </View>
 
@@ -127,6 +136,7 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
 
       <Pressable
         onPress={handlePress}
+        disabled={dependencyUpgradeObsolete}
         style={[
           styles.purchaseButton,
           {
@@ -134,8 +144,14 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
               ? categoryColor
               : isMaxed
                 ? GameColors.ui.success + "30"
-                : GameColors.ui.surface,
-            opacity: canPurchase ? 1 : isMaxed ? 1 : 0.5,
+                : dependencyUpgradeObsolete
+                  ? `${GameColors.ui.warning}24`
+                  : GameColors.ui.surface,
+            opacity: canPurchase
+              ? 1
+              : isMaxed || dependencyUpgradeObsolete
+                ? 1
+                : 0.5,
           },
         ]}
       >
@@ -146,6 +162,15 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
               style={[styles.purchaseText, { color: GameColors.ui.success }]}
             >
               Maxed
+            </ThemedText>
+          </>
+        ) : dependencyUpgradeObsolete ? (
+          <>
+            <Feather name="slash" size={14} color={GameColors.ui.warning} />
+            <ThemedText
+              style={[styles.purchaseText, { color: GameColors.ui.warning }]}
+            >
+              Phase 2 Obsolete
             </ThemedText>
           </>
         ) : (
@@ -201,6 +226,11 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 13,
     color: GameColors.text.secondary,
+  },
+  obsoleteNote: {
+    fontSize: 12,
+    color: GameColors.ui.warning,
+    marginTop: Spacing.xs,
   },
   levelContainer: {
     flexDirection: "row",

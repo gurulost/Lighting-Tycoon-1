@@ -466,6 +466,7 @@ export interface GameState {
   supplierScoutRoute?: SupplierScoutRoute;
   supplierScoutSpawnsRemaining: number;
   mentorClinicMergesRemaining: number;
+  mentorIndependenceMergesRemaining: number;
   warrantyStampMode?: WarrantyStampMode;
   warrantyStampOrdersRemaining: number;
 

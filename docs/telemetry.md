@@ -1,107 +1,159 @@
-# Telemetry Plan
+# Telemetry Runbook
 
-This is a recommended event schema for live tuning and retention analysis.
-Status: PostHog wired; core loop, tutorial, economy, and lockout events instrumented (mobile only).
+PostHog is the analytics source of truth for gameplay telemetry and live tuning.
 
----
+## Access and Setup
 
-## Tutorial Funnel (Why: identify drop-offs)
+1. Request PostHog project access (minimum: `Analyst`, preferred: `Developer`).
+2. Set environment variables in your shell:
+   - `EXPO_PUBLIC_POSTHOG_KEY`
+   - `EXPO_PUBLIC_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`)
+3. Start the app and confirm telemetry is enabled in development logs.
+4. Verify events in PostHog Live Events while exercising core gameplay.
 
-- `tutorial_step_start` (step)
-- `tutorial_step_complete` (step, duration)
+Notes:
+- Telemetry is currently enabled for mobile builds (`posthog-react-native`); web is intentionally disabled.
+- Feature flag payloads (for tuning) are reloaded at app startup and on identify.
+
+## Instrumentation Workflow
+
+1. Add or update events in `client/lib/telemetryCatalog.ts`.
+2. Emit events with `captureEvent(...)` from `client/lib/telemetry.ts`.
+   - Required properties are enforced at compile time based on the catalog.
+3. Keep event names and docs in sync:
+   - Run `npm run telemetry:audit`
+4. Run validation before merge:
+   - `npm run check:types`
+   - `npm run lint`
+
+## Analysis Workflow
+
+1. Build baseline dashboards:
+   - Tutorial Funnel: start -> complete/skip by step.
+   - Core Loop Health: spawn/merge/order/refresh rates by session.
+   - Economy Balance: `cash_earned` vs `cash_spent`, `research_earned` vs `research_spent`.
+   - Strategic Pressure: dependency trend, lockout begin/resolve ratio.
+   - Endgame Progression: projects accepted/completed/failed, council unlock and campaign progress.
+2. Segment by:
+   - App version (`appVersion`, `buildNumber`)
+   - Tuning variant (`tuning_applied.variant`)
+   - New vs returning (`first_open` presence)
+3. Check regressions weekly:
+   - Time to first order
+   - Tutorial completion rate
+   - Lockout resolve rate
+   - Project stage fail rate
+
+Example HogQL starter:
+
+```sql
+select event, count(*) as events
+from events
+where timestamp >= now() - interval 7 day
+  and event in (
+    'tutorial_complete',
+    'tutorial_skipped',
+    'order_fulfill',
+    'lockout_begin',
+    'lockout_resolve',
+    'project_complete'
+  )
+group by event
+order by events desc
+```
+
+## Canonical Event List
+
+The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
+
+### Tutorial
+
+- `tutorial_step_start`
+- `tutorial_step_complete`
 - `tutorial_complete`
 - `tutorial_skipped`
-- `tutorial_nudge` (step, nudgeCount)
+- `tutorial_nudge`
 
-## Core Loop (Why: pacing and friction)
+### Core Loop
 
-- `spawn_part` (tier, family)
-- `merge` (fromTier, toTier, family)
-- `order_spawn` (type, modifiers, tier summary)
-- `order_fulfill` (type, modifiers, rewards)
-- `order_dismiss` (type)
-- `order_refresh` (previousType, newType, cost)
+- `spawn_part`
+- `merge`
+- `order_spawn`
+- `order_spawn_paused`
+- `order_fulfill`
+- `order_dismiss`
+- `order_refresh`
+- `recycle_used`
+- `backpack_used`
+- `board_full`
+- `board_pressure_band`
+- `overlay_wait_max`
 
-## Goals / Missions (Why: retention + intent)
+### Strategy
 
-- `mission_assigned` (templateId, giver, chainId, chainIndex)
-- `mission_progress` (templateId, progress, target)
-- `mission_complete` (templateId, giver, rewards)
-- `mission_skip` (templateId, giver)
-
-## Strategy Layer (Why: lock-in dynamics)
-
-- `dependency_change` (delta, newValue)
+- `dependency_change`
 - `baron_offer_shown`
 - `baron_offer_accept`
 - `baron_offer_decline`
 - `lockout_begin`
-- `lockout_choice` (baron/lab)
-- `lockout_resolve` (baron/freedom)
+- `lockout_choice`
+- `lockout_resolve`
 - `craft_freedom_controller`
 - `use_freedom_controller`
+- `rd_node_unlocked`
 
-## Empire Contracts (Why: endgame engagement)
+### Economy
 
-- `project_offer_refresh` (cost)
-- `project_accept` (projectId, deposit, addonCost)
-- `project_cancel` (projectId, refund)
-- `project_stage_complete` (projectId, stageIndex)
-- `project_complete` (projectId, stages)
-- `project_stage_fail` (projectId, stageIndex, penalty)
-- `project_addon_purchase` (projectId, addon, cost)
-- `project_change_order` (projectId, stageIndex, cost)
-
-## Standards Council (Why: long-horizon progression)
-
-- `council_unlock` (projectsCompleted, reputationTier)
-- `council_campaign_set_active` (campaignId)
-- `council_draft_invest` (campaignId, cash, research, draftComplete)
-- `council_draft_complete` (campaignId)
-- `council_pilot_complete` (campaignId)
-- `council_ratify_spawn` (campaignId, source)
-- `council_ratify_complete` (campaignId)
-- `council_hearing_trigger` (hearingId, source)
-- `council_hearing_clear` (hearingId, method)
-- `council_municipal_grant` (lobbyPressureDrop, baronPressureDrop)
-
-## Economy (Why: balance)
-
-- `cash_earned` / `cash_spent`
-- `research_earned` / `research_spent`
+- `cash_earned`
+- `cash_spent`
+- `research_earned`
+- `research_spent`
 - `reputation_earned`
-- `boost_start` (type, mode, cost, remaining)
-- `boost_consume` (type, remaining, trigger)
-- `supplier_overdraw` (supplierId, overdrawCount, cashSpent, researchSpent, wasteConsumed, extraWasteTriggered, overheatMs, salvageMethod)
+- `boost_start`
+- `boost_consume`
+- `upgrade_purchased`
+- `supplier_overdraw`
+- `supplier_overdraw_decision`
+- `supplier_overdraw_dropoff`
+- `supplier_overdraw_followup`
 
-## Friction Signals (Why: churn predictors)
+### Missions
 
-- `board_full` (freeSlots)
-- `board_pressure_band` (band, freeSlots)
-- `order_spawn_paused`
-- `recycle_used`
-- `backpack_used`
-- `overlay_wait_max` (maxWaitMs)
+- `mission_assigned`
+- `mission_progress`
+- `mission_complete`
+- `mission_skip`
 
-## Sessions / Progression
+### Projects
+
+- `project_offer_refresh`
+- `project_accept`
+- `project_cancel`
+- `project_stage_complete`
+- `project_stage_fail`
+- `project_complete`
+- `project_addon_purchase`
+- `project_change_order`
+
+### Council
+
+- `council_unlock`
+- `council_campaign_set_active`
+- `council_draft_invest`
+- `council_draft_complete`
+- `council_pilot_complete`
+- `council_ratify_spawn`
+- `council_ratify_complete`
+- `council_hearing_trigger`
+- `council_hearing_clear`
+- `council_municipal_grant`
+
+### System
 
 - `first_open`
-- `session_start` / `session_end`
+- `session_start`
+- `session_end`
 - `tier_unlocked`
 - `neighborhood_unlocked`
 - `game_phase_change`
-
-## Configuration / Experiments
-
-- `tuning_applied` (variant, payload, payloadSignature)
-
----
-
-## Primary KPIs
-
-- D1 / D7 retention
-- Avg session length
-- Time to first order
-- Dependency distribution
-- Lockout completion rate
-- Freedom Controller unlock rate
+- `tuning_applied`

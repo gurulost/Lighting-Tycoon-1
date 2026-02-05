@@ -71,6 +71,10 @@ import {
 } from "@/lib/projects";
 import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
 import {
+  getOverdrawDeltaSeconds,
+  getCooldownRemainingSeconds,
+} from "@/lib/cooldown";
+import {
   captureEvent,
   getAppInfo,
   getOrCreatePlayerId,
@@ -125,6 +129,7 @@ type GameAction =
   | { type: "START_MARKETING_CAMPAIGN" }
   | { type: "START_SUPPLIER_SCOUT"; route: SupplierScoutRoute }
   | { type: "START_MENTOR_CLINIC" }
+  | { type: "START_MENTOR_INDEPENDENCE" }
   | { type: "START_WARRANTY_STAMP"; mode: WarrantyStampMode }
   | { type: "PROJECT_GENERATE_OFFERS" }
   | { type: "PROJECT_REFRESH_OFFERS" }
@@ -804,6 +809,13 @@ function getMentorClinicCost(reputationTier: number) {
   return (
     tuning.economy.mentorClinicCostBase +
     reputationTier * tuning.economy.mentorClinicCostStep
+  );
+}
+
+function getMentorIndependenceCost(reputationTier: number) {
+  return (
+    tuning.economy.mentorIndependenceCostBase +
+    reputationTier * tuning.economy.mentorIndependenceCostStep
   );
 }
 
@@ -2196,6 +2208,13 @@ const FIRST_SESSION_ORDERS: Omit<Order, "id">[] = [
 ];
 
 const FIRST_SESSION_REQUIRED_COMPLETIONS = FIRST_SESSION_ORDERS.length + 1;
+const PLAYTEST_PHASE2_BASE_REPUTATION = 1300;
+const PLAYTEST_PHASE2_BASE_CASH = 24000;
+const PLAYTEST_PHASE2_BASE_RESEARCH = 1200;
+const PLAYTEST_PHASE2_BASE_UPGRADE_MATERIALS = 6;
+const PLAYTEST_PHASE2_BASE_COMPATIBILITY_COMPONENTS = 2;
+const PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL = 3;
+const PLAYTEST_PHASE2_MIN_MAX_TIER: PartTier = 4;
 
 function createMentorJobOrder(): Order {
   return withTunedRewards({
@@ -3025,6 +3044,7 @@ function getInitialState(): GameState {
     supplierScoutRoute: undefined,
     supplierScoutSpawnsRemaining: 0,
     mentorClinicMergesRemaining: 0,
+    mentorIndependenceMergesRemaining: 0,
     warrantyStampMode: undefined,
     warrantyStampOrdersRemaining: 0,
     missions: [],
@@ -3897,6 +3917,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           wasteConsumed: overdrawWasteConsumed,
           extraWasteTriggered,
           overheatMs: overdrawOverheatMs,
+          cooldownAddedSeconds: Math.ceil(overdrawOverheatMs / 1000),
+          cooldownRemainingSeconds: getCooldownRemainingSeconds(
+            nextSupplier.cooldownEndsAt,
+            now,
+          ),
           salvageMethod: overdrawCost.salvageMethod,
         });
         if (state.tutorialComplete) {
@@ -4006,15 +4031,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       const clinicActive = state.mentorClinicMergesRemaining > 0;
+      const independenceActive = state.mentorIndependenceMergesRemaining > 0;
       const clinicResearchBonus =
         clinicActive && mergedFamily === "open"
           ? tuning.boosts.clinicOpenResearchBonus
           : 0;
-      const clinicDependencyBonus =
-        clinicActive && mergedFamily === "open"
-          ? tuning.boosts.clinicOpenDependencyDelta
+      const independenceDependencyBonus =
+        independenceActive && mergedFamily === "open"
+          ? tuning.boosts.independenceOpenDependencyDelta
           : 0;
-      dependencyChange += clinicDependencyBonus;
+      dependencyChange += independenceDependencyBonus;
 
       const cashBonus =
         (state.upgrades["quality_bonus_1"] || 0) *
@@ -4321,6 +4347,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           remaining: Math.max(0, state.mentorClinicMergesRemaining - 1),
         });
       }
+      if (independenceActive) {
+        captureEvent("boost_consume", {
+          type: "mentor_independence",
+          remaining: Math.max(0, state.mentorIndependenceMergesRemaining - 1),
+        });
+      }
 
       let nextState: GameState = {
         ...state,
@@ -4360,6 +4392,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mentorClinicMergesRemaining: clinicActive
           ? Math.max(0, state.mentorClinicMergesRemaining - 1)
           : state.mentorClinicMergesRemaining,
+        mentorIndependenceMergesRemaining: independenceActive
+          ? Math.max(0, state.mentorIndependenceMergesRemaining - 1)
+          : state.mentorIndependenceMergesRemaining,
         undoSnapshot: {
           board: [...state.board],
           backpack: [...state.backpack],
@@ -4599,6 +4634,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!part) return state;
       captureEvent("recycle_used", {
         source,
+        partTier: part.tier,
+        partFamily: part.family,
         tier: part.tier,
         family: part.family,
       });
@@ -6036,6 +6073,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronContractOrdersRemaining: nextBaronContractOrdersRemaining,
         warrantyStampOrdersRemaining: nextWarrantyOrdersRemaining,
         warrantyStampMode: nextWarrantyMode,
+        mentorIndependenceMergesRemaining:
+          nextGamePhase === 2 || nextLiberationComplete
+            ? 0
+            : state.mentorIndependenceMergesRemaining,
         tutorialStep: tutorialAdvance
           ? tutorialAdvance.tutorialStep
           : state.tutorialStep,
@@ -6276,6 +6317,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       const currentLevel = state.upgrades[upgrade.id] || 0;
       if (currentLevel >= upgrade.maxLevel) return state;
+      if (
+        upgrade.effect.startsWith("dependency_reduce_") &&
+        (state.liberationComplete || state.gamePhase === 2)
+      ) {
+        return state;
+      }
 
       const cost = Math.max(
         0,
@@ -6679,6 +6726,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       );
 
       captureEvent("order_refresh", {
+        previousType: order.type,
+        newType: newOrder.type,
         previousOrderType: order.type,
         previousModifiers: order.modifierIds || [],
         newOrderType: newOrder.type,
@@ -6790,6 +6839,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "START_MENTOR_CLINIC": {
       if (!state.tutorialComplete || !state.firstSessionComplete) return state;
+      if (state.mentorIndependenceMergesRemaining > 0) return state;
       const cost = getMentorClinicCost(state.reputationTier);
       if (state.cash < cost) return state;
       const nextRemaining = Math.min(
@@ -6810,6 +6860,37 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         cash: state.cash - cost,
         mentorClinicMergesRemaining: nextRemaining,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
+    case "START_MENTOR_INDEPENDENCE": {
+      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
+      if (state.liberationComplete || state.gamePhase === 2) return state;
+      if (state.mentorClinicMergesRemaining > 0) return state;
+      const cost = getMentorIndependenceCost(state.reputationTier);
+      if (state.cash < cost) return state;
+      const nextRemaining = Math.min(
+        tuning.boosts.independenceMaxStack,
+        state.mentorIndependenceMergesRemaining +
+          tuning.boosts.independenceMerges,
+      );
+      if (nextRemaining === state.mentorIndependenceMergesRemaining)
+        return state;
+      captureEvent("cash_spent", {
+        amount: cost,
+        reason: "mentor_independence",
+      });
+      captureEvent("boost_start", {
+        type: "mentor_independence",
+        cost,
+        remaining: nextRemaining,
+      });
+      return {
+        ...state,
+        cash: state.cash - cost,
+        mentorIndependenceMergesRemaining: nextRemaining,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -8634,6 +8715,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         supplierScoutRoute: undefined,
         supplierScoutSpawnsRemaining: 0,
         mentorClinicMergesRemaining: 0,
+        mentorIndependenceMergesRemaining: 0,
         warrantyStampMode: undefined,
         warrantyStampOrdersRemaining: 0,
         lockoutLabOrdersTarget: 0,
@@ -9162,6 +9244,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           highlightedOrderId: nextHighlightedOrderId,
           orderMetrics: nextOrderMetrics,
           phase2GoalPending,
+          mentorIndependenceMergesRemaining: 0,
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
         };
@@ -9170,48 +9253,325 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "PLAYTEST_SKIP_PHASE2": {
       if (state.gamePhase === 2 || state.liberationComplete) return state;
+      const now = Date.now();
       const stripLabRequests =
         state.lockoutActive && state.lockoutChoice === "lab";
       const filteredOrders = state.orders.filter((order) => {
         if (order.isLockout) return false;
+        if (order.isTutorial) return false;
+        if (order.modifierIds?.includes("first_session")) return false;
+        if (order.modifierIds?.includes("project_stage")) return false;
+        if (order.modifierIds?.includes("council_ratify")) return false;
         if (stripLabRequests && order.type === "lab_request") return false;
         return true;
       });
-      const phase2Order = createPhase2GoalOrder(state);
-      const insertResult = insertStoryOrder(state, filteredOrders, phase2Order);
-      const nextOrders = insertResult.inserted
+      const nextReputation = Math.max(
+        state.reputation,
+        PLAYTEST_PHASE2_BASE_REPUTATION,
+      );
+      const nextNeighborhood = getNeighborhoodByRep(nextReputation);
+      const nextRepTier = getReputationTier(nextReputation);
+      const nextMaxTierCrafted = Math.max(
+        state.maxTierCrafted,
+        PLAYTEST_PHASE2_MIN_MAX_TIER,
+      );
+      const nextUpgrades: Record<string, number> = {
+        ...state.upgrades,
+        space_1: Math.max(1, state.upgrades["space_1"] || 0),
+        rd_unlock: Math.max(1, state.upgrades["rd_unlock"] || 0),
+      };
+      const nextRdNodes: Record<string, boolean> = {
+        ...state.rdNodes,
+        open_standard_1: true,
+        open_standard_2: true,
+        open_workshop_1: true,
+        open_workshop_2: true,
+        open_workshop_3: true,
+        freedom_blueprint: true,
+        freedom_build: true,
+      };
+      const seededState: GameState = {
+        ...state,
+        reputation: nextReputation,
+        currentNeighborhoodId: nextNeighborhood.id,
+        reputationTier: nextRepTier,
+        maxTierCrafted: nextMaxTierCrafted,
+        maxOrders: Math.max(state.maxOrders, 3),
+        upgrades: nextUpgrades,
+        rdNodes: nextRdNodes,
+      };
+
+      const hasPhase2GoalOrder = filteredOrders.some((order) =>
+        order.modifierIds?.includes("phase2_goal"),
+      );
+      const phase2Order = hasPhase2GoalOrder
+        ? null
+        : createPhase2GoalOrder(seededState);
+      const insertResult =
+        phase2Order !== null
+          ? insertStoryOrder(seededState, filteredOrders, phase2Order)
+          : null;
+      const nextOrders = insertResult?.inserted
         ? insertResult.orders
         : filteredOrders;
+      const phase2GoalPending = hasPhase2GoalOrder
+        ? false
+        : !(insertResult?.inserted ?? false);
       const baseHighlightedOrderId = filteredOrders.some(
         (order) => order.id === state.highlightedOrderId,
       )
         ? state.highlightedOrderId
         : undefined;
-      const nextHighlightedOrderId = insertResult.inserted
+      const nextHighlightedOrderId = insertResult?.inserted
         ? insertResult.highlightedOrderId
         : baseHighlightedOrderId;
-      const nextOrderMetrics = insertResult.inserted
-        ? updateOrderMetrics(state, phase2Order)
-        : state.orderMetrics;
+      const nextOrderMetrics =
+        insertResult?.inserted && phase2Order
+          ? updateOrderMetrics(seededState, phase2Order)
+          : state.orderMetrics;
+
+      const speedLevel = nextUpgrades["workbench_speed_1"] || 0;
+      const nextOpenLevel = Math.max(
+        state.suppliers.open.level,
+        PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL,
+      );
+      const baronLevel = Math.max(1, state.suppliers.baron.level || 1);
+      const salvageLevel = Math.max(0, state.suppliers.salvage.level || 0);
+      const baronEarlyRelief = nextOpenLevel <= 0 && salvageLevel <= 0;
+      const openConfig = getSupplierConfigWithPerks(
+        seededState,
+        "open",
+        nextOpenLevel,
+        speedLevel,
+      );
+      const baronConfig = getSupplierConfigWithPerks(
+        seededState,
+        "baron",
+        baronLevel,
+        speedLevel,
+        { baronEarlyRelief },
+      );
+      const salvageConfig =
+        salvageLevel > 0
+          ? getSupplierConfigWithPerks(
+              seededState,
+              "salvage",
+              salvageLevel,
+              speedLevel,
+            )
+          : null;
+
+      const nextBoard = [...state.board];
+      const nextBackpack = [...state.backpack];
+      const hasCompatiblePart = [...nextBoard, ...nextBackpack].some(
+        (part) => !!part?.compatible,
+      );
+      let seededCompatible = false;
+      if (!hasCompatiblePart) {
+        const emptySlot = findEmptySlot(state, nextBoard);
+        if (emptySlot !== -1) {
+          nextBoard[emptySlot] = createPart(
+            emptySlot,
+            "open",
+            PLAYTEST_PHASE2_MIN_MAX_TIER,
+            true,
+          );
+          seededCompatible = true;
+        } else {
+          const emptyBackpackSlot = findEmptyBackpackSlot(state, nextBackpack);
+          if (emptyBackpackSlot !== -1) {
+            nextBackpack[emptyBackpackSlot] = createPart(
+              -1,
+              "open",
+              PLAYTEST_PHASE2_MIN_MAX_TIER,
+              true,
+            );
+            seededCompatible = true;
+          }
+        }
+        if (!seededCompatible) {
+          const lockedBoardIndex = nextBoard.findIndex(
+            (part) => part?.family === "locked",
+          );
+          if (lockedBoardIndex !== -1) {
+            const part = nextBoard[lockedBoardIndex];
+            if (part) {
+              nextBoard[lockedBoardIndex] = {
+                ...part,
+                family: "open",
+                compatible: true,
+              };
+              seededCompatible = true;
+            }
+          } else {
+            const lockedBackpackIndex = nextBackpack.findIndex(
+              (part) => part?.family === "locked",
+            );
+            if (lockedBackpackIndex !== -1) {
+              const part = nextBackpack[lockedBackpackIndex];
+              if (part) {
+                nextBackpack[lockedBackpackIndex] = {
+                  ...part,
+                  family: "open",
+                  compatible: true,
+                };
+                seededCompatible = true;
+              }
+            }
+          }
+        }
+      }
+
+      const nextTierDiscovery = { ...state.tierDiscovery };
+      for (let tier = 1; tier <= nextMaxTierCrafted; tier += 1) {
+        nextTierDiscovery[tier] = true;
+      }
+      const nextLastTierDiscovered =
+        (Math.max(
+          state.lastTierDiscovered ?? 1,
+          nextMaxTierCrafted,
+        ) as PartTier) || PLAYTEST_PHASE2_MIN_MAX_TIER;
+      const compatibleSeen =
+        state.compatibleDiscoverySeen || hasCompatiblePart || seededCompatible;
+      const nextCompatibleDiscoveryId =
+        compatibleSeen && !state.compatibleDiscoverySeen
+          ? state.lastCompatibleDiscoveryId + 1
+          : state.lastCompatibleDiscoveryId;
+
+      const unlockedSlot27 = state.unlockedSlots.includes(27)
+        ? state.unlockedSlots
+        : [...state.unlockedSlots, 27];
+      const unblockedSlots = state.blockedSlots.filter((slot) => slot !== 27);
+
+      const phase2Missions = state.missions.filter(
+        (mission) => mission.templateId !== TUTORIAL_GOAL_TEMPLATE_ID,
+      );
       let nextState: GameState = {
         ...state,
+        board: nextBoard,
+        backpack: nextBackpack,
+        backpackUnlocked: true,
+        unlockedSlots: unlockedSlot27,
+        blockedSlots: unblockedSlots,
+        cash: Math.max(state.cash, PLAYTEST_PHASE2_BASE_CASH),
+        reputation: nextReputation,
+        research: Math.max(state.research, PLAYTEST_PHASE2_BASE_RESEARCH),
+        upgradeMaterials: Math.max(
+          state.upgradeMaterials,
+          PLAYTEST_PHASE2_BASE_UPGRADE_MATERIALS,
+        ),
+        compatibilityComponents: Math.max(
+          state.compatibilityComponents,
+          PLAYTEST_PHASE2_BASE_COMPATIBILITY_COMPONENTS,
+        ),
+        upgrades: nextUpgrades,
+        rdNodes: nextRdNodes,
+        suppliers: {
+          ...state.suppliers,
+          baron: {
+            level: baronLevel,
+            chargesRemaining: baronConfig.maxCharges,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+          open: {
+            level: nextOpenLevel,
+            chargesRemaining: openConfig.maxCharges,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+          salvage:
+            salvageLevel > 0 && salvageConfig
+              ? {
+                  level: salvageLevel,
+                  chargesRemaining: salvageConfig.maxCharges,
+                  cooldownEndsAt: 0,
+                  overdrawCount: 0,
+                }
+              : state.suppliers.salvage,
+        },
+        maxOrders: Math.max(state.maxOrders, 3),
+        maxTierCrafted: nextMaxTierCrafted,
+        tierDiscovery: nextTierDiscovery,
+        lastTierDiscovered: nextLastTierDiscovered,
+        compatibleDiscoverySeen: compatibleSeen,
+        lastCompatibleDiscoveryId: nextCompatibleDiscoveryId,
+        tutorialStep: FINAL_TUTORIAL_STEP,
+        tutorialComplete: true,
+        tutorialReplay: true,
+        tutorialSpawnCount: Math.max(state.tutorialSpawnCount, 2),
+        tutorialMergeCount: Math.max(state.tutorialMergeCount, 3),
+        tutorialOrderId: undefined,
+        tutorialStepStartedAt: now,
+        tutorialNudgeCount: 0,
+        tutorialHint: undefined,
+        tutorialMetrics: {
+          ...state.tutorialMetrics,
+          skipped: false,
+        },
+        firstSessionComplete: true,
+        firstSessionOrderIndex: FIRST_SESSION_ORDERS.length,
+        firstSessionOrdersCompleted: Math.max(
+          state.firstSessionOrdersCompleted,
+          FIRST_SESSION_REQUIRED_COMPLETIONS,
+        ),
+        firstSessionForcedDrops: [],
+        firstSessionSecondOfferTriggered: true,
+        firstSessionChoiceOffered: true,
+        firstSessionChoiceResolved: true,
+        firstSessionChoiceMentorOrderId: undefined,
+        firstSessionChoiceBaronOrderId: undefined,
         gamePhase: 2,
         liberationComplete: true,
-        liberationCompletedAt: Date.now(),
+        liberationCompletedAt:
+          typeof state.liberationCompletedAt === "number"
+            ? state.liberationCompletedAt
+            : now,
         dependency: 0,
         baronPressure: 0,
+        reputationTier: nextRepTier,
+        currentNeighborhoodId: nextNeighborhood.id,
         lockoutActive: false,
         lockoutPhase: 0,
         lockoutOrderId: undefined,
         lockoutLabOrdersRemaining: 0,
         lockoutLabOrdersTarget: 0,
         lockoutChoice: undefined,
+        baronOfferAvailable: false,
+        baronOfferSeen: true,
+        baronOfferType: undefined,
+        baronOfferCooldownUntil: Math.max(
+          state.baronOfferCooldownUntil,
+          now + tuning.baron.offerCooldownMs,
+        ),
+        baronSupplySpawnsRemaining: 0,
+        baronRushSpawnsRemaining: 0,
+        baronContractOrdersRemaining: 0,
+        supplierScoutRoute: undefined,
+        supplierScoutSpawnsRemaining: 0,
+        mentorClinicMergesRemaining: 0,
+        mentorIndependenceMergesRemaining: 0,
+        warrantyStampMode: undefined,
+        warrantyStampOrdersRemaining: 0,
+        mergeChainCount: 0,
+        mergeChainExpiresAt: 0,
+        mergeMomentumLevel: 0,
+        mergeMomentumPending: null,
+        mergeMomentumDropFloor: undefined,
+        storyQueue: [],
+        activeStoryBeatId: undefined,
         orders: nextOrders,
         highlightedOrderId: nextHighlightedOrderId,
         orderMetrics: nextOrderMetrics,
-        phase2GoalPending: !insertResult.inserted,
+        phase2GoalPending,
         projectsUnlocked: false,
-        freedomControllerCount: Math.max(0, state.freedomControllerCount - 1),
+        projectOffers: [],
+        activeProject: undefined,
+        projectRevealQueue: [],
+        projectDebuff: undefined,
+        missions: phase2Missions,
+        orderSpawnCooldownUntil: 0,
+        freedomControllerCount: Math.max(state.freedomControllerCount, 1),
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -9219,9 +9579,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
       nextState = queueStoryBeat(nextState, "liberation_victory");
       nextState = queueStoryBeat(nextState, "tina_phase2");
-      if (insertResult.inserted) {
+      if (!phase2GoalPending) {
         nextState = queueStoryBeat(nextState, "phase2_goal");
+        nextState = queueStoryBeat(nextState, "tina_compat_order");
       }
+      nextState = ensureMissions(nextState);
       return nextState;
     }
 
@@ -9794,6 +10156,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.mentorClinicMergesRemaining === "number"
           ? action.state.mentorClinicMergesRemaining
           : base.mentorClinicMergesRemaining;
+      const mentorIndependenceMergesRemaining =
+        typeof action.state.mentorIndependenceMergesRemaining === "number"
+          ? action.state.mentorIndependenceMergesRemaining
+          : base.mentorIndependenceMergesRemaining;
+      const resolvedMentorBoosts =
+        mentorClinicMergesRemaining > 0 && mentorIndependenceMergesRemaining > 0
+          ? mentorClinicMergesRemaining >= mentorIndependenceMergesRemaining
+            ? {
+                mentorClinicMergesRemaining,
+                mentorIndependenceMergesRemaining: 0,
+              }
+            : {
+                mentorClinicMergesRemaining: 0,
+                mentorIndependenceMergesRemaining,
+              }
+          : {
+              mentorClinicMergesRemaining,
+              mentorIndependenceMergesRemaining,
+            };
       const warrantyStampMode =
         action.state.warrantyStampMode === "refund" ||
         action.state.warrantyStampMode === "contract"
@@ -10004,7 +10385,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         mergeMomentumDropFloor,
         supplierScoutRoute: resolvedScoutRoute,
         supplierScoutSpawnsRemaining,
-        mentorClinicMergesRemaining,
+        mentorClinicMergesRemaining:
+          resolvedMentorBoosts.mentorClinicMergesRemaining,
+        mentorIndependenceMergesRemaining:
+          resolvedMentorBoosts.mentorIndependenceMergesRemaining,
         warrantyStampMode: resolvedWarrantyMode,
         warrantyStampOrdersRemaining,
         missions: action.state.tutorialComplete
@@ -10051,6 +10435,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         restoredState = {
           ...restoredState,
           dependency: 0,
+          mentorIndependenceMergesRemaining: 0,
           lockoutActive: false,
           lockoutPhase: 0,
           lockoutOrderId: undefined,
@@ -10358,6 +10743,22 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const prevTierDiscoveryIdRef = useRef(state.lastTierDiscoveryId);
   const prevNeighborhoodIdRef = useRef(state.currentNeighborhoodId);
   const prevGamePhaseRef = useRef(state.gamePhase);
+  const prevSupplierStateRef = useRef(state.suppliers);
+  const overdrawSessionMetricsRef = useRef({
+    count: 0,
+    totalAddedSeconds: 0,
+  });
+  const overdrawOutcomePendingRef = useRef<{
+    id: number;
+    supplierId: SupplierId;
+    startedAt: number;
+    baselineCriticalEventId: number;
+    cooldownAddedSeconds: number;
+  } | null>(null);
+  const overdrawOutcomeTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const overdrawOutcomeIdRef = useRef(0);
   const tuningSignatureRef = useRef<string | null>(null);
   const tuningCapturedRef = useRef<string | null>(null);
 
@@ -10396,7 +10797,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     tuningSignatureRef.current = signature;
     if (telemetryReadyRef.current && tuningCapturedRef.current !== signature) {
       captureEvent("tuning_applied", {
-        variant: tuningVariant,
+        variant: tuningVariant ?? null,
         payload,
         payloadSignature: signature,
       });
@@ -10411,6 +10812,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     sessionIdRef.current = sessionId;
     sessionStartRef.current = Date.now();
     sessionActiveRef.current = true;
+    overdrawSessionMetricsRef.current = { count: 0, totalAddedSeconds: 0 };
+    overdrawOutcomePendingRef.current = null;
+    if (overdrawOutcomeTimeoutRef.current) {
+      clearTimeout(overdrawOutcomeTimeoutRef.current);
+      overdrawOutcomeTimeoutRef.current = null;
+    }
     const snapshot = stateRef.current;
     captureEvent("session_start", {
       sessionId,
@@ -10427,10 +10834,45 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     (reason: "background" | "inactive" | "unmount") => {
       if (!sessionActiveRef.current) return;
       const durationMs = Math.max(0, Date.now() - sessionStartRef.current);
+      const overdrawMetrics = overdrawSessionMetricsRef.current;
+      const overdrawAvgAddedSeconds =
+        overdrawMetrics.count > 0
+          ? overdrawMetrics.totalAddedSeconds / overdrawMetrics.count
+          : 0;
+      const pendingOutcome = overdrawOutcomePendingRef.current;
+      if (pendingOutcome) {
+        const followupCriticalEvents =
+          stateRef.current.lastCriticalEventId -
+          pendingOutcome.baselineCriticalEventId;
+        if (followupCriticalEvents > 0) {
+          captureEvent("supplier_overdraw_followup", {
+            supplierId: pendingOutcome.supplierId,
+            cooldownAddedSeconds: pendingOutcome.cooldownAddedSeconds,
+            elapsedMs: Math.max(0, Date.now() - pendingOutcome.startedAt),
+            followupCriticalEvents,
+            reason: "session_end",
+          });
+        } else {
+          captureEvent("supplier_overdraw_dropoff", {
+            supplierId: pendingOutcome.supplierId,
+            cooldownAddedSeconds: pendingOutcome.cooldownAddedSeconds,
+            elapsedMs: Math.max(0, Date.now() - pendingOutcome.startedAt),
+            reason: "session_end",
+          });
+        }
+        overdrawOutcomePendingRef.current = null;
+      }
+      if (overdrawOutcomeTimeoutRef.current) {
+        clearTimeout(overdrawOutcomeTimeoutRef.current);
+        overdrawOutcomeTimeoutRef.current = null;
+      }
       captureEvent("session_end", {
         sessionId: sessionIdRef.current,
         durationMs,
         reason,
+        overdrawCount: overdrawMetrics.count,
+        overdrawAddedSecondsTotal: overdrawMetrics.totalAddedSeconds,
+        overdrawAddedSecondsAvg: overdrawAvgAddedSeconds,
       });
       sessionActiveRef.current = false;
     },
@@ -10461,6 +10903,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     prevTierDiscoveryIdRef.current = state.lastTierDiscoveryId;
     prevNeighborhoodIdRef.current = state.currentNeighborhoodId;
     prevGamePhaseRef.current = state.gamePhase;
+    prevSupplierStateRef.current = state.suppliers;
     prevOrderSpawnPausedRef.current =
       state.tutorialComplete &&
       state.firstSessionComplete &&
@@ -10492,7 +10935,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         tuningCapturedRef.current !== tuningSignatureRef.current
       ) {
         captureEvent("tuning_applied", {
-          variant: tuningVariant,
+          variant: tuningVariant ?? null,
           payload: tuningPayload ?? null,
           payloadSignature: tuningSignatureRef.current,
         });
@@ -10543,6 +10986,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const delta = state.dependency - prevDependencyRef.current;
     if (delta !== 0) {
       captureEvent("dependency_change", {
+        from: prevDependencyRef.current,
+        to: state.dependency,
         delta,
         newValue: state.dependency,
       });
@@ -10565,11 +11010,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (state.lockoutActive && !prevLockoutActiveRef.current) {
       captureEvent("lockout_begin", {
         dependency: state.dependency,
+        baronPressure: state.baronPressure,
         phase: state.lockoutPhase,
       });
     }
     prevLockoutActiveRef.current = state.lockoutActive;
-  }, [hydrated, state.lockoutActive, state.lockoutPhase, state.dependency]);
+  }, [
+    hydrated,
+    state.lockoutActive,
+    state.lockoutPhase,
+    state.dependency,
+    state.baronPressure,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
@@ -10636,6 +11088,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (orderSpawnPaused && !prevOrderSpawnPausedRef.current) {
       captureEvent("order_spawn_paused", {
         freeSlots,
+        pressureBand: boardPressureBand,
         orders: state.orders.length,
         maxOrders: effectiveMaxOrders,
       });
@@ -10702,11 +11155,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (state.lastTierDiscovered) {
         captureEvent("tier_unlocked", {
           tier: state.lastTierDiscovered,
+          maxTierCrafted: state.maxTierCrafted,
         });
       }
       prevTierDiscoveryIdRef.current = state.lastTierDiscoveryId;
     }
-  }, [hydrated, state.lastTierDiscoveryId, state.lastTierDiscovered]);
+  }, [
+    hydrated,
+    state.lastTierDiscoveryId,
+    state.lastTierDiscovered,
+    state.maxTierCrafted,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
@@ -10759,6 +11218,112 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   useEffect(() => {
+    if (!hydrated || !telemetryReadyRef.current) {
+      prevSupplierStateRef.current = state.suppliers;
+      return;
+    }
+    const previousSuppliers = prevSupplierStateRef.current;
+    (Object.keys(state.suppliers) as SupplierId[]).forEach((supplierId) => {
+      const previous = previousSuppliers[supplierId];
+      const next = state.suppliers[supplierId];
+      const deltaSeconds = getOverdrawDeltaSeconds(previous, next);
+      if (deltaSeconds <= 0) return;
+
+      overdrawSessionMetricsRef.current.count += 1;
+      overdrawSessionMetricsRef.current.totalAddedSeconds += deltaSeconds;
+
+      captureEvent("supplier_overdraw_decision", {
+        supplierId,
+        cooldownAddedSeconds: deltaSeconds,
+        cooldownRemainingSeconds: getCooldownRemainingSeconds(
+          next.cooldownEndsAt,
+        ),
+        overdrawCount: next.overdrawCount,
+      });
+
+      const pendingOutcome = overdrawOutcomePendingRef.current;
+      if (pendingOutcome) {
+        captureEvent("supplier_overdraw_followup", {
+          supplierId: pendingOutcome.supplierId,
+          cooldownAddedSeconds: pendingOutcome.cooldownAddedSeconds,
+          elapsedMs: Math.max(0, Date.now() - pendingOutcome.startedAt),
+          followupCriticalEvents: Math.max(
+            0,
+            state.lastCriticalEventId - pendingOutcome.baselineCriticalEventId,
+          ),
+          reason: "next_overdraw",
+        });
+        overdrawOutcomePendingRef.current = null;
+        if (overdrawOutcomeTimeoutRef.current) {
+          clearTimeout(overdrawOutcomeTimeoutRef.current);
+          overdrawOutcomeTimeoutRef.current = null;
+        }
+      }
+
+      overdrawOutcomeIdRef.current += 1;
+      const outcomeId = overdrawOutcomeIdRef.current;
+      overdrawOutcomePendingRef.current = {
+        id: outcomeId,
+        supplierId,
+        startedAt: Date.now(),
+        baselineCriticalEventId: state.lastCriticalEventId,
+        cooldownAddedSeconds: deltaSeconds,
+      };
+      if (overdrawOutcomeTimeoutRef.current) {
+        clearTimeout(overdrawOutcomeTimeoutRef.current);
+      }
+      overdrawOutcomeTimeoutRef.current = setTimeout(() => {
+        const pending = overdrawOutcomePendingRef.current;
+        if (!pending || pending.id !== outcomeId) return;
+        const followupCriticalEvents =
+          stateRef.current.lastCriticalEventId -
+          pending.baselineCriticalEventId;
+        if (followupCriticalEvents > 0) {
+          captureEvent("supplier_overdraw_followup", {
+            supplierId: pending.supplierId,
+            cooldownAddedSeconds: pending.cooldownAddedSeconds,
+            elapsedMs: Math.max(0, Date.now() - pending.startedAt),
+            followupCriticalEvents,
+            reason: "timeout_guard",
+          });
+          overdrawOutcomePendingRef.current = null;
+          overdrawOutcomeTimeoutRef.current = null;
+          return;
+        }
+        captureEvent("supplier_overdraw_dropoff", {
+          supplierId: pending.supplierId,
+          cooldownAddedSeconds: pending.cooldownAddedSeconds,
+          elapsedMs: Math.max(0, Date.now() - pending.startedAt),
+          reason: "no_followup_action",
+        });
+        overdrawOutcomePendingRef.current = null;
+        overdrawOutcomeTimeoutRef.current = null;
+      }, 45000);
+    });
+    prevSupplierStateRef.current = state.suppliers;
+  }, [hydrated, state.suppliers, state.lastCriticalEventId]);
+
+  useEffect(() => {
+    if (!hydrated || !telemetryReadyRef.current) return;
+    const pending = overdrawOutcomePendingRef.current;
+    if (!pending) return;
+    if (state.lastCriticalEventId <= pending.baselineCriticalEventId) return;
+    captureEvent("supplier_overdraw_followup", {
+      supplierId: pending.supplierId,
+      cooldownAddedSeconds: pending.cooldownAddedSeconds,
+      elapsedMs: Math.max(0, Date.now() - pending.startedAt),
+      followupCriticalEvents:
+        state.lastCriticalEventId - pending.baselineCriticalEventId,
+      reason: "critical_event",
+    });
+    overdrawOutcomePendingRef.current = null;
+    if (overdrawOutcomeTimeoutRef.current) {
+      clearTimeout(overdrawOutcomeTimeoutRef.current);
+      overdrawOutcomeTimeoutRef.current = null;
+    }
+  }, [hydrated, state.lastCriticalEventId]);
+
+  useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
       if (!telemetryReadyRef.current) return;
       if (nextState === "active") {
@@ -10776,6 +11341,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       sub.remove();
     };
   }, [endSession, startSession]);
+
+  useEffect(() => {
+    return () => {
+      if (!overdrawOutcomeTimeoutRef.current) return;
+      clearTimeout(overdrawOutcomeTimeoutRef.current);
+      overdrawOutcomeTimeoutRef.current = null;
+    };
+  }, []);
 
   const enqueueSave = useCallback((payload: string) => {
     saveQueueRef.current = saveQueueRef.current
