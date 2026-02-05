@@ -53,7 +53,13 @@ export function NeighborhoodBadge({
       colors={["#1A1A2E", "#23233D", "#1A1A2E"]}
       style={[styles.container, compact && styles.containerCompact]}
     >
-      <View style={[styles.header, compact && styles.headerCompact]}>
+      <View
+        style={[
+          styles.header,
+          compact && styles.headerCompact,
+          { minHeight: iconSize },
+        ]}
+      >
         <View
           style={[
             styles.iconWrap,
@@ -67,7 +73,13 @@ export function NeighborhoodBadge({
             color={GameColors.currency.reputation}
           />
         </View>
-        <ThemedText style={[styles.title, compact && styles.titleCompact]}>
+        <ThemedText
+          style={[styles.title, compact && styles.titleCompact]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={compact ? 0.78 : 0.85}
+          ellipsizeMode="tail"
+        >
           {current.name}
         </ThemedText>
         {!compact ? (
