@@ -200,8 +200,7 @@ export function OverlayManager({
     }
 
     if (item.type === "unlock_banner") {
-      const title =
-        (item.payload?.title as string) ?? "Phase 3 unlocked";
+      const title = (item.payload?.title as string) ?? "Phase 3 unlocked";
       const message =
         (item.payload?.message as string) ??
         "Standards Council is open. Draft standards to shape the city.";

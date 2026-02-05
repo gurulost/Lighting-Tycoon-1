@@ -129,10 +129,7 @@ interface LayoutRect {
 
 function layoutRectEqual(a: LayoutRect, b: LayoutRect) {
   return (
-    a.x === b.x &&
-    a.y === b.y &&
-    a.width === b.width &&
-    a.height === b.height
+    a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
   );
 }
 
@@ -350,14 +347,15 @@ export default function GameScreen() {
     !state.lockoutActive &&
     state.orders.length < effectiveMaxOrders &&
     boardPressureBand === "red";
+  const { council, projectsCompleted, reputationTier } = state;
   const councilUnlockInfo = useMemo(
-    () => getCouncilUnlockInfo(state),
-    [state.council.unlocked, state.projectsCompleted, state.reputationTier],
+    () => getCouncilUnlockInfo({ council, projectsCompleted, reputationTier }),
+    [council, projectsCompleted, reputationTier],
   );
   const showCouncilButton = state.gamePhase === 2;
-  const councilBadge = state.council.activeHearing ? 1 : 0;
+  const councilBadge = council.activeHearing ? 1 : 0;
   const councilTooltipMessage = useMemo(() => {
-    if (state.council.unlocked) return councilUnlockInfo.copy;
+    if (council.unlocked) return councilUnlockInfo.copy;
     const lines = [councilUnlockInfo.copy];
     if (councilUnlockInfo.minProjects > 0) {
       lines.push(
@@ -377,7 +375,7 @@ export default function GameScreen() {
       );
     }
     return lines.join("\n");
-  }, [councilUnlockInfo, state.council.unlocked]);
+  }, [councilUnlockInfo, council.unlocked]);
   const unreadStoryCount = useMemo(() => {
     if (state.storyLog.length === 0) return 0;
     return state.storyLog.reduce(
@@ -1057,7 +1055,9 @@ export default function GameScreen() {
     const desiredBeatId = state.activeStoryBeatId;
     const desiredOverlayId = desiredBeatId ? `story:${desiredBeatId}` : null;
 
-    const storyOverlays = overlayQueue.filter((entry) => entry.type === "story");
+    const storyOverlays = overlayQueue.filter(
+      (entry) => entry.type === "story",
+    );
 
     if (!desiredOverlayId) {
       storyOverlays.forEach((entry) => dismissOverlay(entry.id));
@@ -1233,10 +1233,7 @@ export default function GameScreen() {
             </Pressable>
             <View
               onLayout={setTarget("glossary")}
-              style={[
-                styles.helpButtonWrap,
-                { borderRadius: topActionRadius },
-              ]}
+              style={[styles.helpButtonWrap, { borderRadius: topActionRadius }]}
             >
               <Pressable
                 style={topActionButtonStyle}
@@ -1288,7 +1285,9 @@ export default function GameScreen() {
                 onPress={() => setHudCollapsed((prev) => !prev)}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel={topCondensed ? "Expand HUD" : "Collapse HUD"}
+                accessibilityLabel={
+                  topCondensed ? "Expand HUD" : "Collapse HUD"
+                }
               >
                 <LinearGradient
                   colors={["#1F1F2E", "#252542", "#1F1F2E"]}

@@ -706,7 +706,9 @@ function enqueueOverlayState(state: GameState, item: OverlayItem): GameState {
     ...item,
     createdAt: typeof item.createdAt === "number" ? item.createdAt : now,
   } as OverlayItem;
-  if (!Object.prototype.hasOwnProperty.call(OVERLAY_PRIORITY, normalized.type)) {
+  if (
+    !Object.prototype.hasOwnProperty.call(OVERLAY_PRIORITY, normalized.type)
+  ) {
     return state;
   }
   if (
@@ -1581,9 +1583,7 @@ function applyMissionReward(state: GameState, mission: Mission): GameState {
   const nextRepTier = getReputationTier(nextState.reputation);
   const neighborhoodChanged =
     nextNeighborhood.id !== nextState.currentNeighborhoodId;
-  if (
-    neighborhoodChanged || nextRepTier !== nextState.reputationTier
-  ) {
+  if (neighborhoodChanged || nextRepTier !== nextState.reputationTier) {
     nextState = {
       ...nextState,
       currentNeighborhoodId: nextNeighborhood.id,
@@ -5492,7 +5492,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (!nextCouncil.unlocked) {
         const repAfterRewards = state.reputation + repReward;
-        const neighborhoodAfterRewards = getNeighborhoodByRep(repAfterRewards);
         const repTierAfterRewards = getReputationTier(repAfterRewards);
         const unlockState: GameState = {
           ...state,
@@ -6152,10 +6151,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (councilUnlockedNow) {
+        const unlockedAt = Date.now();
         nextState = queueStoryBeat(nextState, "council_unlock");
         nextState = enqueueOverlayState(nextState, {
-          id: `unlock:phase3:${Date.now()}`,
+          id: `unlock:phase3:${unlockedAt}`,
           type: "unlock_banner",
+          createdAt: unlockedAt,
           dedupeKey: "phase3_unlock",
           payload: {
             title: "Phase 3 unlocked",
@@ -9177,11 +9178,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return true;
       });
       const phase2Order = createPhase2GoalOrder(state);
-      const insertResult = insertStoryOrder(
-        state,
-        filteredOrders,
-        phase2Order,
-      );
+      const insertResult = insertStoryOrder(state, filteredOrders, phase2Order);
       const nextOrders = insertResult.inserted
         ? insertResult.orders
         : filteredOrders;

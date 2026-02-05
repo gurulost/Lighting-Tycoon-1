@@ -451,7 +451,11 @@ export function ProjectBoardModal({
   const canAffordOvertime = state.cash >= tuning.projects.addonOvertimeCrewCost;
   const canAffordChangeOrder =
     state.cash >= tuning.projects.addonChangeOrderCost;
-  const councilUnlockInfo = getCouncilUnlockInfo(state);
+  const councilUnlockInfo = getCouncilUnlockInfo({
+    council: state.council,
+    projectsCompleted: state.projectsCompleted,
+    reputationTier: state.reputationTier,
+  });
   const councilUnlockMinProjects = councilUnlockInfo.minProjects;
   const councilUnlockMinRepTier = councilUnlockInfo.minRepTier;
   const councilCapstoneTitle = councilUnlockInfo.capstoneTitle;
@@ -562,7 +566,8 @@ export function ProjectBoardModal({
                       color={GameColors.ui.primary}
                     />
                     <ThemedText style={styles.councilGatePillText}>
-                      Projects {councilProjectsProgress}/{councilUnlockMinProjects}
+                      Projects {councilProjectsProgress}/
+                      {councilUnlockMinProjects}
                     </ThemedText>
                   </View>
                 ) : null}
@@ -586,7 +591,8 @@ export function ProjectBoardModal({
                       color={GameColors.ui.success}
                     />
                     <ThemedText style={styles.councilGatePillText}>
-                      Capstone {councilCapstoneComplete ? "Complete" : "Pending"}
+                      Capstone{" "}
+                      {councilCapstoneComplete ? "Complete" : "Pending"}
                     </ThemedText>
                   </View>
                 ) : null}

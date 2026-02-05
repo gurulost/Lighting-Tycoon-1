@@ -263,7 +263,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   mentor_council_path: {
     id: "mentor_council_path",
     speaker: "mentor",
-    line1: "Standards Council is next. Finish the capstone or stack six contracts.",
+    line1:
+      "Standards Council is next. Finish the capstone or stack six contracts.",
     line2: "Keep your reputation tier climbing to open the door.",
     onceOnly: true,
     portrait: "confident",

@@ -12,8 +12,9 @@ const lastBase =
 
 export const REPUTATION_TIER_THRESHOLDS = [
   ...baseThresholds,
-  ...Array.from({ length: EXTRA_TIER_COUNT }, (_, index) =>
-    lastBase + EXTRA_TIER_STEP * (index + 1),
+  ...Array.from(
+    { length: EXTRA_TIER_COUNT },
+    (_, index) => lastBase + EXTRA_TIER_STEP * (index + 1),
   ),
 ];
 

@@ -229,7 +229,14 @@ export type CouncilUnlockInfo = {
   copy: string;
 };
 
-export function getCouncilUnlockInfo(state: GameState): CouncilUnlockInfo {
+export type CouncilUnlockState = Pick<
+  GameState,
+  "council" | "projectsCompleted" | "reputationTier"
+>;
+
+export function getCouncilUnlockInfo(
+  state: CouncilUnlockState,
+): CouncilUnlockInfo {
   const tuning = getTuning();
   const minProjects = Math.max(
     0,

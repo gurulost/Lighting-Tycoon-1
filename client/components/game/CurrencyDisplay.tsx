@@ -32,7 +32,9 @@ function formatNumber(num: number): string {
 
   const formatSuffix = (value: number, suffix: string) => {
     const useDecimal = value < 100;
-    const rounded = useDecimal ? Math.round(value * 10) / 10 : Math.round(value);
+    const rounded = useDecimal
+      ? Math.round(value * 10) / 10
+      : Math.round(value);
     const text = rounded.toFixed(useDecimal ? 1 : 0);
     const trimmed = useDecimal ? text.replace(/\.0$/, "") : text;
     return `${sign}${trimmed}${suffix}`;
