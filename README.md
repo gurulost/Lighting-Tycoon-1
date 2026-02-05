@@ -20,6 +20,8 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 - `npm run server:dev` - run the API server (optional)
 - `npm run check:types` - TypeScript typecheck
 - `npm run lint` - lint
+- `npm run with:env -- <command>` - run command with `.env.local`/`.env` auto-loaded
+- `npm run telemetry:doctor` - verify PostHog env setup
 - `npm run telemetry:audit` - verify telemetry catalog/code/docs consistency
 - `npm run format` - format code
 - `npm test` - run unit/component tests
@@ -52,7 +54,7 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 - `docs/glossary.md` - in-game glossary
 - `docs/audio.md` - SFX map
 - `design_guidelines.md` - visual and UI direction
-- `docs/telemetry.md` - analytics event plan
+- `docs/telemetry.md` - analytics runbook + event catalog
 - `docs/qa.md` - QA checklist
 - `docs/release_checklist.md` - production release checklist
 - `docs/changelog.md` - change log

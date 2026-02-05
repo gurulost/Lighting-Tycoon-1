@@ -8,8 +8,20 @@ PostHog is the analytics source of truth for gameplay telemetry and live tuning.
 2. Set environment variables in your shell:
    - `EXPO_PUBLIC_POSTHOG_KEY`
    - `EXPO_PUBLIC_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`)
+   - `POSTHOG_PERSONAL_API_KEY` (for queries)
+   - `POSTHOG_PROJECT_ID` (for queries)
+   - `POSTHOG_API_HOST` (defaults to `https://us.posthog.com`)
 3. Start the app and confirm telemetry is enabled in development logs.
 4. Verify events in PostHog Live Events while exercising core gameplay.
+
+## Credential Storage For Agents
+
+1. Store real PostHog values in `.env.local` at repo root (gitignored).
+2. Keep only placeholders in `.env.example`.
+3. Run tooling through the wrapper so values auto-load:
+   - `npm run with:env -- <command>`
+4. Validate setup:
+   - `npm run with:env -- npm run telemetry:doctor`
 
 Notes:
 - Telemetry is currently enabled for mobile builds (`posthog-react-native`); web is intentionally disabled.

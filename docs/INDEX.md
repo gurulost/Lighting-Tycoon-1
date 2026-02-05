@@ -33,7 +33,7 @@
 
 - `qa.md` - QA harness
 - `release_checklist.md` - production release checklist
-- `telemetry.md` - analytics event plan
+- `telemetry.md` - analytics runbook and event catalog
 - `changelog.md` - change log
 - `game_audit_report.md` - current state audit
 

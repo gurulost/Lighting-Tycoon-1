@@ -14,6 +14,8 @@
     "lint": "npx expo lint",
     "lint:fix": "npx expo lint --fix",
     "check:types": "tsc --noEmit",
+    "with:env": "bash scripts/with-local-env.sh",
+    "telemetry:doctor": "bash scripts/with-local-env.sh node scripts/telemetry-doctor.mjs",
     "telemetry:audit": "tsx scripts/telemetry-audit.ts",
     "check:format": "prettier --check \"**/*.{js,ts,tsx,css,json}\"",
     "format": "prettier --write \"**/*.{js,ts,tsx,css,json}\"",
