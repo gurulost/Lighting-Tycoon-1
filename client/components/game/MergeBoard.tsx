@@ -41,6 +41,8 @@ import {
   TrimLightStrip,
   TRIM_LIGHT_ANIMATION_DURATIONS,
 } from "@/components/game/TrimLightStrip";
+import { useCooldown } from "@/hooks/useCooldown";
+import { useCooldownDeltaFeedback } from "@/hooks/useCooldownDeltaFeedback";
 import {
   WORKBENCH_SLOT,
   ORDER_INBOX_SLOT,
@@ -76,6 +78,35 @@ const GHOST_LABELS: Record<PartTier, string> = {
   9: "GR",
   10: "KI",
 };
+
+type RecycleTierBand = "bronze" | "silver" | "gold";
+
+const RECYCLE_TIER_PALETTES: Record<
+  RecycleTierBand,
+  {
+    accent: string;
+    ring: string;
+  }
+> = {
+  bronze: {
+    accent: "#E96A3A",
+    ring: "#FF9A6A",
+  },
+  silver: {
+    accent: "#C9D2E8",
+    ring: "#E9F0FF",
+  },
+  gold: {
+    accent: "#F5D074",
+    ring: "#FFE7A8",
+  },
+};
+
+function getRecycleTierBand(tier: PartTier): RecycleTierBand {
+  if (tier >= 8) return "gold";
+  if (tier >= 4) return "silver";
+  return "bronze";
+}
 
 interface MergeBoardProps {
   onWorkbenchPress: () => void;
@@ -210,17 +241,6 @@ export function MergeBoard({
   const workbenchRef = useRef<View>(null);
   const hapticsEnabled = state.settings.hapticsEnabled;
   const reducedMotion = state.settings.reducedMotion;
-  const [baronCooldownDelta, setBaronCooldownDelta] = useState<number | null>(
-    null,
-  );
-  const [, setCooldownRenderTick] = useState(0);
-  const baronCooldownDeltaTimeout =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingBaronDelta = useRef<number | null>(null);
-  const prevBaronCooldown = useRef({
-    endsAt: state.suppliers.baron.cooldownEndsAt,
-    charges: state.suppliers.baron.chargesRemaining,
-  });
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragSource, setDragSource] = useState<{
     source: "board" | "backpack";
@@ -241,6 +261,8 @@ export function MergeBoard({
     useState<LayoutRect | null>(null);
   const [backpackLayout, setBackpackLayout] = useState<LayoutRect | null>(null);
   const [recycleLayout, setRecycleLayout] = useState<LayoutRect | null>(null);
+  const [recycleTierBand, setRecycleTierBand] =
+    useState<RecycleTierBand>("bronze");
   const containerRef = useRef<View>(null);
   const gridRef = useRef<View>(null);
   const backpackRef = useRef<View>(null);
@@ -248,6 +270,9 @@ export function MergeBoard({
   const orderPulse = useSharedValue(0);
   const backpackGlow = useSharedValue(0);
   const recyclePulse = useSharedValue(0);
+  const recycleAccentPulse = useSharedValue(0);
+  const recyclePayoff = useSharedValue(0);
+  const recycleFlash = useSharedValue(0);
   const dragPreviewX = useSharedValue(0);
   const dragPreviewY = useSharedValue(0);
   const dragPreviewScale = useSharedValue(1);
@@ -279,6 +304,10 @@ export function MergeBoard({
     duration: TRIM_LIGHT_ANIMATION_DURATIONS.chase,
     reducedMotion,
   });
+  const recyclePalette = useMemo(
+    () => RECYCLE_TIER_PALETTES[recycleTierBand],
+    [recycleTierBand],
+  );
   const tileEnter = reducedMotion ? undefined : FadeIn.duration(200);
 
   useEffect(() => {
@@ -421,11 +450,17 @@ export function MergeBoard({
   );
   const recycleSize = Math.max(minRecycleSize, backpackSlotSize);
   const baronSupplier = state.suppliers.baron;
-  const baronCooling =
-    baronSupplier.level > 0 &&
-    baronSupplier.chargesRemaining <= 0 &&
-    baronSupplier.cooldownEndsAt > Date.now();
-  const showBaronCooldown = baronCooling;
+  const baronCooldown = useCooldown({
+    cooldownEndsAt: baronSupplier.cooldownEndsAt,
+    active: baronSupplier.level > 0 && baronSupplier.chargesRemaining <= 0,
+  });
+  const showBaronCooldown = baronCooldown.isActive;
+  const baronCooldownDelta = useCooldownDeltaFeedback({
+    cooldownEndsAt: baronSupplier.cooldownEndsAt,
+    chargesRemaining: baronSupplier.chargesRemaining,
+    isCooling: baronCooldown.isActive,
+    isPanelOpen: suppliersOpen,
+  });
 
   const isSlotBlocked = useCallback(
     (index: number) => {
@@ -436,77 +471,6 @@ export function MergeBoard({
     },
     [state.blockedSlots, state.unlockedSlots],
   );
-
-  useEffect(() => {
-    const prev = prevBaronCooldown.current;
-    const wasCooling = prev.charges <= 0 && prev.endsAt > 0;
-    const isCooling =
-      baronSupplier.chargesRemaining <= 0 && baronSupplier.cooldownEndsAt > 0;
-    const deltaMs = baronSupplier.cooldownEndsAt - prev.endsAt;
-    if (wasCooling && isCooling && deltaMs > 0) {
-      const deltaSeconds = Math.ceil(deltaMs / 1000);
-      if (suppliersOpen) {
-        pendingBaronDelta.current =
-          (pendingBaronDelta.current ?? 0) + deltaSeconds;
-      } else {
-        setBaronCooldownDelta(deltaSeconds);
-        if (baronCooldownDeltaTimeout.current) {
-          clearTimeout(baronCooldownDeltaTimeout.current);
-        }
-        baronCooldownDeltaTimeout.current = setTimeout(() => {
-          setBaronCooldownDelta(null);
-        }, 1400);
-      }
-    }
-    prevBaronCooldown.current = {
-      endsAt: baronSupplier.cooldownEndsAt,
-      charges: baronSupplier.chargesRemaining,
-    };
-  }, [
-    baronSupplier.cooldownEndsAt,
-    baronSupplier.chargesRemaining,
-    suppliersOpen,
-  ]);
-
-  useEffect(() => {
-    if (!suppliersOpen && pendingBaronDelta.current) {
-      const deltaSeconds = pendingBaronDelta.current;
-      pendingBaronDelta.current = null;
-      const stillCooling =
-        baronSupplier.chargesRemaining <= 0 &&
-        baronSupplier.cooldownEndsAt > Date.now();
-      if (!stillCooling) return;
-      setBaronCooldownDelta(deltaSeconds);
-      if (baronCooldownDeltaTimeout.current) {
-        clearTimeout(baronCooldownDeltaTimeout.current);
-      }
-      baronCooldownDeltaTimeout.current = setTimeout(() => {
-        setBaronCooldownDelta(null);
-      }, 1400);
-    }
-  }, [
-    suppliersOpen,
-    baronSupplier.chargesRemaining,
-    baronSupplier.cooldownEndsAt,
-  ]);
-
-  useEffect(() => {
-    if (baronCooling) return;
-    pendingBaronDelta.current = null;
-    if (baronCooldownDeltaTimeout.current) {
-      clearTimeout(baronCooldownDeltaTimeout.current);
-      baronCooldownDeltaTimeout.current = null;
-    }
-    setBaronCooldownDelta(null);
-  }, [baronCooling]);
-
-  useEffect(() => {
-    return () => {
-      if (baronCooldownDeltaTimeout.current) {
-        clearTimeout(baronCooldownDeltaTimeout.current);
-      }
-    };
-  }, []);
 
   const isStationSlot = useCallback(
     (index: number) => state.stationSlots.includes(index),
@@ -597,6 +561,38 @@ export function MergeBoard({
     };
   }, [isDragging, reducedMotion, recyclePulse]);
 
+  useEffect(() => {
+    return () => {
+      cancelAnimation(recycleAccentPulse);
+      cancelAnimation(recyclePayoff);
+      cancelAnimation(recycleFlash);
+    };
+  }, [recycleAccentPulse, recyclePayoff, recycleFlash]);
+
+  const triggerRecyclePayoff = useCallback(
+    (tier: PartTier) => {
+      setRecycleTierBand(getRecycleTierBand(tier));
+      cancelAnimation(recycleAccentPulse);
+      cancelAnimation(recyclePayoff);
+      cancelAnimation(recycleFlash);
+      recycleAccentPulse.value = 0;
+      recyclePayoff.value = 0;
+      recycleFlash.value = 1;
+
+      recycleAccentPulse.value = withSequence(
+        withTiming(1, { duration: reducedMotion ? 100 : 130 }),
+        withTiming(0, { duration: reducedMotion ? 130 : 190 }),
+      );
+      recyclePayoff.value = withTiming(1, {
+        duration: reducedMotion ? 170 : 260,
+      });
+      recycleFlash.value = withTiming(0, {
+        duration: reducedMotion ? 130 : 190,
+      });
+    },
+    [reducedMotion, recycleAccentPulse, recyclePayoff, recycleFlash],
+  );
+
   const backpackGlowStyle = useAnimatedStyle(() => ({
     shadowOpacity: state.backpackUnlocked ? 0.2 + backpackGlow.value * 0.3 : 0,
   }));
@@ -604,6 +600,97 @@ export function MergeBoard({
   const recyclePulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + recyclePulse.value * 0.03 }],
     shadowOpacity: 0.2 + recyclePulse.value * 0.5,
+  }));
+
+  const recycleAccentPulseStyle = useAnimatedStyle(() => ({
+    opacity: recycleAccentPulse.value * 0.7,
+    transform: [
+      { scale: 1 + recycleAccentPulse.value * (reducedMotion ? 0.02 : 0.05) },
+    ],
+  }));
+
+  const recycleFlashRingStyle = useAnimatedStyle(() => ({
+    opacity: recycleFlash.value * 0.9,
+    transform: [
+      {
+        scale: interpolate(
+          recycleFlash.value,
+          [1, 0],
+          reducedMotion ? [0.96, 1.08] : [0.88, 1.28],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  const recycleCashStreakStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      recyclePayoff.value,
+      [0, 0.82, 1],
+      [0.95, 0.4, 0],
+      Extrapolation.CLAMP,
+    ),
+    transform: [
+      {
+        translateX: interpolate(
+          recyclePayoff.value,
+          [0, 1],
+          reducedMotion ? [-2, -4] : [-6, -14],
+          Extrapolation.CLAMP,
+        ),
+      },
+      {
+        translateY: interpolate(
+          recyclePayoff.value,
+          [0, 1],
+          reducedMotion ? [0, -8] : [2, -24],
+          Extrapolation.CLAMP,
+        ),
+      },
+      {
+        scale: interpolate(
+          recyclePayoff.value,
+          [0, 1],
+          reducedMotion ? [1, 0.96] : [1, 0.86],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  const recycleBoltStreakStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      recyclePayoff.value,
+      [0, 0.82, 1],
+      [0.95, 0.4, 0],
+      Extrapolation.CLAMP,
+    ),
+    transform: [
+      {
+        translateX: interpolate(
+          recyclePayoff.value,
+          [0, 1],
+          reducedMotion ? [2, 4] : [6, 14],
+          Extrapolation.CLAMP,
+        ),
+      },
+      {
+        translateY: interpolate(
+          recyclePayoff.value,
+          [0, 1],
+          reducedMotion ? [0, -8] : [2, -24],
+          Extrapolation.CLAMP,
+        ),
+      },
+      {
+        scale: interpolate(
+          recyclePayoff.value,
+          [0, 1],
+          reducedMotion ? [1, 0.96] : [1, 0.86],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
   }));
 
   const dragPreviewStyle = useAnimatedStyle(() => ({
@@ -995,12 +1082,27 @@ export function MergeBoard({
 
       if (absoluteX !== undefined && absoluteY !== undefined) {
         if (recycleLayout && pointInRect(absoluteX, absoluteY, recycleLayout)) {
-          dispatch({ type: "RECYCLE_PART", source, index: fromIndex });
-          SoundManager.play("recycle");
-          if (hapticsEnabled) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          const recycledPart =
+            source === "board"
+              ? state.board[fromIndex]
+              : state.backpack[fromIndex];
+          if (!recycledPart) {
+            SoundManager.play("error");
+            if (hapticsEnabled) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            }
+            handled = true;
+          } else {
+            triggerRecyclePayoff(recycledPart.tier);
+            dispatch({ type: "RECYCLE_PART", source, index: fromIndex });
+            SoundManager.play("recycle");
+            if (hapticsEnabled) {
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success,
+              );
+            }
+            handled = true;
           }
-          handled = true;
         } else {
           const backpackIndex = backpackSlotRects.findIndex((rect) =>
             pointInRect(absoluteX, absoluteY, rect),
@@ -1263,6 +1365,7 @@ export function MergeBoard({
       boardContainerLayout,
       boardLayout,
       gridLayoutRelative,
+      triggerRecyclePayoff,
       dispatch,
       dragOffsetX,
       dragOffsetY,
@@ -1461,13 +1564,13 @@ export function MergeBoard({
               ) : null}
               {showBaronCooldown ? (
                 <CooldownBadge
-                  cooldownEndsAt={baronSupplier.cooldownEndsAt}
+                  seconds={baronCooldown.remainingSeconds}
                   active={showBaronCooldown}
+                  urgency={baronCooldown.urgency}
                   tileSize={tileSize}
                   accentColor={GameColors.locked.primary}
                   dimmed
                   deltaSeconds={baronCooldownDelta ?? undefined}
-                  onExpire={() => setCooldownRenderTick((tick) => tick + 1)}
                 />
               ) : null}
             </LinearGradient>
@@ -1999,6 +2102,62 @@ export function MergeBoard({
                   </View>
                 </LinearGradient>
               </View>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.recycleAccentPulse,
+                  { borderColor: recyclePalette.accent },
+                  recycleAccentPulseStyle,
+                ]}
+              />
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.recycleFlashRing,
+                  { borderColor: recyclePalette.ring },
+                  recycleFlashRingStyle,
+                ]}
+              />
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.recycleStreak,
+                  styles.recycleCashStreak,
+                  recycleCashStreakStyle,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.recycleStreakTrail,
+                    { backgroundColor: `${GameColors.currency.cash}75` },
+                  ]}
+                />
+                <Feather
+                  name="dollar-sign"
+                  size={11}
+                  color={GameColors.currency.cash}
+                />
+              </Animated.View>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.recycleStreak,
+                  styles.recycleBoltStreak,
+                  recycleBoltStreakStyle,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.recycleStreakTrail,
+                    { backgroundColor: `${GameColors.currency.research}75` },
+                  ]}
+                />
+                <Feather
+                  name="zap"
+                  size={11}
+                  color={GameColors.currency.research}
+                />
+              </Animated.View>
               <LinearGradient
                 colors={["#FFFFFF50", "#FFFFFF05", "#FFFFFF00"]}
                 style={styles.recycleShine}
@@ -2427,6 +2586,43 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     borderWidth: 1,
     borderColor: "#293458",
+  },
+  recycleAccentPulse: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    bottom: 2,
+    left: 2,
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1.5,
+  },
+  recycleFlashRing: {
+    position: "absolute",
+    width: "68%",
+    height: "68%",
+    top: "16%",
+    left: "16%",
+    borderRadius: 999,
+    borderWidth: 2,
+  },
+  recycleStreak: {
+    position: "absolute",
+    top: "44%",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 14,
+  },
+  recycleCashStreak: {
+    left: "38%",
+  },
+  recycleBoltStreak: {
+    right: "38%",
+  },
+  recycleStreakTrail: {
+    width: 2,
+    height: 16,
+    borderRadius: 1,
+    marginBottom: -2,
   },
   recycleShine: {
     position: "absolute",
