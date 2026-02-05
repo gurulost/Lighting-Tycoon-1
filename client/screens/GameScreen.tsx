@@ -111,6 +111,8 @@ type ModalType =
   | "suppliers"
   | null;
 
+type ProjectBoardTab = "offers" | "active" | "trophies";
+
 type TutorialTarget =
   | "board"
   | "orders"
@@ -155,6 +157,7 @@ interface BottomButtonProps {
   color: string;
   onPress: () => void;
   badge?: number;
+  indicator?: boolean;
   paused?: boolean;
   disabled?: boolean;
   onDisabledPress?: () => void;
@@ -169,6 +172,7 @@ function BottomButton({
   color,
   onPress,
   badge,
+  indicator,
   paused = false,
   disabled,
   onDisabledPress,
@@ -243,6 +247,7 @@ function BottomButton({
             <ThemedText style={styles.badgeText}>{badge}</ThemedText>
           </View>
         ) : null}
+        {!badge && indicator ? <View style={styles.indicatorDot} /> : null}
         {paused ? (
           <View style={styles.pauseBadge}>
             <Feather name="pause" size={10} color="#1A1A2E" />
@@ -275,6 +280,12 @@ export default function GameScreen() {
   } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [projectDossierId, setProjectDossierId] = useState<string | null>(null);
+  const [projectBoardFocusId, setProjectBoardFocusId] = useState<string | null>(
+    null,
+  );
+  const [projectBoardInitialTab, setProjectBoardInitialTab] =
+    useState<ProjectBoardTab | null>(null);
+  const [projectBoardOpenId, setProjectBoardOpenId] = useState(0);
   const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
     null,
@@ -352,8 +363,15 @@ export default function GameScreen() {
     () => getCouncilUnlockInfo({ council, projectsCompleted, reputationTier }),
     [council, projectsCompleted, reputationTier],
   );
+  const showProjectsButton = state.gamePhase === 2;
   const showCouncilButton = state.gamePhase === 2;
   const councilBadge = council.activeHearing ? 1 : 0;
+  const projectOfferCount = state.projectsUnlocked
+    ? state.projectOffers.length
+    : 0;
+  const projectBadge =
+    projectOfferCount > 0 ? Math.min(9, projectOfferCount) : undefined;
+  const projectIndicator = !projectBadge && !!state.activeProject;
   const councilTooltipMessage = useMemo(() => {
     if (council.unlocked) return councilUnlockInfo.copy;
     const lines = [councilUnlockInfo.copy];
@@ -456,7 +474,23 @@ export default function GameScreen() {
         ? "Audit: compliance order pending"
         : "Audit: choose a response";
 
-  const closeModal = () => setActiveModal(null);
+  const closeModal = () => {
+    if (activeModal === "projects") {
+      setProjectBoardFocusId(null);
+      setProjectBoardInitialTab(null);
+    }
+    setActiveModal(null);
+  };
+  const openProjectBoard = useCallback(
+    (options?: { focusProjectId?: string; tab?: ProjectBoardTab }) => {
+      setProjectBoardFocusId(options?.focusProjectId ?? null);
+      setProjectBoardInitialTab(options?.tab ?? null);
+      setProjectBoardOpenId((prev) => prev + 1);
+      setProjectDossierId(null);
+      setActiveModal("projects");
+    },
+    [],
+  );
   const openStoryLog = useCallback(() => {
     setActiveModal("story");
     const latestTimestamp =
@@ -493,6 +527,26 @@ export default function GameScreen() {
     },
     [markProjectRevealSeen],
   );
+  const openProjectBoardForProject = useCallback(
+    (projectId: string, tab?: ProjectBoardTab) => {
+      const isActive = state.activeProject?.projectId === projectId;
+      const isOffered = state.projectOffers.some(
+        (offer) => offer.projectId === projectId,
+      );
+      const resolvedTab = tab ?? (isActive ? "active" : "offers");
+      openProjectBoard({
+        focusProjectId: isOffered ? projectId : undefined,
+        tab: resolvedTab,
+      });
+      markProjectRevealSeen(projectId);
+    },
+    [
+      markProjectRevealSeen,
+      openProjectBoard,
+      state.activeProject,
+      state.projectOffers,
+    ],
+  );
   const dismissProjectReveal = useCallback(() => {
     if (!pendingProjectRevealId) return;
     dispatch({
@@ -505,6 +559,12 @@ export default function GameScreen() {
       openProjectDossier(projectId);
     },
     [openProjectDossier],
+  );
+  const handleRevealBoard = useCallback(
+    (projectId: string) => {
+      openProjectBoardForProject(projectId);
+    },
+    [openProjectBoardForProject],
   );
   const handleResumeTutorial = () => {
     dispatch({ type: "RESUME_TUTORIAL" });
@@ -1412,6 +1472,7 @@ export default function GameScreen() {
           layoutVersion={storyLayoutTick}
           boardContainerLayout={boardContainerLayout}
           maxHeight={boardContainerLayout?.height}
+          suppliersOpen={activeModal === "suppliers"}
           onWorkbenchPress={() => {
             setActiveModal("suppliers");
           }}
@@ -1503,6 +1564,19 @@ export default function GameScreen() {
           reducedMotion={state.settings.reducedMotion}
         />
 
+        {showProjectsButton ? (
+          <BottomButton
+            icon={state.projectsUnlocked ? "flag" : "lock"}
+            label="Projects"
+            color={GameColors.ui.primary}
+            onPress={() => openProjectBoard()}
+            badge={projectBadge}
+            indicator={projectIndicator}
+            compact={isCompactLayout}
+            reducedMotion={state.settings.reducedMotion}
+          />
+        ) : null}
+
         {showCouncilButton ? (
           <BottomButton
             icon="award"
@@ -1585,7 +1659,7 @@ export default function GameScreen() {
         <OrdersModal
           onClose={closeModal}
           closeDisabled={!state.tutorialComplete && state.tutorialStep === 3}
-          onOpenProjects={() => setActiveModal("projects")}
+          onOpenProjects={() => openProjectBoard()}
         />
       </Modal>
 
@@ -1598,6 +1672,9 @@ export default function GameScreen() {
         <ProjectBoardModal
           onClose={closeModal}
           onOpenDossier={openProjectDossier}
+          focusProjectId={projectBoardFocusId}
+          initialTab={projectBoardInitialTab}
+          openId={projectBoardOpenId}
         />
       </Modal>
 
@@ -1611,6 +1688,7 @@ export default function GameScreen() {
           <ProjectDossierModal
             projectId={projectDossierId}
             onClose={() => setProjectDossierId(null)}
+            onOpenBoard={openProjectBoardForProject}
           />
         ) : null}
       </Modal>
@@ -1741,6 +1819,7 @@ export default function GameScreen() {
           projectId={pendingProjectRevealId}
           onDismiss={dismissProjectReveal}
           onOpenDossier={handleRevealDossier}
+          onOpenBoard={handleRevealBoard}
         />
       </Modal>
 
@@ -1969,6 +2048,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#1A1A2E",
+  },
+  indicatorDot: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: GameColors.ui.success,
     borderWidth: 2,
     borderColor: "#1A1A2E",
   },
