@@ -30,6 +30,7 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { PartItem, MergeAnimation } from "./PartItem";
+import { CooldownBadge } from "@/components/game/CooldownBadge";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
@@ -93,6 +94,7 @@ interface MergeBoardProps {
   maxHeight?: number;
   layoutVersion?: number;
   boardContainerLayout?: LayoutRect | null;
+  suppliersOpen?: boolean;
 }
 
 function AnimatedStation({
@@ -202,11 +204,23 @@ export function MergeBoard({
   maxHeight,
   layoutVersion,
   boardContainerLayout,
+  suppliersOpen = false,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
   const workbenchRef = useRef<View>(null);
   const hapticsEnabled = state.settings.hapticsEnabled;
   const reducedMotion = state.settings.reducedMotion;
+  const [baronCooldownDelta, setBaronCooldownDelta] = useState<number | null>(
+    null,
+  );
+  const [, setCooldownRenderTick] = useState(0);
+  const baronCooldownDeltaTimeout =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBaronDelta = useRef<number | null>(null);
+  const prevBaronCooldown = useRef({
+    endsAt: state.suppliers.baron.cooldownEndsAt,
+    charges: state.suppliers.baron.chargesRemaining,
+  });
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragSource, setDragSource] = useState<{
     source: "board" | "backpack";
@@ -406,6 +420,12 @@ export function MergeBoard({
     Math.min(desiredBackpackSlotSize, maxBackpackSlotSize),
   );
   const recycleSize = Math.max(minRecycleSize, backpackSlotSize);
+  const baronSupplier = state.suppliers.baron;
+  const baronCooling =
+    baronSupplier.level > 0 &&
+    baronSupplier.chargesRemaining <= 0 &&
+    baronSupplier.cooldownEndsAt > Date.now();
+  const showBaronCooldown = baronCooling;
 
   const isSlotBlocked = useCallback(
     (index: number) => {
@@ -416,6 +436,77 @@ export function MergeBoard({
     },
     [state.blockedSlots, state.unlockedSlots],
   );
+
+  useEffect(() => {
+    const prev = prevBaronCooldown.current;
+    const wasCooling = prev.charges <= 0 && prev.endsAt > 0;
+    const isCooling =
+      baronSupplier.chargesRemaining <= 0 && baronSupplier.cooldownEndsAt > 0;
+    const deltaMs = baronSupplier.cooldownEndsAt - prev.endsAt;
+    if (wasCooling && isCooling && deltaMs > 0) {
+      const deltaSeconds = Math.ceil(deltaMs / 1000);
+      if (suppliersOpen) {
+        pendingBaronDelta.current =
+          (pendingBaronDelta.current ?? 0) + deltaSeconds;
+      } else {
+        setBaronCooldownDelta(deltaSeconds);
+        if (baronCooldownDeltaTimeout.current) {
+          clearTimeout(baronCooldownDeltaTimeout.current);
+        }
+        baronCooldownDeltaTimeout.current = setTimeout(() => {
+          setBaronCooldownDelta(null);
+        }, 1400);
+      }
+    }
+    prevBaronCooldown.current = {
+      endsAt: baronSupplier.cooldownEndsAt,
+      charges: baronSupplier.chargesRemaining,
+    };
+  }, [
+    baronSupplier.cooldownEndsAt,
+    baronSupplier.chargesRemaining,
+    suppliersOpen,
+  ]);
+
+  useEffect(() => {
+    if (!suppliersOpen && pendingBaronDelta.current) {
+      const deltaSeconds = pendingBaronDelta.current;
+      pendingBaronDelta.current = null;
+      const stillCooling =
+        baronSupplier.chargesRemaining <= 0 &&
+        baronSupplier.cooldownEndsAt > Date.now();
+      if (!stillCooling) return;
+      setBaronCooldownDelta(deltaSeconds);
+      if (baronCooldownDeltaTimeout.current) {
+        clearTimeout(baronCooldownDeltaTimeout.current);
+      }
+      baronCooldownDeltaTimeout.current = setTimeout(() => {
+        setBaronCooldownDelta(null);
+      }, 1400);
+    }
+  }, [
+    suppliersOpen,
+    baronSupplier.chargesRemaining,
+    baronSupplier.cooldownEndsAt,
+  ]);
+
+  useEffect(() => {
+    if (baronCooling) return;
+    pendingBaronDelta.current = null;
+    if (baronCooldownDeltaTimeout.current) {
+      clearTimeout(baronCooldownDeltaTimeout.current);
+      baronCooldownDeltaTimeout.current = null;
+    }
+    setBaronCooldownDelta(null);
+  }, [baronCooling]);
+
+  useEffect(() => {
+    return () => {
+      if (baronCooldownDeltaTimeout.current) {
+        clearTimeout(baronCooldownDeltaTimeout.current);
+      }
+    };
+  }, []);
 
   const isStationSlot = useCallback(
     (index: number) => state.stationSlots.includes(index),
@@ -1355,10 +1446,30 @@ export function MergeBoard({
             >
               <Image
                 source={stationWorkbench}
-                style={styles.stationIcon}
+                style={[
+                  styles.stationIcon,
+                  showBaronCooldown && styles.stationIconCooling,
+                ]}
                 contentFit="contain"
                 cachePolicy="memory-disk"
               />
+              {showBaronCooldown ? (
+                <View
+                  style={styles.stationCooldownOverlay}
+                  pointerEvents="none"
+                />
+              ) : null}
+              {showBaronCooldown ? (
+                <CooldownBadge
+                  cooldownEndsAt={baronSupplier.cooldownEndsAt}
+                  active={showBaronCooldown}
+                  tileSize={tileSize}
+                  accentColor={GameColors.locked.primary}
+                  dimmed
+                  deltaSeconds={baronCooldownDelta ?? undefined}
+                  onExpire={() => setCooldownRenderTick((tick) => tick + 1)}
+                />
+              ) : null}
             </LinearGradient>
           </AnimatedStation>
         </View>
@@ -2070,6 +2181,13 @@ const styles = StyleSheet.create({
   stationIcon: {
     width: "70%",
     height: "70%",
+  },
+  stationIconCooling: {
+    opacity: 0.5,
+  },
+  stationCooldownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,8,18,0.55)",
   },
   cooldownStrip: {
     position: "absolute",
