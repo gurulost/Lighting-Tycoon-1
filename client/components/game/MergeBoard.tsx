@@ -1843,23 +1843,59 @@ export function MergeBoard({
             ]}
           >
             <LinearGradient
-              colors={["#2A1212", "#321818", "#2A1212"]}
+              colors={["#120506", "#2B1212", "#150708"]}
               style={styles.recycleGradient}
             >
-              <Feather name="trash-2" size={18} color={GameColors.ui.danger} />
-              <View style={styles.recycleHintRow}>
-                <Feather
-                  name="dollar-sign"
-                  size={10}
-                  color={GameColors.currency.cash}
-                />
-                <ThemedText style={styles.recycleHintPlus}>+</ThemedText>
-                <Feather
-                  name="zap"
-                  size={10}
-                  color={GameColors.currency.research}
-                />
+              <View style={styles.recycleFrameGlow} />
+              <View style={styles.recycleInset}>
+                <LinearGradient
+                  colors={["#1D0A0D", "#2B1216", "#17080B"]}
+                  style={styles.recycleCore}
+                >
+                  <View style={styles.recycleStripes}>
+                    <View style={styles.recycleStripe} />
+                    <View
+                      style={[styles.recycleStripe, styles.recycleStripeMid]}
+                    />
+                    <View
+                      style={[styles.recycleStripe, styles.recycleStripeLow]}
+                    />
+                  </View>
+                  <View style={styles.recycleHalo} />
+                  <View style={styles.recycleIconStack}>
+                    <LinearGradient
+                      colors={["#FF6A3D", "#D32F2F"]}
+                      style={styles.recycleIconBadge}
+                    >
+                      <Feather name="trash-2" size={18} color="#1A090A" />
+                    </LinearGradient>
+                    <LinearGradient
+                      colors={["#151B2C", "#0E1220"]}
+                      style={styles.recycleRewardChip}
+                    >
+                      <Feather
+                        name="dollar-sign"
+                        size={10}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.recycleHintPlus}>+</ThemedText>
+                      <Feather
+                        name="zap"
+                        size={10}
+                        color={GameColors.currency.research}
+                      />
+                    </LinearGradient>
+                  </View>
+                </LinearGradient>
               </View>
+              <LinearGradient
+                colors={["#FFFFFF50", "#FFFFFF05", "#FFFFFF00"]}
+                style={styles.recycleShine}
+              />
+              <View style={[styles.recycleRivet, styles.recycleRivetTL]} />
+              <View style={[styles.recycleRivet, styles.recycleRivetTR]} />
+              <View style={[styles.recycleRivet, styles.recycleRivetBL]} />
+              <View style={[styles.recycleRivet, styles.recycleRivetBR]} />
             </LinearGradient>
           </Animated.View>
         </View>
@@ -2177,29 +2213,143 @@ const styles = StyleSheet.create({
   recycleBin: {
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: "#432020",
+    borderColor: "#4A1F20",
     overflow: "hidden",
+    shadowColor: "#140606",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   recycleBinActive: {
     borderColor: GameColors.ui.danger,
     shadowColor: GameColors.ui.danger,
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
   },
   recycleGradient: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 2,
+    position: "relative",
   },
-  recycleHintRow: {
+  recycleFrameGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1,
+    borderColor: "#6A2B2B",
+    opacity: 0.5,
+  },
+  recycleInset: {
+    flex: 1,
+    margin: 4,
+    borderRadius: BorderRadius.xs,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#3A1416",
+  },
+  recycleCore: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  recycleStripes: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.22,
+    transform: [{ rotate: "-18deg" }],
+  },
+  recycleStripe: {
+    position: "absolute",
+    left: "-35%",
+    right: "-35%",
+    height: 6,
+    backgroundColor: "#2B1012",
+    top: "18%",
+  },
+  recycleStripeMid: {
+    top: "45%",
+  },
+  recycleStripeLow: {
+    top: "70%",
+  },
+  recycleHalo: {
+    position: "absolute",
+    width: "70%",
+    height: "70%",
+    borderRadius: 999,
+    backgroundColor: "#FF4A3A1A",
+    top: "15%",
+    left: "15%",
+    shadowColor: "#FF5A46",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  recycleIconStack: {
+    alignItems: "center",
+    gap: 5,
+  },
+  recycleIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FFD0B0",
+    shadowColor: "#FF5A46",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  recycleRewardChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "#293458",
+  },
+  recycleShine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "45%",
+  },
+  recycleRivet: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#1A0708",
+    borderWidth: 1,
+    borderColor: "#5C2525",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  recycleRivetTL: {
+    top: 4,
+    left: 4,
+  },
+  recycleRivetTR: {
+    top: 4,
+    right: 4,
+  },
+  recycleRivetBL: {
+    bottom: 4,
+    left: 4,
+  },
+  recycleRivetBR: {
+    bottom: 4,
+    right: 4,
   },
   recycleHintPlus: {
-    fontSize: 9,
-    color: GameColors.text.secondary,
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#D8DEF5",
     marginHorizontal: 1,
   },
   dragPreviewItem: {
