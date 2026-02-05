@@ -20,12 +20,14 @@ type ProjectRevealModalProps = {
   projectId: string | null;
   onDismiss: () => void;
   onOpenDossier: (projectId: string) => void;
+  onOpenBoard?: (projectId: string) => void;
 };
 
 export function ProjectRevealModal({
   projectId,
   onDismiss,
   onOpenDossier,
+  onOpenBoard,
 }: ProjectRevealModalProps) {
   const insets = useSafeAreaInsets();
   const project = projectId
@@ -42,6 +44,20 @@ export function ProjectRevealModal({
   }, [project]);
 
   if (!project) return null;
+
+  const primaryAction = onOpenBoard
+    ? {
+        label: "Review offer",
+        icon: "flag" as const,
+        onPress: () => onOpenBoard(project.id),
+      }
+    : {
+        label: "View dossier",
+        icon: "book" as const,
+        onPress: () => onOpenDossier(project.id),
+      };
+  const secondaryAction = { label: "Maybe later", onPress: onDismiss };
+  const showDossierLink = Boolean(onOpenBoard);
 
   const screen = Dimensions.get("window");
   const maxCardHeight = Math.min(screen.height * 0.92, 780);
@@ -120,6 +136,20 @@ export function ProjectRevealModal({
             ))}
           </View>
 
+          {showDossierLink ? (
+            <Pressable
+              style={styles.dossierLink}
+              onPress={() => onOpenDossier(project.id)}
+              accessibilityRole="button"
+              accessibilityLabel="View project dossier"
+            >
+              <Feather name="book" size={12} color={GameColors.ui.primary} />
+              <ThemedText style={styles.dossierLinkText}>
+                View dossier
+              </ThemedText>
+            </Pressable>
+          ) : null}
+
           <View style={styles.perkBlock}>
             <View style={styles.perkIcon}>
               <Feather name="star" size={14} color={GameColors.ui.success} />
@@ -138,22 +168,25 @@ export function ProjectRevealModal({
           </View>
 
           <View style={styles.actionRow}>
-            <Pressable style={styles.secondaryButton} onPress={onDismiss}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={secondaryAction.onPress}
+            >
               <ThemedText style={styles.secondaryButtonText}>
-                Maybe later
+                {secondaryAction.label}
               </ThemedText>
             </Pressable>
             <Pressable
               style={styles.primaryButton}
-              onPress={() => onOpenDossier(project.id)}
+              onPress={primaryAction.onPress}
             >
               <LinearGradient
                 colors={["#3E8CFF", "#2E5BFF"]}
                 style={styles.primaryButtonFill}
               >
-                <Feather name="book" size={14} color="#FFFFFF" />
+                <Feather name={primaryAction.icon} size={14} color="#FFFFFF" />
                 <ThemedText style={styles.primaryButtonText}>
-                  View dossier
+                  {primaryAction.label}
                 </ThemedText>
               </LinearGradient>
             </Pressable>
@@ -261,6 +294,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GameColors.text.secondary,
     lineHeight: 18,
+  },
+  dossierLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}40`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  dossierLinkText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: GameColors.ui.primary,
   },
   perkBlock: {
     flexDirection: "row",

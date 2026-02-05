@@ -83,11 +83,13 @@ function TagChip({ tag }: { tag: StageTag }) {
 type ProjectDossierModalProps = {
   projectId: string;
   onClose: () => void;
+  onOpenBoard?: (projectId: string, tab?: "offers" | "active") => void;
 };
 
 export function ProjectDossierModal({
   projectId,
   onClose,
+  onOpenBoard,
 }: ProjectDossierModalProps) {
   const { state } = useGame();
   const project = PROJECT_DEFINITION_BY_ID.get(projectId);
@@ -162,6 +164,9 @@ export function ProjectDossierModal({
         : eligible
           ? "Eligible"
           : "Locked";
+  const canOpenBoard = Boolean(onOpenBoard && (offered || activeProject));
+  const boardTab = activeProject ? "active" : "offers";
+  const boardCtaLabel = activeProject ? "Open active project" : "Review offer";
 
   return (
     <ModalShell
@@ -412,7 +417,15 @@ export function ProjectDossierModal({
           </View>
         </View>
 
-        {activeProject ? (
+        {canOpenBoard ? (
+          <Pressable
+            style={styles.ctaButton}
+            onPress={() => onOpenBoard?.(project.id, boardTab)}
+          >
+            <Feather name="flag" size={14} color={GameColors.ui.primary} />
+            <ThemedText style={styles.ctaText}>{boardCtaLabel}</ThemedText>
+          </Pressable>
+        ) : activeProject ? (
           <Pressable style={styles.ctaButton} onPress={onClose}>
             <Feather name="flag" size={14} color={GameColors.ui.primary} />
             <ThemedText style={styles.ctaText}>Back to project</ThemedText>

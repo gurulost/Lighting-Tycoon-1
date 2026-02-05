@@ -161,6 +161,7 @@ function ProjectOfferCard({
   canAfford,
   onViewDossier,
   isNew,
+  isFocused,
 }: {
   project: ProjectDefinition;
   depositCost: number;
@@ -172,6 +173,7 @@ function ProjectOfferCard({
   canAfford: boolean;
   onViewDossier?: () => void;
   isNew?: boolean;
+  isFocused?: boolean;
 }) {
   const tone = TONE_META[project.client.tone];
   const tuning = getTuning();
@@ -183,7 +185,7 @@ function ProjectOfferCard({
   return (
     <LinearGradient
       colors={[`${tone.color}20`, "#1A1A2E", "#1A1A2E"]}
-      style={styles.offerCard}
+      style={[styles.offerCard, isFocused && styles.offerCardFocused]}
     >
       <View style={styles.offerHeader}>
         <View style={styles.offerTitleRow}>
@@ -299,9 +301,15 @@ function ProjectOfferCard({
 export function ProjectBoardModal({
   onClose,
   onOpenDossier,
+  focusProjectId,
+  initialTab,
+  openId = 0,
 }: {
   onClose: () => void;
   onOpenDossier?: (projectId: string) => void;
+  focusProjectId?: string | null;
+  initialTab?: TabKey | null;
+  openId?: number;
 }) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
@@ -311,14 +319,33 @@ export function ProjectBoardModal({
   const depositMultiplier =
     councilPerks.projectDepositMult * councilHearing.projectDepositMult;
 
-  const [activeTab, setActiveTab] = React.useState<TabKey>(
-    state.activeProject ? "active" : "offers",
-  );
+  const resolveOpenTab = React.useCallback((): TabKey => {
+    if (initialTab === "trophies") return "trophies";
+    if (initialTab === "active") {
+      return state.activeProject ? "active" : "offers";
+    }
+    if (initialTab === "offers") return "offers";
+    return state.activeProject ? "active" : "offers";
+  }, [initialTab, state.activeProject]);
+  const [activeTab, setActiveTab] = React.useState<TabKey>(resolveOpenTab);
+  const openIdRef = React.useRef(openId);
+  const skipAutoTabRef = React.useRef(false);
   const [addonSelections, setAddonSelections] = React.useState<
     Record<string, AddonSelection>
   >({});
 
   React.useEffect(() => {
+    if (openIdRef.current === openId) return;
+    openIdRef.current = openId;
+    setActiveTab(resolveOpenTab());
+    skipAutoTabRef.current = true;
+  }, [openId, resolveOpenTab]);
+
+  React.useEffect(() => {
+    if (skipAutoTabRef.current) {
+      skipAutoTabRef.current = false;
+      return;
+    }
     setActiveTab(state.activeProject ? "active" : "offers");
   }, [state.activeProject]);
 
@@ -361,6 +388,17 @@ export function ProjectBoardModal({
       (entry): entry is { offer: ProjectOffer; project: ProjectDefinition } =>
         Boolean(entry.project),
     );
+  const focusOfferId =
+    focusProjectId &&
+    offers.some((entry) => entry.offer.projectId === focusProjectId)
+      ? focusProjectId
+      : null;
+  const orderedOffers = focusOfferId
+    ? [
+        offers.find((entry) => entry.offer.projectId === focusOfferId)!,
+        ...offers.filter((entry) => entry.offer.projectId !== focusOfferId),
+      ]
+    : offers;
 
   const activeProject = state.activeProject;
   const activeDefinition = activeProject
@@ -647,7 +685,7 @@ export function ProjectBoardModal({
               </Pressable>
             </View>
 
-            {offers.length === 0 ? (
+            {orderedOffers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Feather
                   name="flag"
@@ -661,7 +699,7 @@ export function ProjectBoardModal({
               </View>
             ) : (
               <View style={styles.offerList}>
-                {offers.map(({ offer, project }) => {
+                {orderedOffers.map(({ offer, project }) => {
                   const depositCost = getProjectDepositCost(
                     project,
                     state.reputationTier,
@@ -707,6 +745,7 @@ export function ProjectBoardModal({
                       totalCost={totalCost}
                       canAfford={canAfford}
                       isNew={!state.projectRevealSeen?.[project.id]}
+                      isFocused={offer.projectId === focusOfferId}
                       onViewDossier={
                         onOpenDossier
                           ? () => onOpenDossier(project.id)
@@ -1425,6 +1464,14 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
     padding: Spacing.lg,
     gap: Spacing.sm,
+  },
+  offerCardFocused: {
+    borderColor: `${GameColors.ui.primary}70`,
+    shadowColor: GameColors.ui.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   offerHeader: {
     flexDirection: "row",

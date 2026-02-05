@@ -265,16 +265,18 @@ export function OrdersModal({
   const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
   const isTutorialOrdersStep =
     !state.tutorialComplete && state.tutorialStep === 3;
-  const marketingOrders = 3;
-  const marketingMax = 9;
-  const scoutSpawnsOpen = 6;
-  const scoutSpawnsLocked = 4;
-  const scoutMax = 12;
-  const clinicMerges = 10;
-  const clinicMax = 20;
-  const warrantyOrders = 3;
-  const warrantyMax = 6;
   const tuning = getTuning();
+  const marketingOrders = tuning.boosts.marketingOrders;
+  const marketingMax = tuning.boosts.marketingMaxStack;
+  const scoutSpawnsOpen = tuning.boosts.scoutSpawnsOpen;
+  const scoutSpawnsLocked = tuning.boosts.scoutSpawnsLocked;
+  const scoutMax = tuning.boosts.scoutMaxStack;
+  const clinicMerges = tuning.boosts.clinicMerges;
+  const clinicMax = tuning.boosts.clinicMaxStack;
+  const independenceMerges = tuning.boosts.independenceMerges;
+  const independenceMax = tuning.boosts.independenceMaxStack;
+  const warrantyOrders = tuning.boosts.warrantyOrders;
+  const warrantyMax = tuning.boosts.warrantyMaxStack;
   const hearingPenalty = getCouncilHearingPenalty(state);
   const activeHearing = state.council.activeHearing
     ? COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId]
@@ -296,6 +298,9 @@ export function OrdersModal({
   const clinicCost =
     tuning.economy.mentorClinicCostBase +
     state.reputationTier * tuning.economy.mentorClinicCostStep;
+  const independenceCost =
+    tuning.economy.mentorIndependenceCostBase +
+    state.reputationTier * tuning.economy.mentorIndependenceCostStep;
   const warrantyCost =
     tuning.economy.warrantyStampCostBase +
     state.reputationTier * tuning.economy.warrantyStampCostStep;
@@ -303,20 +308,27 @@ export function OrdersModal({
     state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
   const showProjectsButton = state.gamePhase === 2;
   const showPhase1Objective = state.gamePhase === 1 && state.tutorialComplete;
+  const showPhase2Objective =
+    state.gamePhase === 2 && !state.projectsUnlocked;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
   const scoutRemaining = state.supplierScoutSpawnsRemaining;
   const clinicRemaining = state.mentorClinicMergesRemaining;
+  const independenceRemaining = state.mentorIndependenceMergesRemaining;
   const warrantyRemaining = state.warrantyStampOrdersRemaining;
   const scoutActive = scoutRemaining > 0;
   const clinicActive = clinicRemaining > 0;
+  const independenceActive = independenceRemaining > 0;
   const warrantyActive = warrantyRemaining > 0;
   const scoutAtCap = scoutRemaining >= scoutMax;
   const clinicAtCap = clinicRemaining >= clinicMax;
+  const independenceAtCap = independenceRemaining >= independenceMax;
   const warrantyAtCap = warrantyRemaining >= warrantyMax;
   const canUseBoosts = state.tutorialComplete;
   const canUseClinic = state.tutorialComplete && state.firstSessionComplete;
+  const canUseIndependence =
+    state.tutorialComplete && state.firstSessionComplete;
   const canUseWarranty = state.tutorialComplete && state.firstSessionComplete;
   const [showScoutOptions, setShowScoutOptions] = React.useState(false);
   const [showWarrantyOptions, setShowWarrantyOptions] = React.useState(false);
@@ -373,10 +385,28 @@ export function OrdersModal({
   const canStartScout = canUseBoosts && state.cash >= scoutCost && !scoutAtCap;
   const canStartClinic =
     canUseClinic && state.cash >= clinicCost && !clinicAtCap;
+  const canStartIndependence =
+    canUseIndependence &&
+    state.cash >= independenceCost &&
+    !independenceAtCap;
   const canStartWarranty =
     canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
+  const phase2GoalOrder = React.useMemo(
+    () =>
+      state.orders.find((order) =>
+        order.modifierIds?.includes("phase2_goal"),
+      ),
+    [state.orders],
+  );
+  const phase2GoalHint = phase2GoalOrder
+    ? "Tap to highlight it in your Orders list."
+    : "Goal order arrives when there's room in the queue.";
+  const handleHighlightPhase2Goal = React.useCallback(() => {
+    if (!phase2GoalOrder) return;
+    dispatch({ type: "HIGHLIGHT_ORDER", orderId: phase2GoalOrder.id });
+  }, [dispatch, phase2GoalOrder]);
   const ordersSummary = React.useMemo(() => {
     const fulfillable: Order[] = [];
     const waiting: Order[] = [];
@@ -524,6 +554,11 @@ export function OrdersModal({
     dispatch({ type: "START_MENTOR_CLINIC" });
   }, [canStartClinic, dispatch]);
 
+  const handleStartIndependence = React.useCallback(() => {
+    if (!canStartIndependence) return;
+    dispatch({ type: "START_MENTOR_INDEPENDENCE" });
+  }, [canStartIndependence, dispatch]);
+
   const handleStartWarranty = React.useCallback(
     (mode: WarrantyStampMode) => {
       if (!canStartWarranty) return;
@@ -643,6 +678,33 @@ export function OrdersModal({
               Goal: Go Open, drop Dependency below 20, break the audit.
             </ThemedText>
           </View>
+        ) : null}
+
+        {showPhase2Objective ? (
+          <Pressable
+            style={[
+              styles.phaseObjectiveCard,
+              !phase2GoalOrder && styles.phaseObjectiveCardDisabled,
+            ]}
+            onPress={phase2GoalOrder ? handleHighlightPhase2Goal : undefined}
+          >
+            <Feather name="flag" size={14} color={GameColors.ui.primary} />
+            <View style={styles.phaseObjectiveCopy}>
+              <ThemedText style={styles.phaseObjectiveText}>
+                Phase 2 goal: Open Spark Showcase (compatible open install).
+              </ThemedText>
+              <ThemedText style={styles.phaseObjectiveHint}>
+                {phase2GoalHint}
+              </ThemedText>
+            </View>
+            {phase2GoalOrder ? (
+              <View style={styles.phaseObjectiveChip}>
+                <ThemedText style={styles.phaseObjectiveChipText}>
+                  Highlight
+                </ThemedText>
+              </View>
+            ) : null}
+          </Pressable>
         ) : null}
 
         {isTutorialOrdersStep ? (
@@ -1009,8 +1071,65 @@ export function OrdersModal({
                   ) : (
                     <ThemedText style={styles.boostHint}>
                       {canUseClinic
-                        ? `Next ${clinicMerges} merges: open merges grant +1 research and reduce dependency.`
+                        ? `Next ${clinicMerges} merges: open merges grant +1 research.`
                         : "Finish your first session to unlock the clinic."}
+                    </ThemedText>
+                  )}
+                </View>
+
+                <View style={styles.boostCard}>
+                  <View style={styles.refreshRow}>
+                    <Pressable
+                      style={[
+                        styles.refreshButton,
+                        !canStartIndependence && styles.refreshButtonDisabled,
+                      ]}
+                      onPress={
+                        canStartIndependence ? handleStartIndependence : undefined
+                      }
+                    >
+                      <Feather
+                        name="trending-down"
+                        size={16}
+                        color={GameColors.openStandard.primary}
+                      />
+                      <ThemedText style={styles.refreshLabel}>
+                        Mentor Independence Session
+                      </ThemedText>
+                    </Pressable>
+                    <View
+                      style={[
+                        styles.refreshCost,
+                        !canStartIndependence && styles.boostCostDisabled,
+                      ]}
+                    >
+                      <Feather
+                        name="dollar-sign"
+                        size={14}
+                        color={GameColors.currency.cash}
+                      />
+                      <ThemedText style={styles.refreshCostText}>
+                        {independenceCost}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  {independenceActive ? (
+                    <View style={styles.boostStatus}>
+                      <Feather
+                        name="trending-down"
+                        size={12}
+                        color={GameColors.openStandard.primary}
+                      />
+                      <ThemedText style={styles.boostStatusText}>
+                        Active · {independenceRemaining} merge
+                        {independenceRemaining === 1 ? "" : "s"} left
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <ThemedText style={styles.boostHint}>
+                      {canUseIndependence
+                        ? `Next ${independenceMerges} merges: open merges reduce dependency by 1.`
+                        : "Finish your first session to unlock the independence session."}
                     </ThemedText>
                   )}
                 </View>
@@ -1507,10 +1626,34 @@ const styles = StyleSheet.create({
     borderColor: `${GameColors.ui.primary}30`,
     backgroundColor: `${GameColors.ui.primary}08`,
   },
+  phaseObjectiveCardDisabled: {
+    opacity: 0.8,
+  },
+  phaseObjectiveCopy: {
+    flex: 1,
+    gap: 2,
+  },
   phaseObjectiveText: {
     fontSize: 12,
     color: GameColors.text.secondary,
     flexShrink: 1,
+  },
+  phaseObjectiveHint: {
+    fontSize: 11,
+    color: GameColors.text.disabled,
+  },
+  phaseObjectiveChip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}40`,
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
+  phaseObjectiveChipText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: GameColors.ui.primary,
   },
   helpCopy: {
     flex: 1,
