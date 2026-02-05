@@ -46,9 +46,9 @@ Use this as a quick reference for every icon, badge, and system.
 - Recycle Bin: delete parts for cash/research; waste also boosts the workshop.
 
 ## Tactical Boosts
-- Supplier Scout: spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.
-- Mentor Workshop Clinic: spend cash so open merges grant extra research. Consumes on any merge. Mutually exclusive with Mentor Independence Session.
-- Mentor Independence Session: spend cash so open merges reduce Dependency. Consumes on any merge, unavailable in Phase 2, and mutually exclusive with Mentor Workshop Clinic.
+- Supplier Scout: choose a route for your next spawns. Open grants +research per scout spawn, Locked grants +cash but adds pressure, and Tier gives +1 tier with a shorter burst.
+- Mentor Workshop Clinic: spend cash so open merges grant extra research. Consumes on any merge, scales to longer duration at higher reputation tiers, and is mutually exclusive with Mentor Independence Session.
+- Mentor Independence Session: spend cash so open merges reduce Dependency. Consumes on any merge, scales to longer duration at higher reputation tiers, is unavailable in Phase 2, and is mutually exclusive with Mentor Workshop Clinic.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 
 ## Currencies

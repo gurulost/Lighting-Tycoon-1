@@ -72,13 +72,7 @@ export function useCooldownDeltaFeedback({
       chargesRemaining,
       overdrawCount,
     };
-  }, [
-    cooldownEndsAt,
-    chargesRemaining,
-    overdrawCount,
-    isPanelOpen,
-    showDelta,
-  ]);
+  }, [cooldownEndsAt, chargesRemaining, overdrawCount, isPanelOpen, showDelta]);
 
   useEffect(() => {
     if (!isCooling) {

@@ -154,8 +154,9 @@ Use this lightweight checklist to validate core friction fixes and first-session
 ## Tactical Boosts
 - Complete tutorial.
 - Supplier Scout:
-  - Choose Open route. Verify next 6 spawns force Open on the base drop and counter decrements.
-  - Choose Locked route. Verify next 4 spawns force Locked and add +1 Baron Pressure per spawn.
+  - Choose Open route. Verify next 6 spawns force Open on the base drop, grant +1 research each, and counter decrements.
+  - Choose Locked route. Verify next 4 spawns force Locked, grant +$10 each, and add +1 Baron Pressure per spawn.
+  - Choose Tier route. Verify next 5 spawns add +1 tier to the base drop and then expire.
   - Verify forced/tutorial spawns do not consume the counter.
 - Baron supply modifiers:
   - Accept a Baron crate or rush offer and verify the bonus locked roll for the next N non-forced spawns.
@@ -163,9 +164,11 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Before first session completion, clinic/independence/warranty remain disabled with a clear hint.
 - Mentor Workshop Clinic:
   - Activate clinic. Verify next open merges grant +1 research.
+  - Verify purchased duration scales by reputation tier (10-12 merges).
   - Counter decrements on every merge, then expires at 0.
 - Mentor Independence Session:
   - Activate independence session. Verify next open merges reduce Dependency by 1.
+  - Verify purchased duration scales by reputation tier (10-12 merges).
   - Counter decrements on every merge, then expires at 0.
   - Verify the clinic cannot be started while independence is active (and vice versa).
   - In Phase 2, verify the independence session cannot be activated.

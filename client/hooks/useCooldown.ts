@@ -51,14 +51,18 @@ export function useCooldown({
         interval = null;
       }
     }, intervalMs);
-    expiryTimeout = setTimeout(() => {
-      setNow(cooldownTarget);
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-      expiryTimeout = null;
-    }, Math.max(0, cooldownTarget - startedAt));
+    expiryTimeout = setTimeout(
+      () => {
+        const nextNow = Date.now();
+        setNow(nextNow);
+        if (nextNow >= cooldownTarget && interval) {
+          clearInterval(interval);
+          interval = null;
+        }
+        expiryTimeout = null;
+      },
+      Math.max(0, cooldownTarget - startedAt),
+    );
     return () => {
       if (interval) {
         clearInterval(interval);

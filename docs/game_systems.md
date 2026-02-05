@@ -94,9 +94,12 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
 - Freedom Controller converts locked kits to open-compatible
 
 ## Tactical Boosts (Post-Session)
-- Supplier Scout: spend cash to force the next spawns to Open, Locked (adds pressure), or +1 tier.
-- Mentor Workshop Clinic: spend cash so open merges grant extra research; consumes on any merge.
-- Mentor Independence Session: spend cash so open merges reduce Dependency; consumes on any merge and is unavailable in Phase 2.
+- Supplier Scout: spend cash for route control.
+- Open route: force Open drops and grant +research per consumed scout spawn.
+- Locked route: force Locked drops, adds pressure, and grants +cash per consumed scout spawn.
+- Tier route: +1 tier on base drop with a shorter burst than Open.
+- Mentor Workshop Clinic: spend cash so open merges grant extra research; consumes on any merge and scales to longer duration at higher reputation tiers.
+- Mentor Independence Session: spend cash so open merges reduce Dependency; consumes on any merge, scales to longer duration at higher reputation tiers, and is unavailable in Phase 2.
 - Mentor Clinic and Independence Session are mutually exclusive while active.
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 

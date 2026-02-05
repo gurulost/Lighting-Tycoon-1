@@ -83,6 +83,7 @@ import {
 } from "@/lib/telemetry";
 import {
   applyTuningFromPayload,
+  getScaledBoostMergeCount,
   getTuning,
   TUNING_FLAG_KEY,
 } from "@/lib/tuning";
@@ -3831,6 +3832,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           route: scoutRoute,
         });
       }
+      const scoutCashBonus =
+        shouldConsumeScout && scoutRoute === "locked"
+          ? Math.max(0, Math.round(tuning.boosts.scoutLockedCashBonus))
+          : 0;
+      const scoutResearchBonus =
+        shouldConsumeScout && scoutRoute === "open"
+          ? Math.max(0, Math.round(tuning.boosts.scoutOpenResearchBonus))
+          : 0;
+      if (scoutCashBonus > 0) {
+        captureEvent("cash_earned", {
+          amount: scoutCashBonus,
+          source: "supplier_scout",
+          route: scoutRoute,
+        });
+      }
+      if (scoutResearchBonus > 0) {
+        captureEvent("research_earned", {
+          amount: scoutResearchBonus,
+          source: "supplier_scout",
+          route: scoutRoute,
+        });
+      }
 
       const shouldConsumeDropFloor = appliedTierFloor && placedBase;
 
@@ -3842,8 +3865,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         highlightedOrderId: nextHighlightedOrderId,
         suppliers: { ...state.suppliers, [supplierId]: nextSupplier },
         activeProject: nextActiveProject,
-        cash: state.cash - overdrawCash,
-        research: state.research - overdrawResearch,
+        cash: state.cash - overdrawCash + scoutCashBonus,
+        research: state.research - overdrawResearch + scoutResearchBonus,
         upgradeMaterials:
           state.upgradeMaterials + rollResult.upgradeMaterialsDelta,
         compatibilityComponents:
@@ -6801,10 +6824,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.tutorialComplete) return state;
       const cost = getSupplierScoutCost(state.reputationTier);
       if (state.cash < cost) return state;
-      const routeSpawns =
+      const routeSpawnsRaw =
         action.route === "locked"
           ? tuning.boosts.scoutSpawnsLocked
-          : tuning.boosts.scoutSpawnsOpen;
+          : action.route === "tier"
+            ? tuning.boosts.scoutSpawnsTier
+            : tuning.boosts.scoutSpawnsOpen;
+      const routeSpawns = Math.max(0, Math.round(routeSpawnsRaw));
       const nextRemaining = Math.min(
         tuning.boosts.scoutMaxStack,
         state.supplierScoutSpawnsRemaining + routeSpawns,
@@ -6842,9 +6868,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.mentorIndependenceMergesRemaining > 0) return state;
       const cost = getMentorClinicCost(state.reputationTier);
       if (state.cash < cost) return state;
+      const clinicMerges = getScaledBoostMergeCount(
+        tuning.boosts.clinicMerges,
+        state.reputationTier,
+      );
       const nextRemaining = Math.min(
         tuning.boosts.clinicMaxStack,
-        state.mentorClinicMergesRemaining + tuning.boosts.clinicMerges,
+        state.mentorClinicMergesRemaining + clinicMerges,
       );
       if (nextRemaining === state.mentorClinicMergesRemaining) return state;
       captureEvent("cash_spent", {
@@ -6871,10 +6901,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.mentorClinicMergesRemaining > 0) return state;
       const cost = getMentorIndependenceCost(state.reputationTier);
       if (state.cash < cost) return state;
+      const independenceMerges = getScaledBoostMergeCount(
+        tuning.boosts.independenceMerges,
+        state.reputationTier,
+      );
       const nextRemaining = Math.min(
         tuning.boosts.independenceMaxStack,
-        state.mentorIndependenceMergesRemaining +
-          tuning.boosts.independenceMerges,
+        state.mentorIndependenceMergesRemaining + independenceMerges,
       );
       if (nextRemaining === state.mentorIndependenceMergesRemaining)
         return state;

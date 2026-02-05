@@ -14,7 +14,14 @@ Example payload (partial):
   "orderSpawn": { "baseMs": 6500, "stepMs": 900, "minMs": 2500, "yellowMultiplier": 1.6 },
   "economy": { "orderRefreshBase": 40, "orderRefreshStep": 20, "upgradeCostMultiplier": 1 },
   "orders": { "openOnlyResearchBonus": 2, "rushBonusMax": 0.5 },
-  "boosts": { "scoutSpawnsOpen": 6, "scoutTierBonus": 1 },
+  "boosts": {
+    "scoutSpawnsOpen": 6,
+    "scoutSpawnsLocked": 4,
+    "scoutSpawnsTier": 5,
+    "scoutTierBonus": 1,
+    "scoutOpenResearchBonus": 1,
+    "scoutLockedCashBonus": 10
+  },
   "baron": { "offerChance": 0.25, "offerCooldownMs": 60000 },
   "merge": { "chainWindowMs": 10000, "chainBonusThreshold": 3 },
   "missions": { "maxActive": 2, "repeatWindowMs": 720000 },
@@ -203,22 +210,24 @@ Unlocked after tutorial (Supplier Scout) and after first session completion (oth
 
 **Supplier Scout**
 - Cost: `90 + reputationTier * 30`
-- Duration: Open/Tier = 6 spawns, Locked = 4 spawns (stack to 12)
+- Duration: Open = 6 spawns, Locked = 4 spawns, Tier = 5 spawns (stack to 12)
 - Routes:
-  - Open Route: force base drop to Open
-  - Locked Route: force base drop to Locked (+1 Baron pressure per spawn)
+  - Open Route: force base drop to Open and grant `+1 research` per consumed scout spawn
+  - Locked Route: force base drop to Locked (+1 Baron pressure per spawn) and grant `+$10` per consumed scout spawn
   - Tier Route: `+1 tier` on base drop (tunable via `boosts.scoutTierBonus`)
 - Consumption: only on non-forced spawns
 
 **Mentor Workshop Clinic**
 - Cost: `90 + reputationTier * 30`
-- Duration: 10 merges (stack to 20)
+- Duration: 10-12 merges by reputation tier (stack to 20)
+- Scaling: +1 merge at reputation tier 4, +2 merges at tier 8+
 - Effect: open merges gain `+1 research`
 - Consumption: any merge (open, locked, or waste)
 
 **Mentor Independence Session**
-- Cost: `140 + reputationTier * 45`
-- Duration: 10 merges (stack to 20)
+- Cost: `120 + reputationTier * 35`
+- Duration: 10-12 merges by reputation tier (stack to 20)
+- Scaling: +1 merge at reputation tier 4, +2 merges at tier 8+
 - Effect: open merges reduce Dependency by 1
 - Consumption: any merge (open, locked, or waste)
 - Note: Clinic and Independence Session are mutually exclusive while active.

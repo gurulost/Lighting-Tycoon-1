@@ -44,8 +44,11 @@ export type TuningConfig = {
     marketingDifficultyBonus: number;
     scoutSpawnsOpen: number;
     scoutSpawnsLocked: number;
+    scoutSpawnsTier: number;
     scoutMaxStack: number;
     scoutTierBonus: number;
+    scoutOpenResearchBonus: number;
+    scoutLockedCashBonus: number;
     clinicMerges: number;
     clinicMaxStack: number;
     clinicOpenResearchBonus: number;
@@ -251,8 +254,8 @@ const DEFAULT_TUNING: TuningConfig = {
     supplierScoutCostStep: 30,
     mentorClinicCostBase: 90,
     mentorClinicCostStep: 30,
-    mentorIndependenceCostBase: 140,
-    mentorIndependenceCostStep: 45,
+    mentorIndependenceCostBase: 120,
+    mentorIndependenceCostStep: 35,
     warrantyStampCostBase: 150,
     warrantyStampCostStep: 45,
     upgradeCostMultiplier: 1,
@@ -275,8 +278,11 @@ const DEFAULT_TUNING: TuningConfig = {
     marketingDifficultyBonus: 2,
     scoutSpawnsOpen: 6,
     scoutSpawnsLocked: 4,
+    scoutSpawnsTier: 5,
     scoutMaxStack: 12,
     scoutTierBonus: 1,
+    scoutOpenResearchBonus: 1,
+    scoutLockedCashBonus: 10,
     clinicMerges: 10,
     clinicMaxStack: 20,
     clinicOpenResearchBonus: 1,
@@ -514,6 +520,16 @@ function replaceObject(
 
 export function getTuning(): TuningConfig {
   return activeTuning;
+}
+
+export function getScaledBoostMergeCount(
+  baseMerges: number,
+  reputationTier: number,
+) {
+  const normalizedBase = Math.max(1, Math.floor(baseMerges));
+  const normalizedTier = Math.max(0, Math.floor(reputationTier));
+  const tierBonus = Math.min(2, Math.floor(normalizedTier / 4));
+  return normalizedBase + tierBonus;
 }
 
 export function applyTuningFromPayload(payload: unknown) {

@@ -83,4 +83,30 @@ describe("useCooldown", () => {
     expect(result.current.isExpired).toBe(true);
     expect(result.current.remainingSeconds).toBe(0);
   });
+
+  it("does not force-expire when system time moves backwards", () => {
+    const { result } = renderHook(() =>
+      useCooldown({
+        cooldownEndsAt: 2000,
+        active: true,
+        tickMs: 1000,
+      }),
+    );
+
+    act(() => {
+      jest.setSystemTime(0);
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(result.current.isActive).toBe(true);
+    expect(result.current.remainingSeconds).toBe(1);
+    expect(jest.getTimerCount()).toBeGreaterThan(0);
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(result.current.isExpired).toBe(true);
+    expect(result.current.remainingSeconds).toBe(0);
+  });
 });

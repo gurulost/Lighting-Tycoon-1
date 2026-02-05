@@ -21,7 +21,7 @@ import { OnboardingCallout } from "./OnboardingCallout";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
-import { getTuning } from "@/lib/tuning";
+import { getScaledBoostMergeCount, getTuning } from "@/lib/tuning";
 import { getCouncilHearingPenalty } from "@/lib/council";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
 import {
@@ -268,12 +268,37 @@ export function OrdersModal({
   const tuning = getTuning();
   const marketingOrders = tuning.boosts.marketingOrders;
   const marketingMax = tuning.boosts.marketingMaxStack;
-  const scoutSpawnsOpen = tuning.boosts.scoutSpawnsOpen;
-  const scoutSpawnsLocked = tuning.boosts.scoutSpawnsLocked;
+  const scoutSpawnsOpen = Math.max(
+    0,
+    Math.round(tuning.boosts.scoutSpawnsOpen),
+  );
+  const scoutSpawnsLocked = Math.max(
+    0,
+    Math.round(tuning.boosts.scoutSpawnsLocked),
+  );
+  const scoutSpawnsTier = Math.max(
+    0,
+    Math.round(tuning.boosts.scoutSpawnsTier),
+  );
   const scoutMax = tuning.boosts.scoutMaxStack;
-  const clinicMerges = tuning.boosts.clinicMerges;
+  const scoutTierBonus = Math.max(0, Math.round(tuning.boosts.scoutTierBonus));
+  const scoutOpenResearchBonus = Math.max(
+    0,
+    Math.round(tuning.boosts.scoutOpenResearchBonus),
+  );
+  const scoutLockedCashBonus = Math.max(
+    0,
+    Math.round(tuning.boosts.scoutLockedCashBonus),
+  );
+  const clinicMerges = getScaledBoostMergeCount(
+    tuning.boosts.clinicMerges,
+    state.reputationTier,
+  );
   const clinicMax = tuning.boosts.clinicMaxStack;
-  const independenceMerges = tuning.boosts.independenceMerges;
+  const independenceMerges = getScaledBoostMergeCount(
+    tuning.boosts.independenceMerges,
+    state.reputationTier,
+  );
   const independenceMax = tuning.boosts.independenceMaxStack;
   const warrantyOrders = tuning.boosts.warrantyOrders;
   const warrantyMax = tuning.boosts.warrantyMaxStack;
@@ -959,8 +984,10 @@ export function OrdersModal({
                     </View>
                   ) : (
                     <ThemedText style={styles.boostHint}>
-                      Next {scoutSpawnsOpen} spawns (Open/Tier) or{" "}
-                      {scoutSpawnsLocked} spawns (Locked).
+                      Open {scoutSpawnsOpen} spawns (+{scoutOpenResearchBonus}{" "}
+                      research each), Locked {scoutSpawnsLocked} (+$
+                      {scoutLockedCashBonus} each, +pressure), Tier{" "}
+                      {scoutSpawnsTier} (+{scoutTierBonus} tier).
                     </ThemedText>
                   )}
                   {showScoutOptions ? (
@@ -982,7 +1009,7 @@ export function OrdersModal({
                           Open Route
                         </ThemedText>
                         <ThemedText style={styles.boostOptionSub}>
-                          Force Open parts
+                          Force Open (+{scoutOpenResearchBonus} research/spawn)
                         </ThemedText>
                       </Pressable>
                       <Pressable
@@ -1002,7 +1029,8 @@ export function OrdersModal({
                           Locked Route
                         </ThemedText>
                         <ThemedText style={styles.boostOptionSub}>
-                          Force Locked parts (+pressure)
+                          Force Locked (+pressure, +$
+                          {scoutLockedCashBonus}/spawn)
                         </ThemedText>
                       </Pressable>
                       <Pressable
@@ -1022,7 +1050,7 @@ export function OrdersModal({
                           Tier Route
                         </ThemedText>
                         <ThemedText style={styles.boostOptionSub}>
-                          +1 tier on base drop
+                          +{scoutTierBonus} tier ({scoutSpawnsTier} spawns)
                         </ThemedText>
                       </Pressable>
                     </View>

@@ -544,7 +544,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "boost-scout",
         title: "Supplier Scout",
         summary: "Force the next supplier spawns.",
-        detail: "Choose Open, Locked (adds Baron pressure), or +1 tier.",
+        detail:
+          "Open grants +research per scout spawn, Locked grants +cash but adds Baron pressure, and Tier gives +1 tier with a shorter burst.",
         icon: "compass",
         color: GameColors.ui.primary,
       },
