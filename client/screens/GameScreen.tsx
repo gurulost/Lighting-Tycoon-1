@@ -371,8 +371,8 @@ export default function GameScreen() {
     () => getCouncilUnlockInfo({ council, projectsCompleted, reputationTier }),
     [council, projectsCompleted, reputationTier],
   );
-  const showProjectsButton = state.gamePhase === 2;
-  const showCouncilButton = state.gamePhase === 2;
+  const showProjectsButton = state.gamePhase >= 2;
+  const showCouncilButton = state.gamePhase >= 3;
   const councilBadge = council.activeHearing ? 1 : 0;
   const projectOfferCount = state.projectsUnlocked
     ? state.projectOffers.length

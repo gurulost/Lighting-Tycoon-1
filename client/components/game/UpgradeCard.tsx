@@ -71,7 +71,7 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
       : undefined;
   const dependencyUpgradeObsolete =
     upgrade.effect.startsWith("dependency_reduce_") &&
-    (state.liberationComplete || state.gamePhase === 2);
+    (state.liberationComplete || state.gamePhase >= 2);
   const canPurchase =
     !isMaxed && canAfford && requirementsMet && !dependencyUpgradeObsolete;
 
@@ -125,7 +125,8 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
           </ThemedText>
           {dependencyUpgradeObsolete ? (
             <ThemedText style={styles.obsoleteNote}>
-              Phase 2: Dependency is frozen at 0, so this upgrade has no effect.
+              Phase 2+: Dependency is frozen at 0, so this upgrade has no
+              effect.
             </ThemedText>
           ) : !requirementsMet && missingRequirementName ? (
             <ThemedText style={styles.obsoleteNote}>
@@ -191,7 +192,7 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
             <ThemedText
               style={[styles.purchaseText, { color: GameColors.ui.warning }]}
             >
-              Phase 2 Obsolete
+              Phase 2+ Obsolete
             </ThemedText>
           </>
         ) : !requirementsMet ? (

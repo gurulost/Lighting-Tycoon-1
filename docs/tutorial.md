@@ -96,3 +96,17 @@ Goals:
 - Tutorial skip
 - Time to first order
 - First upgrade timing
+
+---
+
+## Post-Tutorial Phase Roadmap
+- Phase 1 ends when lockout is resolved via Freedom path.
+- Phase 2 begins immediately after liberation:
+  - Tier cap increases from 10 -> 13.
+  - Projects unlock after the Phase 2 goal order is completed.
+  - New showcase milestone at tier 13.
+- Phase 3 begins when Council unlocks:
+  - Tier cap increases from 13 -> 16.
+  - Council campaigns and ratify orders become available.
+  - Final showcase milestone at tier 16.
+- Legacy cycles remain post-Phase-3 only.

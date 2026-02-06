@@ -20,7 +20,14 @@ import { AvatarImage } from "./AvatarImage";
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
-import { Part, PartFamily, PartTier } from "@/types/game";
+import {
+  PART_TIER_ORDER,
+  Part,
+  PartFamily,
+  PartTier,
+  TIER_NAMES,
+  TIER_SHORT_CODES,
+} from "@/types/game";
 import { PartItem } from "./PartItem";
 import { useGame } from "@/context/GameContext";
 
@@ -108,6 +115,26 @@ const makePart = (tier: PartTier, family: PartFamily): Part => ({
   position: -1,
 });
 
+function buildPartGlossaryItems(family: "open" | "locked"): GlossaryItem[] {
+  const familyTitle = family === "open" ? "Open" : "Locked";
+  const familySummary =
+    family === "open" ? "open-standard" : "certified locked";
+  return PART_TIER_ORDER.map((tier) => ({
+    id: `part-${family}-${tier}`,
+    title: `${TIER_NAMES[tier]} (${familyTitle})`,
+    summary: `Tier ${tier} ${familySummary} part.`,
+    part: { tier, family },
+  }));
+}
+
+function buildTierLegendDetail() {
+  return (
+    PART_TIER_ORDER.map(
+      (tier) => `${TIER_SHORT_CODES[tier]}=${TIER_NAMES[tier].split(" ")[0]}`,
+    ).join(", ") + "."
+  );
+}
+
 const GLOSSARY_SECTIONS: GlossarySection[] = [
   {
     id: "start-here",
@@ -147,135 +174,13 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
     id: "parts-open",
     title: "Parts (Open Standard)",
     tier: "basics",
-    items: [
-      {
-        id: "part-open-1",
-        title: "Clip (Open)",
-        summary: "Tier 1 open-standard part.",
-        part: { tier: 1, family: "open" },
-      },
-      {
-        id: "part-open-2",
-        title: "Track (Open)",
-        summary: "Tier 2 open-standard part.",
-        part: { tier: 2, family: "open" },
-      },
-      {
-        id: "part-open-3",
-        title: "Segment (Open)",
-        summary: "Tier 3 open-standard part.",
-        part: { tier: 3, family: "open" },
-      },
-      {
-        id: "part-open-4",
-        title: "Smart Kit (Open)",
-        summary: "Tier 4 open-standard part.",
-        part: { tier: 4, family: "open" },
-      },
-      {
-        id: "part-open-5",
-        title: "Premium System (Open)",
-        summary: "Tier 5 open-standard part.",
-        part: { tier: 5, family: "open" },
-      },
-      {
-        id: "part-open-6",
-        title: "Routing Array (Open)",
-        summary: "Tier 6 open-standard part.",
-        part: { tier: 6, family: "open" },
-      },
-      {
-        id: "part-open-7",
-        title: "Network Spine (Open)",
-        summary: "Tier 7 open-standard part.",
-        part: { tier: 7, family: "open" },
-      },
-      {
-        id: "part-open-8",
-        title: "Control Stack (Open)",
-        summary: "Tier 8 open-standard part.",
-        part: { tier: 8, family: "open" },
-      },
-      {
-        id: "part-open-9",
-        title: "Signature Grid (Open)",
-        summary: "Tier 9 open-standard part.",
-        part: { tier: 9, family: "open" },
-      },
-      {
-        id: "part-open-10",
-        title: "Kingdom Install (Open)",
-        summary: "Tier 10 open-standard part.",
-        part: { tier: 10, family: "open" },
-      },
-    ],
+    items: buildPartGlossaryItems("open"),
   },
   {
     id: "parts-locked",
     title: "Parts (Locked Certified)",
     tier: "basics",
-    items: [
-      {
-        id: "part-locked-1",
-        title: "Clip (Locked)",
-        summary: "Tier 1 certified locked part.",
-        part: { tier: 1, family: "locked" },
-      },
-      {
-        id: "part-locked-2",
-        title: "Track (Locked)",
-        summary: "Tier 2 certified locked part.",
-        part: { tier: 2, family: "locked" },
-      },
-      {
-        id: "part-locked-3",
-        title: "Segment (Locked)",
-        summary: "Tier 3 certified locked part.",
-        part: { tier: 3, family: "locked" },
-      },
-      {
-        id: "part-locked-4",
-        title: "Smart Kit (Locked)",
-        summary: "Tier 4 certified locked part.",
-        part: { tier: 4, family: "locked" },
-      },
-      {
-        id: "part-locked-5",
-        title: "Premium System (Locked)",
-        summary: "Tier 5 certified locked part.",
-        part: { tier: 5, family: "locked" },
-      },
-      {
-        id: "part-locked-6",
-        title: "Routing Array (Locked)",
-        summary: "Tier 6 certified locked part.",
-        part: { tier: 6, family: "locked" },
-      },
-      {
-        id: "part-locked-7",
-        title: "Network Spine (Locked)",
-        summary: "Tier 7 certified locked part.",
-        part: { tier: 7, family: "locked" },
-      },
-      {
-        id: "part-locked-8",
-        title: "Control Stack (Locked)",
-        summary: "Tier 8 certified locked part.",
-        part: { tier: 8, family: "locked" },
-      },
-      {
-        id: "part-locked-9",
-        title: "Signature Grid (Locked)",
-        summary: "Tier 9 certified locked part.",
-        part: { tier: 9, family: "locked" },
-      },
-      {
-        id: "part-locked-10",
-        title: "Kingdom Install (Locked)",
-        summary: "Tier 10 certified locked part.",
-        part: { tier: 10, family: "locked" },
-      },
-    ],
+    items: buildPartGlossaryItems("locked"),
   },
   {
     id: "parts-waste",
@@ -758,7 +663,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Phase 2",
         summary: "Liberation phase after Freedom.",
         detail:
-          "Dependency resets and harder orders arrive; Baron pressure can cut payouts.",
+          "Dependency freezes at 0, the tier cap expands to 13, and harder contracts enter rotation.",
         icon: "flag",
         color: GameColors.ui.primary,
       },
@@ -808,7 +713,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Council Unlock",
         summary: "Phase 3 governance layer.",
         detail:
-          "Unlocked after the Expo capstone or 6 contracts plus a high reputation tier. Draft standards, run pilots, and ratify rules.",
+          "Unlocked after the Expo capstone or 6 contracts plus a high reputation tier. Phase 3 raises the tier cap to 16 and opens Council campaigns.",
         icon: "award",
         color: GameColors.currency.research,
       },
@@ -839,10 +744,9 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
     items: [
       {
         id: "legend-order-letters",
-        title: "Order Letters (CL/TR/SG/KT/PR/AR/SP/ST/GR/KI)",
+        title: "Order Letters (Tier Codes)",
         summary: "Tier code legend for order hints.",
-        detail:
-          "CL=Clip, TR=Track, SG=Segment, KT=Kit, PR=System, AR=Array, SP=Spine, ST=Stack, GR=Grid, KI=Kingdom.",
+        detail: buildTierLegendDetail(),
         icon: "type",
         color: GameColors.ui.primary,
       },

@@ -9,6 +9,7 @@ import {
   getOrderRefreshBlockReason,
   getOrderRefreshCost,
 } from "@/lib/siteRules";
+import { createInitialLegacyState } from "@/lib/legacy";
 import { GameState, ProjectDefinition } from "@/types/game";
 
 function makeState({
@@ -26,6 +27,7 @@ function makeState({
       activeHearing: undefined,
       ...council,
     },
+    legacy: createInitialLegacyState(),
   } as unknown as GameState;
 }
 

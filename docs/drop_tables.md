@@ -14,6 +14,9 @@ This document captures the current supplier drop tables and bonus channels used 
 | Open Workshop | 3 | 5 | 52000 |
 | Open Workshop | 4 | 6 | 48000 |
 | Open Workshop | 5 | 7 | 44000 |
+| Open Workshop | 6 | 8 | 41000 |
+| Open Workshop | 7 | 9 | 38000 |
+| Open Workshop | 8 | 10 | 35000 |
 | Salvage Corner | 1 | 4 | 75000 |
 | Salvage Corner | 2 | 5 | 68000 |
 | Salvage Corner | 3 | 6 | 62000 |
@@ -89,6 +92,36 @@ Note: During cooldowns, suppliers can be overdrawn at a cost; Baron overdraws ca
 - T9: 6.8182%
 - T10: 2.2727%
 - Bonus channel: 10% Upgrade Material, 5% Compatibility Component
+
+### Level 6
+- T6: 23%
+- T7: 23%
+- T8: 23%
+- T9: 14%
+- T10: 9%
+- T11: 6%
+- T12: 2%
+- Bonus channel: 11% Upgrade Material, 6% Compatibility Component
+
+### Level 7
+- T8: 20%
+- T9: 20%
+- T10: 20%
+- T11: 15%
+- T12: 11%
+- T13: 8%
+- T14: 6%
+- Bonus channel: 12% Upgrade Material, 7% Compatibility Component
+
+### Level 8
+- T10: 18%
+- T11: 18%
+- T12: 18%
+- T13: 16%
+- T14: 12%
+- T15: 10%
+- T16: 8%
+- Bonus channel: 13% Upgrade Material, 8% Compatibility Component
 
 ## Salvage Corner (nested table)
 

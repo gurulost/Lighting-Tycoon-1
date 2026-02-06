@@ -1,0 +1,408 @@
+import { PROJECT_DEFINITIONS } from "@/constants/projects";
+import { __TEST_ONLY__ } from "@/context/GameContext";
+import type { GameState, Order, Part, PartTier } from "@/types/game";
+
+jest.mock("@react-native-async-storage/async-storage", () =>
+  require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
+);
+
+function createPart(position: number, tier: PartTier): Part {
+  return {
+    id: `part-${position}-${tier}`,
+    family: "open",
+    tier,
+    position,
+  };
+}
+
+function createOrder(orderId = "ord_test"): Order {
+  return {
+    id: orderId,
+    title: "Test Install",
+    type: "basic",
+    requirements: [{ tier: 1, family: "any", count: 1 }],
+    rewards: { cash: 10, reputation: 10, research: 2 },
+  };
+}
+
+function buildSpawnReadyState(state: GameState): GameState {
+  return {
+    ...state,
+    tutorialComplete: true,
+    firstSessionComplete: true,
+    firstSessionOrderIndex: 999,
+    firstSessionOrdersCompleted: 999,
+    phase2GoalPending: false,
+    orders: [],
+    storySeen: {
+      ...state.storySeen,
+      phase2_goal: true,
+    },
+    orderSpawnCooldownUntil: 0,
+  };
+}
+
+describe("phase/tier progression reducer coverage", () => {
+  it("enforces merge caps at 13 in Phase 2 and 16 in Phase 3", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const board = [...initial.board];
+    board[0] = createPart(0, 13);
+    board[1] = createPart(1, 13);
+
+    const phase2State: GameState = {
+      ...initial,
+      gamePhase: 2,
+      liberationComplete: true,
+      tutorialComplete: true,
+      firstSessionComplete: true,
+      maxTierCrafted: 13,
+      board,
+    };
+
+    const phase2Merge = __TEST_ONLY__.gameReducer(
+      phase2State as any,
+      {
+        type: "MERGE_PARTS",
+        fromIndex: 0,
+        toIndex: 1,
+      } as any,
+    );
+
+    expect(phase2Merge).toBe(phase2State);
+
+    const phase3State: GameState = {
+      ...phase2State,
+      gamePhase: 3,
+    };
+    const phase3Merge = __TEST_ONLY__.gameReducer(
+      phase3State as any,
+      {
+        type: "MERGE_PARTS",
+        fromIndex: 0,
+        toIndex: 1,
+      } as any,
+    );
+
+    expect(phase3Merge).not.toBe(phase3State);
+    expect(phase3Merge.board[1]?.tier).toBe(14);
+  });
+
+  it("transitions into Phase 2 on freedom lockout resolution", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const lockedState: GameState = {
+      ...initial,
+      lockoutActive: true,
+      lockoutPhase: 3,
+      tutorialComplete: true,
+      firstSessionComplete: true,
+      dependency: 20,
+      gamePhase: 1,
+    };
+
+    const next = __TEST_ONLY__.gameReducer(
+      lockedState as any,
+      {
+        type: "RESOLVE_LOCKOUT",
+        choice: "freedom",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(2);
+    expect(next.liberationComplete).toBe(true);
+  });
+
+  it("transitions into Phase 3 when Council unlock conditions are met", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const board = [...initial.board];
+    board[0] = createPart(0, 1);
+    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 6).map(
+      (project) => project.id,
+    );
+    const order = createOrder("unlock-council");
+
+    const state: GameState = {
+      ...initial,
+      tutorialComplete: true,
+      firstSessionComplete: true,
+      gamePhase: 2,
+      liberationComplete: true,
+      reputation: 2500,
+      reputationTier: 9,
+      currentNeighborhoodId: "liberation",
+      projectsCompleted,
+      orders: [order],
+      board,
+    };
+
+    const next = __TEST_ONLY__.gameReducer(
+      state as any,
+      {
+        type: "FULFILL_ORDER",
+        orderId: order.id,
+      } as any,
+    );
+
+    expect(next.council.unlocked).toBe(true);
+    expect(next.gamePhase).toBe(3);
+  });
+
+  it("normalizes loaded saves with unlocked Council to Phase 3", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const loaded: GameState = {
+      ...initial,
+      gamePhase: 2,
+      liberationComplete: true,
+      council: {
+        ...initial.council,
+        unlocked: true,
+      },
+    };
+
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "LOAD_STATE",
+        state: loaded as any,
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(3);
+    expect(next.council.unlocked).toBe(true);
+  });
+
+  it("inserts pending showcase orders for tiers 10/13/16", () => {
+    const base = __TEST_ONLY__.getInitialState();
+
+    const tier10State = buildSpawnReadyState({
+      ...base,
+      gamePhase: 2,
+      liberationComplete: true,
+      maxTierCrafted: 10,
+      tier10ShowcasePending: true,
+      tier10ShowcaseSeen: false,
+    } as GameState);
+    const tier10Next = __TEST_ONLY__.gameReducer(
+      tier10State as any,
+      {
+        type: "SPAWN_ORDER",
+      } as any,
+    );
+    expect(
+      tier10Next.orders.some((order) =>
+        order.modifierIds?.includes("tier10_showcase"),
+      ),
+    ).toBe(true);
+    expect(tier10Next.tier10ShowcasePending).toBe(false);
+    expect(tier10Next.tier10ShowcaseSeen).toBe(true);
+
+    const tier13State = buildSpawnReadyState({
+      ...base,
+      gamePhase: 2,
+      liberationComplete: true,
+      maxTierCrafted: 13,
+      tier13ShowcasePending: true,
+      tier13ShowcaseSeen: false,
+    } as GameState);
+    const tier13Next = __TEST_ONLY__.gameReducer(
+      tier13State as any,
+      {
+        type: "SPAWN_ORDER",
+      } as any,
+    );
+    expect(
+      tier13Next.orders.some((order) =>
+        order.modifierIds?.includes("tier13_showcase"),
+      ),
+    ).toBe(true);
+    expect(tier13Next.tier13ShowcasePending).toBe(false);
+    expect(tier13Next.tier13ShowcaseSeen).toBe(true);
+
+    const tier16State = buildSpawnReadyState({
+      ...base,
+      gamePhase: 3,
+      liberationComplete: true,
+      council: {
+        ...base.council,
+        unlocked: true,
+      },
+      maxTierCrafted: 16,
+      tier16ShowcasePending: true,
+      tier16ShowcaseSeen: false,
+    } as GameState);
+    const tier16Next = __TEST_ONLY__.gameReducer(
+      tier16State as any,
+      {
+        type: "SPAWN_ORDER",
+      } as any,
+    );
+    expect(
+      tier16Next.orders.some((order) =>
+        order.modifierIds?.includes("tier16_showcase"),
+      ),
+    ).toBe(true);
+    expect(tier16Next.tier16ShowcasePending).toBe(false);
+    expect(tier16Next.tier16ShowcaseSeen).toBe(true);
+  });
+
+  it("bootstraps directly into a Council-unlocked Phase 3 playtest state", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_SKIP_PHASE3",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(3);
+    expect(next.council.unlocked).toBe(true);
+    expect(next.projectsUnlocked).toBe(true);
+    expect(next.maxTierCrafted).toBeGreaterThanOrEqual(13);
+    expect(next.suppliers.open.level).toBeGreaterThanOrEqual(8);
+  });
+
+  it("caps spawned order requirements to the active phase tier ceiling", () => {
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.42);
+    const initial = __TEST_ONLY__.getInitialState();
+    try {
+      const phase2Base = __TEST_ONLY__.gameReducer(
+        initial as any,
+        {
+          type: "PLAYTEST_SKIP_PHASE2",
+        } as any,
+      );
+      const phase2State = buildSpawnReadyState({
+        ...(phase2Base as GameState),
+        tier10ShowcasePending: false,
+        tier13ShowcasePending: false,
+        tier16ShowcasePending: false,
+      });
+      const phase2Next = __TEST_ONLY__.gameReducer(
+        phase2State as any,
+        {
+          type: "SPAWN_ORDER",
+        } as any,
+      );
+      expect(phase2Next.orders.length).toBeGreaterThan(0);
+      const phase2MaxRequiredTier = Math.max(
+        ...phase2Next.orders.flatMap((order) =>
+          order.requirements.map((req) => req.tier),
+        ),
+      );
+      expect(phase2MaxRequiredTier).toBeLessThanOrEqual(13);
+
+      const phase3Base = __TEST_ONLY__.gameReducer(
+        initial as any,
+        {
+          type: "PLAYTEST_SKIP_PHASE3",
+        } as any,
+      );
+      const phase3State = buildSpawnReadyState({
+        ...(phase3Base as GameState),
+        council: {
+          ...(phase3Base as GameState).council,
+          unlocked: true,
+        },
+        gamePhase: 3,
+        tier10ShowcasePending: false,
+        tier13ShowcasePending: false,
+        tier16ShowcasePending: false,
+      });
+      const phase3Next = __TEST_ONLY__.gameReducer(
+        phase3State as any,
+        {
+          type: "SPAWN_ORDER",
+        } as any,
+      );
+      expect(phase3Next.orders.length).toBeGreaterThan(0);
+      const phase3MaxRequiredTier = Math.max(
+        ...phase3Next.orders.flatMap((order) =>
+          order.requirements.map((req) => req.tier),
+        ),
+      );
+      expect(phase3MaxRequiredTier).toBeLessThanOrEqual(16);
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
+  it("enforces late-game tier floor orders at 10, 13, and 16 milestones", () => {
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.5);
+    const initial = __TEST_ONLY__.getInitialState();
+    try {
+      const phase2Tier10 = buildSpawnReadyState({
+        ...(__TEST_ONLY__.gameReducer(
+          initial as any,
+          {
+            type: "PLAYTEST_SKIP_PHASE2",
+          } as any,
+        ) as GameState),
+        maxTierCrafted: 10,
+        tier10ShowcasePending: false,
+        tier13ShowcasePending: false,
+        tier16ShowcasePending: false,
+      });
+      const phase2Tier10Next = __TEST_ONLY__.gameReducer(
+        phase2Tier10 as any,
+        {
+          type: "SPAWN_ORDER",
+        } as any,
+      );
+      const phase2Tier10Max = Math.max(
+        ...phase2Tier10Next.orders.flatMap((order) =>
+          order.requirements.map((req) => req.tier),
+        ),
+      );
+      expect(phase2Tier10Max).toBeGreaterThanOrEqual(10);
+
+      const phase2Tier13 = buildSpawnReadyState({
+        ...phase2Tier10,
+        maxTierCrafted: 13,
+      });
+      const phase2Tier13Next = __TEST_ONLY__.gameReducer(
+        phase2Tier13 as any,
+        {
+          type: "SPAWN_ORDER",
+        } as any,
+      );
+      const phase2Tier13Max = Math.max(
+        ...phase2Tier13Next.orders.flatMap((order) =>
+          order.requirements.map((req) => req.tier),
+        ),
+      );
+      expect(phase2Tier13Max).toBeGreaterThanOrEqual(13);
+
+      const phase3Base = __TEST_ONLY__.gameReducer(
+        initial as any,
+        {
+          type: "PLAYTEST_SKIP_PHASE3",
+        } as any,
+      ) as GameState;
+      const phase3Tier16 = buildSpawnReadyState({
+        ...phase3Base,
+        gamePhase: 3,
+        council: {
+          ...phase3Base.council,
+          unlocked: true,
+        },
+        maxTierCrafted: 16,
+        tier10ShowcasePending: false,
+        tier13ShowcasePending: false,
+        tier16ShowcasePending: false,
+      });
+      const phase3Tier16Next = __TEST_ONLY__.gameReducer(
+        phase3Tier16 as any,
+        {
+          type: "SPAWN_ORDER",
+        } as any,
+      );
+      const phase3Tier16Max = Math.max(
+        ...phase3Tier16Next.orders.flatMap((order) =>
+          order.requirements.map((req) => req.tier),
+        ),
+      );
+      expect(phase3Tier16Max).toBeGreaterThanOrEqual(16);
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+});

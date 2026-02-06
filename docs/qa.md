@@ -51,6 +51,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 ## Phase 2 Transition
 - Complete lockout via Freedom Controller.
 - Verify:
+  - Game enters Phase 2 and tier cap expands to 13.
   - Dependency stays at 0 (merges/orders do not change it).
   - Baron Pressure applies a reward tax at 40+ (-10%) and 70+ (-20%) to cash + research.
   - Phase 2 goal order is inserted once and highlighted.
@@ -90,6 +91,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Unlock gate:
   - Complete the Expo capstone (or 6 projects + rep tier gate).
   - Verify Council button appears and opens the Council screen.
+  - Verify game enters Phase 3 and tier cap expands to 16.
 - Draft:
   - Start a campaign and invest cash + research (partial allowed).
   - Verify progress saves and status moves to PILOT when fully funded.
@@ -99,6 +101,7 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Ratify:
   - When pilot completes, a protected Council showcase order is inserted.
   - Complete the order and confirm campaign status becomes COMPLETED.
+  - Late campaigns should request tiers in the 14-16 range.
 - Perks:
   - Verify at least one perk changes gameplay (e.g., open-only drop min tier).
 - Lobby Pressure + Hearings:
@@ -124,6 +127,16 @@ Use this lightweight checklist to validate core friction fixes and first-session
   - Verify badge unlock every 2 completed cycles.
 - Save/load migration:
   - Load pre-legacy save with final campaign/perk complete and verify legacy unlock + pending cycle setup.
+
+## Phase/Tier 16 Validation
+- Use `Playtest: Skip to Phase 3` from Settings or R&D.
+- Verify:
+  - Council is unlocked immediately.
+  - Open Workshop is advanced for high-tier generation.
+  - Orders never request above tier 16.
+  - Showcase progression can trigger at tier 10, 13, and 16.
+  - Phase 2 (tier 13 cap) blocks merging tier 13 -> 14.
+  - Phase 3 allows merging tier 13 -> 14.
 
 ## Second Baron Offer Trigger
 - In first-session:

@@ -440,7 +440,7 @@ const DEFAULT_TUNING: TuningConfig = {
     difficultyFloorTier3: 6,
     difficultyFloorTier4: 7,
     difficultyFloorTier5: 8,
-    tierFloorThresholds: [4, 5, 7, 10],
+    tierFloorThresholds: [4, 5, 7, 10, 13, 16],
   },
   suppliers: {
     cooldownReductionPerLevelMs: 2000,

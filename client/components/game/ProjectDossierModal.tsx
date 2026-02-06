@@ -124,7 +124,7 @@ export function ProjectDossierModal({
   );
   const eligible =
     state.projectsUnlocked &&
-    state.gamePhase === 2 &&
+    state.gamePhase >= 2 &&
     state.reputationTier >= project.unlock.minRepTier &&
     (typeof project.unlock.minProjectsCompleted !== "number" ||
       state.projectsCompleted.length >= project.unlock.minProjectsCompleted);

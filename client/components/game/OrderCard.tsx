@@ -53,6 +53,12 @@ const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
   8: "grid",
   9: "aperture",
   10: "award",
+  11: "hexagon",
+  12: "activity",
+  13: "command",
+  14: "layout",
+  15: "sun",
+  16: "zap",
 };
 
 export function OrderCard({

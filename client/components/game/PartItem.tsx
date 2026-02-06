@@ -60,6 +60,13 @@ const PART_SPRITES: Record<
   8: { open: partStackOpen, locked: partStackLocked },
   9: { open: partGridOpen, locked: partGridLocked },
   10: { open: partKingdomOpen, locked: partKingdomLocked },
+  // Placeholder art for new tiers until dedicated sprites are delivered.
+  11: { open: partKingdomOpen, locked: partKingdomLocked },
+  12: { open: partKingdomOpen, locked: partKingdomLocked },
+  13: { open: partKingdomOpen, locked: partKingdomLocked },
+  14: { open: partKingdomOpen, locked: partKingdomLocked },
+  15: { open: partKingdomOpen, locked: partKingdomLocked },
+  16: { open: partKingdomOpen, locked: partKingdomLocked },
 };
 
 interface PartItemProps {

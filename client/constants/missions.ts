@@ -156,6 +156,30 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     minRepTier: 4,
     minTierCrafted: 10,
   },
+  {
+    id: "milestone_tier13",
+    giver: "system",
+    type: "fulfill_tier13_order",
+    label: "Fulfill a Tier 13 install",
+    description: "Metro Nexus work proves Phase 2 mastery.",
+    target: 1,
+    reward: { cash: 900, reputation: 95, research: 36 },
+    weight: 0.25,
+    minRepTier: 6,
+    minTierCrafted: 13,
+  },
+  {
+    id: "milestone_tier16",
+    giver: "system",
+    type: "fulfill_tier16_order",
+    label: "Fulfill a Tier 16 install",
+    description: "Legacy-standard installs mark full Council-era dominance.",
+    target: 1,
+    reward: { cash: 1800, reputation: 140, research: 64 },
+    weight: 0.15,
+    minRepTier: 8,
+    minTierCrafted: 16,
+  },
 
   // Mentor episode: Open Standards
   {

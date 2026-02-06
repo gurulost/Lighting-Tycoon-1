@@ -21,7 +21,14 @@ import { OnboardingCallout } from "./OnboardingCallout";
 import { SiteRuleBanner } from "./SiteRuleBanner";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
-import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
+import {
+  Order,
+  PART_TIER_ORDER,
+  SupplierScoutRoute,
+  TIER_NAMES,
+  TIER_SHORT_CODES,
+  WarrantyStampMode,
+} from "@/types/game";
 import { getScaledBoostMergeCount, getTuning } from "@/lib/tuning";
 import {
   getActiveSiteRule,
@@ -333,7 +340,7 @@ export function OrdersModal({
     state.reputationTier * tuning.economy.warrantyStampCostStep;
   const effectiveMaxOrders =
     state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
-  const showProjectsButton = state.gamePhase === 2;
+  const showProjectsButton = state.gamePhase >= 2;
   const showPhase1Objective = state.gamePhase === 1 && state.tutorialComplete;
   const showPhase2Objective = state.gamePhase === 2 && !state.projectsUnlocked;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
@@ -354,7 +361,7 @@ export function OrdersModal({
   const clinicBlockedByIndependence = independenceActive;
   const independenceBlockedByClinic = clinicActive;
   const independenceObsoleteInPhase2 =
-    state.liberationComplete || state.gamePhase === 2;
+    state.liberationComplete || state.gamePhase >= 2;
   const canUseBoosts = state.tutorialComplete;
   const canUseClinic = state.tutorialComplete && state.firstSessionComplete;
   const canUseIndependence =
@@ -371,18 +378,10 @@ export function OrdersModal({
   const installMomentKey = React.useRef(0);
   const [installMoment, setInstallMoment] =
     React.useState<InstallMoment | null>(null);
-  const orderLegend = [
-    { key: "CL", label: "Clip" },
-    { key: "TR", label: "Track" },
-    { key: "SG", label: "Segment" },
-    { key: "KT", label: "Kit" },
-    { key: "PR", label: "System" },
-    { key: "AR", label: "Array" },
-    { key: "SP", label: "Spine" },
-    { key: "ST", label: "Stack" },
-    { key: "GR", label: "Grid" },
-    { key: "KI", label: "Kingdom" },
-  ];
+  const orderLegend = PART_TIER_ORDER.map((tier) => ({
+    key: TIER_SHORT_CODES[tier],
+    label: TIER_NAMES[tier].split(" ")[0],
+  }));
   const badgeLegend = [
     { key: "O", label: "Open" },
     { key: "L", label: "Locked" },
@@ -396,6 +395,8 @@ export function OrdersModal({
     !order.modifierIds?.includes("first_session") &&
     !order.modifierIds?.includes("tier5_showcase") &&
     !order.modifierIds?.includes("tier10_showcase") &&
+    !order.modifierIds?.includes("tier13_showcase") &&
+    !order.modifierIds?.includes("tier16_showcase") &&
     !order.modifierIds?.includes("threshold_story") &&
     !order.modifierIds?.includes("project_stage") &&
     !order.modifierIds?.includes("council_ratify");
@@ -1192,7 +1193,7 @@ export function OrdersModal({
                       {!state.tutorialComplete || !state.firstSessionComplete
                         ? "Finish your first session to unlock the independence session."
                         : independenceObsoleteInPhase2
-                          ? "Phase 2: Dependency is frozen, so the independence session is unavailable."
+                          ? "Phase 2+: Dependency is frozen, so the independence session is unavailable."
                           : independenceBlockedByClinic
                             ? "Finish the Mentor Workshop Clinic before starting the independence session."
                             : `Next ${independenceMerges} merges: open merges reduce Dependency by 1. Consumes on any merge.`}

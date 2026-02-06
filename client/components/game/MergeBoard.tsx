@@ -50,6 +50,7 @@ import {
   PartFamily,
   PartTier,
   Part,
+  TIER_SHORT_CODES,
 } from "@/types/game";
 
 const stationWorkbench = require("../../../assets/images/station-workbench.webp");
@@ -66,18 +67,7 @@ interface LayoutRect {
   height: number;
 }
 
-const GHOST_LABELS: Record<PartTier, string> = {
-  1: "CL",
-  2: "TR",
-  3: "SG",
-  4: "KT",
-  5: "PR",
-  6: "AR",
-  7: "SP",
-  8: "ST",
-  9: "GR",
-  10: "KI",
-};
+const GHOST_LABELS: Record<PartTier, string> = TIER_SHORT_CODES;
 
 type RecycleTierBand = "bronze" | "silver" | "gold";
 

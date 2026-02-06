@@ -33,6 +33,7 @@
 
 - `qa.md` - QA harness
 - `release_checklist.md` - production release checklist
+- `phase-1-2-3-tier-16-production-checklist.md` - source-of-truth rollout checklist for explicit phases and tier cap expansion to 16
 - `telemetry.md` - analytics runbook and event catalog
 - `changelog.md` - change log
 - `game_audit_report.md` - current state audit

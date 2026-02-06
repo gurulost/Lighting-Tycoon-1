@@ -2,7 +2,23 @@ import type { OverlayItem } from "@/types/overlay";
 
 export type PartFamily = "open" | "locked" | "waste";
 
-export type PartTier = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type PartTier =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16;
 
 export type SupplierScoutRoute = "open" | "locked" | "tier";
 
@@ -48,7 +64,36 @@ export const TIER_NAMES: Record<PartTier, string> = {
   8: "Control Stack",
   9: "Signature Grid",
   10: "Kingdom Install",
+  11: "Civic Lattice",
+  12: "Beacon Matrix",
+  13: "Metro Nexus",
+  14: "Skyline Core",
+  15: "Atlas Network",
+  16: "Legacy Standard",
 };
+
+export const TIER_SHORT_CODES: Record<PartTier, string> = {
+  1: "CL",
+  2: "TR",
+  3: "SG",
+  4: "KT",
+  5: "PR",
+  6: "AR",
+  7: "SP",
+  8: "ST",
+  9: "GR",
+  10: "KI",
+  11: "LT",
+  12: "MX",
+  13: "NX",
+  14: "SC",
+  15: "AN",
+  16: "LS",
+};
+
+export const PART_TIER_ORDER: PartTier[] = [
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+];
 
 export interface Part {
   id: string;
@@ -79,6 +124,8 @@ export type MissionType =
   | "reach_tier"
   | "fulfill_tier5_order"
   | "fulfill_tier10_order"
+  | "fulfill_tier13_order"
+  | "fulfill_tier16_order"
   | "accept_baron_offer"
   | "decline_baron_offer"
   | "craft_freedom_controller"
@@ -221,7 +268,7 @@ export interface ProjectDefinition {
   trophyName?: string;
   locationBackdrop?: string;
   unlock: {
-    phaseMin: 2;
+    phaseMin: 2 | 3;
     minRepTier: number;
     minProjectsCompleted?: number;
   };
@@ -368,7 +415,7 @@ export interface GameState {
   reputation: number;
   research: number;
   dependency: number;
-  gamePhase: 1 | 2;
+  gamePhase: 1 | 2 | 3;
   liberationComplete: boolean;
   liberationCompletedAt?: number;
   phase2GoalPending: boolean;
@@ -446,6 +493,10 @@ export interface GameState {
   tier5ShowcasePending: boolean;
   tier10ShowcaseSeen: boolean;
   tier10ShowcasePending: boolean;
+  tier13ShowcaseSeen: boolean;
+  tier13ShowcasePending: boolean;
+  tier16ShowcaseSeen: boolean;
+  tier16ShowcasePending: boolean;
 
   settings: {
     soundEnabled: boolean;
@@ -717,6 +768,36 @@ export const RD_DEFINITIONS: RDNode[] = [
     compatibilityCost: 2,
     unlocked: false,
     prerequisites: ["open_workshop_4"],
+  },
+  {
+    id: "open_workshop_6",
+    name: "Open Workshop VI",
+    description: "Expand into civic lattice and matrix-grade output.",
+    cost: 390,
+    materialCost: 6,
+    compatibilityCost: 2,
+    unlocked: false,
+    prerequisites: ["open_workshop_5"],
+  },
+  {
+    id: "open_workshop_7",
+    name: "Open Workshop VII",
+    description: "Phase 3-ready output for skyline-class installs.",
+    cost: 470,
+    materialCost: 7,
+    compatibilityCost: 3,
+    unlocked: false,
+    prerequisites: ["open_workshop_6"],
+  },
+  {
+    id: "open_workshop_8",
+    name: "Open Workshop VIII",
+    description: "Legacy-standard output for the highest-tier installs.",
+    cost: 560,
+    materialCost: 8,
+    compatibilityCost: 4,
+    unlocked: false,
+    prerequisites: ["open_workshop_7"],
   },
   {
     id: "freedom_blueprint",

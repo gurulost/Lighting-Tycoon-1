@@ -195,8 +195,13 @@ function RDNodeCard({
 }
 
 export function RDTree({ onCraftFreedomController }: RDTreeProps) {
-  const { state, unlockRDNode, craftFreedomController, skipToPhase2 } =
-    useGame();
+  const {
+    state,
+    unlockRDNode,
+    craftFreedomController,
+    skipToPhase2,
+    skipToPhase3,
+  } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const insets = useSafeAreaInsets();
   const tuning = getTuning();
@@ -252,7 +257,8 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
     (state.upgrades["rd_unlock"] || 0) >= 1 &&
     state.rdNodes["freedom_build"] &&
     state.research >= 300;
-  const canSkipPhase2 = state.gamePhase !== 2 && !state.liberationComplete;
+  const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
+  const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
 
   const handleSkipPhase2 = () => {
     if (!canSkipPhase2) return;
@@ -260,6 +266,14 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     skipToPhase2();
+  };
+
+  const handleSkipPhase3 = () => {
+    if (!canSkipPhase3) return;
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    skipToPhase3();
   };
 
   return (
@@ -383,7 +397,7 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
       <View style={styles.playtestSection}>
         <ThemedText style={styles.playtestLabel}>Playtest</ThemedText>
         <ThemedText style={styles.playtestDescription}>
-          Skip to Phase 2 state (as if Phase 1 just ended).
+          Jump directly to late-phase milestones for fast QA loops.
         </ThemedText>
         <Pressable
           onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
@@ -408,6 +422,31 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
             ]}
           >
             Skip to Phase 2
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
+          style={[
+            styles.playtestButton,
+            !canSkipPhase3 && styles.playtestButtonDisabled,
+          ]}
+        >
+          <Feather
+            name="fast-forward"
+            size={14}
+            color={
+              canSkipPhase3
+                ? GameColors.text.secondary
+                : GameColors.text.disabled
+            }
+          />
+          <ThemedText
+            style={[
+              styles.playtestButtonText,
+              !canSkipPhase3 && styles.playtestButtonTextDisabled,
+            ]}
+          >
+            Skip to Phase 3
           </ThemedText>
         </Pressable>
       </View>

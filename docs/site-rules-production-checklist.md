@@ -23,6 +23,8 @@ Status source of truth for implementing project-specific site rules.
 ## Discovered Additions Required Before Sign-off
 - [x] Confirm/lock rush deadline clamp floor (`MIN_RUSH_DEADLINE_MS`, set to 15000).
 - [x] Validate refresh lock reason precedence + UI copy when both hearing and site rule can block refresh.
+- [x] Stabilize e2e tutorial-skip interaction in `tests/e2e/settings.spec.ts` (long-press path).
+- [x] Ensure site rule helper tests include required `legacy` state shape after council/legacy coupling.
 
 ## Manual QA Matrix (to complete in step 10)
 - [x] Public Scrutiny: open-only install rep uplift applies; refresh cost increased.
@@ -42,3 +44,7 @@ Status source of truth for implementing project-specific site rules.
 - 2026-02-06: Step 9 complete (`npm run check:types`, `npm run lint`, `npm test -- --runInBand` all passing).
 - 2026-02-06: Step 10 complete via focused automated QA matrix coverage (rule behavior + precedence + completion clearing).
 - 2026-02-06: Step 11 complete (all checklist items resolved; production sign-off pass complete).
+- 2026-02-06: Post-implementation audit fixes applied:
+- 2026-02-06: `tests/e2e/settings.spec.ts` hardened to use deterministic long-press tutorial skip flow.
+- 2026-02-06: `tests/unit/siteRules.test.ts` updated with default `legacy` state to match current council dependencies.
+- 2026-02-06: `client/lib/siteRules.ts` removed unused `isOrderRefreshBlocked` export for cleanup.

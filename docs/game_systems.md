@@ -17,16 +17,39 @@ This document is the single source of truth for the core gameplay systems.
 - Recycle Bin: delete parts for small refund
 
 ## Parts and Families
-- Tiers: Clip, Track, Segment, Smart Kit, Premium System, Routing Array, Network Spine, Control Stack, Signature Grid, Kingdom Install
+- Tiers 1-16:
+  - 1 Clip
+  - 2 Track
+  - 3 Segment
+  - 4 Smart Kit
+  - 5 Premium System
+  - 6 Routing Array
+  - 7 Network Spine
+  - 8 Control Stack
+  - 9 Signature Grid
+  - 10 Kingdom Install
+  - 11 Civic Lattice
+  - 12 Beacon Matrix
+  - 13 Metro Nexus
+  - 14 Skyline Core
+  - 15 Atlas Network
+  - 16 Legacy Standard
 - Families:
   - Open: slower early, research-oriented
   - Locked: faster early, reinforces Dependency
+
+## Phases and Tier Caps
+- Phase 1: tutorial + dependency/liberation arc, tier cap 10.
+- Phase 2: post-liberation expansion, tier cap 13.
+- Phase 3: Council governance era, tier cap 16.
+- Legacy cycles start after final Council completion and reset run state while preserving legacy meta progression.
 
 ## Workbench / Spawning
 - Workbench opens the Supplier panel (Baron, Open, Salvage)
 - Each supplier has charges and a cooldown
 - During cooldowns, suppliers can be overdrawn at a cost (cash/research/waste) with a soft overheat penalty
 - Drop tiers are driven by supplier level tables
+- Open Workshop progression now extends to level VIII for Phase 3 tier access.
 - Baron offers add a temporary **bonus locked roll**
 - Phase 2 freezes Dependency at 0; Baron offers can still inject locked spikes
 
@@ -35,6 +58,8 @@ This document is the single source of truth for the core gameplay systems.
 - Types: basic, style match, rush, premium, certified, locked required, lab request
 - Modifiers add constraints without adding new items
 - Phase 2 inserts a one-time compatibility-focused goal order on liberation
+- Showcase milestones are now tier-based at 10, 13, and 16.
+- Late-game tier-floor quotas ensure high-tier asks stay represented as the player climbs.
 
 ## Phase 2 Mega-Projects (Empire Contracts)
 Mentor framing: You're free, but scale has a new kind of pressure. Empire Contracts are how the city measures you now - deposit-heavy, multi-stage work where every install is public, and every misstep compounds. Deliver the stages cleanly and the skyline follows; stumble and the market tightens.
@@ -42,6 +67,7 @@ Mentor framing: You're free, but scale has a new kind of pressure. Empire Contra
 Tina intent: I'm not just keeping the shop alive; I'm building landmarks. These contracts are the proof - stage by stage, we set the standard, make the open way visible, and turn every big build into a permanent signal that we run this city now.
 
 - Unlocks after the Phase 2 goal order is completed (`gamePhase = 2` + goal cleared).
+- Stage specs are authored as base ranges and shifted by phase (`+3` in Phase 2, `+6` in Phase 3) so contract difficulty scales with phase caps without duplicate content tables.
 - Project Board offers 3 contracts at a time; refreshable for cash.
 - Accepting a contract pays a large deposit and inserts a protected stage order.
 - Each stage is a normal order tagged `project_stage` and cannot be refreshed/dismissed.
@@ -66,6 +92,7 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
   - Pilot: complete action-based objectives during normal play.
   - Ratify: a single protected Council showcase order (no real-time timers).
 - Completing a campaign grants a run perk (order mix, rewards, supplier tweaks). Legacy doctrines carry a limited subset across cycles.
+- Ratify order ranges now span into tiers 14-16 in late campaigns so Council progression exercises full Phase 3 cap space.
 - Lobby Pressure (0-100) rises with Draft/Pilot/Ratify progress and drops via open-only installs.
 - Hearings trigger at thresholds and apply small penalties until cleared via short objectives or pay-to-clear.
 - Municipal Grants (perk): spend cash to reduce Lobby Pressure (and a small amount of Baron Pressure).

@@ -124,6 +124,54 @@ export const OPEN_TABLES: Record<number, SupplierTable> = {
       { type: "compatibility_component", chance: 0.05 },
     ],
   },
+  6: {
+    family: "open",
+    tiers: [
+      { tier: 6, weight: 23 },
+      { tier: 7, weight: 23 },
+      { tier: 8, weight: 23 },
+      { tier: 9, weight: 14 },
+      { tier: 10, weight: 9 },
+      { tier: 11, weight: 6 },
+      { tier: 12, weight: 2 },
+    ],
+    bonus: [
+      { type: "upgrade_material", chance: 0.11 },
+      { type: "compatibility_component", chance: 0.06 },
+    ],
+  },
+  7: {
+    family: "open",
+    tiers: [
+      { tier: 8, weight: 20 },
+      { tier: 9, weight: 20 },
+      { tier: 10, weight: 20 },
+      { tier: 11, weight: 15 },
+      { tier: 12, weight: 11 },
+      { tier: 13, weight: 8 },
+      { tier: 14, weight: 6 },
+    ],
+    bonus: [
+      { type: "upgrade_material", chance: 0.12 },
+      { type: "compatibility_component", chance: 0.07 },
+    ],
+  },
+  8: {
+    family: "open",
+    tiers: [
+      { tier: 10, weight: 18 },
+      { tier: 11, weight: 18 },
+      { tier: 12, weight: 18 },
+      { tier: 13, weight: 16 },
+      { tier: 14, weight: 12 },
+      { tier: 15, weight: 10 },
+      { tier: 16, weight: 8 },
+    ],
+    bonus: [
+      { type: "upgrade_material", chance: 0.13 },
+      { type: "compatibility_component", chance: 0.08 },
+    ],
+  },
 };
 
 export const SALVAGE_TOP_ROLL = {

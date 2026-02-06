@@ -214,6 +214,7 @@ type GameAction =
   | { type: "SPAWN_ORDER" }
   | { type: "RESOLVE_LOCKOUT"; choice: "baron" | "freedom" }
   | { type: "PLAYTEST_SKIP_PHASE2" }
+  | { type: "PLAYTEST_SKIP_PHASE3" }
   | { type: "LOAD_STATE"; state: GameState };
 
 type SupplierTapMode = "tap" | "overdraw";
@@ -630,7 +631,7 @@ function applyDependency(
   allowLockout = true,
   pressureDelta = 0,
 ): DependencyOutcome {
-  const phaseFrozen = state.liberationComplete || state.gamePhase === 2;
+  const phaseFrozen = state.liberationComplete || isPhaseAtLeast(state, 2);
   const prevPressure =
     typeof state.baronPressure === "number" ? state.baronPressure : 0;
   let nextDependency = state.dependency + delta;
@@ -925,7 +926,7 @@ function buildInitialCouncilState(): GameState["council"] {
 }
 
 function canUnlockCouncil(state: GameState) {
-  if (state.gamePhase !== 2) return false;
+  if (state.gamePhase < 2) return false;
   const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
   const capstoneComplete =
     capstoneId && state.projectsCompleted.includes(capstoneId);
@@ -1006,7 +1007,11 @@ function buildCouncilRatifyOrder(
     stageRewards: { rewardMultiplier: spec.rewardMultiplier },
     failPenalty: { type: "pressure", pressureIncrease: 0 },
   };
-  const baseRecipe = getProjectBaseRecipe(stageStub, Math.random);
+  const baseRecipe = getProjectBaseRecipe(
+    stageStub,
+    Math.random,
+    getMaxPartTierForState(state),
+  );
   const derived = applyProjectStageRequirements(
     baseRecipe.requirements,
     stageStub,
@@ -1208,7 +1213,7 @@ function reconcileUpgradeState(state: GameState): GameState {
     Object.values(state.rdNodes).some(Boolean) ||
     nextSuppliers.open.level > 0 ||
     state.freedomControllerCount > 0 ||
-    state.gamePhase === 2 ||
+    state.gamePhase >= 2 ||
     state.liberationComplete;
   if (hasRdProgress) {
     ensureUpgradeOwned("rd_unlock");
@@ -1336,7 +1341,7 @@ function applyMissionRewardTuning(
 const MAX_STORY_LOG_ENTRIES = 120;
 const PERSISTED_STORY_LOG_LIMIT = 120;
 const PERSISTED_STORY_QUEUE_LIMIT = 8;
-const MAX_PART_TIER: PartTier = 10;
+const MAX_PART_TIER: PartTier = 16;
 const MAX_WASTE_TIER: PartTier = 3;
 const SAVE_VERSION = 1;
 const STORAGE_KEY = "lighting_tycoon_state_v1";
@@ -1359,6 +1364,26 @@ const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
 };
 const SAVE_DEBOUNCE_MS = 1200;
 const SAVE_MAX_WAIT_MS = 12000;
+const PHASE_MAX_PART_TIER: Record<GameState["gamePhase"], PartTier> = {
+  1: 10,
+  2: 13,
+  3: 16,
+};
+
+function getMaxPartTierForPhase(phase: GameState["gamePhase"]): PartTier {
+  return PHASE_MAX_PART_TIER[phase] ?? 10;
+}
+
+function getMaxPartTierForState(state: Pick<GameState, "gamePhase">): PartTier {
+  return getMaxPartTierForPhase(state.gamePhase);
+}
+
+function isPhaseAtLeast(
+  state: Pick<GameState, "gamePhase">,
+  phase: GameState["gamePhase"],
+) {
+  return state.gamePhase >= phase;
+}
 
 type SaveEnvelope = {
   version: number;
@@ -1675,6 +1700,7 @@ function getTargetOrderDifficulty(
   reputationTier: number,
   maxTierCrafted: number,
   upgrades: Record<string, number>,
+  maxPartTier: PartTier,
   bonus = 0,
 ) {
   const tierScore = Math.max(1, maxTierCrafted);
@@ -1683,7 +1709,7 @@ function getTargetOrderDifficulty(
   const target = Math.round(
     tierScore + repScore * 0.5 + qualityBonus * 0.5 + bonus,
   );
-  return Math.max(2, Math.min(10, target));
+  return Math.max(2, Math.min(maxPartTier, target));
 }
 
 function getMaxActiveMissions() {
@@ -2153,6 +2179,28 @@ function applyMissionProgress(
         }
         break;
       }
+      case "fulfill_tier13_order": {
+        if (event.type === "fulfill_order") {
+          const requiresTier13 = event.order.requirements.some(
+            (req) => req.tier >= 13,
+          );
+          if (requiresTier13) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
+      case "fulfill_tier16_order": {
+        if (event.type === "fulfill_order") {
+          const requiresTier16 = event.order.requirements.some(
+            (req) => req.tier >= 16,
+          );
+          if (requiresTier16) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
       case "accept_baron_offer": {
         if (event.type === "accept_baron_offer") {
           nextProgress = Math.min(target, mission.progress + 1);
@@ -2291,17 +2339,14 @@ function pickWeightedTemplate<T extends { weight?: number }>(
 function getProjectBaseRecipe(
   stage: ProjectStageDefinition,
   rng: () => number,
+  maxPartTier: PartTier,
+  tierBonus = 0,
 ) {
   const [rawMin, rawMax] = stage.orderSpec.targetTierRange;
   const difficultyBonus = stage.orderSpec.difficultyBonus ?? 0;
-  const minTier = Math.max(
-    1,
-    Math.min(rawMin, rawMax) + Math.floor(difficultyBonus),
-  );
-  const maxTier = Math.min(
-    10,
-    Math.max(rawMin, rawMax) + Math.floor(difficultyBonus),
-  );
+  const totalBonus = Math.floor(difficultyBonus) + Math.floor(tierBonus);
+  const minTier = Math.max(1, Math.min(rawMin, rawMax) + totalBonus);
+  const maxTier = Math.min(maxPartTier, Math.max(rawMin, rawMax) + totalBonus);
   const candidates = BASE_RECIPES.filter((recipe) => {
     const recipeMax = Math.max(...recipe.requirements.map((req) => req.tier));
     return recipeMax >= minTier && recipeMax <= maxTier;
@@ -2382,7 +2427,14 @@ export function buildProjectStageOrder(
     `${seed}:${project.id}:${stage.stageIndex}:${rerollCount}`,
   );
   const rng = createSeededRng(seedKey);
-  const baseRecipe = getProjectBaseRecipe(stage, rng);
+  const projectPhaseTierBonus =
+    state.gamePhase >= 3 ? 6 : state.gamePhase >= 2 ? 3 : 0;
+  const baseRecipe = getProjectBaseRecipe(
+    stage,
+    rng,
+    getMaxPartTierForState(state),
+    projectPhaseTierBonus,
+  );
   const spec = modifierVariant
     ? { ...stage.orderSpec, ...modifierVariant }
     : stage.orderSpec;
@@ -2614,6 +2666,13 @@ const PLAYTEST_PHASE2_BASE_UPGRADE_MATERIALS = 6;
 const PLAYTEST_PHASE2_BASE_COMPATIBILITY_COMPONENTS = 2;
 const PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL = 3;
 const PLAYTEST_PHASE2_MIN_MAX_TIER: PartTier = 4;
+const PLAYTEST_PHASE3_BASE_REPUTATION = 2200;
+const PLAYTEST_PHASE3_BASE_CASH = 90000;
+const PLAYTEST_PHASE3_BASE_RESEARCH = 4200;
+const PLAYTEST_PHASE3_BASE_UPGRADE_MATERIALS = 20;
+const PLAYTEST_PHASE3_BASE_COMPATIBILITY_COMPONENTS = 10;
+const PLAYTEST_PHASE3_MIN_OPEN_WORKSHOP_LEVEL = 8;
+const PLAYTEST_PHASE3_MIN_MAX_TIER: PartTier = 13;
 
 function buildLegacyCycleStartState(
   state: GameState,
@@ -2959,17 +3018,19 @@ function isProtectedOrder(state: GameState, order: Order) {
   if (order.modifierIds?.includes("first_session")) return true;
   if (order.modifierIds?.includes("tier5_showcase")) return true;
   if (order.modifierIds?.includes("tier10_showcase")) return true;
+  if (order.modifierIds?.includes("tier13_showcase")) return true;
+  if (order.modifierIds?.includes("tier16_showcase")) return true;
   if (order.modifierIds?.includes("threshold_story")) return true;
   if (order.modifierIds?.includes("project_stage")) return true;
   if (order.modifierIds?.includes("council_ratify")) return true;
   return false;
 }
 
-function insertTier5ShowcaseOrder(
+function insertShowcaseOrder(
   state: GameState,
   orders: Order[],
+  showcaseOrder: Order,
 ): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
-  const showcaseOrder = createTier5ShowcaseOrder();
   if (orders.length < getEffectiveMaxOrders(state)) {
     return {
       orders: [...orders, showcaseOrder],
@@ -3007,46 +3068,32 @@ function insertTier5ShowcaseOrder(
   };
 }
 
+function insertTier5ShowcaseOrder(
+  state: GameState,
+  orders: Order[],
+): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
+  return insertShowcaseOrder(state, orders, createTier5ShowcaseOrder());
+}
+
 function insertTier10ShowcaseOrder(
   state: GameState,
   orders: Order[],
 ): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
-  const showcaseOrder = createTier10ShowcaseOrder();
-  if (orders.length < getEffectiveMaxOrders(state)) {
-    return {
-      orders: [...orders, showcaseOrder],
-      highlightedOrderId: state.highlightedOrderId,
-      inserted: true,
-    };
-  }
+  return insertShowcaseOrder(state, orders, createTier10ShowcaseOrder());
+}
 
-  let removableIndex = -1;
-  for (let i = orders.length - 1; i >= 0; i -= 1) {
-    if (!isProtectedOrder(state, orders[i])) {
-      removableIndex = i;
-      break;
-    }
-  }
-  if (removableIndex === -1) {
-    return {
-      orders,
-      highlightedOrderId: state.highlightedOrderId,
-      inserted: false,
-    };
-  }
+function insertTier13ShowcaseOrder(
+  state: GameState,
+  orders: Order[],
+): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
+  return insertShowcaseOrder(state, orders, createTier13ShowcaseOrder());
+}
 
-  const removedOrder = orders[removableIndex];
-  const nextOrders = orders.filter((_, index) => index !== removableIndex);
-  const nextHighlightedOrderId =
-    state.highlightedOrderId === removedOrder.id
-      ? undefined
-      : state.highlightedOrderId;
-
-  return {
-    orders: [...nextOrders, showcaseOrder],
-    highlightedOrderId: nextHighlightedOrderId,
-    inserted: true,
-  };
+function insertTier16ShowcaseOrder(
+  state: GameState,
+  orders: Order[],
+): { orders: Order[]; highlightedOrderId?: string; inserted: boolean } {
+  return insertShowcaseOrder(state, orders, createTier16ShowcaseOrder());
 }
 
 function insertStoryOrder(
@@ -3195,19 +3242,21 @@ function getRecycleReward(part: Part) {
       pressureReduction: reward.pressureReduction,
     };
   }
+  const recycleBaseByTier: Partial<Record<PartTier, number>> = {
+    1: 20,
+    2: 50,
+    3: 100,
+    4: 200,
+    5: 400,
+    6: 800,
+    7: 1200,
+    8: 1800,
+    9: 2600,
+    10: 3600,
+  };
   const baseValue =
-    {
-      1: 20,
-      2: 50,
-      3: 100,
-      4: 200,
-      5: 400,
-      6: 800,
-      7: 1200,
-      8: 1800,
-      9: 2600,
-      10: 3600,
-    }[part.tier] || 20;
+    recycleBaseByTier[part.tier] ??
+    Math.round(3600 * Math.pow(1.35, Math.max(0, part.tier - 10)));
   const cash = Math.max(1, Math.floor(baseValue * 0.2));
   let research = part.family === "open" ? Math.max(0, part.tier - 2) : 0;
   if (part.tier >= 5) {
@@ -3259,11 +3308,12 @@ function generateOrder(
   maxTierCrafted: number,
   upgrades: Record<string, number>,
   marketingBoostOrdersRemaining: number,
-  gamePhase: 1 | 2,
+  gamePhase: 1 | 2 | 3,
   requiredMinTier?: PartTier,
   compatOrderWeightMultiplier = 1,
   rushDeadlineMult = 1,
 ): Order | null {
+  const phaseMaxPartTier = getMaxPartTierForPhase(gamePhase);
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
   const currentNeighborhood =
     NEIGHBORHOODS.find((n) => n.id === currentNeighborhoodId) ||
@@ -3292,6 +3342,9 @@ function generateOrder(
     if (t.type === "locked_required" && certifiedActive) return false;
     if (t.type === "compatibility_required" && compatibilityActive)
       return false;
+    if (Math.max(...t.requirements.map((req) => req.tier)) > phaseMaxPartTier) {
+      return false;
+    }
     return true;
   });
 
@@ -3321,11 +3374,12 @@ function generateOrder(
       ? tuning.boosts.marketingDifficultyBonus
       : 0;
   const phaseDifficultyBonus =
-    gamePhase === 2 ? tuning.phase2.difficultyBonus : 0;
+    gamePhase >= 2 ? tuning.phase2.difficultyBonus : 0;
   const targetDifficulty = getTargetOrderDifficulty(
     reputationTier,
     maxTierCrafted,
     upgrades,
+    phaseMaxPartTier,
     marketingBoost + phaseDifficultyBonus,
   );
   const weightedTemplates = candidateTemplates.map((template) => {
@@ -3338,7 +3392,7 @@ function generateOrder(
     const difficultyDelta = Math.abs(templateDifficulty - targetDifficulty);
     const difficultyWeight = Math.pow(0.75, difficultyDelta);
     const phaseWeight =
-      gamePhase === 2 && template.type === "compatibility_required"
+      gamePhase >= 2 && template.type === "compatibility_required"
         ? tuning.phase2.compatibilityOrderWeight * compatOrderWeightMultiplier
         : 1;
     return {
@@ -3488,6 +3542,67 @@ function createTier10ShowcaseOrder(): Order {
     flavorText: "Your masterpiece. The whole district takes notice.",
     modifierIds: ["tier10_showcase"],
   });
+}
+
+function createTier13ShowcaseOrder(): Order {
+  return withTunedRewards({
+    id: generateId(),
+    title: "Metro Showcase",
+    type: "premium",
+    requirements: [{ tier: 13, family: "any", count: 1 }],
+    rewards: { cash: 9800, reputation: 360, research: 210 },
+    flavorText: "The citywide board wants proof you can run Nexus scale.",
+    modifierIds: ["tier13_showcase"],
+  });
+}
+
+function createTier16ShowcaseOrder(): Order {
+  return withTunedRewards({
+    id: generateId(),
+    title: "Legacy Showcase",
+    type: "premium",
+    requirements: [{ tier: 16, family: "any", count: 1 }],
+    rewards: { cash: 16000, reputation: 520, research: 320 },
+    flavorText: "Final benchmark. Deliver the install everyone else chases.",
+    modifierIds: ["tier16_showcase"],
+  });
+}
+
+function getTierDiscoveryBeat(tier: number): string | null {
+  switch (tier) {
+    case 2:
+      return "discover_track";
+    case 3:
+      return "discover_segment";
+    case 4:
+      return "discover_smartkit";
+    case 5:
+      return "discover_system";
+    case 6:
+      return "discover_array";
+    case 7:
+      return "discover_spine";
+    case 8:
+      return "discover_stack";
+    case 9:
+      return "discover_grid";
+    case 10:
+      return "discover_kingdom";
+    case 11:
+      return "discover_lattice";
+    case 12:
+      return "discover_matrix";
+    case 13:
+      return "discover_nexus";
+    case 14:
+      return "discover_core";
+    case 15:
+      return "discover_atlas";
+    case 16:
+      return "discover_legacy_standard";
+    default:
+      return null;
+  }
 }
 
 function createTutorialMetrics() {
@@ -3666,6 +3781,10 @@ export function getInitialState(): GameState {
     tier5ShowcasePending: false,
     tier10ShowcaseSeen: false,
     tier10ShowcasePending: false,
+    tier13ShowcaseSeen: false,
+    tier13ShowcasePending: false,
+    tier16ShowcaseSeen: false,
+    tier16ShowcasePending: false,
     settings: {
       soundEnabled: true,
       hapticsEnabled: true,
@@ -4072,7 +4191,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             Math.round(tuning.boosts.scoutTierBonus),
           );
           baseItem.tier = Math.min(
-            MAX_PART_TIER,
+            getMaxPartTierForState(state),
             baseItem.tier + tierBonus,
           ) as PartTier;
         }
@@ -4098,7 +4217,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               : 0;
           const tierBonusChance = Math.min(0.95, qualityChance);
           if (tierBonusChance > 0 && Math.random() < tierBonusChance) {
-            nextTier = Math.min(MAX_PART_TIER, nextTier + 1) as PartTier;
+            nextTier = Math.min(
+              getMaxPartTierForState(state),
+              nextTier + 1,
+            ) as PartTier;
           }
           return { ...item, tier: nextTier };
         });
@@ -4402,6 +4524,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let nextTier5ShowcasePending = state.tier5ShowcasePending;
       let nextTier10ShowcaseSeen = state.tier10ShowcaseSeen;
       let nextTier10ShowcasePending = state.tier10ShowcasePending;
+      let nextTier13ShowcaseSeen = state.tier13ShowcaseSeen;
+      let nextTier13ShowcasePending = state.tier13ShowcasePending;
+      let nextTier16ShowcaseSeen = state.tier16ShowcaseSeen;
+      let nextTier16ShowcasePending = state.tier16ShowcasePending;
       let nextTierDiscovery = state.tierDiscovery;
       let nextTierDiscoveryId = state.lastTierDiscoveryId;
       let nextTierDiscovered = state.lastTierDiscovered;
@@ -4415,26 +4541,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         nextTierDiscoveryId = state.lastTierDiscoveryId + 1;
         nextTierDiscovered = spawnedTier;
         if (shouldQueueDiscovery) {
-          const tierBeat =
-            spawnedTier === 2
-              ? "discover_track"
-              : spawnedTier === 3
-                ? "discover_segment"
-                : spawnedTier === 4
-                  ? "discover_smartkit"
-                  : spawnedTier === 5
-                    ? "discover_system"
-                    : spawnedTier === 6
-                      ? "discover_array"
-                      : spawnedTier === 7
-                        ? "discover_spine"
-                        : spawnedTier === 8
-                          ? "discover_stack"
-                          : spawnedTier === 9
-                            ? "discover_grid"
-                            : spawnedTier === 10
-                              ? "discover_kingdom"
-                              : null;
+          const tierBeat = getTierDiscoveryBeat(spawnedTier);
           if (tierBeat) discoveryBeats.push(tierBeat);
         }
       }
@@ -4467,6 +4574,36 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           nextTier10ShowcasePending = false;
         } else {
           nextTier10ShowcasePending = true;
+        }
+      }
+      if (
+        spawnedTier === 13 &&
+        !state.tier13ShowcaseSeen &&
+        !state.tier13ShowcasePending
+      ) {
+        const showcaseResult = insertTier13ShowcaseOrder(state, nextOrders);
+        if (showcaseResult.inserted) {
+          nextOrders = showcaseResult.orders;
+          nextHighlightedOrderId = showcaseResult.highlightedOrderId;
+          nextTier13ShowcaseSeen = true;
+          nextTier13ShowcasePending = false;
+        } else {
+          nextTier13ShowcasePending = true;
+        }
+      }
+      if (
+        spawnedTier === 16 &&
+        !state.tier16ShowcaseSeen &&
+        !state.tier16ShowcasePending
+      ) {
+        const showcaseResult = insertTier16ShowcaseOrder(state, nextOrders);
+        if (showcaseResult.inserted) {
+          nextOrders = showcaseResult.orders;
+          nextHighlightedOrderId = showcaseResult.highlightedOrderId;
+          nextTier16ShowcaseSeen = true;
+          nextTier16ShowcasePending = false;
+        } else {
+          nextTier16ShowcasePending = true;
         }
       }
 
@@ -4570,6 +4707,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         tier5ShowcasePending: nextTier5ShowcasePending,
         tier10ShowcaseSeen: nextTier10ShowcaseSeen,
         tier10ShowcasePending: nextTier10ShowcasePending,
+        tier13ShowcaseSeen: nextTier13ShowcaseSeen,
+        tier13ShowcasePending: nextTier13ShowcasePending,
+        tier16ShowcaseSeen: nextTier16ShowcaseSeen,
+        tier16ShowcasePending: nextTier16ShowcasePending,
         tierDiscovery: nextTierDiscovery,
         lastTierDiscoveryId: nextTierDiscoveryId,
         lastTierDiscovered: nextTierDiscovered,
@@ -4687,6 +4828,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const { fromIndex, toIndex } = action;
       const fromPart = state.board[fromIndex];
       const toPart = state.board[toIndex];
+      const phaseMaxTier = getMaxPartTierForPhase(state.gamePhase);
 
       if (!fromPart || !toPart) return state;
       if (fromPart.tier !== toPart.tier) return state;
@@ -4696,7 +4838,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (fromPart.family !== "waste" || toPart.family !== "waste")
           return state;
         if (fromPart.tier >= MAX_WASTE_TIER) return state;
-      } else if (fromPart.tier >= MAX_PART_TIER) {
+      } else if (fromPart.tier >= phaseMaxTier) {
         return state;
       }
 
@@ -4884,6 +5026,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let nextHighlightedOrderId = state.highlightedOrderId;
       let nextTier5ShowcaseSeen = state.tier5ShowcaseSeen;
       let nextTier5ShowcasePending = state.tier5ShowcasePending;
+      let nextTier10ShowcaseSeen = state.tier10ShowcaseSeen;
+      let nextTier10ShowcasePending = state.tier10ShowcasePending;
+      let nextTier13ShowcaseSeen = state.tier13ShowcaseSeen;
+      let nextTier13ShowcasePending = state.tier13ShowcasePending;
+      let nextTier16ShowcaseSeen = state.tier16ShowcaseSeen;
+      let nextTier16ShowcasePending = state.tier16ShowcasePending;
       let nextOrderMetrics = state.orderMetrics;
       let nextTierDiscovery = state.tierDiscovery;
       let nextTierDiscoveryId = state.lastTierDiscoveryId;
@@ -4900,26 +5048,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         nextTierDiscoveryId = state.lastTierDiscoveryId + 1;
         nextTierDiscovered = newTier;
         if (shouldQueueDiscovery) {
-          const tierBeat =
-            newTier === 2
-              ? "discover_track"
-              : newTier === 3
-                ? "discover_segment"
-                : newTier === 4
-                  ? "discover_smartkit"
-                  : newTier === 5
-                    ? "discover_system"
-                    : newTier === 6
-                      ? "discover_array"
-                      : newTier === 7
-                        ? "discover_spine"
-                        : newTier === 8
-                          ? "discover_stack"
-                          : newTier === 9
-                            ? "discover_grid"
-                            : newTier === 10
-                              ? "discover_kingdom"
-                              : null;
+          const tierBeat = getTierDiscoveryBeat(newTier);
           if (tierBeat) discoveryBeats.push(tierBeat);
         }
       }
@@ -4960,8 +5089,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           nextTier5ShowcasePending = true;
         }
       }
-      let nextTier10ShowcaseSeen = state.tier10ShowcaseSeen;
-      let nextTier10ShowcasePending = state.tier10ShowcasePending;
       if (
         newTier === 10 &&
         !state.tier10ShowcaseSeen &&
@@ -4975,6 +5102,36 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           nextTier10ShowcasePending = false;
         } else {
           nextTier10ShowcasePending = true;
+        }
+      }
+      if (
+        newTier === 13 &&
+        !state.tier13ShowcaseSeen &&
+        !state.tier13ShowcasePending
+      ) {
+        const showcaseResult = insertTier13ShowcaseOrder(state, nextOrders);
+        if (showcaseResult.inserted) {
+          nextOrders = showcaseResult.orders;
+          nextHighlightedOrderId = showcaseResult.highlightedOrderId;
+          nextTier13ShowcaseSeen = true;
+          nextTier13ShowcasePending = false;
+        } else {
+          nextTier13ShowcasePending = true;
+        }
+      }
+      if (
+        newTier === 16 &&
+        !state.tier16ShowcaseSeen &&
+        !state.tier16ShowcasePending
+      ) {
+        const showcaseResult = insertTier16ShowcaseOrder(state, nextOrders);
+        if (showcaseResult.inserted) {
+          nextOrders = showcaseResult.orders;
+          nextHighlightedOrderId = showcaseResult.highlightedOrderId;
+          nextTier16ShowcaseSeen = true;
+          nextTier16ShowcasePending = false;
+        } else {
+          nextTier16ShowcasePending = true;
         }
       }
       if (
@@ -5109,6 +5266,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         tier5ShowcasePending: nextTier5ShowcasePending,
         tier10ShowcaseSeen: nextTier10ShowcaseSeen,
         tier10ShowcasePending: nextTier10ShowcasePending,
+        tier13ShowcaseSeen: nextTier13ShowcaseSeen,
+        tier13ShowcasePending: nextTier13ShowcasePending,
+        tier16ShowcaseSeen: nextTier16ShowcaseSeen,
+        tier16ShowcasePending: nextTier16ShowcasePending,
         tierDiscovery: nextTierDiscovery,
         lastTierDiscoveryId: nextTierDiscoveryId,
         lastTierDiscovered: nextTierDiscovered,
@@ -5600,6 +5761,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let nextProjectRevealQueue = state.projectRevealQueue;
       let nextProjectCompletionLog = state.projectCompletionLog;
       let queuedTier10ShowcaseBeat = false;
+      let queuedTier13ShowcaseBeat = false;
+      let queuedTier16ShowcaseBeat = false;
       let nextProjectDebuff = state.projectDebuff;
       let nextActiveProject = state.activeProject;
       let nextProjectOffers = state.projectOffers;
@@ -5689,7 +5852,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         }
         const resolvedTier = Math.max(
           1,
-          Math.min(MAX_PART_TIER, Math.floor(dropTier)),
+          Math.min(getMaxPartTierForState(state), Math.floor(dropTier)),
         ) as PartTier;
         const emptySlot = findEmptySlot(state, nextBoard);
         if (emptySlot !== -1) {
@@ -5811,7 +5974,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       );
       let phase2PenaltyActive = false;
       let phase2RewardMultiplier = 1;
-      if (state.gamePhase === 2) {
+      if (state.gamePhase >= 2) {
         const rewardMultiplier = getPhase2RewardMultiplier(
           dependencyOutcome.baronPressure,
         );
@@ -5927,7 +6090,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const firstSessionActive =
         state.tutorialComplete && !state.firstSessionComplete;
       const baronGate =
-        state.gamePhase === 2 ? true : dependencyOutcome.dependency >= 20;
+        state.gamePhase >= 2 ? true : dependencyOutcome.dependency >= 20;
       const lockoutBlockingOffers =
         state.lockoutActive || dependencyOutcome.lockoutActive;
       const canTriggerBaron =
@@ -6041,9 +6204,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (order.modifierIds?.includes("tier10_showcase")) {
         const speedLevel = state.upgrades["workbench_speed_1"] || 0;
-        if (state.suppliers.open.level > 0) {
-          const nextLevel = Math.min(5, state.suppliers.open.level + 1);
-          if (nextLevel === state.suppliers.open.level) {
+        if (nextSuppliers.open.level > 0) {
+          const maxOpenWorkshopLevel =
+            OPEN_WORKSHOP_LEVELS.length > 0 ? OPEN_WORKSHOP_LEVELS[0] : 1;
+          const nextLevel = Math.min(
+            maxOpenWorkshopLevel,
+            nextSuppliers.open.level + 1,
+          );
+          if (nextLevel === nextSuppliers.open.level) {
             nextUpgradeMaterials += 2;
           } else {
             const config = getSupplierConfigWithPerks(
@@ -6053,7 +6221,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               speedLevel,
             );
             nextSuppliers = {
-              ...state.suppliers,
+              ...nextSuppliers,
               open: {
                 level: nextLevel,
                 chargesRemaining: config.maxCharges,
@@ -6072,6 +6240,81 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         }
         nextCompatibilityComponents += 1;
         queuedTier10ShowcaseBeat = true;
+      }
+      if (order.modifierIds?.includes("tier13_showcase")) {
+        const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+        if (nextSuppliers.open.level > 0) {
+          const maxOpenWorkshopLevel =
+            OPEN_WORKSHOP_LEVELS.length > 0 ? OPEN_WORKSHOP_LEVELS[0] : 1;
+          const nextLevel = Math.min(
+            maxOpenWorkshopLevel,
+            nextSuppliers.open.level + 1,
+          );
+          if (nextLevel === nextSuppliers.open.level) {
+            nextUpgradeMaterials += 3;
+          } else {
+            const config = getSupplierConfigWithPerks(
+              state,
+              "open",
+              nextLevel,
+              speedLevel,
+            );
+            nextSuppliers = {
+              ...nextSuppliers,
+              open: {
+                level: nextLevel,
+                chargesRemaining: config.maxCharges,
+                cooldownEndsAt: 0,
+                overdrawCount: 0,
+              },
+            };
+            const upgradedNodes = { ...nextRdNodes };
+            for (let level = 1; level <= nextLevel; level += 1) {
+              upgradedNodes[`open_workshop_${level}`] = true;
+            }
+            nextRdNodes = upgradedNodes;
+          }
+        } else {
+          nextUpgradeMaterials += 3;
+        }
+        nextCompatibilityComponents += 2;
+        queuedTier13ShowcaseBeat = true;
+      }
+      if (order.modifierIds?.includes("tier16_showcase")) {
+        const speedLevel = state.upgrades["workbench_speed_1"] || 0;
+        if (nextSuppliers.open.level > 0) {
+          const maxOpenWorkshopLevel =
+            OPEN_WORKSHOP_LEVELS.length > 0 ? OPEN_WORKSHOP_LEVELS[0] : 1;
+          const nextLevel = maxOpenWorkshopLevel;
+          if (nextLevel === nextSuppliers.open.level) {
+            nextUpgradeMaterials += 5;
+          } else {
+            const config = getSupplierConfigWithPerks(
+              state,
+              "open",
+              nextLevel,
+              speedLevel,
+            );
+            nextSuppliers = {
+              ...nextSuppliers,
+              open: {
+                level: nextLevel,
+                chargesRemaining: config.maxCharges,
+                cooldownEndsAt: 0,
+                overdrawCount: 0,
+              },
+            };
+            const upgradedNodes = { ...nextRdNodes };
+            for (let level = 1; level <= nextLevel; level += 1) {
+              upgradedNodes[`open_workshop_${level}`] = true;
+            }
+            nextRdNodes = upgradedNodes;
+          }
+        } else {
+          nextUpgradeMaterials += 5;
+        }
+        nextCompatibilityComponents += 3;
+        queuedTier16ShowcaseBeat = true;
       }
 
       if (
@@ -6326,6 +6569,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             ...nextCouncil,
             unlocked: true,
           };
+          nextGamePhase = 3;
           councilUnlockedNow = true;
         }
       }
@@ -7111,6 +7355,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (queuedTier10ShowcaseBeat) {
         nextState = queueStoryBeat(nextState, "tier10_showcase");
       }
+      if (queuedTier13ShowcaseBeat) {
+        nextState = queueStoryBeat(nextState, "tier13_showcase");
+      }
+      if (queuedTier16ShowcaseBeat) {
+        nextState = queueStoryBeat(nextState, "tier16_showcase");
+      }
       if (queuedFirstSessionBeat) {
         nextState = queueStoryBeat(nextState, queuedFirstSessionBeat);
       }
@@ -7195,7 +7445,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (
         upgrade.effect.startsWith("dependency_reduce_") &&
-        (state.liberationComplete || state.gamePhase === 2)
+        (state.liberationComplete || state.gamePhase >= 2)
       ) {
         return state;
       }
@@ -7882,7 +8132,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         });
         return state;
       }
-      if (state.liberationComplete || state.gamePhase === 2) {
+      if (state.liberationComplete || state.gamePhase >= 2) {
         captureEvent("upgrade_blocked", {
           choiceGroup: MENTOR_CHOICE_GROUP,
           optionId: MENTOR_INDEPENDENCE_OPTION_ID,
@@ -8011,7 +8261,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "PROJECT_GENERATE_OFFERS": {
-      if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
+      if (!state.projectsUnlocked || state.gamePhase < 2) return state;
       const offers = generateProjectOffers(state, 3);
       const projectRevealQueue = updateProjectRevealQueue(
         state.projectRevealQueue,
@@ -8030,7 +8280,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "PROJECT_REFRESH_OFFERS": {
-      if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
+      if (!state.projectsUnlocked || state.gamePhase < 2) return state;
       const refreshCost = getProjectOfferRefreshCost(state.reputationTier);
       if (state.cash < refreshCost) return state;
       captureEvent("project_offer_refresh", {
@@ -8088,7 +8338,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "PROJECT_ACCEPT": {
-      if (!state.projectsUnlocked || state.gamePhase !== 2) return state;
+      if (!state.projectsUnlocked || state.gamePhase < 2) return state;
       if (state.activeProject) return state;
       const project = getProjectDefinitionById(action.projectId);
       if (!project) return state;
@@ -8368,7 +8618,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "PROJECT_ADDON_PURCHASE": {
       if (!state.activeProject) return state;
-      if (state.gamePhase !== 2) return state;
+      if (state.gamePhase < 2) return state;
       const activeProject = state.activeProject;
       const project = getProjectDefinitionById(activeProject.projectId);
       if (!project) return state;
@@ -8484,7 +8734,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "PROJECT_CHANGE_ORDER": {
       if (!state.activeProject) return state;
-      if (state.gamePhase !== 2) return state;
+      if (state.gamePhase < 2) return state;
       const activeProject = state.activeProject;
       const project = getProjectDefinitionById(activeProject.projectId);
       if (!project) return state;
@@ -9585,6 +9835,42 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           };
         }
       }
+      if (
+        workingState.tier13ShowcasePending &&
+        !workingState.tier13ShowcaseSeen
+      ) {
+        const showcaseResult = insertTier13ShowcaseOrder(
+          workingState,
+          workingState.orders,
+        );
+        if (showcaseResult.inserted) {
+          return {
+            ...workingState,
+            orders: showcaseResult.orders,
+            highlightedOrderId: showcaseResult.highlightedOrderId,
+            tier13ShowcaseSeen: true,
+            tier13ShowcasePending: false,
+          };
+        }
+      }
+      if (
+        workingState.tier16ShowcasePending &&
+        !workingState.tier16ShowcaseSeen
+      ) {
+        const showcaseResult = insertTier16ShowcaseOrder(
+          workingState,
+          workingState.orders,
+        );
+        if (showcaseResult.inserted) {
+          return {
+            ...workingState,
+            orders: showcaseResult.orders,
+            highlightedOrderId: showcaseResult.highlightedOrderId,
+            tier16ShowcaseSeen: true,
+            tier16ShowcasePending: false,
+          };
+        }
+      }
 
       const firstSessionActive =
         workingState.tutorialComplete && !workingState.firstSessionComplete;
@@ -10114,6 +10400,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         tier5ShowcasePending: false,
         tier10ShowcaseSeen: false,
         tier10ShowcasePending: false,
+        tier13ShowcaseSeen: false,
+        tier13ShowcasePending: false,
+        tier16ShowcaseSeen: false,
+        tier16ShowcasePending: false,
         mergeChainCount: 0,
         mergeChainExpiresAt: 0,
         lastMergeBonusId: 0,
@@ -10518,7 +10808,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
 
       const applyQualityFloor = () => {
-        const floor = Math.min(MAX_PART_TIER, 2 + levelIndex) as PartTier;
+        const floor = Math.min(
+          getMaxPartTierForState(state),
+          2 + levelIndex,
+        ) as PartTier;
         nextDropFloor = floor;
       };
 
@@ -10663,7 +10956,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "PLAYTEST_SKIP_PHASE2": {
-      if (state.gamePhase === 2 || state.liberationComplete) return state;
+      if (state.gamePhase >= 2 || state.liberationComplete) return state;
       const now = Date.now();
       const stripLabRequests =
         state.lockoutActive && state.lockoutChoice === "lab";
@@ -10998,6 +11291,268 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return nextState;
     }
 
+    case "PLAYTEST_SKIP_PHASE3": {
+      let workingState = state;
+      if (workingState.gamePhase < 2 || !workingState.liberationComplete) {
+        workingState = gameReducer(workingState, {
+          type: "PLAYTEST_SKIP_PHASE2",
+        });
+      }
+      if (workingState.gamePhase >= 3 && workingState.council.unlocked) {
+        return workingState;
+      }
+
+      const now = Date.now();
+      const nextReputation = Math.max(
+        workingState.reputation,
+        PLAYTEST_PHASE3_BASE_REPUTATION,
+      );
+      const nextNeighborhood = getNeighborhoodByRep(nextReputation);
+      const nextRepTier = getReputationTier(nextReputation);
+      const nextMaxTierCrafted = Math.max(
+        workingState.maxTierCrafted,
+        PLAYTEST_PHASE3_MIN_MAX_TIER,
+      );
+      const nextUpgrades: Record<string, number> = {
+        ...workingState.upgrades,
+        space_1: Math.max(1, workingState.upgrades["space_1"] || 0),
+        rd_unlock: Math.max(1, workingState.upgrades["rd_unlock"] || 0),
+      };
+      const nextRdNodes: Record<string, boolean> = {
+        ...workingState.rdNodes,
+        open_standard_1: true,
+        open_standard_2: true,
+        freedom_blueprint: true,
+        freedom_build: true,
+      };
+      for (
+        let level = 1;
+        level <= PLAYTEST_PHASE3_MIN_OPEN_WORKSHOP_LEVEL;
+        level += 1
+      ) {
+        nextRdNodes[`open_workshop_${level}`] = true;
+      }
+
+      const seededState: GameState = {
+        ...workingState,
+        gamePhase: 3,
+        liberationComplete: true,
+        liberationCompletedAt:
+          typeof workingState.liberationCompletedAt === "number"
+            ? workingState.liberationCompletedAt
+            : now,
+        reputation: nextReputation,
+        reputationTier: nextRepTier,
+        currentNeighborhoodId: nextNeighborhood.id,
+        upgrades: nextUpgrades,
+        rdNodes: nextRdNodes,
+      };
+      const speedLevel = nextUpgrades["workbench_speed_1"] || 0;
+      const nextOpenLevel = Math.max(
+        workingState.suppliers.open.level,
+        PLAYTEST_PHASE3_MIN_OPEN_WORKSHOP_LEVEL,
+      );
+      const baronLevel = Math.max(1, workingState.suppliers.baron.level || 1);
+      const salvageLevel = Math.max(
+        0,
+        workingState.suppliers.salvage.level || 0,
+      );
+      const openConfig = getSupplierConfigWithPerks(
+        seededState,
+        "open",
+        nextOpenLevel,
+        speedLevel,
+      );
+      const baronConfig = getSupplierConfigWithPerks(
+        seededState,
+        "baron",
+        baronLevel,
+        speedLevel,
+      );
+      const salvageConfig =
+        salvageLevel > 0
+          ? getSupplierConfigWithPerks(
+              seededState,
+              "salvage",
+              salvageLevel,
+              speedLevel,
+            )
+          : null;
+
+      const minProjectsCompleted = Math.max(
+        6,
+        tuning.council.unlockMinProjectsCompleted,
+      );
+      const seededProjectIds = PROJECT_DEFINITIONS.slice(
+        0,
+        minProjectsCompleted,
+      ).map((project) => project.id);
+      const projectsCompleted = Array.from(
+        new Set([...workingState.projectsCompleted, ...seededProjectIds]),
+      );
+      const projectCompletionLog = { ...workingState.projectCompletionLog };
+      projectsCompleted.forEach((projectId, index) => {
+        if (!projectCompletionLog[projectId]) {
+          projectCompletionLog[projectId] =
+            now - (projectsCompleted.length - index) * 1000;
+        }
+      });
+
+      const nextTierDiscovery = { ...workingState.tierDiscovery };
+      for (let tier = 1; tier <= nextMaxTierCrafted; tier += 1) {
+        nextTierDiscovery[tier] = true;
+      }
+      const nextLastTierDiscovered =
+        (Math.max(
+          workingState.lastTierDiscovered ?? 1,
+          nextMaxTierCrafted,
+        ) as PartTier) || PLAYTEST_PHASE3_MIN_MAX_TIER;
+
+      const phase3Missions = workingState.missions.filter(
+        (mission) => mission.templateId !== TUTORIAL_GOAL_TEMPLATE_ID,
+      );
+
+      let nextState: GameState = {
+        ...workingState,
+        cash: Math.max(workingState.cash, PLAYTEST_PHASE3_BASE_CASH),
+        reputation: nextReputation,
+        reputationTier: nextRepTier,
+        currentNeighborhoodId: nextNeighborhood.id,
+        research: Math.max(
+          workingState.research,
+          PLAYTEST_PHASE3_BASE_RESEARCH,
+        ),
+        upgradeMaterials: Math.max(
+          workingState.upgradeMaterials,
+          PLAYTEST_PHASE3_BASE_UPGRADE_MATERIALS,
+        ),
+        compatibilityComponents: Math.max(
+          workingState.compatibilityComponents,
+          PLAYTEST_PHASE3_BASE_COMPATIBILITY_COMPONENTS,
+        ),
+        upgrades: nextUpgrades,
+        rdNodes: nextRdNodes,
+        suppliers: {
+          ...workingState.suppliers,
+          baron: {
+            level: baronLevel,
+            chargesRemaining: baronConfig.maxCharges,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+          open: {
+            level: nextOpenLevel,
+            chargesRemaining: openConfig.maxCharges,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+          salvage:
+            salvageLevel > 0 && salvageConfig
+              ? {
+                  level: salvageLevel,
+                  chargesRemaining: salvageConfig.maxCharges,
+                  cooldownEndsAt: 0,
+                  overdrawCount: 0,
+                }
+              : workingState.suppliers.salvage,
+        },
+        maxTierCrafted: nextMaxTierCrafted,
+        tierDiscovery: nextTierDiscovery,
+        lastTierDiscovered: nextLastTierDiscovered,
+        gamePhase: 3,
+        liberationComplete: true,
+        liberationCompletedAt:
+          typeof workingState.liberationCompletedAt === "number"
+            ? workingState.liberationCompletedAt
+            : now,
+        dependency: 0,
+        baronPressure: 0,
+        projectsUnlocked: true,
+        projectsCompleted,
+        projectCompletionLog,
+        projectOffers: [],
+        projectRevealQueue: [],
+        activeProject: undefined,
+        projectDebuff: undefined,
+        council: {
+          ...workingState.council,
+          unlocked: true,
+          activeHearing: undefined,
+          installsSinceLastHearingCheck: 0,
+        },
+        phase2GoalPending: false,
+        lockoutActive: false,
+        lockoutPhase: 0,
+        lockoutOrderId: undefined,
+        lockoutLabOrdersRemaining: 0,
+        lockoutLabOrdersTarget: 0,
+        lockoutChoice: undefined,
+        baronOfferAvailable: false,
+        baronOfferSeen: true,
+        baronOfferType: undefined,
+        baronOfferCooldownUntil: Math.max(
+          workingState.baronOfferCooldownUntil,
+          now + tuning.baron.offerCooldownMs,
+        ),
+        baronSupplySpawnsRemaining: 0,
+        baronRushSpawnsRemaining: 0,
+        baronContractOrdersRemaining: 0,
+        supplierScoutRoute: undefined,
+        supplierScoutSpawnsRemaining: 0,
+        mentorClinicMergesRemaining: 0,
+        mentorIndependenceMergesRemaining: 0,
+        warrantyStampMode: undefined,
+        warrantyStampOrdersRemaining: 0,
+        mergeChainCount: 0,
+        mergeChainExpiresAt: 0,
+        mergeMomentumLevel: 0,
+        mergeMomentumPending: null,
+        mergeMomentumDropFloor: undefined,
+        tutorialStep: FINAL_TUTORIAL_STEP,
+        tutorialComplete: true,
+        tutorialReplay: true,
+        tutorialSpawnCount: Math.max(workingState.tutorialSpawnCount, 2),
+        tutorialMergeCount: Math.max(workingState.tutorialMergeCount, 3),
+        tutorialOrderId: undefined,
+        tutorialStepStartedAt: now,
+        tutorialNudgeCount: 0,
+        tutorialHint: undefined,
+        tutorialMetrics: {
+          ...workingState.tutorialMetrics,
+          skipped: false,
+        },
+        firstSessionComplete: true,
+        firstSessionOrderIndex: FIRST_SESSION_ORDERS.length,
+        firstSessionOrdersCompleted: Math.max(
+          workingState.firstSessionOrdersCompleted,
+          FIRST_SESSION_REQUIRED_COMPLETIONS,
+        ),
+        firstSessionForcedDrops: [],
+        firstSessionSecondOfferTriggered: true,
+        firstSessionChoiceOffered: true,
+        firstSessionChoiceResolved: true,
+        firstSessionChoiceMentorOrderId: undefined,
+        firstSessionChoiceBaronOrderId: undefined,
+        missions: phase3Missions,
+        orderSpawnCooldownUntil: 0,
+        undoSnapshot: undefined,
+        lastCriticalEventId: workingState.lastCriticalEventId + 1,
+      };
+      const refreshedOffers = generateProjectOffers(nextState, 3);
+      nextState = {
+        ...nextState,
+        projectOffers: refreshedOffers,
+        projectRevealQueue: updateProjectRevealQueue(
+          nextState.projectRevealQueue,
+          nextState.projectRevealSeen,
+          refreshedOffers,
+        ),
+      };
+      nextState = queueStoryBeat(nextState, "council_unlock");
+      nextState = ensureMissions(nextState);
+      return nextState;
+    }
+
     case "LOAD_STATE": {
       const base = getInitialState();
       const resolvedReputation =
@@ -11089,12 +11644,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.liberationComplete === "boolean"
           ? action.state.liberationComplete
           : restoredDependency <= 0;
-      const gamePhase =
-        action.state.gamePhase === 1 || action.state.gamePhase === 2
+      const hasRawCouncilUnlocked =
+        !!action.state.council &&
+        typeof action.state.council === "object" &&
+        !!(action.state.council as { unlocked?: boolean }).unlocked;
+      const parsedGamePhase =
+        action.state.gamePhase === 1 ||
+        action.state.gamePhase === 2 ||
+        action.state.gamePhase === 3
           ? action.state.gamePhase
           : liberationComplete
             ? 2
             : 1;
+      const gamePhase = hasRawCouncilUnlocked
+        ? (Math.max(parsedGamePhase, 3) as GameState["gamePhase"])
+        : parsedGamePhase;
       const liberationCompletedAt =
         typeof action.state.liberationCompletedAt === "number"
           ? action.state.liberationCompletedAt
@@ -11307,7 +11871,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const projectsUnlocked =
         typeof projectsUnlockedRaw === "boolean"
           ? projectsUnlockedRaw
-          : gamePhase === 2 && !hasPhase2GoalOrder && !phase2GoalPending;
+          : gamePhase >= 3
+            ? true
+            : gamePhase === 2 && !hasPhase2GoalOrder && !phase2GoalPending;
       const projectOffers = Array.isArray(action.state.projectOffers)
         ? (action.state.projectOffers as ProjectOffer[]).filter(
             (offer) =>
@@ -11601,6 +12167,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.tier10ShowcasePending === "boolean"
           ? action.state.tier10ShowcasePending
           : base.tier10ShowcasePending;
+      const tier13ShowcaseSeen =
+        typeof action.state.tier13ShowcaseSeen === "boolean"
+          ? action.state.tier13ShowcaseSeen
+          : base.tier13ShowcaseSeen;
+      const tier13ShowcasePending =
+        typeof action.state.tier13ShowcasePending === "boolean"
+          ? action.state.tier13ShowcasePending
+          : base.tier13ShowcasePending;
+      const tier16ShowcaseSeen =
+        typeof action.state.tier16ShowcaseSeen === "boolean"
+          ? action.state.tier16ShowcaseSeen
+          : base.tier16ShowcaseSeen;
+      const tier16ShowcasePending =
+        typeof action.state.tier16ShowcasePending === "boolean"
+          ? action.state.tier16ShowcasePending
+          : base.tier16ShowcasePending;
       const tierDiscovery =
         action.state.tierDiscovery &&
         typeof action.state.tierDiscovery === "object"
@@ -11809,7 +12391,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         typeof mergeMomentumDropFloorRaw === "number"
           ? (Math.max(
               1,
-              Math.min(MAX_PART_TIER, mergeMomentumDropFloorRaw),
+              Math.min(
+                getMaxPartTierForPhase(gamePhase),
+                mergeMomentumDropFloorRaw,
+              ),
             ) as PartTier)
           : undefined;
       const rawMissions = Array.isArray(action.state.missions)
@@ -11843,10 +12428,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? action.state.backpack.map((part) => part?.tier ?? 0)
           : []),
       );
-      const maxTierCrafted =
+      const maxTierCraftedRaw =
         typeof action.state.maxTierCrafted === "number"
           ? action.state.maxTierCrafted
           : derivedMaxTier || base.maxTierCrafted;
+      const maxTierCrafted = Math.max(
+        1,
+        Math.min(getMaxPartTierForPhase(gamePhase), maxTierCraftedRaw),
+      );
       let restoredState: GameState = {
         ...base,
         ...action.state,
@@ -11943,6 +12532,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         tier5ShowcasePending,
         tier10ShowcaseSeen,
         tier10ShowcasePending,
+        tier13ShowcaseSeen,
+        tier13ShowcasePending,
+        tier16ShowcaseSeen,
+        tier16ShowcasePending,
         tierDiscovery,
         lastTierDiscoveryId,
         lastTierDiscovered,
@@ -12008,7 +12601,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         storyQueue: filterStoryQueue(restoredState.storyQueue),
       };
 
-      if (restoredState.liberationComplete || restoredState.gamePhase === 2) {
+      if (restoredState.liberationComplete || restoredState.gamePhase >= 2) {
         restoredState = {
           ...restoredState,
           dependency: 0,
@@ -12268,6 +12861,7 @@ interface GameContextValue {
   craftFreedomController: () => void;
   useFreedomController: (partIndex: number) => void;
   skipToPhase2: () => void;
+  skipToPhase3: () => void;
   startLegacyCycle: (
     kitId: LegacyKitId,
     doctrineIds: LegacyDoctrineId[],
@@ -12350,9 +12944,11 @@ function captureResourceDelta(
 
 function getRunMode(state: GameState) {
   if (state.legacy.currentCycle > 0) {
+    if (state.gamePhase >= 3) return "legacy_phase_3";
     return state.gamePhase === 2 ? "legacy_phase_2" : "legacy_phase_1";
   }
   if (!state.tutorialComplete) return "tutorial";
+  if (state.gamePhase >= 3) return "phase_3";
   if (state.gamePhase === 2) return "phase_2";
   return "phase_1";
 }
@@ -12914,7 +13510,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (mentorOfferShownRunRef.current === runId) return;
     if (!state.tutorialComplete || !state.firstSessionComplete) return;
     const options = [MENTOR_CLINIC_OPTION_ID];
-    if (!state.liberationComplete && state.gamePhase !== 2) {
+    if (!state.liberationComplete && state.gamePhase < 2) {
       options.push(MENTOR_INDEPENDENCE_OPTION_ID);
     }
     if (options.length === 0) return;
@@ -13471,6 +14067,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     (fromIndex: number, toIndex: number): boolean => {
       const fromPart = state.board[fromIndex];
       const toPart = state.board[toIndex];
+      const phaseMaxTier = getMaxPartTierForPhase(state.gamePhase);
 
       if (!fromPart || !toPart) return false;
       if (fromPart.tier !== toPart.tier) return false;
@@ -13480,14 +14077,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         if (fromPart.family !== "waste" || toPart.family !== "waste")
           return false;
         if (fromPart.tier >= MAX_WASTE_TIER) return false;
-      } else if (fromPart.tier >= MAX_PART_TIER) {
+      } else if (fromPart.tier >= phaseMaxTier) {
         return false;
       }
 
       dispatch({ type: "MERGE_PARTS", fromIndex, toIndex });
       return true;
     },
-    [state.board],
+    [state.board, state.gamePhase],
   );
 
   const movePart = useCallback((fromIndex: number, toIndex: number) => {
@@ -13518,6 +14115,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "PLAYTEST_SKIP_PHASE2" });
   }, []);
 
+  const skipToPhase3 = useCallback(() => {
+    dispatch({ type: "PLAYTEST_SKIP_PHASE3" });
+  }, []);
+
   const startLegacyCycle = useCallback(
     (kitId: LegacyKitId, doctrineIds: LegacyDoctrineId[]) => {
       dispatch({ type: "START_LEGACY_CYCLE", kitId, doctrineIds });
@@ -13540,6 +14141,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     (fromIndex: number, toIndex: number): boolean => {
       const fromPart = state.board[fromIndex];
       const toPart = state.board[toIndex];
+      const phaseMaxTier = getMaxPartTierForPhase(state.gamePhase);
 
       if (!fromPart || !toPart) return false;
       if (fromPart.tier !== toPart.tier) return false;
@@ -13552,11 +14154,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           fromPart.tier < MAX_WASTE_TIER
         );
       }
-      if (fromPart.tier >= MAX_PART_TIER) return false;
+      if (fromPart.tier >= phaseMaxTier) return false;
 
       return true;
     },
-    [state.board],
+    [state.board, state.gamePhase],
   );
 
   const getFulfillmentIndices = useCallback(
@@ -13583,6 +14185,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         craftFreedomController,
         useFreedomController,
         skipToPhase2,
+        skipToPhase3,
         startLegacyCycle,
         setLegacyTitle,
         canMerge,

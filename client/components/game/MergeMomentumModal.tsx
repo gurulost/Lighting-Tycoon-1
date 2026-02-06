@@ -25,7 +25,9 @@ export function MergeMomentumModal({
   if (!visible) return null;
 
   const levelIndex = threshold === 6 ? 1 : threshold === 10 ? 2 : 0;
-  const qualityFloor = Math.min(10, 2 + levelIndex);
+  const phaseMaxTier =
+    state.gamePhase >= 3 ? 16 : state.gamePhase >= 2 ? 13 : 10;
+  const qualityFloor = Math.min(phaseMaxTier, 2 + levelIndex);
   const cooldownPercent = levelIndex === 0 ? 30 : levelIndex === 1 ? 45 : 60;
   const refillTarget =
     state.suppliers.open.level > 0

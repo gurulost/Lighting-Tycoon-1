@@ -69,9 +69,10 @@ export function SettingsModal({
   debugOverlayEnabled,
   onToggleDebugOverlay,
 }: SettingsModalProps) {
-  const { state, dispatch, skipToPhase2 } = useGame();
+  const { state, dispatch, skipToPhase2, skipToPhase3 } = useGame();
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
-  const canSkipPhase2 = state.gamePhase !== 2 && !state.liberationComplete;
+  const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
+  const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
   const [resetChallengeVisible, setResetChallengeVisible] = useState(false);
   const [resetAnswer, setResetAnswer] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -151,6 +152,25 @@ export function SettingsModal({
           style: "destructive",
           onPress: () => {
             skipToPhase2();
+            onClose();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSkipPhase3 = () => {
+    if (!canSkipPhase3) return;
+    Alert.alert(
+      "Playtest: Skip to Phase 3",
+      "This bootstraps a Council-unlocked Phase 3 state so you can validate tier-16 progression and campaigns quickly.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Skip Now",
+          style: "destructive",
+          onPress: () => {
+            skipToPhase3();
             onClose();
           },
         },
@@ -324,7 +344,39 @@ export function SettingsModal({
                 <ThemedText style={styles.settingDescription}>
                   {canSkipPhase2
                     ? "Bootstrap a fresh save into a Phase 2-ready state"
-                    : "Already in Phase 2"}
+                    : "Already in Phase 2 or later"}
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.actionRow,
+                !canSkipPhase3 && styles.actionRowDisabled,
+              ]}
+              onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
+            >
+              <LinearGradient
+                colors={[
+                  `${GameColors.ui.success}30`,
+                  `${GameColors.ui.success}10`,
+                ]}
+                style={styles.settingIcon}
+              >
+                <Feather
+                  name="fast-forward"
+                  size={20}
+                  color={GameColors.ui.success}
+                />
+              </LinearGradient>
+              <View style={styles.settingContent}>
+                <ThemedText style={styles.settingLabel}>
+                  Playtest: Skip to Phase 3
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  {canSkipPhase3
+                    ? "Bootstrap into a Council-unlocked Phase 3 state"
+                    : "Already in Phase 3"}
                 </ThemedText>
               </View>
             </Pressable>

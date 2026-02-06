@@ -51,6 +51,7 @@ Drop tables are defined in `client/constants/dropTables.ts` and summarized in `d
 
 **Supplier tables**
 - Baron / Open: fixed tier distributions per supplier level.
+- Open Workshop currently defines levels 1-8 (Phase 3-ready at levels 7-8).
 - Salvage: top-roll (refurb/scrap/material), then refurb tier table.
 - Bonus channels are independent rolls (waste, upgrade materials, compatibility components).
 - Early relief: while Open + Salvage are locked, Baron L1 cooldown is shortened (`suppliers.baronEarlyCooldownMs`).
@@ -130,8 +131,8 @@ When a supplier is on cooldown, players can still tap to spawn parts at a cost.
 ---
 
 ## Phase 2 Mix
-- `compatibility_required` orders receive a `1.6x` weight boost when `gamePhase = 2`.
-- Phase 2 target difficulty bumps by `+1`.
+- `compatibility_required` orders receive a `1.6x` weight boost when `gamePhase >= 2`.
+- Target difficulty bumps by `+1` when `gamePhase >= 2`.
 - Phase 2 Baron Pressure reward tax:
   - 40-69 pressure: `-10%` cash + research
   - 70-100 pressure: `-20%` cash + research
@@ -303,7 +304,11 @@ These rules prevent long streaks of low-interest orders in late progression.
 
 **Tier quota (by max tier crafted)**
 - If `maxTierCrafted >= 4`, ensure at least one active order requires Tier 4+.
-- If `maxTierCrafted >= 5`, ensure at least one active order requires Tier 5.
+- If `maxTierCrafted >= 5`, ensure at least one active order requires Tier 5+.
+- If `maxTierCrafted >= 7`, ensure at least one active order requires Tier 7+.
+- If `maxTierCrafted >= 10`, ensure at least one active order requires Tier 10+.
+- If `maxTierCrafted >= 13`, ensure at least one active order requires Tier 13+.
+- If `maxTierCrafted >= 16`, ensure at least one active order requires Tier 16.
 - Applied during order generation (spawn + refresh). If no templates meet the floor,
   the generator falls back to the full pool to avoid deadlocks.
 - Tunable thresholds: `lateGame.tierFloorThresholds`

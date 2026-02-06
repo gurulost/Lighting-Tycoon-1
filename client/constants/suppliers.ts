@@ -23,6 +23,9 @@ export const SUPPLIER_CONFIG: Record<
     3: { maxCharges: 5, cooldownMs: 52000 },
     4: { maxCharges: 6, cooldownMs: 48000 },
     5: { maxCharges: 7, cooldownMs: 44000 },
+    6: { maxCharges: 8, cooldownMs: 41000 },
+    7: { maxCharges: 9, cooldownMs: 38000 },
+    8: { maxCharges: 10, cooldownMs: 35000 },
   },
   salvage: {
     1: { maxCharges: 4, cooldownMs: 75000 },

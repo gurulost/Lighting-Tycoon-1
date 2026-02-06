@@ -13,6 +13,12 @@ Use this as a quick reference for every icon, badge, and system.
 - Control Stack (Open): tier 8 controller stack.
 - Signature Grid (Open): tier 9 flagship grid.
 - Kingdom Install (Open): tier 10 legacy build.
+- Civic Lattice (Open): tier 11 civic-scale mesh.
+- Beacon Matrix (Open): tier 12 city-visible matrix.
+- Metro Nexus (Open): tier 13 district interconnect.
+- Skyline Core (Open): tier 14 skyline anchor system.
+- Atlas Network (Open): tier 15 multi-zone backbone.
+- Legacy Standard (Open): tier 16 endgame benchmark build.
 
 ## Parts (Locked Certified)
 - Clip (Locked): certified part, reinforces Dependency.
@@ -25,6 +31,12 @@ Use this as a quick reference for every icon, badge, and system.
 - Control Stack (Locked): tier 8 locked controller stack.
 - Signature Grid (Locked): tier 9 locked grid.
 - Kingdom Install (Locked): tier 10 locked legacy build.
+- Civic Lattice (Locked): tier 11 locked civic mesh.
+- Beacon Matrix (Locked): tier 12 locked matrix.
+- Metro Nexus (Locked): tier 13 locked interconnect.
+- Skyline Core (Locked): tier 14 locked skyline core.
+- Atlas Network (Locked): tier 15 locked backbone.
+- Legacy Standard (Locked): tier 16 locked benchmark build.
 
 ## Waste & Salvage
 - Packaging Waste: clutter from certified shipments; merge or recycle.
@@ -68,6 +80,7 @@ Use this as a quick reference for every icon, badge, and system.
 - R&D Goals: Freedom Controller and compatible installs.
 - Customer Goals: keep installs flowing and reputation up.
 - System Goals: milestone targets (Tier 5 installs, lockout recovery).
+- System milestones now include Tier 10, Tier 13, and Tier 16 showcase progression.
 
 ## Order Badges
 - Certified: locked preferred or required for full rewards.
@@ -89,6 +102,7 @@ Use this as a quick reference for every icon, badge, and system.
 - Council: the post-empire progression layer where Tina writes industry standards.
 - Unlock: complete the Expo capstone or finish 6 contracts with a high reputation tier.
 - Campaigns: three-step tracks (Draft -> Pilot -> Ratify) that grant permanent perks.
+- Phase caps: Phase 1 -> Tier 10, Phase 2 -> Tier 13, Phase 3 -> Tier 16.
 - Draft: invest cash + research to start a standard.
 - Pilot: fulfill specific install objectives during normal play.
 - Ratify: a protected Council Showcase order that finalizes a campaign.

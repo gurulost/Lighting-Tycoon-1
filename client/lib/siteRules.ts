@@ -39,10 +39,6 @@ export function getOrderRefreshBlockReason(
   return null;
 }
 
-export function isOrderRefreshBlocked(state: GameState) {
-  return getOrderRefreshBlockReason(state) !== null;
-}
-
 export function getOrderRefreshCost(reputationTier: number, state?: GameState) {
   const base = getOrderRefreshBaseRaw(reputationTier);
   if (!state) return Math.round(base);
