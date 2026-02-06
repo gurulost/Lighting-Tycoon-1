@@ -188,6 +188,19 @@ When a supplier is on cooldown, players can still tap to spawn parts at a cost.
   - `council.municipalGrantLobbyPressureDrop`
   - `council.municipalGrantBaronPressureDrop`
 
+## Legacy Standards
+- Cycle challenge scaling:
+  - `legacy.depositMultPerCycle`
+  - `legacy.depositMultCap`
+  - `legacy.lobbyPressureGainPerCycle`
+  - `legacy.lobbyPressureGainCap`
+  - `legacy.deadlineTightenEveryCycles`
+  - `legacy.deadlineTightenCap`
+- Applied per active legacy cycle as:
+  - Project deposits: `1 + min(cap, cycle * perCycle)`
+  - Council pressure gains: `1 + min(cap, cycle * perCycle)`
+  - Project deadlines: `-floor(cycle / everyCycles)` clamped by cap
+
 ---
 
 ## Merge Bonuses

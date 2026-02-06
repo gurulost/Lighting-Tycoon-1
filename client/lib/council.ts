@@ -1,9 +1,11 @@
 import { COUNCIL_PERKS } from "@/constants/councilPerks";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
+import { LEGACY_DOCTRINES } from "@/constants/legacy";
 import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
 import { GameState } from "@/types/game";
 import { getTuning } from "@/lib/tuning";
 import type { CouncilPerkEffects } from "@/constants/councilPerks";
+import { getEquippedLegacyDoctrineIds } from "@/lib/legacy";
 
 const DEFAULT_REWARD_MULT = { cash: 1, reputation: 1, research: 1 } as const;
 
@@ -72,10 +74,7 @@ export function getCouncilPerkEffects(
     unlockMunicipalGrants: false,
   };
 
-  state.council.perksUnlocked.forEach((perkId) => {
-    const perk = COUNCIL_PERKS[perkId];
-    if (!perk) return;
-    const next: CouncilPerkEffects = perk.effects;
+  const applyEffects = (next: CouncilPerkEffects) => {
     effects.globalRewardMult = mergeRewardMult(
       effects.globalRewardMult,
       next.globalRewardMult,
@@ -133,6 +132,18 @@ export function getCouncilPerkEffects(
     effects.hearingPenaltyMult *= next.hearingPenaltyMult ?? 1;
     effects.hearingPayToClearCostMult *= next.hearingPayToClearCostMult ?? 1;
     effects.unlockMunicipalGrants ||= !!next.unlockMunicipalGrants;
+  };
+
+  state.council.perksUnlocked.forEach((perkId) => {
+    const perk = COUNCIL_PERKS[perkId];
+    if (!perk) return;
+    applyEffects(perk.effects);
+  });
+
+  getEquippedLegacyDoctrineIds(state).forEach((doctrineId) => {
+    const doctrine = LEGACY_DOCTRINES[doctrineId];
+    if (!doctrine) return;
+    applyEffects(doctrine.effects);
   });
 
   return effects;

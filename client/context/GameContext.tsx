@@ -17,6 +17,8 @@ import {
   PartFamily,
   PartTier,
   MergeMomentumChoice,
+  LegacyDoctrineId,
+  LegacyKitId,
   SupplierId,
   SupplierScoutRoute,
   WarrantyStampMode,
@@ -64,6 +66,7 @@ import {
 } from "@/constants/councilCampaigns";
 import { COUNCIL_PERKS } from "@/constants/councilPerks";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
+import { LEGACY_FINAL_CAMPAIGN_ID, LEGACY_KITS } from "@/constants/legacy";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import {
   getProjectDepositCost,
@@ -89,6 +92,18 @@ import {
   getTuning,
   TUNING_FLAG_KEY,
 } from "@/lib/tuning";
+import {
+  canStartLegacyCycle,
+  createInitialLegacyState,
+  getLegacyBadgeTitle,
+  getLegacyDifficultyModifiers,
+  getLegacyKit,
+  hasLegacyFinalPerk,
+  makeLegacyBadgeId,
+  normalizeLegacyState,
+  sanitizeLegacyDoctrineLoadout,
+  shouldGrantLegacyBadge,
+} from "@/lib/legacy";
 import { useFeatureFlagWithPayload } from "posthog-react-native";
 import type { PostHog as PostHogClient } from "posthog-react-native";
 import {
@@ -168,6 +183,12 @@ type GameAction =
   | { type: "ENSURE_TUTORIAL_LOCKED_SAMPLE" }
   | { type: "COMPLETE_TUTORIAL"; skipped?: boolean }
   | { type: "RESUME_TUTORIAL" }
+  | {
+      type: "START_LEGACY_CYCLE";
+      kitId: LegacyKitId;
+      doctrineIds: LegacyDoctrineId[];
+    }
+  | { type: "SET_LEGACY_TITLE"; titleId?: string }
   | { type: "RESET_GAME" }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
@@ -829,16 +850,51 @@ function getWarrantyStampCost(reputationTier: number) {
   );
 }
 
+function getLegacyProjectDepositMultiplier(state: GameState) {
+  if (state.legacy.currentCycle <= 0) return 1;
+  const cycleMods = getLegacyDifficultyModifiers(state.legacy.currentCycle);
+  const kitMult =
+    getLegacyKit(state.legacy.selectedKitId)?.projectDepositMult ?? 1;
+  return cycleMods.projectDepositMult * kitMult;
+}
+
+function getLegacyCouncilPressureGainMultiplier(state: GameState) {
+  if (state.legacy.currentCycle <= 0) return 1;
+  const cycleMods = getLegacyDifficultyModifiers(state.legacy.currentCycle);
+  const kitMult =
+    getLegacyKit(state.legacy.selectedKitId)?.councilPressureGainMult ?? 1;
+  return cycleMods.councilPressureGainMult * kitMult;
+}
+
+function scaleLegacyCouncilPressureGain(baseGain: number, state: GameState) {
+  const gain = Math.max(0, baseGain);
+  if (gain <= 0) return 0;
+  return Math.max(
+    0,
+    Math.round(gain * getLegacyCouncilPressureGainMultiplier(state)),
+  );
+}
+
 function getProjectStageDeadline(
   stage: ProjectStageDefinition,
   stageIndex: number,
+  state?: Pick<GameState, "legacy">,
 ) {
   if (!tuning.projects.deadlineEnabled) return undefined;
+  const legacyTighten = state
+    ? getLegacyDifficultyModifiers(state.legacy.currentCycle)
+        .deadlineTightenByInstalls
+    : 0;
   if (stage.deadline?.type === "installs") {
-    return Math.max(1, Math.floor(stage.deadline.installsRemaining));
+    return Math.max(
+      1,
+      Math.floor(stage.deadline.installsRemaining) - legacyTighten,
+    );
   }
   const fallback = tuning.projects.deadlineInstallsByStage[stageIndex];
-  if (typeof fallback === "number") return Math.max(1, Math.floor(fallback));
+  if (typeof fallback === "number") {
+    return Math.max(1, Math.floor(fallback) - legacyTighten);
+  }
   return undefined;
 }
 
@@ -2556,6 +2612,257 @@ const PLAYTEST_PHASE2_BASE_COMPATIBILITY_COMPONENTS = 2;
 const PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL = 3;
 const PLAYTEST_PHASE2_MIN_MAX_TIER: PartTier = 4;
 
+function buildLegacyCycleStartState(
+  state: GameState,
+  kitId: LegacyKitId,
+  doctrineIds: LegacyDoctrineId[],
+) {
+  const now = Date.now();
+  const baseState = getInitialState();
+  const nextReputation = Math.max(
+    baseState.reputation,
+    PLAYTEST_PHASE2_BASE_REPUTATION,
+  );
+  const nextNeighborhood = getNeighborhoodByRep(nextReputation);
+  const nextRepTier = getReputationTier(nextReputation);
+  const nextUpgrades: Record<string, number> = {
+    ...baseState.upgrades,
+    space_1: 1,
+    rd_unlock: 1,
+  };
+  const nextRdNodes: Record<string, boolean> = {
+    ...baseState.rdNodes,
+    open_standard_1: true,
+    open_standard_2: true,
+    open_workshop_1: true,
+    open_workshop_2: true,
+    open_workshop_3: true,
+    freedom_blueprint: true,
+    freedom_build: true,
+  };
+  const nextCycle = Math.max(1, state.legacy.cyclesCompleted + 1);
+  const selectedKit = LEGACY_KITS[kitId] ?? LEGACY_KITS.kit_open_foundry;
+  const equippedDoctrines = sanitizeLegacyDoctrineLoadout(doctrineIds, {
+    cyclesCompleted: state.legacy.cyclesCompleted,
+    doctrinePoints: state.legacy.doctrinePoints,
+  });
+  const unlockedSlots = baseState.unlockedSlots.includes(27)
+    ? baseState.unlockedSlots
+    : [...baseState.unlockedSlots, 27];
+  const blockedSlots = baseState.blockedSlots.filter((slot) => slot !== 27);
+  const seededLegacy = {
+    ...state.legacy,
+    unlocked: true,
+    currentCycle: nextCycle,
+    equippedDoctrines,
+    selectedKitId: selectedKit.id,
+    pendingCycleStart: false,
+    availableKits:
+      state.legacy.availableKits.length > 0
+        ? state.legacy.availableKits
+        : (Object.keys(LEGACY_KITS) as LegacyKitId[]),
+  };
+  const seededForSupplierConfig: GameState = {
+    ...baseState,
+    legacy: seededLegacy,
+    reputation: nextReputation,
+    reputationTier: nextRepTier,
+    currentNeighborhoodId: nextNeighborhood.id,
+    gamePhase: 2,
+    liberationComplete: true,
+    liberationCompletedAt: now,
+    dependency: 0,
+    tutorialComplete: true,
+    tutorialReplay: true,
+    firstSessionComplete: true,
+    firstSessionOrderIndex: FIRST_SESSION_ORDERS.length,
+    firstSessionOrdersCompleted: FIRST_SESSION_REQUIRED_COMPLETIONS,
+    upgrades: nextUpgrades,
+    rdNodes: nextRdNodes,
+    maxOrders: 3,
+    maxTierCrafted: PLAYTEST_PHASE2_MIN_MAX_TIER,
+    backpackUnlocked: true,
+    unlockedSlots,
+    blockedSlots,
+  };
+  const speedLevel = seededForSupplierConfig.upgrades["workbench_speed_1"] || 0;
+  const baronLevel = 1;
+  const openLevel = Math.max(
+    PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL,
+    seededForSupplierConfig.suppliers.open.level,
+  );
+  const salvageLevel = seededForSupplierConfig.suppliers.salvage.level;
+  const openConfig = getSupplierConfigWithPerks(
+    seededForSupplierConfig,
+    "open",
+    openLevel,
+    speedLevel,
+  );
+  const baronConfig = getSupplierConfigWithPerks(
+    seededForSupplierConfig,
+    "baron",
+    baronLevel,
+    speedLevel,
+  );
+  const salvageConfig =
+    salvageLevel > 0
+      ? getSupplierConfigWithPerks(
+          seededForSupplierConfig,
+          "salvage",
+          salvageLevel,
+          speedLevel,
+        )
+      : null;
+  const nextSuppliers: GameState["suppliers"] = {
+    baron: {
+      level: baronLevel,
+      chargesRemaining: baronConfig.maxCharges,
+      cooldownEndsAt: 0,
+      overdrawCount: 0,
+    },
+    open: {
+      level: openLevel,
+      chargesRemaining:
+        openConfig.maxCharges +
+        Math.max(0, selectedKit.openSupplierChargeAdd ?? 0),
+      cooldownEndsAt: 0,
+      overdrawCount: 0,
+    },
+    salvage:
+      salvageLevel > 0 && salvageConfig
+        ? {
+            level: salvageLevel,
+            chargesRemaining: salvageConfig.maxCharges,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          }
+        : seededForSupplierConfig.suppliers.salvage,
+  };
+  let nextBoard = [...seededForSupplierConfig.board];
+  let nextBackpack = [...seededForSupplierConfig.backpack];
+  if (selectedKit.seedPart) {
+    const placed = placePartOnBoardOrBackpack(
+      seededForSupplierConfig,
+      selectedKit.seedPart.family,
+      selectedKit.seedPart.tier,
+      !!selectedKit.seedPart.compatible,
+      nextBoard,
+      nextBackpack,
+    );
+    nextBoard = placed.board;
+    nextBackpack = placed.backpack;
+  }
+  let nextState: GameState = {
+    ...seededForSupplierConfig,
+    board: nextBoard,
+    backpack: nextBackpack,
+    suppliers: nextSuppliers,
+    cash: Math.max(baseState.cash, PLAYTEST_PHASE2_BASE_CASH),
+    research: Math.max(baseState.research, PLAYTEST_PHASE2_BASE_RESEARCH),
+    upgradeMaterials: Math.max(
+      baseState.upgradeMaterials,
+      PLAYTEST_PHASE2_BASE_UPGRADE_MATERIALS,
+    ),
+    compatibilityComponents:
+      Math.max(
+        baseState.compatibilityComponents,
+        PLAYTEST_PHASE2_BASE_COMPATIBILITY_COMPONENTS,
+      ) + Math.max(0, selectedKit.compatibilityComponentsAdd ?? 0),
+    orders: [],
+    highlightedOrderId: undefined,
+    orderMetrics: DEFAULT_ORDER_METRICS,
+    orderSpawnCooldownUntil: 0,
+    phase2GoalPending: false,
+    projectsUnlocked: true,
+    projectOffers: [],
+    activeProject: undefined,
+    projectsCompleted: [],
+    projectCompletionLog: {},
+    projectMilestones: {},
+    projectDebuff: undefined,
+    projectRevealQueue: [],
+    projectRevealSeen: {},
+    council: buildInitialCouncilState(),
+    lockoutActive: false,
+    lockoutPhase: 0,
+    lockoutOrderId: undefined,
+    lockoutLabOrdersRemaining: 0,
+    lockoutLabOrdersTarget: 0,
+    lockoutChoice: undefined,
+    baronOfferAvailable: false,
+    baronOfferSeen: true,
+    baronOfferType: undefined,
+    baronContractOrdersRemaining: 0,
+    baronSupplySpawnsRemaining: 0,
+    baronRushSpawnsRemaining: 0,
+    baronPressure: 0,
+    dependency: 0,
+    gamePhase: 2,
+    liberationComplete: true,
+    liberationCompletedAt: now,
+    tutorialStep: FINAL_TUTORIAL_STEP,
+    tutorialComplete: true,
+    tutorialReplay: true,
+    tutorialSpawnCount: Math.max(baseState.tutorialSpawnCount, 2),
+    tutorialMergeCount: Math.max(baseState.tutorialMergeCount, 3),
+    tutorialOrderId: undefined,
+    tutorialStepStartedAt: now,
+    tutorialNudgeCount: 0,
+    tutorialHint: undefined,
+    tutorialMetrics: {
+      ...baseState.tutorialMetrics,
+      skipped: false,
+    },
+    firstSessionComplete: true,
+    firstSessionOrderIndex: FIRST_SESSION_ORDERS.length,
+    firstSessionOrdersCompleted: FIRST_SESSION_REQUIRED_COMPLETIONS,
+    firstSessionForcedDrops: [],
+    firstSessionSecondOfferTriggered: true,
+    firstSessionChoiceOffered: true,
+    firstSessionChoiceResolved: true,
+    firstSessionChoiceMentorOrderId: undefined,
+    firstSessionChoiceBaronOrderId: undefined,
+    mentorClinicMergesRemaining: 0,
+    mentorIndependenceMergesRemaining: 0,
+    supplierScoutRoute: undefined,
+    supplierScoutSpawnsRemaining: 0,
+    warrantyStampMode: undefined,
+    warrantyStampOrdersRemaining: 0,
+    mergeChainCount: 0,
+    mergeChainExpiresAt: 0,
+    mergeMomentumLevel: 0,
+    mergeMomentumPending: null,
+    mergeMomentumDropFloor: undefined,
+    storyQueue: [],
+    storyLog: [],
+    storySeen: {},
+    activeStoryBeatId: undefined,
+    storyLastViewedAt: 0,
+    lastStoryShownAt: 0,
+    overlayQueue: [],
+    overlayTelemetry: { maxWaitMs: 0, lastShownAt: undefined },
+    missions: [],
+    missionHistory: [],
+    undoSnapshot: undefined,
+    lastCriticalEventId: state.lastCriticalEventId + 1,
+    settings: { ...baseState.settings, ...state.settings },
+    legacy: seededLegacy,
+  };
+  const refreshedOffers = generateProjectOffers(nextState, 3);
+  nextState = {
+    ...nextState,
+    projectOffers: refreshedOffers,
+    projectRevealQueue: updateProjectRevealQueue(
+      nextState.projectRevealQueue,
+      nextState.projectRevealSeen,
+      refreshedOffers,
+    ),
+  };
+  nextState = queueStoryBeat(nextState, "legacy_cycle_start");
+  nextState = ensureMissions(nextState);
+  return nextState;
+}
+
 function createMentorJobOrder(): Order {
   return withTunedRewards({
     id: generateId(),
@@ -3280,6 +3587,7 @@ function getInitialState(): GameState {
     projectRevealSeen: {},
     baronPressure: 0,
     council: buildInitialCouncilState(),
+    legacy: createInitialLegacyState(),
     baronSupplySpawnsRemaining: 0,
     baronRushSpawnsRemaining: 0,
     suppliers: {
@@ -5309,6 +5617,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let projectStageFailed = false;
       let completedProjectId: string | null = null;
       let nextCouncil = state.council;
+      let nextLegacy = state.legacy;
+      let legacyUnlockedNow = false;
+      let legacyCycleCompletedNow = false;
+      let legacyBadgeGrantedId: string | null = null;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
       const warrantyMode = warrantyActive ? state.warrantyStampMode : undefined;
@@ -5941,6 +6253,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const nextDeadline = getProjectStageDeadline(
               nextStage,
               nextStageIndex,
+              state,
             );
             nextActiveProject = {
               ...state.activeProject,
@@ -6027,10 +6340,47 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             if (!councilPerksUnlocked.includes(campaign.perkId)) {
               councilPerksUnlocked = [...councilPerksUnlocked, campaign.perkId];
             }
-            councilLobbyPressure +=
+            const ratifyPressureGain =
               campaign.pressure.onRatifyComplete +
               tuning.council.lobbyPressureGainOnRatify;
+            councilLobbyPressure += scaleLegacyCouncilPressureGain(
+              ratifyPressureGain,
+              state,
+            );
             councilCampaignCompletedId = councilCampaignId;
+            if (councilCampaignId === LEGACY_FINAL_CAMPAIGN_ID) {
+              let cyclesCompleted = nextLegacy.cyclesCompleted;
+              let doctrinePoints = nextLegacy.doctrinePoints;
+              let badgesUnlocked = nextLegacy.badgesUnlocked;
+              if (!nextLegacy.unlocked) {
+                legacyUnlockedNow = true;
+                doctrinePoints = Math.max(1, doctrinePoints);
+              }
+              if (nextLegacy.currentCycle > 0) {
+                legacyCycleCompletedNow = true;
+                cyclesCompleted += 1;
+                doctrinePoints += 1;
+                if (shouldGrantLegacyBadge(cyclesCompleted)) {
+                  const badgeId = makeLegacyBadgeId(cyclesCompleted);
+                  if (!badgesUnlocked.includes(badgeId)) {
+                    badgesUnlocked = [...badgesUnlocked, badgeId];
+                    legacyBadgeGrantedId = badgeId;
+                  }
+                }
+              }
+              nextLegacy = {
+                ...nextLegacy,
+                unlocked: true,
+                cyclesCompleted,
+                doctrinePoints,
+                pendingCycleStart: true,
+                badgesUnlocked,
+                selectedTitleId:
+                  legacyBadgeGrantedId && !nextLegacy.selectedTitleId
+                    ? legacyBadgeGrantedId
+                    : nextLegacy.selectedTitleId,
+              };
+            }
           }
         }
 
@@ -6114,7 +6464,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const milestoneGain =
               activeCampaign.pressure.onPilotMilestone +
               tuning.council.lobbyPressureGainPerPilotMilestone;
-            councilLobbyPressure += milestonesCompleted * milestoneGain;
+            councilLobbyPressure += scaleLegacyCouncilPressureGain(
+              milestonesCompleted * milestoneGain,
+              state,
+            );
           }
 
           const pilotComplete = activeCampaign.pilotObjectives.every(
@@ -6462,6 +6815,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           campaignId: councilCampaignCompletedId,
         });
       }
+      if (legacyUnlockedNow) {
+        captureEvent("legacy_unlocked", {
+          cycle: nextLegacy.currentCycle,
+          doctrinePoints: nextLegacy.doctrinePoints,
+        });
+      }
+      if (legacyCycleCompletedNow) {
+        captureEvent("legacy_cycle_complete", {
+          cycle: nextLegacy.cyclesCompleted,
+          doctrinePoints: nextLegacy.doctrinePoints,
+          badgeId: legacyBadgeGrantedId,
+          badgeTitle: legacyBadgeGrantedId
+            ? getLegacyBadgeTitle(nextLegacy.cyclesCompleted)
+            : undefined,
+        });
+      }
       if (councilHearingTriggeredId) {
         captureEvent("council_hearing_trigger", {
           hearingId: councilHearingTriggeredId,
@@ -6516,6 +6885,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectDebuff: nextProjectDebuff,
         projectRevealQueue: nextProjectRevealQueue,
         council: nextCouncil,
+        legacy: nextLegacy,
         lockoutActive: lockoutActiveValue,
         lockoutPhase: lockoutPhaseValue,
         lockoutOrderId: lockoutResolution ? undefined : nextLockoutOrderId,
@@ -6674,6 +7044,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (councilCampaignCompletedId) {
         nextState = queueStoryBeat(nextState, "council_campaign_complete");
+      }
+      if (legacyUnlockedNow) {
+        nextState = queueStoryBeat(nextState, "legacy_unlocked");
+      }
+      if (legacyCycleCompletedNow) {
+        nextState = queueStoryBeat(nextState, "legacy_cycle_complete");
       }
 
       if (dependencyStory) {
@@ -7683,8 +8059,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!offer) return state;
       const councilPerks = getCouncilPerkEffects(state);
       const councilHearing = getCouncilHearingPenalty(state);
+      const legacyDepositMult = getLegacyProjectDepositMultiplier(state);
       const depositMultiplier =
-        councilPerks.projectDepositMult * councilHearing.projectDepositMult;
+        councilPerks.projectDepositMult *
+        councilHearing.projectDepositMult *
+        legacyDepositMult;
       const depositCost = getProjectDepositCost(
         project,
         state.reputationTier,
@@ -7709,7 +8088,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const insertResult = insertStoryOrder(state, state.orders, stageOrder);
       if (!insertResult.inserted) return state;
 
-      let deadlineRemaining = getProjectStageDeadline(stage, 0);
+      let deadlineRemaining = getProjectStageDeadline(stage, 0, state);
       let expeditorUsedStages: number[] = [];
       if (addon.permitExpeditor && typeof deadlineRemaining === "number") {
         deadlineRemaining += 2;
@@ -8218,8 +8597,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const lobbyGain =
         tuning.council.lobbyPressureGainPerDraftInvest +
         (draftComplete ? campaign.pressure.onDraftComplete : 0);
+      const scaledLobbyGain = scaleLegacyCouncilPressureGain(lobbyGain, state);
       let nextLobbyPressure = clampNumber(
-        state.council.lobbyPressure + lobbyGain,
+        state.council.lobbyPressure + scaledLobbyGain,
         0,
         100,
       );
@@ -9563,6 +9943,50 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tutorialMetrics: {
           ...state.tutorialMetrics,
           skipped: false,
+        },
+      };
+    }
+
+    case "START_LEGACY_CYCLE": {
+      if (!canStartLegacyCycle(state)) return state;
+      if (!LEGACY_KITS[action.kitId]) return state;
+      const nextState = buildLegacyCycleStartState(
+        state,
+        action.kitId,
+        action.doctrineIds,
+      );
+      captureEvent("legacy_kit_select", {
+        kitId: action.kitId,
+        cycle: nextState.legacy.currentCycle,
+      });
+      captureEvent("legacy_doctrine_equip", {
+        doctrineIds: nextState.legacy.equippedDoctrines,
+        slots:
+          nextState.legacy.equippedDoctrines.length > 0
+            ? nextState.legacy.equippedDoctrines.length
+            : 0,
+        cycle: nextState.legacy.currentCycle,
+      });
+      captureEvent("legacy_cycle_start", {
+        cycle: nextState.legacy.currentCycle,
+        kitId: action.kitId,
+        doctrineCount: nextState.legacy.equippedDoctrines.length,
+      });
+      return nextState;
+    }
+
+    case "SET_LEGACY_TITLE": {
+      const selectedTitleId =
+        typeof action.titleId === "string" &&
+        state.legacy.badgesUnlocked.includes(action.titleId)
+          ? action.titleId
+          : undefined;
+      if (state.legacy.selectedTitleId === selectedTitleId) return state;
+      return {
+        ...state,
+        legacy: {
+          ...state.legacy,
+          selectedTitleId,
         },
       };
     }
@@ -11087,6 +11511,31 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : baseCouncil.refreshCount,
         perksUnlocked,
       };
+      const rawLegacy =
+        action.state.legacy && typeof action.state.legacy === "object"
+          ? (action.state.legacy as Partial<GameState["legacy"]>)
+          : undefined;
+      let legacy = normalizeLegacyState(rawLegacy);
+      const finalCampaignComplete =
+        campaigns[LEGACY_FINAL_CAMPAIGN_ID]?.status === "COMPLETED";
+      const finalPerkUnlocked = hasLegacyFinalPerk({ council });
+      if (finalCampaignComplete || finalPerkUnlocked) {
+        legacy = {
+          ...legacy,
+          unlocked: true,
+          doctrinePoints: Math.max(1, legacy.doctrinePoints),
+          pendingCycleStart:
+            legacy.pendingCycleStart ||
+            finalCampaignComplete ||
+            finalPerkUnlocked,
+        };
+      }
+      if (legacy.currentCycle > 0 && !legacy.unlocked) {
+        legacy = {
+          ...legacy,
+          unlocked: true,
+        };
+      }
       const lockoutLabOrdersTarget =
         typeof action.state.lockoutLabOrdersTarget === "number"
           ? action.state.lockoutLabOrdersTarget
@@ -11391,6 +11840,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectRevealQueue,
         projectRevealSeen,
         council,
+        legacy,
         backpackSlots: restoredBackpackSlots,
         backpack: sanitizedBackpack,
         orders: normalizedOrders,
@@ -11678,7 +12128,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             typeof restoredState.activeProject.stageDeadlineRemaining !==
               "number"
           ) {
-            const fallbackDeadline = getProjectStageDeadline(stage, stageIndex);
+            const fallbackDeadline = getProjectStageDeadline(
+              stage,
+              stageIndex,
+              restoredState,
+            );
             if (typeof fallbackDeadline === "number") {
               restoredState = {
                 ...restoredState,
@@ -11771,6 +12225,11 @@ interface GameContextValue {
   craftFreedomController: () => void;
   useFreedomController: (partIndex: number) => void;
   skipToPhase2: () => void;
+  startLegacyCycle: (
+    kitId: LegacyKitId,
+    doctrineIds: LegacyDoctrineId[],
+  ) => void;
+  setLegacyTitle: (titleId?: string) => void;
   canMerge: (fromIndex: number, toIndex: number) => boolean;
   getFulfillmentIndices: (order: Order) => number[] | null;
   undoLastMove: () => void;
@@ -11847,6 +12306,9 @@ function captureResourceDelta(
 }
 
 function getRunMode(state: GameState) {
+  if (state.legacy.currentCycle > 0) {
+    return state.gamePhase === 2 ? "legacy_phase_2" : "legacy_phase_1";
+  }
   if (!state.tutorialComplete) return "tutorial";
   if (state.gamePhase === 2) return "phase_2";
   return "phase_1";
@@ -11984,6 +12446,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       firstSessionComplete: snapshot.firstSessionComplete,
       reputationTier: snapshot.reputationTier,
       dependency: snapshot.dependency,
+      legacyCycle: snapshot.legacy.currentCycle,
+      legacyCyclesCompleted: snapshot.legacy.cyclesCompleted,
     };
     try {
       await AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(payload));
@@ -12085,6 +12549,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       gamePhase: snapshot.gamePhase,
       reputationTier: snapshot.reputationTier,
       dependency: snapshot.dependency,
+      legacyCycle: snapshot.legacy.currentCycle,
+      legacyCyclesCompleted: snapshot.legacy.cyclesCompleted,
     });
     captureEvent("run_start", {
       run_id: runId,
@@ -12095,6 +12561,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       game_phase: snapshot.gamePhase,
       dependency: snapshot.dependency,
       reputation_tier: snapshot.reputationTier,
+      legacy_cycle: snapshot.legacy.currentCycle,
+      legacy_cycles_completed: snapshot.legacy.cyclesCompleted,
     });
     pulseSessionHeartbeat("start");
   }, [pulseSessionHeartbeat]);
@@ -12186,6 +12654,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         research: snapshot.research,
         reputation: snapshot.reputation,
         dependency: snapshot.dependency,
+        legacy_cycle: snapshot.legacy.currentCycle,
+        legacy_cycles_completed: snapshot.legacy.cyclesCompleted,
       });
 
       sessionActiveRef.current = false;
@@ -13005,6 +13475,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "PLAYTEST_SKIP_PHASE2" });
   }, []);
 
+  const startLegacyCycle = useCallback(
+    (kitId: LegacyKitId, doctrineIds: LegacyDoctrineId[]) => {
+      dispatch({ type: "START_LEGACY_CYCLE", kitId, doctrineIds });
+    },
+    [],
+  );
+
+  const setLegacyTitle = useCallback((titleId?: string) => {
+    dispatch({ type: "SET_LEGACY_TITLE", titleId });
+  }, []);
+
   const undoLastMove = useCallback(() => {
     dispatch({ type: "UNDO_LAST_MOVE" });
   }, []);
@@ -13059,6 +13540,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         craftFreedomController,
         useFreedomController,
         skipToPhase2,
+        startLegacyCycle,
+        setLegacyTitle,
         canMerge,
         getFulfillmentIndices,
         undoLastMove,
@@ -13077,3 +13560,9 @@ export function useGame() {
   }
   return context;
 }
+
+export const __TEST_ONLY__ = {
+  gameReducer,
+  getInitialState,
+  buildLegacyCycleStartState,
+};

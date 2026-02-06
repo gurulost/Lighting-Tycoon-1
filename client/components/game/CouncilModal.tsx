@@ -23,11 +23,13 @@ import {
 import { COUNCIL_PERKS } from "@/constants/councilPerks";
 import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
 import { getCouncilHearingPenalty, getCouncilPerkEffects } from "@/lib/council";
+import { canStartLegacyCycle, getDoctrineSlotCap } from "@/lib/legacy";
 import { getTuning } from "@/lib/tuning";
 import type { CouncilCampaignStatus } from "@/types/game";
 
 interface CouncilModalProps {
   onClose: () => void;
+  onOpenLegacyCycle?: () => void;
 }
 
 type StatusMeta = {
@@ -238,7 +240,10 @@ function CampaignCard({
   );
 }
 
-export function CouncilModal({ onClose }: CouncilModalProps) {
+export function CouncilModal({
+  onClose,
+  onOpenLegacyCycle,
+}: CouncilModalProps) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
   const tuning = getTuning();
@@ -269,6 +274,16 @@ export function CouncilModal({ onClose }: CouncilModalProps) {
     () => [...COUNCIL_CAMPAIGNS].sort((a, b) => a.sortIndex - b.sortIndex),
     [],
   );
+  const allCampaignsCompleted = campaignList.every((campaign) => {
+    const progress = state.council.campaigns[campaign.id];
+    return progress?.status === "COMPLETED";
+  });
+  const legacyDoctrineSlots = getDoctrineSlotCap(state.legacy.cyclesCompleted);
+  const legacySetupReady = canStartLegacyCycle(state);
+  const canOpenLegacySetup = !!onOpenLegacyCycle && legacySetupReady;
+  const legacyDisplayCycle = state.legacy.pendingCycleStart
+    ? Math.max(1, state.legacy.cyclesCompleted + 1)
+    : Math.max(1, state.legacy.currentCycle || 1);
 
   const getDefaultCampaignId = React.useCallback(() => {
     if (state.council.activeCampaignId) return state.council.activeCampaignId;
@@ -826,7 +841,7 @@ export function CouncilModal({ onClose }: CouncilModalProps) {
               </View>
             </View>
             <ThemedText style={styles.completedText}>
-              Standard ratified. The perk stays active permanently.
+              Standard ratified. This campaign perk stays active for this run.
             </ThemedText>
           </View>
         ) : null}
@@ -918,6 +933,61 @@ export function CouncilModal({ onClose }: CouncilModalProps) {
             and the lobby has to keep up.
           </ThemedText>
         </View>
+
+        {state.legacy.unlocked || allCampaignsCompleted ? (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>
+                Legacy Standards
+              </ThemedText>
+              <View style={styles.sectionBadge}>
+                <Feather
+                  name={canOpenLegacySetup ? "zap" : "clock"}
+                  size={12}
+                  color={GameColors.currency.research}
+                />
+                <ThemedText style={styles.sectionBadgeText}>
+                  Cycle {legacyDisplayCycle}
+                </ThemedText>
+              </View>
+            </View>
+            <ThemedText style={styles.legacyText}>
+              {canOpenLegacySetup
+                ? "Final accord ratified. Start a new cycle with a doctrine loadout and custom kit."
+                : state.legacy.pendingCycleStart
+                  ? "Legacy cycle is ready. Open setup to begin the next run."
+                  : state.legacy.unlocked
+                    ? "Finish the final Council campaign in this run to re-open the next legacy cycle."
+                    : "Complete every Council campaign to unlock the first legacy cycle."}
+            </ThemedText>
+            <View style={styles.legacyMetaRow}>
+              <ThemedText style={styles.legacyMetaLabel}>
+                Doctrine points: {state.legacy.doctrinePoints}
+              </ThemedText>
+              <ThemedText style={styles.legacyMetaLabel}>
+                Loadout slots: {legacyDoctrineSlots}
+              </ThemedText>
+              <ThemedText style={styles.legacyMetaLabel}>
+                Cycles complete: {state.legacy.cyclesCompleted}
+              </ThemedText>
+            </View>
+            {canOpenLegacySetup ? (
+              <Pressable
+                style={styles.primaryButton}
+                onPress={onOpenLegacyCycle}
+              >
+                <Feather
+                  name="rotate-ccw"
+                  size={14}
+                  color={GameColors.text.primary}
+                />
+                <ThemedText style={styles.primaryButtonText}>
+                  Begin Legacy Cycle
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.sectionCard}>
           <LobbyPressureMeter
@@ -1409,6 +1479,18 @@ const styles = StyleSheet.create({
   completedText: {
     fontSize: 13,
     color: GameColors.text.secondary,
+  },
+  legacyText: {
+    fontSize: 13,
+    color: GameColors.text.secondary,
+    lineHeight: 18,
+  },
+  legacyMetaRow: {
+    gap: Spacing.xs,
+  },
+  legacyMetaLabel: {
+    fontSize: 12,
+    color: GameColors.text.primary,
   },
   perkRow: {
     flexDirection: "row",

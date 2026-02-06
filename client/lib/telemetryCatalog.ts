@@ -117,6 +117,31 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "Council system unlocked.",
     requiredProperties: ["projectsCompleted", "reputationTier"],
   },
+  legacy_cycle_complete: {
+    category: "system",
+    description: "A Legacy cycle reached final Council completion.",
+    requiredProperties: ["cycle", "doctrinePoints"],
+  },
+  legacy_cycle_start: {
+    category: "system",
+    description: "A new Legacy cycle started.",
+    requiredProperties: ["cycle", "kitId", "doctrineCount"],
+  },
+  legacy_doctrine_equip: {
+    category: "system",
+    description: "Legacy doctrines were equipped for a cycle.",
+    requiredProperties: ["doctrineIds", "slots", "cycle"],
+  },
+  legacy_kit_select: {
+    category: "system",
+    description: "Legacy starter kit selected.",
+    requiredProperties: ["kitId", "cycle"],
+  },
+  legacy_unlocked: {
+    category: "system",
+    description: "Legacy Standards mode unlocked.",
+    requiredProperties: ["cycle", "doctrinePoints"],
+  },
   craft_freedom_controller: {
     category: "strategy",
     description: "Freedom Controller crafted.",

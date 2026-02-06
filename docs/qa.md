@@ -107,6 +107,24 @@ Use this lightweight checklist to validate core friction fixes and first-session
 - Municipal Grants (perk unlock):
   - After unlocking the Municipal Grants perk, spend a grant to reduce Lobby Pressure.
 
+## Legacy Standards
+- Unlock + setup:
+  - Complete `camp_international_harmonization_accord` and verify Legacy panel appears in Council.
+  - Open Legacy setup and verify kit/doctrine selections are available.
+- Cycle start reset contract:
+  - Start a legacy cycle and verify run state resets (cash/board/orders/upgrades/projects/council progress/hearings/pressure).
+  - Verify legacy meta persists (cycle count, doctrine points, badges, selected title).
+  - Verify tutorial/first-session gates are skipped on cycle start.
+- Scaling:
+  - Compare project deposits between cycle 0 and cycle 1+ and confirm increase.
+  - Verify Council pressure gains per draft/pilot/ratify are higher on higher cycles.
+  - Verify project stage deadlines tighten with cycle count and respect cap.
+- Rewards:
+  - Complete a legacy cycle and verify +1 doctrine point.
+  - Verify badge unlock every 2 completed cycles.
+- Save/load migration:
+  - Load pre-legacy save with final campaign/perk complete and verify legacy unlock + pending cycle setup.
+
 ## Second Baron Offer Trigger
 - In first-session:
   - If you accept the first Baron offer, complete two orders.

@@ -29,6 +29,7 @@ import {
   getCouncilHearingPenalty,
   getCouncilUnlockInfo,
 } from "@/lib/council";
+import { getLegacyDifficultyModifiers, getLegacyKit } from "@/lib/legacy";
 
 type TabKey = "offers" | "active" | "trophies";
 
@@ -316,8 +317,16 @@ export function ProjectBoardModal({
   const tuning = getTuning();
   const councilPerks = getCouncilPerkEffects(state);
   const councilHearing = getCouncilHearingPenalty(state);
+  const legacyDifficulty = getLegacyDifficultyModifiers(
+    state.legacy.currentCycle,
+  );
+  const legacyKit = getLegacyKit(state.legacy.selectedKitId);
+  const legacyDepositMult =
+    legacyDifficulty.projectDepositMult * (legacyKit?.projectDepositMult ?? 1);
   const depositMultiplier =
-    councilPerks.projectDepositMult * councilHearing.projectDepositMult;
+    councilPerks.projectDepositMult *
+    councilHearing.projectDepositMult *
+    legacyDepositMult;
 
   const resolveOpenTab = React.useCallback((): TabKey => {
     if (initialTab === "trophies") return "trophies";
@@ -810,7 +819,7 @@ export function ProjectBoardModal({
               </ThemedText>
               {completedPerks.length === 0 ? (
                 <ThemedText style={styles.emptySubtitle}>
-                  Finish your first project to unlock a legacy perk.
+                  Finish your first project to unlock a project perk.
                 </ThemedText>
               ) : (
                 <View style={styles.perkList}>

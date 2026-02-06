@@ -154,6 +154,14 @@ export type TuningConfig = {
     municipalGrantLobbyPressureDrop: number;
     municipalGrantBaronPressureDrop: number;
   };
+  legacy: {
+    depositMultPerCycle: number;
+    depositMultCap: number;
+    lobbyPressureGainPerCycle: number;
+    lobbyPressureGainCap: number;
+    deadlineTightenEveryCycles: number;
+    deadlineTightenCap: number;
+  };
   merge: {
     momentumThresholds: number[];
     chainWindowMs: number;
@@ -387,6 +395,14 @@ const DEFAULT_TUNING: TuningConfig = {
     municipalGrantResearchCost: 0,
     municipalGrantLobbyPressureDrop: 15,
     municipalGrantBaronPressureDrop: 5,
+  },
+  legacy: {
+    depositMultPerCycle: 0.08,
+    depositMultCap: 0.4,
+    lobbyPressureGainPerCycle: 0.05,
+    lobbyPressureGainCap: 0.25,
+    deadlineTightenEveryCycles: 2,
+    deadlineTightenCap: 2,
   },
   merge: {
     momentumThresholds: [3, 6, 10],

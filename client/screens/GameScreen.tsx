@@ -34,6 +34,7 @@ import { ProjectBoardModal } from "@/components/game/ProjectBoardModal";
 import { ProjectDossierModal } from "@/components/game/ProjectDossierModal";
 import { ProjectRevealModal } from "@/components/game/ProjectRevealModal";
 import { CouncilModal } from "@/components/game/CouncilModal";
+import { LegacyCycleModal } from "@/components/game/LegacyCycleModal";
 import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
 import { LockoutModal } from "@/components/game/LockoutModal";
@@ -102,6 +103,7 @@ type ModalType =
   | "orders"
   | "projects"
   | "council"
+  | "legacy"
   | "upgrades"
   | "rd"
   | "settings"
@@ -1732,7 +1734,19 @@ export default function GameScreen() {
         presentationStyle="pageSheet"
         onRequestClose={closeModal}
       >
-        <CouncilModal onClose={closeModal} />
+        <CouncilModal
+          onClose={closeModal}
+          onOpenLegacyCycle={() => setActiveModal("legacy")}
+        />
+      </Modal>
+
+      <Modal
+        visible={activeModal === "legacy"}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeModal}
+      >
+        <LegacyCycleModal onClose={closeModal} />
       </Modal>
 
       <Modal

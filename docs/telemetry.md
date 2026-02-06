@@ -179,3 +179,8 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `neighborhood_unlocked`
 - `game_phase_change`
 - `tuning_applied`
+- `legacy_unlocked`
+- `legacy_kit_select`
+- `legacy_doctrine_equip`
+- `legacy_cycle_start`
+- `legacy_cycle_complete`

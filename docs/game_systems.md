@@ -65,10 +65,18 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
   - Draft: invest cash + research (partial investment allowed).
   - Pilot: complete action-based objectives during normal play.
   - Ratify: a single protected Council showcase order (no real-time timers).
-- Completing a campaign grants a permanent perk (order mix, rewards, supplier tweaks).
+- Completing a campaign grants a run perk (order mix, rewards, supplier tweaks). Legacy doctrines carry a limited subset across cycles.
 - Lobby Pressure (0-100) rises with Draft/Pilot/Ratify progress and drops via open-only installs.
 - Hearings trigger at thresholds and apply small penalties until cleared via short objectives or pay-to-clear.
 - Municipal Grants (perk): spend cash to reduce Lobby Pressure (and a small amount of Baron Pressure).
+
+## Legacy Standards (New Game+)
+- Unlocks when the final Council campaign (International Harmonization Accord) is ratified.
+- Starting a legacy cycle resets run progression: board, resources, orders, upgrades, projects, council progress, hearings, and pressure.
+- Legacy meta persists: cycle count, doctrine points, equipped doctrine loadout, selected starter kit, and cosmetic badges/titles.
+- Legacy cycles skip tutorial and first-session gates and start from a Phase 2-ready baseline.
+- Cycle scaling increases challenge each run (higher project deposits, faster Council pressure gain, tighter project deadlines).
+- Rewards: +1 doctrine point per completed cycle and a cosmetic badge every 2 cycles.
 
 ## Order Spawn Pressure
 - Orders spawn on a timer, but pause when the board is congested.

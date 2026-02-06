@@ -13,6 +13,14 @@ export type OrderFamilyPreference = "open" | "locked";
 
 export type SupplierId = "baron" | "open" | "salvage";
 export type MergeMomentumChoice = "refill" | "cooldown" | "quality";
+export type LegacyDoctrineId =
+  | "doctrine_open_reserves"
+  | "doctrine_interop_accelerator"
+  | "doctrine_municipal_cushion";
+export type LegacyKitId =
+  | "kit_open_foundry"
+  | "kit_interop_bench"
+  | "kit_municipal_bridge";
 
 export type RecycleReward = {
   cash: number;
@@ -272,6 +280,19 @@ export interface CouncilState {
   perksUnlocked: string[];
 }
 
+export interface LegacyState {
+  unlocked: boolean;
+  currentCycle: number;
+  cyclesCompleted: number;
+  doctrinePoints: number;
+  equippedDoctrines: LegacyDoctrineId[];
+  availableKits: LegacyKitId[];
+  selectedKitId?: LegacyKitId;
+  badgesUnlocked: string[];
+  selectedTitleId?: string;
+  pendingCycleStart: boolean;
+}
+
 export interface Upgrade {
   id: string;
   category: "space" | "workbench" | "quality" | "logistics" | "rd";
@@ -334,6 +355,7 @@ export interface GameState {
   projectRevealSeen: Record<string, boolean>;
   baronPressure: number;
   council: CouncilState;
+  legacy: LegacyState;
   baronSupplySpawnsRemaining: number;
   baronRushSpawnsRemaining: number;
   suppliers: Record<SupplierId, SupplierState>;
