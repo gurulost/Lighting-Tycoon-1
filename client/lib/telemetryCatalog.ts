@@ -222,6 +222,11 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "Order was refreshed.",
     requiredProperties: ["previousType", "newType", "cost"],
   },
+  order_refresh_blocked: {
+    category: "core_loop",
+    description: "Order refresh was blocked by a gameplay constraint.",
+    requiredProperties: ["reason", "orderType"],
+  },
   order_spawn: {
     category: "core_loop",
     description: "Order spawned into the queue.",

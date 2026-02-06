@@ -18,12 +18,16 @@ import { ThemedText } from "@/components/ThemedText";
 import { OrderCard } from "./OrderCard";
 import { ModalShell } from "./ModalShell";
 import { OnboardingCallout } from "./OnboardingCallout";
+import { SiteRuleBanner } from "./SiteRuleBanner";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { Order, SupplierScoutRoute, WarrantyStampMode } from "@/types/game";
 import { getScaledBoostMergeCount, getTuning } from "@/lib/tuning";
-import { getCouncilHearingPenalty } from "@/lib/council";
-import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
+import {
+  getActiveSiteRule,
+  getOrderRefreshBlockReason,
+  getOrderRefreshCost,
+} from "@/lib/siteRules";
 import {
   TrimLightStrip,
   TrimLightPattern,
@@ -302,18 +306,16 @@ export function OrdersModal({
   const independenceMax = tuning.boosts.independenceMaxStack;
   const warrantyOrders = tuning.boosts.warrantyOrders;
   const warrantyMax = tuning.boosts.warrantyMaxStack;
-  const hearingPenalty = getCouncilHearingPenalty(state);
-  const activeHearing = state.council.activeHearing
-    ? COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId]
-    : undefined;
-  const refreshBlocked = !!activeHearing?.constraints?.disallowRefresh;
-  const refreshBase =
-    tuning.economy.orderRefreshBase +
-    state.reputationTier * tuning.economy.orderRefreshStep;
-  const refreshCost = Math.max(
-    0,
-    Math.round(refreshBase * hearingPenalty.refreshCostMult),
-  );
+  const activeSiteRule = getActiveSiteRule(state);
+  const refreshBlockReason = getOrderRefreshBlockReason(state);
+  const refreshBlocked = refreshBlockReason !== null;
+  const refreshCost = getOrderRefreshCost(state.reputationTier, state);
+  const refreshBlockedHint =
+    refreshBlockReason === "site_rule"
+      ? "Refresh disabled by site rule."
+      : refreshBlockReason === "hearing"
+        ? "Refresh blocked by active Council hearing."
+        : null;
   const marketingCost =
     tuning.economy.marketingCostBase +
     state.reputationTier * tuning.economy.marketingCostStep;
@@ -795,6 +797,11 @@ export function OrdersModal({
                 </ThemedText>
               </View>
             </View>
+            {refreshBlockedHint ? (
+              <ThemedText style={styles.refreshBlockedHint}>
+                {refreshBlockedHint}
+              </ThemedText>
+            ) : null}
 
             <View style={styles.refreshRow}>
               <Pressable
@@ -844,6 +851,20 @@ export function OrdersModal({
                 Boosts higher-tier orders for the next {marketingOrders} orders.
               </ThemedText>
             )}
+          </View>
+        ) : null}
+
+        {activeSiteRule ? (
+          <View style={styles.siteRuleWrap}>
+            <SiteRuleBanner
+              siteRule={activeSiteRule}
+              heading="Active Site Rule"
+              note={
+                refreshBlockReason === "site_rule"
+                  ? "Order refresh is currently unavailable."
+                  : undefined
+              }
+            />
           </View>
         ) : null}
 
@@ -1450,6 +1471,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
     gap: Spacing.sm,
   },
+  siteRuleWrap: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
   refreshRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1490,6 +1515,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: GameColors.currency.cash,
+  },
+  refreshBlockedHint: {
+    fontSize: 11,
+    color: GameColors.ui.warning,
+    marginTop: -2,
   },
   legendCard: {
     marginHorizontal: Spacing.lg,

@@ -1,4 +1,8 @@
-import { ProjectDefinition } from "@/types/game";
+import {
+  ProjectDefinition,
+  SiteRuleDefinition,
+  SiteRuleId,
+} from "@/types/game";
 
 const NARRATIVE_GENERIC = {
   offer: "project_offer_generic",
@@ -8,11 +12,69 @@ const NARRATIVE_GENERIC = {
   complete: "project_complete_generic",
 };
 
+export const SITE_RULES: Record<SiteRuleId, SiteRuleDefinition> = {
+  public_scrutiny: {
+    id: "public_scrutiny",
+    name: "Public Scrutiny",
+    tagline: "Every install is visible.",
+    upsideText: "Open-only installs gain +15% reputation.",
+    downsideText: "Order refresh costs +30% more.",
+    effects: {
+      openOnlyRepMult: 1.15,
+      orderRefreshCostMult: 1.3,
+    },
+  },
+  storm_protocol: {
+    id: "storm_protocol",
+    name: "Storm Protocol",
+    tagline: "Weather windows close fast.",
+    upsideText: "Compatibility installs gain +15% cash.",
+    downsideText: "New rush order timers are 20% shorter.",
+    effects: {
+      compatCashMult: 1.15,
+      rushDeadlineMult: 0.8,
+    },
+  },
+  union_scheduling: {
+    id: "union_scheduling",
+    name: "Union Scheduling",
+    tagline: "Stronger milestones, slower sourcing.",
+    upsideText: "Project stage rewards gain +12%.",
+    downsideText: "Open supplier cooldown is 25% longer.",
+    effects: {
+      projectStageRewardMult: 1.12,
+      openSupplierCooldownMult: 1.25,
+    },
+  },
+  safety_lock: {
+    id: "safety_lock",
+    name: "Safety Lock",
+    tagline: "Compliance first, no shortcuts.",
+    upsideText: "Eco-audit research bonus gains +35%.",
+    downsideText: "Order refresh is disabled.",
+    effects: {
+      ecoAuditBonusResearchMult: 1.35,
+      disallowOrderRefresh: true,
+    },
+  },
+};
+
+export function getSiteRuleForProjectStage(
+  project: ProjectDefinition,
+  stageIndex: number,
+) {
+  const stageRuleId = project.stages[stageIndex]?.siteRuleId;
+  const ruleId = stageRuleId ?? project.siteRuleId;
+  if (!ruleId) return null;
+  return SITE_RULES[ruleId] ?? null;
+}
+
 export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
   {
     id: "proj_neon_city_grid",
     title: "Neon City Grid Reboot",
     locationName: "Neon City - Municipal Core",
+    siteRuleId: "public_scrutiny",
     client: { name: "Mayor Marisol Vance", role: "Mayor", tone: "demanding" },
     synopsis:
       "Replace legacy street lighting with open-standard infrastructure. Public visibility is massive.",
@@ -86,6 +148,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_festival_main_stage",
     title: "Festival of Sparks: Main Stage",
     locationName: "Riverfront Festival Grounds",
+    siteRuleId: "storm_protocol",
     client: { name: "Aria Kale", role: "Festival Director", tone: "visionary" },
     synopsis:
       "A spectacle contract with high stakes and zero tolerance for failure.",
@@ -151,6 +214,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_harbor_beacon",
     title: "Harbor Beacon Modernization",
     locationName: "Old Harbor Lighthouse District",
+    siteRuleId: "storm_protocol",
     client: { name: "Chief Rourke", role: "Port Authority", tone: "skeptical" },
     synopsis:
       "Reliability contract where weather, corrosion, and public safety matter more than flash.",
@@ -220,6 +284,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_metro_wayfinding",
     title: "Metro Wayfinding Overhaul",
     locationName: "Underground Metro Line",
+    siteRuleId: "union_scheduling",
     client: {
       name: "Commissioner Han",
       role: "Transit Commissioner",
@@ -306,6 +371,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_skyline_tower_facade",
     title: "Skyline Tower Signature Facade",
     locationName: "Glassspire Financial Tower",
+    siteRuleId: "public_scrutiny",
     client: {
       name: "Liaison Sato",
       role: "Executive Liaison",
@@ -380,6 +446,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_childrens_hospital",
     title: "Children's Hospital Nightlight Wing",
     locationName: "St. Luma Children's Hospital",
+    siteRuleId: "safety_lock",
     client: { name: "Dr. Imani Reyes", role: "Chief Physician", tone: "warm" },
     synopsis:
       "Safety-first install with high scrutiny and high community stakes.",
@@ -442,6 +509,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_museum_exhibit",
     title: "Museum of Light: Retrospective Exhibit",
     locationName: "Museum of Light",
+    siteRuleId: "union_scheduling",
     client: { name: "Curator Elowen Shaw", role: "Curator", tone: "visionary" },
     synopsis:
       "A creative contract that leans into compatibility sets and signature builds.",
@@ -520,6 +588,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_stadium_halftime",
     title: "Stadium Halftime Spectacle",
     locationName: "Titan Field Stadium",
+    siteRuleId: "storm_protocol",
     client: { name: "Jax Moreno", role: "Head of Events", tone: "demanding" },
     synopsis:
       "A pressure contract packed with rush installs and a high payout ceiling.",
@@ -577,6 +646,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_airport_runway",
     title: "Airport Runway Guidance Upgrade",
     locationName: "Neon City International Airport",
+    siteRuleId: "safety_lock",
     client: {
       name: "Inspector Wren",
       role: "Safety Inspector",
@@ -650,6 +720,7 @@ export const PROJECT_DEFINITIONS: ProjectDefinition[] = [
     id: "proj_international_expo",
     title: "International Light Expo Pavilion",
     locationName: "World Light Expo Grounds",
+    siteRuleId: "public_scrutiny",
     client: { name: "Chair Solenne", role: "Expo Chair", tone: "visionary" },
     synopsis:
       "The capstone contract that crowns you as the industry standard-setter.",

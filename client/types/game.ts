@@ -140,6 +140,32 @@ export interface Order {
 
 export type ProjectTone = "warm" | "demanding" | "visionary" | "skeptical";
 
+export type SiteRuleId =
+  | "public_scrutiny"
+  | "storm_protocol"
+  | "union_scheduling"
+  | "safety_lock";
+
+export type SiteRuleEffects = {
+  orderRefreshCostMult?: number;
+  disallowOrderRefresh?: boolean;
+  rushDeadlineMult?: number;
+  projectStageRewardMult?: number;
+  openSupplierCooldownMult?: number;
+  openOnlyRepMult?: number;
+  compatCashMult?: number;
+  ecoAuditBonusResearchMult?: number;
+};
+
+export type SiteRuleDefinition = {
+  id: SiteRuleId;
+  name: string;
+  tagline: string;
+  upsideText: string;
+  downsideText: string;
+  effects: SiteRuleEffects;
+};
+
 export type ProjectStageDeadline = {
   type: "installs";
   installsRemaining: number;
@@ -170,6 +196,7 @@ export interface ProjectStageDefinition {
   stageIndex: number;
   stageTitle: string;
   orderSpec: ProjectStageOrderSpec;
+  siteRuleId?: SiteRuleId;
   deadline?: ProjectStageDeadline;
   stageRewards: ProjectStageRewards;
   failPenalty: ProjectStageFailPenalty;
@@ -179,6 +206,7 @@ export interface ProjectDefinition {
   id: string;
   title: string;
   locationName: string;
+  siteRuleId?: SiteRuleId;
   client: {
     name: string;
     role: string;

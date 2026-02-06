@@ -7,16 +7,19 @@ import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
+import { SiteRuleBanner } from "./SiteRuleBanner";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import {
   ProjectDefinition,
   ProjectOffer,
   ProjectStageDefinition,
+  SiteRuleDefinition,
 } from "@/types/game";
 import {
   PROJECT_DEFINITIONS,
   PROJECT_DEFINITION_BY_ID,
+  getSiteRuleForProjectStage,
 } from "@/constants/projects";
 import { getProjectTrophyImage } from "@/constants/projectAssets";
 import {
@@ -160,6 +163,7 @@ function ProjectOfferCard({
   disableAccept,
   totalCost,
   canAfford,
+  siteRule,
   onViewDossier,
   isNew,
   isFocused,
@@ -172,6 +176,7 @@ function ProjectOfferCard({
   disableAccept: boolean;
   totalCost: number;
   canAfford: boolean;
+  siteRule: SiteRuleDefinition | null;
   onViewDossier?: () => void;
   isNew?: boolean;
   isFocused?: boolean;
@@ -226,6 +231,7 @@ function ProjectOfferCard({
         {project.locationName}
       </ThemedText>
       <ThemedText style={styles.offerSynopsis}>{project.synopsis}</ThemedText>
+      <SiteRuleBanner siteRule={siteRule} heading="Site Rule" compact />
 
       {onViewDossier ? (
         <Pressable style={styles.dossierButton} onPress={onViewDossier}>
@@ -417,6 +423,10 @@ export function ProjectBoardModal({
   const activeStage = activeDefinition
     ? activeDefinition.stages[activeProject?.stageIndex ?? 0]
     : undefined;
+  const activeSiteRule =
+    activeDefinition && activeProject
+      ? getSiteRuleForProjectStage(activeDefinition, activeProject.stageIndex)
+      : null;
   const completionScale = Math.max(
     0,
     tuning.projects.completionRewardMultiplier,
@@ -728,12 +738,14 @@ export function ProjectBoardModal({
                       : 0);
                   const totalCost = depositCost + addonCost;
                   const canAfford = state.cash >= totalCost;
+                  const siteRule = getSiteRuleForProjectStage(project, 0);
                   return (
                     <ProjectOfferCard
                       key={offer.projectId}
                       project={project}
                       depositCost={depositCost}
                       addonSelection={selection}
+                      siteRule={siteRule}
                       onToggleAddon={(key) =>
                         setAddonSelections((prev) => ({
                           ...prev,
@@ -1032,6 +1044,11 @@ export function ProjectBoardModal({
                       </ThemedText>
                     </View>
                   ) : null}
+
+                  <SiteRuleBanner
+                    siteRule={activeSiteRule}
+                    heading="Active Site Rule"
+                  />
 
                   <View style={styles.activePerksRow}>
                     {activeProject.siteLogisticsUsed ? (

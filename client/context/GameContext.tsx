@@ -59,6 +59,7 @@ import {
 import {
   PROJECT_DEFINITIONS,
   PROJECT_DEFINITION_BY_ID,
+  getSiteRuleForProjectStage,
 } from "@/constants/projects";
 import {
   COUNCIL_CAMPAIGNS,
@@ -73,6 +74,12 @@ import {
   getProjectOfferRefreshCost,
 } from "@/lib/projects";
 import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
+import {
+  applyRushDeadlineMultiplier,
+  getActiveSiteRule,
+  getOrderRefreshBlockReason,
+  getOrderRefreshCost,
+} from "@/lib/siteRules";
 import {
   getOverdrawDeltaSeconds,
   getCooldownRemainingSeconds,
@@ -806,15 +813,6 @@ function getOrderIntervalMs(reputationTier: number) {
   return Math.max(tuning.orderSpawn.minMs, base - reputationTier * step);
 }
 
-function getOrderRefreshCost(reputationTier: number, state?: GameState) {
-  const base =
-    tuning.economy.orderRefreshBase +
-    reputationTier * tuning.economy.orderRefreshStep;
-  if (!state) return Math.round(base);
-  const hearingPenalty = getCouncilHearingPenalty(state).refreshCostMult;
-  return Math.max(0, Math.round(base * hearingPenalty));
-}
-
 function getMarketingCampaignCost(reputationTier: number) {
   return (
     tuning.economy.marketingCostBase +
@@ -1059,7 +1057,7 @@ function buildCouncilRatifyOrder(
   });
 }
 
-function getSupplierConfigWithPerks(
+export function getSupplierConfigWithPerks(
   state: GameState,
   supplierId: SupplierId,
   level: number,
@@ -1074,8 +1072,11 @@ function getSupplierConfigWithPerks(
   );
   if (supplierId !== "open") return base;
   const perks = getCouncilPerkEffects(state);
+  const activeSiteRule = getActiveSiteRule(state);
   const bonusCharges = perks.openSupplierChargeCapAdd ?? 0;
-  const cooldownMult = perks.openSupplierCooldownMult ?? 1;
+  const cooldownMult =
+    (perks.openSupplierCooldownMult ?? 1) *
+    (activeSiteRule?.effects.openSupplierCooldownMult ?? 1);
   return {
     maxCharges: Math.max(0, base.maxCharges + bonusCharges),
     cooldownMs: Math.max(
@@ -2369,7 +2370,7 @@ function getProjectStageModifierVariants(
   return Array.from(unique.values());
 }
 
-function buildProjectStageOrder(
+export function buildProjectStageOrder(
   state: GameState,
   project: ProjectDefinition,
   stage: ProjectStageDefinition,
@@ -2403,9 +2404,11 @@ function buildProjectStageOrder(
     modifierIds: rewardModifierIds,
   });
 
+  const stageSiteRule = getSiteRuleForProjectStage(project, stage.stageIndex);
   const stageMultiplier =
     Math.max(0, stage.stageRewards.rewardMultiplier) *
-    Math.max(0, tuning.projects.stageRewardMultiplier);
+    Math.max(0, tuning.projects.stageRewardMultiplier) *
+    Math.max(0, stageSiteRule?.effects.projectStageRewardMult ?? 1);
   const rewards = {
     cash: Math.round(baseRewards.cash * stageMultiplier),
     reputation: Math.round(baseRewards.reputation * stageMultiplier),
@@ -3259,6 +3262,7 @@ function generateOrder(
   gamePhase: 1 | 2,
   requiredMinTier?: PartTier,
   compatOrderWeightMultiplier = 1,
+  rushDeadlineMult = 1,
 ): Order | null {
   const neighborhoodIndex = getNeighborhoodIndex(currentNeighborhoodId);
   const currentNeighborhood =
@@ -3360,12 +3364,17 @@ function generateOrder(
       ? `${ensureSentence(rawOverride)} ${ensureSentence(archetypeFlavor || fallbackFlavor)}`
       : ensureSentence(rawOverride);
   const flavorText = polishedOverride || fallbackFlavor;
+  const rushDeadline = applyRushDeadlineMultiplier(
+    template.rushDeadline,
+    rushDeadlineMult,
+  );
 
   return {
     ...template,
     rewards: applyOrderRewardTuning(template.rewards),
     id: generateId(),
-    rushStartTime: template.rushDeadline ? Date.now() : undefined,
+    rushDeadline,
+    rushStartTime: rushDeadline ? Date.now() : undefined,
     flavorText,
   };
 }
@@ -3546,7 +3555,7 @@ function spawnTutorialPart(
   return { board: newBoard, spawned: true };
 }
 
-function getInitialState(): GameState {
+export function getInitialState(): GameState {
   const board: (Part | null)[] = Array(INITIAL_BOARD_SIZE).fill(null);
   const startingNeighborhood = getNeighborhoodByRep(0);
 
@@ -3880,7 +3889,7 @@ function findEmptySlots(state: GameState, count: number): number[] {
   return slots;
 }
 
-function gameReducer(state: GameState, action: GameAction): GameState {
+export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "TICK_SUPPLIERS": {
       const now = Date.now();
@@ -5577,6 +5586,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let cashReward = order.rewards.cash;
       let repReward = order.rewards.reputation;
       let researchReward = order.rewards.research;
+      const activeSiteRule = getActiveSiteRule(state);
       const councilPerks = getCouncilPerkEffects(state);
       const councilHearing = getCouncilHearingPenalty(state);
       let dependencyChange = 0;
@@ -5745,7 +5755,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const ecoMult =
           councilPerks.ecoAuditResearchBonusMult *
           councilHearing.ecoAuditResearchBonusMult;
-        researchReward += Math.round(order.ecoAuditBonusResearch * ecoMult);
+        const siteEcoMult =
+          activeSiteRule?.effects.ecoAuditBonusResearchMult ?? 1;
+        researchReward += Math.round(
+          order.ecoAuditBonusResearch * ecoMult * siteEcoMult,
+        );
       }
 
       if (contractActive) {
@@ -5862,6 +5876,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       cashReward = Math.floor(cashReward * cashMultiplier);
       repReward = Math.floor(repReward * repMultiplier);
       researchReward = Math.floor(researchReward * researchMultiplier);
+
+      if (isCompatOrder) {
+        cashReward = Math.floor(
+          cashReward * (activeSiteRule?.effects.compatCashMult ?? 1),
+        );
+      }
+      if (openOnly) {
+        repReward = Math.floor(
+          repReward * (activeSiteRule?.effects.openOnlyRepMult ?? 1),
+        );
+      }
 
       if (projectCompletionReward !== null) {
         const completionReward = projectCompletionReward as {
@@ -6154,6 +6179,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (projectStageMatches && state.activeProject) {
         const { project, stage } = activeProjectData;
+        const stageSiteRuleId =
+          getSiteRuleForProjectStage(project, stage.stageIndex)?.id ?? null;
         const stageHistory = [
           ...state.activeProject.stageHistory,
           { stageIndex: stage.stageIndex, completedAt: Date.now() },
@@ -6185,6 +6212,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           captureEvent("project_complete", {
             projectId: project.id,
             stages: project.stages.length,
+            siteRuleId: stageSiteRuleId,
           });
 
           if (!nextProjectsCompleted.includes(project.id)) {
@@ -6264,6 +6292,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             captureEvent("project_stage_complete", {
               projectId: project.id,
               stageIndex: stage.stageIndex,
+              siteRuleId: stageSiteRuleId,
             });
           }
         }
@@ -6733,6 +6762,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       captureEvent("order_fulfill", {
         orderType: order.type,
         modifiers: order.modifierIds || [],
+        siteRuleId: activeSiteRule?.id ?? null,
         rewards: {
           cash: cashReward,
           reputation: repReward,
@@ -7556,10 +7586,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const order = state.orders.find((o) => o.id === action.orderId);
       if (!order) return state;
       if (isProtectedOrder(state, order)) return state;
-      const activeHearing = state.council.activeHearing
-        ? COUNCIL_HEARING_BY_ID[state.council.activeHearing.hearingId]
-        : undefined;
-      if (activeHearing?.constraints?.disallowRefresh) return state;
+      const activeSiteRule = getActiveSiteRule(state);
+      const refreshBlockReason = getOrderRefreshBlockReason(state);
+      if (refreshBlockReason) {
+        captureEvent("order_refresh_blocked", {
+          reason: refreshBlockReason,
+          orderType: order.type,
+          modifiers: order.modifierIds || [],
+          siteRuleId: activeSiteRule?.id ?? null,
+        });
+        return state;
+      }
       const refreshCost = getOrderRefreshCost(state.reputationTier, state);
       if (state.cash < refreshCost) return state;
 
@@ -7576,6 +7613,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const compatOrderWeightMultiplier =
         councilPerks.compatOrderWeightMult *
         councilHearing.compatOrderWeightMult;
+      const rushDeadlineMult = activeSiteRule?.effects.rushDeadlineMult ?? 1;
       const requiredMinTier = getOrderTierFloor(state, remainingOrders);
       const newOrder = generateOrder(
         state.dependency,
@@ -7590,6 +7628,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.gamePhase,
         requiredMinTier,
         compatOrderWeightMultiplier,
+        rushDeadlineMult,
       );
       if (!newOrder) return state;
       const nextMarketingBoostOrdersRemaining = Math.max(
@@ -7606,6 +7645,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         newOrderType: newOrder.type,
         newModifiers: newOrder.modifierIds || [],
         cost: refreshCost,
+        siteRuleId: activeSiteRule?.id ?? null,
       });
       captureEvent("cash_spent", {
         amount: refreshCost,
@@ -9633,9 +9673,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.freedomControllerCount > 0;
       const councilPerks = getCouncilPerkEffects(workingState);
       const councilHearing = getCouncilHearingPenalty(workingState);
+      const activeSiteRule = getActiveSiteRule(workingState);
       const compatOrderWeightMultiplier =
         councilPerks.compatOrderWeightMult *
         councilHearing.compatOrderWeightMult;
+      const rushDeadlineMult = activeSiteRule?.effects.rushDeadlineMult ?? 1;
       const requiredMinTier = getOrderTierFloor(
         workingState,
         workingState.orders,
@@ -9653,6 +9695,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         workingState.gamePhase,
         requiredMinTier,
         compatOrderWeightMultiplier,
+        rushDeadlineMult,
       );
       if (!newOrder) return workingState;
       const nextMarketingBoostOrdersRemaining = Math.max(
