@@ -550,7 +550,7 @@ export function OrdersModal({
 
     const partsToUse = getFulfillmentIndices(order);
     if (partsToUse) {
-      fulfillOrder(orderId, partsToUse);
+      fulfillOrder(orderId);
       triggerInstallMoment(order);
       onOrderFulfilled?.(order);
       if (state.highlightedOrderId === orderId) {

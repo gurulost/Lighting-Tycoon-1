@@ -4,13 +4,13 @@ test("opens the settings modal", async ({ page }) => {
   await page.goto("/");
 
   const skipButton = page.getByTestId("tutorial-skip");
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 8; i += 1) {
     const isVisible = await skipButton
-      .isVisible({ timeout: 2_000 })
+      .isVisible({ timeout: 1_000 })
       .catch(() => false);
     if (!isVisible) break;
-    await skipButton.click();
-    await page.waitForTimeout(80);
+    await skipButton.click({ force: true, timeout: 1_500 }).catch(() => {});
+    await page.waitForTimeout(120);
   }
 
   await expect(skipButton).toBeHidden({ timeout: 10_000 });

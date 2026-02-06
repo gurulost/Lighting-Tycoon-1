@@ -101,24 +101,37 @@ export function OrderCard({
     return false;
   };
 
-  const availableParts = state.board.filter((p): p is Part => {
-    if (!p) return false;
-    return order.requirements.some((req) => isPartValidForRequirement(p, req));
-  });
-
   const totalRequired = order.requirements.reduce(
     (sum, req) => sum + req.count,
     0,
   );
-  const progressParts = [...state.board, ...state.backpack].filter(
-    (part): part is Part => !!part,
+  // Mirror reducer allocation order so progress and requirement checks match fulfillability.
+  const sortedRequirementEntries = order.requirements
+    .map((req, requirementIndex) => ({ req, requirementIndex }))
+    .sort((a, b) => {
+      const familyScore =
+        (a.req.family === "any" ? 1 : 0) - (b.req.family === "any" ? 1 : 0);
+      if (familyScore !== 0) return familyScore;
+      return b.req.tier - a.req.tier;
+    });
+  const matchedCountByRequirement = Array(order.requirements.length).fill(0);
+  const usedProgressIndices = new Set<number>();
+  sortedRequirementEntries.forEach(({ req, requirementIndex }) => {
+    let matchedForRequirement = 0;
+    for (let i = 0; i < state.board.length; i += 1) {
+      if (matchedForRequirement >= req.count) break;
+      const part = state.board[i];
+      if (!part || usedProgressIndices.has(i)) continue;
+      if (!isPartValidForRequirement(part, req)) continue;
+      usedProgressIndices.add(i);
+      matchedForRequirement += 1;
+    }
+    matchedCountByRequirement[requirementIndex] = matchedForRequirement;
+  });
+  const satisfied = matchedCountByRequirement.reduce(
+    (sum, count) => sum + count,
+    0,
   );
-  const satisfied = order.requirements.reduce((sum, req) => {
-    const matching = progressParts.filter((part) =>
-      isPartValidForRequirement(part, req),
-    );
-    return sum + Math.min(matching.length, req.count);
-  }, 0);
   const rawProgress = totalRequired > 0 ? satisfied / totalRequired : 0;
   const partialProgress = Math.min(1, rawProgress);
   const visualProgress = canFulfill ? 1 : Math.min(0.95, partialProgress);
@@ -130,7 +143,6 @@ export function OrderCard({
         : order.type === "style_match"
           ? "classic"
           : "warmWhite";
-
   const orderSource = order.modifierIds?.includes("mentor_job")
     ? "mentor"
     : order.modifierIds?.includes("baron_contract")
@@ -694,10 +706,8 @@ export function OrderCard({
 
           <View style={styles.requirements}>
             {order.requirements.map((req, index) => {
-              const matching = availableParts.filter((p) =>
-                isPartValidForRequirement(p, req),
-              );
-              const hasEnough = matching.length >= req.count;
+              const matchedCount = matchedCountByRequirement[index] || 0;
+              const hasEnough = matchedCount >= req.count;
               const familyColor =
                 req.family === "open"
                   ? GameColors.openStandard.primary
@@ -817,7 +827,7 @@ export function OrderCard({
             <View style={styles.trackingRow}>
               <Feather name="eye" size={12} color={GameColors.ui.primary} />
               <ThemedText style={styles.trackingText}>
-                Tracking parts on board + backpack
+                Tracking parts on board (move from backpack to use)
               </ThemedText>
             </View>
           ) : null}

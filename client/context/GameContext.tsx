@@ -122,7 +122,7 @@ type GameAction =
   | { type: "CLEAR_RECYCLE_REWARD" }
   | { type: "CLEAR_MISSION_REWARD" }
   | { type: "SET_ORDERS_HELP_SEEN" }
-  | { type: "FULFILL_ORDER"; orderId: string; partIndices: number[] }
+  | { type: "FULFILL_ORDER"; orderId: string }
   | { type: "PURCHASE_UPGRADE"; upgradeId: string }
   | { type: "UNLOCK_RD_NODE"; nodeId: string }
   | { type: "CRAFT_FREEDOM_CONTROLLER" }
@@ -1034,6 +1034,12 @@ const SLOT_UPGRADE_RULES: { slot: number; upgradeId: string }[] = [
   { slot: 28, upgradeId: "space_2" },
   { slot: 29, upgradeId: "space_3" },
 ];
+const OPEN_WORKSHOP_LEVELS = RD_DEFINITIONS.map((node) => {
+  const match = /^open_workshop_(\d+)$/.exec(node.id);
+  return match ? Number(match[1]) : null;
+})
+  .filter((level): level is number => typeof level === "number")
+  .sort((a, b) => b - a);
 
 function reconcileUpgradeState(state: GameState): GameState {
   let upgradesChanged = false;
@@ -1101,6 +1107,38 @@ function reconcileUpgradeState(state: GameState): GameState {
       ...nextSuppliers,
       salvage: {
         level: 1,
+        chargesRemaining: config.maxCharges,
+        cooldownEndsAt: 0,
+        overdrawCount: 0,
+      },
+    };
+    suppliersChanged = true;
+  }
+
+  const unlockedOpenWorkshopLevel = OPEN_WORKSHOP_LEVELS.find(
+    (level) => state.rdNodes[`open_workshop_${level}`],
+  );
+  if (
+    typeof unlockedOpenWorkshopLevel === "number" &&
+    unlockedOpenWorkshopLevel > nextSuppliers.open.level
+  ) {
+    const speedLevel = nextUpgrades["workbench_speed_1"] || 0;
+    const config = getSupplierConfigWithPerks(
+      {
+        ...state,
+        upgrades: nextUpgrades,
+        unlockedSlots: nextUnlockedSlots,
+        blockedSlots: nextBlockedSlots,
+        suppliers: nextSuppliers,
+      },
+      "open",
+      unlockedOpenWorkshopLevel,
+      speedLevel,
+    );
+    nextSuppliers = {
+      ...nextSuppliers,
+      open: {
+        level: unlockedOpenWorkshopLevel,
         chargesRemaining: config.maxCharges,
         cooldownEndsAt: 0,
         overdrawCount: 0,
@@ -9630,6 +9668,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         lastMissionReward: null,
         storySeen: nextStorySeen,
       };
+      nextState = reconcileUpgradeState(nextState);
       nextState = queueStoryBeat(nextState, "tina_intro");
       return nextState;
     }
@@ -11726,7 +11765,7 @@ interface GameContextValue {
   claimMergeMomentum: (choice: MergeMomentumChoice) => void;
   mergeParts: (fromIndex: number, toIndex: number) => boolean;
   movePart: (fromIndex: number, toIndex: number) => void;
-  fulfillOrder: (orderId: string, partIndices: number[]) => void;
+  fulfillOrder: (orderId: string) => void;
   purchaseUpgrade: (upgradeId: string) => void;
   unlockRDNode: (nodeId: string) => void;
   craftFreedomController: () => void;
@@ -11820,6 +11859,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     TUNING_FLAG_KEY,
     featureFlagClient,
   );
+  const tuningPayloadSignature = React.useMemo(
+    () => JSON.stringify(tuningPayload ?? {}),
+    [tuningPayload],
+  );
   const orderRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const supplierTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -11911,7 +11954,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyTuningFromPayload(tuningPayload);
     const payload = tuningPayload ?? null;
-    const signature = JSON.stringify(payload ?? {});
+    const signature = tuningPayloadSignature;
     tuningSignatureRef.current = signature;
     if (telemetryReadyRef.current && tuningCapturedRef.current !== signature) {
       captureEvent("tuning_applied", {
@@ -11921,7 +11964,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       });
       tuningCapturedRef.current = signature;
     }
-  }, [tuningPayload, tuningVariant]);
+  }, [tuningPayload, tuningVariant, tuningPayloadSignature]);
 
   const persistActiveSession = useCallback(async (lastHeartbeatAt: number) => {
     const sessionId = sessionIdRef.current;
@@ -12804,7 +12847,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (orderRef.current) clearInterval(orderRef.current);
     };
-  }, [state.reputationTier]);
+  }, [state.reputationTier, tuningPayloadSignature]);
 
   useEffect(() => {
     if (supplierTickRef.current) {
@@ -12938,8 +12981,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "MOVE_PART", fromIndex, toIndex });
   }, []);
 
-  const fulfillOrder = useCallback((orderId: string, partIndices: number[]) => {
-    dispatch({ type: "FULFILL_ORDER", orderId, partIndices });
+  const fulfillOrder = useCallback((orderId: string) => {
+    dispatch({ type: "FULFILL_ORDER", orderId });
   }, []);
 
   const purchaseUpgrade = useCallback((upgradeId: string) => {
