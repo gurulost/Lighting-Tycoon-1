@@ -35,33 +35,15 @@
     ],
     "boardSize": 30,
     "unlockedSlots": [],
-    "blockedSlots": [
-      27,
-      28,
-      29
-    ],
-    "stationSlots": [
-      0,
-      5,
-      24
-    ],
+    "blockedSlots": [27, 28, 29],
+    "stationSlots": [0, 5, 24],
     "backpackSlots": 4,
-    "backpack": [
-      null,
-      null,
-      null,
-      null
-    ],
+    "backpack": [null, null, null, null],
     "backpackUnlocked": false,
     "firstSessionComplete": false,
     "firstSessionOrderIndex": 2,
     "firstSessionOrdersCompleted": 0,
-    "firstSessionForcedDrops": [
-      2,
-      2,
-      3,
-      3
-    ],
+    "firstSessionForcedDrops": [2, 2, 3, 3],
     "firstSessionSecondOfferTriggered": false,
     "firstSessionChoiceOffered": false,
     "firstSessionChoiceResolved": false,
@@ -220,9 +202,7 @@
         },
         "flavorText": "A simple run to get the glow started.",
         "templateId": "first_session_1",
-        "modifierIds": [
-          "first_session"
-        ],
+        "modifierIds": ["first_session"],
         "id": "ud8emzlb9"
       },
       {
@@ -247,9 +227,7 @@
         },
         "flavorText": "Add a soft corner and a clean run.",
         "templateId": "first_session_2",
-        "modifierIds": [
-          "first_session"
-        ],
+        "modifierIds": ["first_session"],
         "id": "bggb4hgld"
       }
     ],
