@@ -32,6 +32,8 @@ Notes:
 1. Add or update events in `client/lib/telemetryCatalog.ts`.
 2. Emit events with `captureEvent(...)` from `client/lib/telemetry.ts`.
    - Required properties are enforced at compile time based on the catalog.
+   - Schema metadata is attached automatically to all events.
+   - Active session context is attached automatically while a run is active.
 3. Keep event names and docs in sync:
    - Run `npm run telemetry:audit`
 4. Run validation before merge:
@@ -113,6 +115,10 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `craft_freedom_controller`
 - `use_freedom_controller`
 - `rd_node_unlocked`
+- `upgrade_offer_shown`
+- `upgrade_selected`
+- `upgrade_rejected`
+- `upgrade_blocked`
 
 ### Economy
 
@@ -121,6 +127,7 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `research_earned`
 - `research_spent`
 - `reputation_earned`
+- `resource_delta`
 - `boost_start`
 - `boost_consume`
 - `upgrade_purchased`
@@ -163,7 +170,10 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 ### System
 
 - `first_open`
+- `run_start`
+- `run_end`
 - `session_start`
+- `session_heartbeat`
 - `session_end`
 - `tier_unlocked`
 - `neighborhood_unlocked`

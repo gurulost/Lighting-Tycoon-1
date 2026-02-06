@@ -267,6 +267,18 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "Reputation was earned.",
     requiredProperties: ["amount", "source"],
   },
+  resource_delta: {
+    category: "economy",
+    description: "A tracked resource changed value.",
+    requiredProperties: [
+      "resource",
+      "delta",
+      "source",
+      "source_id",
+      "run_time_s",
+      "balance_after",
+    ],
+  },
   research_earned: {
     category: "economy",
     description: "Research was earned.",
@@ -281,6 +293,11 @@ export const TELEMETRY_EVENT_CATALOG = {
     category: "system",
     description: "Gameplay session ended.",
     requiredProperties: ["sessionId", "durationMs", "reason"],
+  },
+  session_heartbeat: {
+    category: "system",
+    description: "Heartbeat for an active gameplay session.",
+    requiredProperties: ["sessionId", "runId", "elapsedMs"],
   },
   session_start: {
     category: "system",
@@ -347,15 +364,45 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "Tutorial step started.",
     requiredProperties: ["step"],
   },
+  upgrade_blocked: {
+    category: "strategy",
+    description: "Upgrade offer was unavailable when selected.",
+    requiredProperties: ["choiceGroup", "optionId", "blockedBy"],
+  },
+  upgrade_offer_shown: {
+    category: "strategy",
+    description: "Upgrade offer set was shown to the player.",
+    requiredProperties: ["choiceGroup", "options"],
+  },
   upgrade_purchased: {
     category: "economy",
     description: "Upgrade purchased with cash.",
     requiredProperties: ["upgradeId", "level", "cost"],
   },
+  upgrade_rejected: {
+    category: "strategy",
+    description: "Upgrade option was not selected.",
+    requiredProperties: ["choiceGroup", "optionId", "reason"],
+  },
+  upgrade_selected: {
+    category: "strategy",
+    description: "Upgrade option was selected from a choice set.",
+    requiredProperties: ["choiceGroup", "optionId"],
+  },
   use_freedom_controller: {
     category: "strategy",
     description: "Freedom Controller used on part.",
     requiredProperties: ["tier", "family"],
+  },
+  run_end: {
+    category: "system",
+    description: "Gameplay run ended.",
+    requiredProperties: ["run_id", "session_id", "duration_s", "end_reason"],
+  },
+  run_start: {
+    category: "system",
+    description: "Gameplay run started.",
+    requiredProperties: ["run_id", "session_id", "mode", "seed", "tuning_hash"],
   },
 } as const satisfies Record<string, TelemetryEventDefinition>;
 

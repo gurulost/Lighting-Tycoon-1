@@ -76,10 +76,12 @@ import {
 } from "@/lib/cooldown";
 import {
   captureEvent,
+  clearTelemetryRuntimeContext,
   getAppInfo,
   getOrCreatePlayerId,
   identifyUser,
   posthog,
+  setTelemetryRuntimeContext,
 } from "@/lib/telemetry";
 import {
   applyTuningFromPayload,
@@ -1581,11 +1583,58 @@ function applyMissionReward(state: GameState, mission: Mission): GameState {
   if (!reward.cash && !reward.reputation && !reward.research) {
     return state;
   }
+  const cashReward = reward.cash ?? 0;
+  const reputationReward = reward.reputation ?? 0;
+  const researchReward = reward.research ?? 0;
+  if (cashReward > 0) {
+    captureEvent("cash_earned", {
+      amount: cashReward,
+      source: "mission",
+      missionTemplateId: mission.templateId,
+      missionId: mission.id,
+    });
+    captureResourceDelta(
+      "cash",
+      cashReward,
+      "mission",
+      mission.templateId,
+      state.cash + cashReward,
+      {
+        mission_id: mission.id,
+      },
+    );
+  }
+  if (researchReward > 0) {
+    captureEvent("research_earned", {
+      amount: researchReward,
+      source: "mission",
+      missionTemplateId: mission.templateId,
+      missionId: mission.id,
+    });
+    captureResourceDelta(
+      "research",
+      researchReward,
+      "mission",
+      mission.templateId,
+      state.research + researchReward,
+      {
+        mission_id: mission.id,
+      },
+    );
+  }
+  if (reputationReward > 0) {
+    captureEvent("reputation_earned", {
+      amount: reputationReward,
+      source: "mission",
+      missionTemplateId: mission.templateId,
+      missionId: mission.id,
+    });
+  }
   let nextState: GameState = {
     ...state,
-    cash: state.cash + (reward.cash ?? 0),
-    reputation: state.reputation + (reward.reputation ?? 0),
-    research: state.research + (reward.research ?? 0),
+    cash: state.cash + cashReward,
+    reputation: state.reputation + reputationReward,
+    research: state.research + researchReward,
     lastMissionRewardId: state.lastMissionRewardId + 1,
     lastMissionReward: { label: mission.label, reward },
     undoSnapshot: undefined,
@@ -3846,6 +3895,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           source: "supplier_scout",
           route: scoutRoute,
         });
+        captureResourceDelta(
+          "cash",
+          scoutCashBonus,
+          "supplier_scout",
+          supplierId,
+          state.cash + scoutCashBonus,
+          {
+            route: scoutRoute,
+          },
+        );
       }
       if (scoutResearchBonus > 0) {
         captureEvent("research_earned", {
@@ -3853,6 +3912,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           source: "supplier_scout",
           route: scoutRoute,
         });
+        captureResourceDelta(
+          "research",
+          scoutResearchBonus,
+          "supplier_scout",
+          supplierId,
+          state.research + scoutResearchBonus,
+          {
+            route: scoutRoute,
+          },
+        );
       }
 
       const shouldConsumeDropFloor = appliedTierFloor && placedBase;
@@ -3924,6 +3993,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             reason: "supplier_overdraw",
             supplierId,
           });
+          captureResourceDelta(
+            "cash",
+            -overdrawCash,
+            "supplier_overdraw",
+            supplierId,
+            state.cash - overdrawCash,
+          );
         }
         if (overdrawResearch > 0) {
           captureEvent("research_spent", {
@@ -3931,6 +4007,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             reason: "supplier_overdraw",
             supplierId,
           });
+          captureResourceDelta(
+            "research",
+            -overdrawResearch,
+            "supplier_overdraw",
+            supplierId,
+            state.research - overdrawResearch,
+          );
         }
         captureEvent("supplier_overdraw", {
           supplierId,
@@ -4351,12 +4434,26 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           amount: mergeCashEarned,
           source: "merge",
         });
+        captureResourceDelta(
+          "cash",
+          mergeCashEarned,
+          "merge",
+          `${fromPart.tier}->${newTier}`,
+          state.cash + mergeCashEarned,
+        );
       }
       if (mergeResearchEarned > 0) {
         captureEvent("research_earned", {
           amount: mergeResearchEarned,
           source: "merge",
         });
+        captureResourceDelta(
+          "research",
+          mergeResearchEarned,
+          "merge",
+          `${fromPart.tier}->${newTier}`,
+          state.research + mergeResearchEarned,
+        );
       }
       if (mergeReputationEarned > 0) {
         captureEvent("reputation_earned", {
@@ -4671,6 +4768,36 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           baseReward.research * councilPerks.recycleRewardMult.research,
         ),
       };
+      if (reward.cash > 0) {
+        captureEvent("cash_earned", {
+          amount: reward.cash,
+          source: "recycle",
+          partFamily: part.family,
+          partTier: part.tier,
+        });
+        captureResourceDelta(
+          "cash",
+          reward.cash,
+          "recycle",
+          `${source}:${part.family}:${part.tier}`,
+          state.cash + reward.cash,
+        );
+      }
+      if (reward.research > 0) {
+        captureEvent("research_earned", {
+          amount: reward.research,
+          source: "recycle",
+          partFamily: part.family,
+          partTier: part.tier,
+        });
+        captureResourceDelta(
+          "research",
+          reward.research,
+          "recycle",
+          `${source}:${part.family}:${part.tier}`,
+          state.research + reward.research,
+        );
+      }
       const newBoard = [...state.board];
       const newBackpack = [...state.backpack];
       if (source === "board") {
@@ -5985,6 +6112,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           source: "order",
           orderType: order.type,
         });
+        captureResourceDelta(
+          "cash",
+          cashReward,
+          "order",
+          order.id,
+          state.cash + cashReward,
+          {
+            order_type: order.type,
+          },
+        );
       }
       if (repReward > 0) {
         captureEvent("reputation_earned", {
@@ -5999,6 +6136,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           source: "order",
           orderType: order.type,
         });
+        captureResourceDelta(
+          "research",
+          researchReward,
+          "order",
+          order.id,
+          state.research + researchReward,
+          {
+            order_type: order.type,
+          },
+        );
       }
       if (councilUnlockedNow) {
         captureEvent("council_unlock", {
@@ -6363,6 +6510,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         upgradeId: upgrade.id,
         level: currentLevel + 1,
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "upgrade",
+        upgrade.id,
+        state.cash - cost,
+        {
+          level: currentLevel + 1,
+        },
+      );
       captureEvent("upgrade_purchased", {
         upgradeId: upgrade.id,
         level: currentLevel + 1,
@@ -6542,6 +6699,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "rd_node",
         nodeId: node.id,
       });
+      captureResourceDelta(
+        "research",
+        -tunedCost,
+        "rd_node",
+        node.id,
+        state.research - tunedCost,
+      );
       captureEvent("rd_node_unlocked", {
         nodeId: node.id,
         cost: tunedCost,
@@ -6601,6 +6765,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: 300,
         reason: "freedom_controller",
       });
+      captureResourceDelta(
+        "research",
+        -300,
+        "freedom_controller",
+        "craft",
+        state.research - 300,
+      );
       captureEvent("craft_freedom_controller", {
         count: state.freedomControllerCount + 1,
       });
@@ -6761,6 +6932,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: refreshCost,
         reason: "order_refresh",
       });
+      captureResourceDelta(
+        "cash",
+        -refreshCost,
+        "order_refresh",
+        order.id,
+        state.cash - refreshCost,
+      );
       if (
         state.marketingBoostOrdersRemaining > nextMarketingBoostOrdersRemaining
       ) {
@@ -6804,6 +6982,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: cost,
         reason: "marketing_boost",
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "marketing_boost",
+        "marketing",
+        state.cash - cost,
+      );
       captureEvent("boost_start", {
         type: "marketing",
         cost,
@@ -6841,6 +7026,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "supplier_scout",
         route: action.route,
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "supplier_scout",
+        action.route,
+        state.cash - cost,
+        {
+          route: action.route,
+        },
+      );
       captureEvent("boost_start", {
         type: "supplier_scout",
         cost,
@@ -6864,10 +7059,42 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "START_MENTOR_CLINIC": {
-      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
-      if (state.mentorIndependenceMergesRemaining > 0) return state;
+      if (!state.tutorialComplete) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_CLINIC_OPTION_ID,
+          blockedBy: "tutorial_incomplete",
+        });
+        return state;
+      }
+      if (!state.firstSessionComplete) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_CLINIC_OPTION_ID,
+          blockedBy: "first_session_incomplete",
+        });
+        return state;
+      }
+      if (state.mentorIndependenceMergesRemaining > 0) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_CLINIC_OPTION_ID,
+          blockedBy: "mutually_exclusive_active",
+          blockedOption: MENTOR_INDEPENDENCE_OPTION_ID,
+        });
+        return state;
+      }
       const cost = getMentorClinicCost(state.reputationTier);
-      if (state.cash < cost) return state;
+      if (state.cash < cost) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_CLINIC_OPTION_ID,
+          blockedBy: "insufficient_cash",
+          cash: state.cash,
+          cost,
+        });
+        return state;
+      }
       const clinicMerges = getScaledBoostMergeCount(
         tuning.boosts.clinicMerges,
         state.reputationTier,
@@ -6876,11 +7103,35 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tuning.boosts.clinicMaxStack,
         state.mentorClinicMergesRemaining + clinicMerges,
       );
-      if (nextRemaining === state.mentorClinicMergesRemaining) return state;
+      if (nextRemaining === state.mentorClinicMergesRemaining) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_CLINIC_OPTION_ID,
+          blockedBy: "max_stack_reached",
+        });
+        return state;
+      }
+      captureEvent("upgrade_selected", {
+        choiceGroup: MENTOR_CHOICE_GROUP,
+        optionId: MENTOR_CLINIC_OPTION_ID,
+      });
+      captureEvent("upgrade_rejected", {
+        choiceGroup: MENTOR_CHOICE_GROUP,
+        optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+        reason: "alternative_selected",
+        selectedOptionId: MENTOR_CLINIC_OPTION_ID,
+      });
       captureEvent("cash_spent", {
         amount: cost,
         reason: "mentor_clinic",
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "mentor_clinic",
+        MENTOR_CLINIC_OPTION_ID,
+        state.cash - cost,
+      );
       captureEvent("boost_start", {
         type: "mentor_clinic",
         cost,
@@ -6896,11 +7147,51 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "START_MENTOR_INDEPENDENCE": {
-      if (!state.tutorialComplete || !state.firstSessionComplete) return state;
-      if (state.liberationComplete || state.gamePhase === 2) return state;
-      if (state.mentorClinicMergesRemaining > 0) return state;
+      if (!state.tutorialComplete) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+          blockedBy: "tutorial_incomplete",
+        });
+        return state;
+      }
+      if (!state.firstSessionComplete) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+          blockedBy: "first_session_incomplete",
+        });
+        return state;
+      }
+      if (state.liberationComplete || state.gamePhase === 2) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+          blockedBy: "phase_restricted",
+          gamePhase: state.gamePhase,
+        });
+        return state;
+      }
+      if (state.mentorClinicMergesRemaining > 0) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+          blockedBy: "mutually_exclusive_active",
+          blockedOption: MENTOR_CLINIC_OPTION_ID,
+        });
+        return state;
+      }
       const cost = getMentorIndependenceCost(state.reputationTier);
-      if (state.cash < cost) return state;
+      if (state.cash < cost) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+          blockedBy: "insufficient_cash",
+          cash: state.cash,
+          cost,
+        });
+        return state;
+      }
       const independenceMerges = getScaledBoostMergeCount(
         tuning.boosts.independenceMerges,
         state.reputationTier,
@@ -6909,12 +7200,35 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         tuning.boosts.independenceMaxStack,
         state.mentorIndependenceMergesRemaining + independenceMerges,
       );
-      if (nextRemaining === state.mentorIndependenceMergesRemaining)
+      if (nextRemaining === state.mentorIndependenceMergesRemaining) {
+        captureEvent("upgrade_blocked", {
+          choiceGroup: MENTOR_CHOICE_GROUP,
+          optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+          blockedBy: "max_stack_reached",
+        });
         return state;
+      }
+      captureEvent("upgrade_selected", {
+        choiceGroup: MENTOR_CHOICE_GROUP,
+        optionId: MENTOR_INDEPENDENCE_OPTION_ID,
+      });
+      captureEvent("upgrade_rejected", {
+        choiceGroup: MENTOR_CHOICE_GROUP,
+        optionId: MENTOR_CLINIC_OPTION_ID,
+        reason: "alternative_selected",
+        selectedOptionId: MENTOR_INDEPENDENCE_OPTION_ID,
+      });
       captureEvent("cash_spent", {
         amount: cost,
         reason: "mentor_independence",
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "mentor_independence",
+        MENTOR_INDEPENDENCE_OPTION_ID,
+        state.cash - cost,
+      );
       captureEvent("boost_start", {
         type: "mentor_independence",
         cost,
@@ -6949,6 +7263,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "warranty_stamp",
         mode: action.mode,
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "warranty_stamp",
+        action.mode,
+        state.cash - cost,
+        {
+          mode: action.mode,
+        },
+      );
       captureEvent("boost_start", {
         type: "warranty_stamp",
         cost,
@@ -6997,6 +7321,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: refreshCost,
         reason: "project_offer_refresh",
       });
+      captureResourceDelta(
+        "cash",
+        -refreshCost,
+        "project_offer_refresh",
+        "project_offer_refresh",
+        state.cash - refreshCost,
+      );
       const offers = generateProjectOffers(state, 3);
       const projectRevealQueue = updateProjectRevealQueue(
         state.projectRevealQueue,
@@ -7134,6 +7465,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: totalCost,
         reason: "project_deposit",
       });
+      captureResourceDelta(
+        "cash",
+        -totalCost,
+        "project_deposit",
+        project.id,
+        state.cash - totalCost,
+      );
       return nextState;
     }
 
@@ -7202,6 +7540,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         projectId: project.id,
         refund,
       });
+      if (refund > 0) {
+        captureEvent("cash_earned", {
+          amount: refund,
+          source: "project_cancel",
+          projectId: project.id,
+        });
+        captureResourceDelta(
+          "cash",
+          refund,
+          "project_cancel",
+          project.id,
+          state.cash + refund,
+        );
+      }
       return nextState;
     }
 
@@ -7210,6 +7562,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const active = getActiveProjectStage(state);
       if (!active) return state;
       const penaltyResult = applyProjectFailPenalty(state, active.stage);
+      const failCashAfter = Math.max(0, state.cash + penaltyResult.refund);
+      const failCashDelta = failCashAfter - state.cash;
       const orders = stripProjectOrders(state.orders);
       const nextHighlightedOrderId =
         state.highlightedOrderId &&
@@ -7222,7 +7576,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       );
       const nextStateBase: GameState = {
         ...state,
-        cash: Math.max(0, state.cash + penaltyResult.refund),
+        cash: failCashAfter,
         baronPressure: penaltyResult.baronPressure,
         projectDebuff: penaltyResult.projectDebuff,
         orders,
@@ -7260,6 +7614,33 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         stageIndex: active.stage.stageIndex,
         penalty: active.stage.failPenalty.type,
       });
+      if (failCashDelta > 0) {
+        captureEvent("cash_earned", {
+          amount: failCashDelta,
+          source: "project_stage_fail",
+          projectId: active.project.id,
+        });
+        captureResourceDelta(
+          "cash",
+          failCashDelta,
+          "project_stage_fail",
+          active.project.id,
+          failCashAfter,
+        );
+      } else if (failCashDelta < 0) {
+        captureEvent("cash_spent", {
+          amount: Math.abs(failCashDelta),
+          reason: "project_stage_fail",
+          projectId: active.project.id,
+        });
+        captureResourceDelta(
+          "cash",
+          failCashDelta,
+          "project_stage_fail",
+          active.project.id,
+          failCashAfter,
+        );
+      }
       return nextState;
     }
 
@@ -7288,6 +7669,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           amount: cost,
           reason: "project_addon_expeditor",
         });
+        captureResourceDelta(
+          "cash",
+          -cost,
+          "project_addon_expeditor",
+          project.id,
+          state.cash - cost,
+        );
         return {
           ...state,
           cash: state.cash - cost,
@@ -7312,6 +7700,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           amount: cost,
           reason: "project_addon_logistics",
         });
+        captureResourceDelta(
+          "cash",
+          -cost,
+          "project_addon_logistics",
+          project.id,
+          state.cash - cost,
+        );
         return {
           ...state,
           cash: state.cash - cost,
@@ -7345,6 +7740,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           amount: cost,
           reason: "project_addon_overtime",
         });
+        captureResourceDelta(
+          "cash",
+          -cost,
+          "project_addon_overtime",
+          project.id,
+          state.cash - cost,
+        );
         return {
           ...state,
           cash: state.cash - cost,
@@ -7418,6 +7820,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: cost,
         reason: "project_change_order",
       });
+      captureResourceDelta(
+        "cash",
+        -cost,
+        "project_change_order",
+        project.id,
+        state.cash - cost,
+      );
       return {
         ...state,
         cash: state.cash - cost,
@@ -7569,11 +7978,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "council_draft",
         campaignId: campaign.id,
       });
+      captureResourceDelta(
+        "cash",
+        -spendCash,
+        "council_draft",
+        campaign.id,
+        state.cash - spendCash,
+      );
       captureEvent("research_spent", {
         amount: spendResearch,
         reason: "council_draft",
         campaignId: campaign.id,
       });
+      captureResourceDelta(
+        "research",
+        -spendResearch,
+        "council_draft",
+        campaign.id,
+        state.research - spendResearch,
+      );
       captureEvent("council_draft_invest", {
         campaignId: campaign.id,
         cash: spendCash,
@@ -7671,11 +8094,62 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         reason: "council_hearing_clear",
         hearingId: hearing.id,
       });
+      captureResourceDelta(
+        "cash",
+        -cashCost,
+        "council_hearing_clear",
+        hearing.id,
+        state.cash - cashCost,
+      );
       captureEvent("research_spent", {
         amount: researchCost,
         reason: "council_hearing_clear",
         hearingId: hearing.id,
       });
+      captureResourceDelta(
+        "research",
+        -researchCost,
+        "council_hearing_clear",
+        hearing.id,
+        state.research - researchCost,
+      );
+      if (bonusCash > 0) {
+        const earnedCash = Math.floor(bonusCash);
+        captureEvent("cash_earned", {
+          amount: earnedCash,
+          source: "council_hearing_clear",
+          hearingId: hearing.id,
+        });
+        captureResourceDelta(
+          "cash",
+          earnedCash,
+          "council_hearing_clear_bonus",
+          hearing.id,
+          state.cash - cashCost + earnedCash,
+        );
+      }
+      if (bonusResearch > 0) {
+        const earnedResearch = Math.floor(bonusResearch);
+        captureEvent("research_earned", {
+          amount: earnedResearch,
+          source: "council_hearing_clear",
+          hearingId: hearing.id,
+        });
+        captureResourceDelta(
+          "research",
+          earnedResearch,
+          "council_hearing_clear_bonus",
+          hearing.id,
+          state.research - researchCost + earnedResearch,
+        );
+      }
+      if (bonusRep > 0) {
+        captureEvent("reputation_earned", {
+          amount: Math.floor(bonusRep),
+          source: "council_hearing_clear",
+          hearingId: hearing.id,
+        });
+      }
       captureEvent("council_hearing_clear", {
         hearingId: hearing.id,
         method: "pay",
@@ -7747,11 +8221,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         amount: cashCost,
         reason: "council_municipal_grant",
       });
+      captureResourceDelta(
+        "cash",
+        -cashCost,
+        "council_municipal_grant",
+        "municipal_grant",
+        state.cash - cashCost,
+      );
       if (researchCost > 0) {
         captureEvent("research_spent", {
           amount: researchCost,
           reason: "council_municipal_grant",
         });
+        captureResourceDelta(
+          "research",
+          -researchCost,
+          "council_municipal_grant",
+          "municipal_grant",
+          state.research - researchCost,
+        );
       }
       captureEvent("council_municipal_grant", {
         lobbyPressureDrop: lobbyDrop,
@@ -7795,6 +8283,32 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           tuning.baron.contractMaxStack,
           state.baronContractOrdersRemaining + tuning.baron.contractOrders,
         );
+        const contractCashBonus = tuning.baron.offerContractCashBonus;
+        if (contractCashBonus > 0) {
+          captureEvent("cash_earned", {
+            amount: contractCashBonus,
+            source: "baron_offer_contract",
+          });
+          captureResourceDelta(
+            "cash",
+            contractCashBonus,
+            "baron_offer_contract",
+            "contract",
+            state.cash + contractCashBonus,
+          );
+        } else if (contractCashBonus < 0) {
+          captureEvent("cash_spent", {
+            amount: Math.abs(contractCashBonus),
+            reason: "baron_offer_contract",
+          });
+          captureResourceDelta(
+            "cash",
+            contractCashBonus,
+            "baron_offer_contract",
+            "contract",
+            state.cash + contractCashBonus,
+          );
+        }
 
         let nextState: GameState = {
           ...state,
@@ -7808,7 +8322,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           baronChoice: "accepted",
           baronOfferType: undefined,
           baronContractOrdersRemaining: nextContractRemaining,
-          cash: state.cash + tuning.baron.offerContractCashBonus,
+          cash: state.cash + contractCashBonus,
           tutorialStep: tutorialAdvance
             ? tutorialAdvance.tutorialStep
             : state.tutorialStep,
@@ -7901,6 +8415,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           dependencyOutcome.dependency,
         );
         const sawLocked = placedLocked && !state.lockedDiscoverySeen;
+        const rushCashBonus = emptySlot === -1 ? 40 : 0;
+        const rushResearchBonus = emptySlot === -1 ? 4 : 0;
+        if (rushCashBonus > 0) {
+          captureEvent("cash_earned", {
+            amount: rushCashBonus,
+            source: "baron_offer_rush",
+          });
+          captureResourceDelta(
+            "cash",
+            rushCashBonus,
+            "baron_offer_rush",
+            "rush",
+            state.cash + rushCashBonus,
+          );
+        }
+        if (rushResearchBonus > 0) {
+          captureEvent("research_earned", {
+            amount: rushResearchBonus,
+            source: "baron_offer_rush",
+          });
+          captureResourceDelta(
+            "research",
+            rushResearchBonus,
+            "baron_offer_rush",
+            "rush",
+            state.research + rushResearchBonus,
+          );
+        }
 
         let nextState: GameState = {
           ...state,
@@ -7920,8 +8462,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ? state.lastLockedDiscoveryId + 1
             : state.lastLockedDiscoveryId,
           maxTierCrafted: nextMaxTierCrafted,
-          cash: state.cash + (emptySlot === -1 ? 40 : 0),
-          research: state.research + (emptySlot === -1 ? 4 : 0),
+          cash: state.cash + rushCashBonus,
+          research: state.research + rushResearchBonus,
           tutorialStep: tutorialAdvance
             ? tutorialAdvance.tutorialStep
             : state.tutorialStep,
@@ -7992,6 +8534,61 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const bonusCash = tuning.baron.offerCrateCashBonus;
       const bonusResearch = tuning.baron.offerCrateResearchBonus;
       const missingSlots = Math.max(0, 2 - emptySlots.length);
+      const crateCashBonus =
+        bonusCash + missingSlots * tuning.baron.offerCrateMissingSlotCash;
+      const crateResearchBonus =
+        bonusResearch +
+        missingSlots * tuning.baron.offerCrateMissingSlotResearch;
+      if (crateCashBonus > 0) {
+        captureEvent("cash_earned", {
+          amount: crateCashBonus,
+          source: "baron_offer_crate",
+        });
+        captureResourceDelta(
+          "cash",
+          crateCashBonus,
+          "baron_offer_crate",
+          "crate",
+          state.cash + crateCashBonus,
+        );
+      } else if (crateCashBonus < 0) {
+        captureEvent("cash_spent", {
+          amount: Math.abs(crateCashBonus),
+          reason: "baron_offer_crate",
+        });
+        captureResourceDelta(
+          "cash",
+          crateCashBonus,
+          "baron_offer_crate",
+          "crate",
+          state.cash + crateCashBonus,
+        );
+      }
+      if (crateResearchBonus > 0) {
+        captureEvent("research_earned", {
+          amount: crateResearchBonus,
+          source: "baron_offer_crate",
+        });
+        captureResourceDelta(
+          "research",
+          crateResearchBonus,
+          "baron_offer_crate",
+          "crate",
+          state.research + crateResearchBonus,
+        );
+      } else if (crateResearchBonus < 0) {
+        captureEvent("research_spent", {
+          amount: Math.abs(crateResearchBonus),
+          reason: "baron_offer_crate",
+        });
+        captureResourceDelta(
+          "research",
+          crateResearchBonus,
+          "baron_offer_crate",
+          "crate",
+          state.research + crateResearchBonus,
+        );
+      }
       const placedTiers: PartTier[] = [];
 
       const newBoard = [...state.board];
@@ -8046,14 +8643,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? state.lastLockedDiscoveryId + 1
           : state.lastLockedDiscoveryId,
         maxTierCrafted: nextMaxTierCrafted,
-        cash:
-          state.cash +
-          bonusCash +
-          missingSlots * tuning.baron.offerCrateMissingSlotCash,
-        research:
-          state.research +
-          bonusResearch +
-          missingSlots * tuning.baron.offerCrateMissingSlotResearch,
+        cash: state.cash + crateCashBonus,
+        research: state.research + crateResearchBonus,
         tutorialStep: tutorialAdvance
           ? tutorialAdvance.tutorialStep
           : state.tutorialStep,
@@ -8129,6 +8720,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         !state.tutorialComplete && state.tutorialStep === 5
           ? advanceTutorialStep(state, 6)
           : null;
+      const declineCashBonus = emptySlot === -1 ? 10 : 0;
+      const declineResearchBonus = emptySlot === -1 ? 2 : 0;
+      if (declineCashBonus > 0) {
+        captureEvent("cash_earned", {
+          amount: declineCashBonus,
+          source: "baron_offer_decline",
+        });
+        captureResourceDelta(
+          "cash",
+          declineCashBonus,
+          "baron_offer_decline",
+          "decline",
+          state.cash + declineCashBonus,
+        );
+      }
+      if (declineResearchBonus > 0) {
+        captureEvent("research_earned", {
+          amount: declineResearchBonus,
+          source: "baron_offer_decline",
+        });
+        captureResourceDelta(
+          "research",
+          declineResearchBonus,
+          "baron_offer_decline",
+          "decline",
+          state.research + declineResearchBonus,
+        );
+      }
 
       let nextState: GameState = {
         ...state,
@@ -8138,8 +8757,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         baronOfferCooldownUntil: Date.now() + tuning.baron.offerCooldownMs,
         baronChoice: "declined",
         baronOfferType: undefined,
-        cash: emptySlot === -1 ? state.cash + 10 : state.cash,
-        research: emptySlot === -1 ? state.research + 2 : state.research,
+        cash: state.cash + declineCashBonus,
+        research: state.research + declineResearchBonus,
         tutorialStep: tutorialAdvance
           ? tutorialAdvance.tutorialStep
           : state.tutorialStep,
@@ -10727,13 +11346,78 @@ interface GameContextValue {
 
 const GameContext = createContext<GameContextValue | null>(null);
 const FIRST_OPEN_KEY = "lighting_tycoon_first_open_v1";
+const ACTIVE_SESSION_KEY = "lighting_tycoon_active_session_v1";
 const FINAL_TUTORIAL_STEP = 7;
+const SESSION_HEARTBEAT_MS = 30000;
+const SESSION_RECOVERY_TIMEOUT_MS = 90000;
+const MENTOR_CHOICE_GROUP = "mentor_path";
+const MENTOR_CLINIC_OPTION_ID = "mentor_clinic";
+const MENTOR_INDEPENDENCE_OPTION_ID = "mentor_independence";
 const tuning = getTuning();
 const fallbackFeatureFlagClient = {
   getFeatureFlag: () => undefined,
   getFeatureFlagPayload: () => undefined,
   onFeatureFlags: () => () => {},
 } as unknown as PostHogClient;
+
+type ActiveTelemetryRun = {
+  runId: string | null;
+  sessionId: string | null;
+  startedAtMs: number;
+};
+
+const activeTelemetryRun: ActiveTelemetryRun = {
+  runId: null,
+  sessionId: null,
+  startedAtMs: 0,
+};
+
+function setActiveTelemetryRun(
+  runId: string,
+  sessionId: string,
+  startedAtMs: number,
+) {
+  activeTelemetryRun.runId = runId;
+  activeTelemetryRun.sessionId = sessionId;
+  activeTelemetryRun.startedAtMs = startedAtMs;
+}
+
+function clearActiveTelemetryRun() {
+  activeTelemetryRun.runId = null;
+  activeTelemetryRun.sessionId = null;
+  activeTelemetryRun.startedAtMs = 0;
+}
+
+function getRunTimeSeconds(now = Date.now()) {
+  if (activeTelemetryRun.startedAtMs <= 0) return 0;
+  return Math.max(0, Math.floor((now - activeTelemetryRun.startedAtMs) / 1000));
+}
+
+function captureResourceDelta(
+  resource: "cash" | "research",
+  delta: number,
+  source: string,
+  sourceId: string,
+  balanceAfter: number,
+  extra?: Record<string, unknown>,
+) {
+  if (!Number.isFinite(delta) || delta === 0) return;
+  captureEvent("resource_delta", {
+    resource,
+    delta,
+    source,
+    source_id: sourceId,
+    run_time_s: getRunTimeSeconds(),
+    balance_after: balanceAfter,
+    ...(extra || {}),
+  });
+}
+
+function getRunMode(state: GameState) {
+  if (!state.tutorialComplete) return "tutorial";
+  if (state.gamePhase === 2) return "phase_2";
+  return "phase_1";
+}
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, getInitialState());
@@ -10754,8 +11438,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
   const playerIdRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const runIdRef = useRef<string | null>(null);
+  const runSeedRef = useRef<string | null>(null);
   const sessionStartRef = useRef(0);
+  const runStartRef = useRef(0);
+  const sessionHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const sessionActiveRef = useRef(false);
+  const mentorOfferShownRunRef = useRef<string | null>(null);
   const prevTutorialStepRef = useRef(state.tutorialStep);
   const prevTutorialCompleteRef = useRef(state.tutorialComplete);
   const prevTutorialSkippedRef = useRef(state.tutorialMetrics.skipped);
@@ -10838,22 +11529,119 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [tuningPayload, tuningVariant]);
 
+  const persistActiveSession = useCallback(async (lastHeartbeatAt: number) => {
+    const sessionId = sessionIdRef.current;
+    const runId = runIdRef.current;
+    if (!sessionId || !runId) return;
+    const snapshot = stateRef.current;
+    const payload = {
+      sessionId,
+      runId,
+      runSeed: runSeedRef.current ?? "none",
+      startedAt: runStartRef.current,
+      lastHeartbeatAt,
+      mode: getRunMode(snapshot),
+      tuningHash: tuningSignatureRef.current,
+      gamePhase: snapshot.gamePhase,
+      tutorialComplete: snapshot.tutorialComplete,
+      firstSessionComplete: snapshot.firstSessionComplete,
+      reputationTier: snapshot.reputationTier,
+      dependency: snapshot.dependency,
+    };
+    try {
+      await AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore storage errors for telemetry durability
+    }
+  }, []);
+
+  const clearPersistedActiveSession = useCallback(
+    async (sessionId?: string, runId?: string) => {
+      try {
+        const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
+        if (!raw) return;
+        if (!sessionId || !runId) {
+          await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
+          return;
+        }
+        let parsed: { sessionId?: unknown; runId?: unknown };
+        try {
+          parsed = JSON.parse(raw) as { sessionId?: unknown; runId?: unknown };
+        } catch {
+          await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
+          return;
+        }
+        const storedSessionId =
+          typeof parsed.sessionId === "string" ? parsed.sessionId : null;
+        const storedRunId =
+          typeof parsed.runId === "string" ? parsed.runId : null;
+        if (storedSessionId !== sessionId || storedRunId !== runId) {
+          return;
+        }
+        await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
+      } catch {
+        // ignore storage errors for telemetry durability
+      }
+    },
+    [],
+  );
+
+  const pulseSessionHeartbeat = useCallback(
+    (reason: "start" | "interval") => {
+      if (!sessionActiveRef.current) return;
+      const sessionId = sessionIdRef.current;
+      const runId = runIdRef.current;
+      if (!sessionId || !runId) return;
+      const now = Date.now();
+      void persistActiveSession(now);
+      captureEvent("session_heartbeat", {
+        sessionId,
+        runId,
+        elapsedMs: Math.max(0, now - sessionStartRef.current),
+        reason,
+      });
+    },
+    [persistActiveSession],
+  );
+
   const startSession = useCallback(() => {
     if (!telemetryReadyRef.current) return;
+    if (!playerIdRef.current) return;
     if (sessionActiveRef.current) return;
-    const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const now = Date.now();
+    const sessionId = `${now}-${Math.random().toString(36).slice(2, 10)}`;
+    const runId = `${now}-${Math.random().toString(36).slice(2, 10)}`;
+    const runSeed = `${Math.floor(Math.random() * 1_000_000_000)}`;
     sessionIdRef.current = sessionId;
-    sessionStartRef.current = Date.now();
+    runIdRef.current = runId;
+    runSeedRef.current = runSeed;
+    sessionStartRef.current = now;
+    runStartRef.current = now;
     sessionActiveRef.current = true;
+    mentorOfferShownRunRef.current = null;
+    setActiveTelemetryRun(runId, sessionId, now);
+    setTelemetryRuntimeContext({
+      session_id: sessionId,
+      run_id: runId,
+      player_id: playerIdRef.current,
+    });
     overdrawSessionMetricsRef.current = { count: 0, totalAddedSeconds: 0 };
     overdrawOutcomePendingRef.current = null;
     if (overdrawOutcomeTimeoutRef.current) {
       clearTimeout(overdrawOutcomeTimeoutRef.current);
       overdrawOutcomeTimeoutRef.current = null;
     }
+    if (sessionHeartbeatRef.current) {
+      clearInterval(sessionHeartbeatRef.current);
+    }
+    sessionHeartbeatRef.current = setInterval(() => {
+      pulseSessionHeartbeat("interval");
+    }, SESSION_HEARTBEAT_MS);
+
     const snapshot = stateRef.current;
     captureEvent("session_start", {
       sessionId,
+      runId,
       ...getAppInfo(),
       tutorialComplete: snapshot.tutorialComplete,
       firstSessionComplete: snapshot.firstSessionComplete,
@@ -10861,12 +11649,47 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       reputationTier: snapshot.reputationTier,
       dependency: snapshot.dependency,
     });
-  }, []);
+    captureEvent("run_start", {
+      run_id: runId,
+      session_id: sessionId,
+      mode: getRunMode(snapshot),
+      seed: runSeed,
+      tuning_hash: tuningSignatureRef.current,
+      game_phase: snapshot.gamePhase,
+      dependency: snapshot.dependency,
+      reputation_tier: snapshot.reputationTier,
+    });
+    pulseSessionHeartbeat("start");
+  }, [pulseSessionHeartbeat]);
 
   const endSession = useCallback(
-    (reason: "background" | "inactive" | "unmount") => {
-      if (!sessionActiveRef.current) return;
-      const durationMs = Math.max(0, Date.now() - sessionStartRef.current);
+    (
+      reason: "background" | "inactive" | "unmount" | "timeout_recovery",
+      override?: {
+        sessionId: string;
+        runId: string;
+        startedAt: number;
+        endedAt?: number;
+        runSeed?: string;
+        recoveryLagMs?: number;
+        recoveryTimedOut?: boolean;
+      },
+    ) => {
+      const hasOverride = !!override;
+      const isActive = sessionActiveRef.current;
+      if (!isActive && !hasOverride) return;
+
+      const sessionId = override?.sessionId ?? sessionIdRef.current;
+      const runId = override?.runId ?? runIdRef.current;
+      const startedAt = override?.startedAt ?? sessionStartRef.current;
+      if (!sessionId || !runId || !startedAt) return;
+
+      if (sessionHeartbeatRef.current) {
+        clearInterval(sessionHeartbeatRef.current);
+        sessionHeartbeatRef.current = null;
+      }
+      const endedAt = override?.endedAt ?? Date.now();
+      const durationMs = Math.max(0, endedAt - startedAt);
       const overdrawMetrics = overdrawSessionMetricsRef.current;
       const overdrawAvgAddedSeconds =
         overdrawMetrics.count > 0
@@ -10899,17 +11722,49 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(overdrawOutcomeTimeoutRef.current);
         overdrawOutcomeTimeoutRef.current = null;
       }
+
+      const snapshot = stateRef.current;
       captureEvent("session_end", {
-        sessionId: sessionIdRef.current,
+        sessionId,
+        runId,
         durationMs,
         reason,
+        recoveryLagMs: override?.recoveryLagMs,
+        recoveryTimedOut: override?.recoveryTimedOut,
         overdrawCount: overdrawMetrics.count,
         overdrawAddedSecondsTotal: overdrawMetrics.totalAddedSeconds,
         overdrawAddedSecondsAvg: overdrawAvgAddedSeconds,
       });
+      captureEvent("run_end", {
+        run_id: runId,
+        session_id: sessionId,
+        duration_s: Math.floor(durationMs / 1000),
+        end_reason: reason,
+        recovery_lag_ms: override?.recoveryLagMs,
+        recovery_timed_out: override?.recoveryTimedOut,
+        mode: getRunMode(snapshot),
+        seed: override?.runSeed ?? runSeedRef.current ?? "none",
+        tuning_hash: tuningSignatureRef.current,
+        cash: snapshot.cash,
+        research: snapshot.research,
+        reputation: snapshot.reputation,
+        dependency: snapshot.dependency,
+      });
+
       sessionActiveRef.current = false;
+      sessionIdRef.current = null;
+      runIdRef.current = null;
+      runSeedRef.current = null;
+      sessionStartRef.current = 0;
+      runStartRef.current = 0;
+      clearActiveTelemetryRun();
+      clearTelemetryRuntimeContext();
+      setTelemetryRuntimeContext({
+        player_id: playerIdRef.current ?? undefined,
+      });
+      void clearPersistedActiveSession(sessionId, runId);
     },
-    [],
+    [clearPersistedActiveSession],
   );
 
   useEffect(() => {
@@ -10953,12 +11808,68 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const playerId = await getOrCreatePlayerId();
       if (cancelled || !playerId) return;
       playerIdRef.current = playerId;
+      setTelemetryRuntimeContext({ player_id: playerId });
       identifyUser(playerId, getAppInfo());
       try {
         const firstOpen = await AsyncStorage.getItem(FIRST_OPEN_KEY);
         if (!firstOpen) {
           captureEvent("first_open", getAppInfo());
           await AsyncStorage.setItem(FIRST_OPEN_KEY, "1");
+        }
+      } catch {
+        // ignore storage errors for telemetry bootstrap
+      }
+      try {
+        const raw = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
+        if (raw) {
+          let parsed: {
+            sessionId?: unknown;
+            runId?: unknown;
+            runSeed?: unknown;
+            startedAt?: unknown;
+            lastHeartbeatAt?: unknown;
+          };
+          try {
+            parsed = JSON.parse(raw) as {
+              sessionId?: unknown;
+              runId?: unknown;
+              runSeed?: unknown;
+              startedAt?: unknown;
+              lastHeartbeatAt?: unknown;
+            };
+          } catch {
+            await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
+            parsed = {};
+          }
+          const sessionId =
+            typeof parsed.sessionId === "string" ? parsed.sessionId : null;
+          const runId = typeof parsed.runId === "string" ? parsed.runId : null;
+          const runSeed =
+            typeof parsed.runSeed === "string" ? parsed.runSeed : undefined;
+          const startedAt =
+            typeof parsed.startedAt === "number" ? parsed.startedAt : null;
+          const lastHeartbeatAt =
+            typeof parsed.lastHeartbeatAt === "number"
+              ? parsed.lastHeartbeatAt
+              : 0;
+          if (sessionId && runId && startedAt) {
+            const staleMs = Math.max(0, Date.now() - lastHeartbeatAt);
+            setTelemetryRuntimeContext({
+              player_id: playerId,
+              session_id: sessionId,
+              run_id: runId,
+            });
+            setActiveTelemetryRun(runId, sessionId, startedAt);
+            endSession("timeout_recovery", {
+              sessionId,
+              runId,
+              startedAt,
+              endedAt: Math.max(startedAt, lastHeartbeatAt),
+              runSeed,
+              recoveryLagMs: staleMs,
+              recoveryTimedOut: staleMs >= SESSION_RECOVERY_TIMEOUT_MS,
+            });
+          }
         }
       } catch {
         // ignore storage errors for telemetry bootstrap
@@ -10980,7 +11891,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, startSession, tuningPayload, tuningVariant]);
+  }, [endSession, hydrated, startSession, tuningPayload, tuningVariant]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
@@ -11003,16 +11914,24 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
     if (!prevTutorialCompleteRef.current && state.tutorialComplete) {
-      captureEvent("tutorial_complete", {
-        skipped: state.tutorialMetrics.skipped,
-      });
-    }
-    if (!prevTutorialSkippedRef.current && state.tutorialMetrics.skipped) {
-      captureEvent("tutorial_skipped");
+      if (state.tutorialMetrics.skipped) {
+        captureEvent("tutorial_skipped", {
+          step: state.tutorialStep,
+        });
+      } else {
+        captureEvent("tutorial_complete", {
+          skipped: false,
+        });
+      }
     }
     prevTutorialCompleteRef.current = state.tutorialComplete;
     prevTutorialSkippedRef.current = state.tutorialMetrics.skipped;
-  }, [hydrated, state.tutorialComplete, state.tutorialMetrics.skipped]);
+  }, [
+    hydrated,
+    state.tutorialComplete,
+    state.tutorialMetrics.skipped,
+    state.tutorialStep,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
@@ -11037,6 +11956,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
     prevBaronOfferAvailableRef.current = state.baronOfferAvailable;
   }, [hydrated, state.baronOfferAvailable, state.baronOfferType]);
+
+  useEffect(() => {
+    if (!hydrated || !telemetryReadyRef.current) return;
+    const runId = runIdRef.current;
+    if (!runId) return;
+    if (mentorOfferShownRunRef.current === runId) return;
+    if (!state.tutorialComplete || !state.firstSessionComplete) return;
+    const options = [MENTOR_CLINIC_OPTION_ID];
+    if (!state.liberationComplete && state.gamePhase !== 2) {
+      options.push(MENTOR_INDEPENDENCE_OPTION_ID);
+    }
+    if (options.length === 0) return;
+    captureEvent("upgrade_offer_shown", {
+      choiceGroup: MENTOR_CHOICE_GROUP,
+      options,
+      gamePhase: state.gamePhase,
+      liberationComplete: state.liberationComplete,
+      mutuallyExclusive: true,
+    });
+    mentorOfferShownRunRef.current = runId;
+  }, [
+    hydrated,
+    state.tutorialComplete,
+    state.firstSessionComplete,
+    state.liberationComplete,
+    state.gamePhase,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;

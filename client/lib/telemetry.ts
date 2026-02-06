@@ -17,11 +17,20 @@ import type {
 const apiKey = process.env.EXPO_PUBLIC_POSTHOG_KEY?.trim();
 const host =
   process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() || "https://us.i.posthog.com";
+const buildSha = process.env.EXPO_PUBLIC_BUILD_SHA?.trim() || undefined;
+
+export const TELEMETRY_SCHEMA_VERSION = "2026-02-05.1";
 
 const isWeb = Platform.OS === "web";
 const PLAYER_ID_KEY = "lighting_tycoon_player_id_v1";
 const appVersion = Application.nativeApplicationVersion || undefined;
 const buildNumber = Application.nativeBuildVersion || undefined;
+type TelemetryRuntimeContext = {
+  run_id?: string;
+  session_id?: string;
+  player_id?: string;
+};
+let telemetryRuntimeContext: TelemetryRuntimeContext = {};
 
 export const posthog =
   apiKey && !isWeb
@@ -60,6 +69,35 @@ function toPostHogProperties(
 
 type TelemetryProperties = Record<string, unknown>;
 
+function withTelemetryDefaults(
+  properties?: TelemetryProperties,
+): TelemetryProperties {
+  const source = properties ? { ...properties } : {};
+  if (source.schema_version === undefined) {
+    source.schema_version = TELEMETRY_SCHEMA_VERSION;
+  }
+  const contextEntries = Object.entries(telemetryRuntimeContext);
+  contextEntries.forEach(([key, value]) => {
+    if (value === undefined) return;
+    if (source[key] !== undefined) return;
+    source[key] = value;
+  });
+  return source;
+}
+
+export function setTelemetryRuntimeContext(
+  context: Partial<TelemetryRuntimeContext>,
+) {
+  telemetryRuntimeContext = {
+    ...telemetryRuntimeContext,
+    ...context,
+  };
+}
+
+export function clearTelemetryRuntimeContext() {
+  telemetryRuntimeContext = {};
+}
+
 export function captureEvent<
   E extends TelemetryEventNameWithRequiredProperties,
 >(name: E, properties: TelemetryEventPayload<E>): void;
@@ -77,9 +115,9 @@ export function captureEvent(
     return;
   }
 
+  const source = withTelemetryDefaults(properties);
   const required = TELEMETRY_EVENT_CATALOG[name].requiredProperties;
   if (required.length > 0) {
-    const source = properties || {};
     const missing = required.filter(
       (key) =>
         !Object.prototype.hasOwnProperty.call(source, key) ||
@@ -96,7 +134,7 @@ export function captureEvent(
       return;
     }
   }
-  posthog?.capture(name, toPostHogProperties(properties));
+  posthog?.capture(name, toPostHogProperties(source));
 }
 
 export function identifyUser(id: string, properties?: Record<string, unknown>) {
@@ -125,6 +163,8 @@ export function getAppInfo() {
   return {
     appVersion,
     buildNumber,
+    buildSha,
     platform: Platform.OS,
+    schema_version: TELEMETRY_SCHEMA_VERSION,
   };
 }
