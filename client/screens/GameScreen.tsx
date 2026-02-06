@@ -60,6 +60,7 @@ import { STORY_BEATS } from "@/constants/story";
 import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
 import { OverlayItem, OVERLAY_PRIORITY } from "@/types/overlay";
+import type { GameState, PartFamily } from "@/types/game";
 
 const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
 
@@ -98,6 +99,91 @@ const mentorPortrait512 = require("../../assets/images/mentor/mentor-portrait-51
 const baronPortrait128 = require("../../assets/images/baron/baron-portrait-128.webp");
 const baronPortrait256 = require("../../assets/images/baron/baron-portrait-256.webp");
 const baronPortrait512 = require("../../assets/images/baron/baron-portrait-512.webp");
+
+type E2EPartSnapshot = {
+  id: string;
+  family: PartFamily;
+  tier: number;
+  position: number;
+  compatible?: boolean;
+};
+
+type E2EStateSnapshot = {
+  tutorialComplete: boolean;
+  tutorialStep: number;
+  cash: number;
+  research: number;
+  reputation: number;
+  dependency: number;
+  boardSize: number;
+  board: (E2EPartSnapshot | null)[];
+  backpack: (E2EPartSnapshot | null)[];
+  orders: {
+    id: string;
+    type: string;
+    requirements: { tier: number; family: string; count: number }[];
+    rewards: { cash: number; reputation: number; research: number };
+  }[];
+};
+
+type E2EResetOptions = {
+  seed?: number;
+  skipTutorial?: boolean;
+  reducedMotion?: boolean;
+};
+
+type E2EStatePatch = Partial<GameState>;
+
+interface LightingTycoonE2EApi {
+  version: 1;
+  readonly ready: boolean;
+  resetGame: (options?: E2EResetOptions) => void;
+  setSeed: (seed: number) => number;
+  skipTutorial: () => void;
+  patchState: (patch: E2EStatePatch) => void;
+  getState: () => E2EStateSnapshot;
+  waitForIdle: (timeoutMs?: number) => Promise<void>;
+  flushSave: () => void;
+}
+
+function normalizeE2ESeed(seed: number) {
+  if (!Number.isFinite(seed)) return 1;
+  const normalized = Math.floor(seed) >>> 0;
+  return normalized === 0 ? 1 : normalized;
+}
+
+function createE2ERng(seed: number) {
+  let value = normalizeE2ESeed(seed);
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+
+function publishE2EApi(api: LightingTycoonE2EApi) {
+  const scope = globalThis as typeof globalThis & {
+    __LT?: LightingTycoonE2EApi;
+  };
+  scope.__LT = api;
+  if (typeof window !== "undefined") {
+    (window as typeof window & { __LT?: LightingTycoonE2EApi }).__LT = api;
+  }
+}
+
+function clearE2EApi(api: LightingTycoonE2EApi) {
+  const scope = globalThis as typeof globalThis & {
+    __LT?: LightingTycoonE2EApi;
+  };
+  if (scope.__LT === api) {
+    delete scope.__LT;
+  }
+  if (typeof window !== "undefined") {
+    const win = window as typeof window & { __LT?: LightingTycoonE2EApi };
+    if (win.__LT === api) {
+      delete win.__LT;
+    }
+  }
+}
 
 type ModalType =
   | "orders"
@@ -279,6 +365,7 @@ export default function GameScreen() {
     getFulfillmentIndices,
     claimMergeMomentum,
     hydrated,
+    flushSaveNow,
   } = useGame();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [projectDossierId, setProjectDossierId] = useState<string | null>(null);
@@ -331,6 +418,9 @@ export default function GameScreen() {
     useState<LayoutRect | null>(null);
   const [screenHeight, setScreenHeight] = useState(0);
   const boardContainerRef = useRef<View>(null);
+  const liveStateRef = useRef(state);
+  const hydratedRef = useRef(hydrated);
+  const originalMathRandomRef = useRef<(() => number) | null>(null);
   const dependencyTargetRef = useRef<View>(null);
   const mergeBonusRef = useRef(state.lastMergeBonusId);
   const recycleRewardRef = useRef(state.lastRecycleRewardId);
@@ -461,6 +551,11 @@ export default function GameScreen() {
     height: topActionSize,
     borderRadius: topActionRadius,
   };
+  const e2eMode = useMemo(() => {
+    if (process.env.EXPO_PUBLIC_E2E === "1") return true;
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("e2e") === "1";
+  }, []);
   const topBarStyle = [
     styles.topBar,
     {
@@ -489,6 +584,197 @@ export default function GameScreen() {
     }
     setActiveModal(null);
   };
+
+  useEffect(() => {
+    liveStateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    hydratedRef.current = hydrated;
+  }, [hydrated]);
+
+  const applyE2ESeed = useCallback(
+    (seed: number) => {
+      const normalizedSeed = normalizeE2ESeed(seed);
+      if (!e2eMode) return normalizedSeed;
+      if (!originalMathRandomRef.current) {
+        originalMathRandomRef.current = Math.random;
+      }
+      const rng = createE2ERng(normalizedSeed);
+      Math.random = () => rng();
+      return normalizedSeed;
+    },
+    [e2eMode],
+  );
+
+  const getE2EStateSnapshot = useCallback((): E2EStateSnapshot => {
+    const current = liveStateRef.current;
+    return {
+      tutorialComplete: current.tutorialComplete,
+      tutorialStep: current.tutorialStep,
+      cash: current.cash,
+      research: current.research,
+      reputation: current.reputation,
+      dependency: current.dependency,
+      boardSize: current.boardSize,
+      board: current.board.map((part) =>
+        part
+          ? {
+              id: part.id,
+              family: part.family,
+              tier: part.tier,
+              position: part.position,
+              compatible: part.compatible,
+            }
+          : null,
+      ),
+      backpack: current.backpack.map((part) =>
+        part
+          ? {
+              id: part.id,
+              family: part.family,
+              tier: part.tier,
+              position: part.position,
+              compatible: part.compatible,
+            }
+          : null,
+      ),
+      orders: current.orders.map((order) => ({
+        id: order.id,
+        type: order.type,
+        requirements: order.requirements.map((requirement) => ({
+          tier: requirement.tier,
+          family: requirement.family,
+          count: requirement.count,
+        })),
+        rewards: { ...order.rewards },
+      })),
+    };
+  }, []);
+
+  const patchE2EState = useCallback(
+    (patch: E2EStatePatch) => {
+      dispatch({
+        type: "LOAD_STATE",
+        state: {
+          ...liveStateRef.current,
+          ...patch,
+        } as GameState,
+      });
+    },
+    [dispatch],
+  );
+
+  const skipTutorialForE2E = useCallback(() => {
+    dispatch({ type: "COMPLETE_TUTORIAL", skipped: true });
+  }, [dispatch]);
+
+  const resetGameForE2E = useCallback(
+    (options?: E2EResetOptions) => {
+      if (typeof options?.seed === "number") {
+        applyE2ESeed(options.seed);
+      }
+
+      setActiveModal(null);
+      setProjectDossierId(null);
+      setProjectBoardFocusId(null);
+      setProjectBoardInitialTab(null);
+      setSelectedPartIndex(null);
+
+      dispatch({ type: "RESET_GAME" });
+
+      const reducedMotion = options?.reducedMotion ?? true;
+      if (reducedMotion) {
+        dispatch({
+          type: "UPDATE_SETTINGS",
+          settings: {
+            reducedMotion: true,
+            soundEnabled: false,
+            hapticsEnabled: false,
+          },
+        });
+      }
+
+      const shouldSkipTutorial = options?.skipTutorial ?? true;
+      if (shouldSkipTutorial) {
+        dispatch({ type: "COMPLETE_TUTORIAL", skipped: true });
+      }
+    },
+    [applyE2ESeed, dispatch],
+  );
+
+  const waitForE2EIdle = useCallback(async (timeoutMs = 5000) => {
+    const timeout = Math.max(250, timeoutMs);
+    const deadline = Date.now() + timeout;
+    const hasTransientUi = () => {
+      if (typeof document === "undefined") return false;
+      return Boolean(
+        document.querySelector('[data-testid="merge-animation-active"]') ||
+          document.querySelector('[data-testid="drag-preview-item"]'),
+      );
+    };
+
+    while (Date.now() <= deadline) {
+      if (!hasTransientUi()) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 64);
+        });
+        if (!hasTransientUi()) {
+          return;
+        }
+      }
+
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 32);
+      });
+    }
+
+    throw new Error("Timed out waiting for Lighting Tycoon to become idle.");
+  }, []);
+
+  const e2eApi = useMemo<LightingTycoonE2EApi | null>(() => {
+    if (!e2eMode) return null;
+    return {
+      version: 1,
+      get ready() {
+        return hydratedRef.current;
+      },
+      resetGame: resetGameForE2E,
+      setSeed: applyE2ESeed,
+      skipTutorial: skipTutorialForE2E,
+      patchState: patchE2EState,
+      getState: getE2EStateSnapshot,
+      waitForIdle: waitForE2EIdle,
+      flushSave: flushSaveNow,
+    };
+  }, [
+    applyE2ESeed,
+    e2eMode,
+    flushSaveNow,
+    getE2EStateSnapshot,
+    patchE2EState,
+    resetGameForE2E,
+    skipTutorialForE2E,
+    waitForE2EIdle,
+  ]);
+
+  if (e2eApi) {
+    publishE2EApi(e2eApi);
+  }
+
+  useEffect(() => {
+    if (!e2eApi) return;
+    publishE2EApi(e2eApi);
+
+    return () => {
+      clearE2EApi(e2eApi);
+      if (originalMathRandomRef.current) {
+        Math.random = originalMathRandomRef.current;
+        originalMathRandomRef.current = null;
+      }
+    };
+  }, [e2eApi]);
+
   const openProjectBoard = useCallback(
     (options?: { focusProjectId?: string; tab?: ProjectBoardTab }) => {
       setProjectBoardFocusId(options?.focusProjectId ?? null);

@@ -25,6 +25,9 @@ Playwright (web E2E) builds a static export and serves it locally:
 npm run test:e2e
 ```
 
+`test:e2e` builds and serves a static export, so tests run against production-like
+web output.
+
 First-time Playwright setup:
 
 ```bash
@@ -49,6 +52,22 @@ maestro test .maestro/smoke.yaml
 
 `npm run test:maestro` will try to locate Java 17 automatically; set `JAVA_HOME`
 manually if your install lives elsewhere.
+
+## Playwright E2E Lanes
+
+- Black-box: user-visible journeys using clicks/drags and UI assertions.
+- Gray-box: deterministic tests that preload a known save envelope before app
+  boot, then assert persisted state after actions.
+
+Current first-pass suite:
+
+- `tests/e2e/settings.spec.ts`
+- `tests/e2e/game-flows.spec.ts`
+
+Deterministic setup uses `tests/e2e/fixtures/base-state.json` as the baseline
+save envelope. Test helpers preload that payload into
+`lighting_tycoon_state_v1` before navigation, then scenario tests patch board,
+orders, and currencies up-front for repeatable flows.
 
 ## Maestro on iOS (Runbook)
 

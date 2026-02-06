@@ -71,6 +71,7 @@ const PART_SPRITES: Record<
 
 interface PartItemProps {
   part: Part;
+  testID?: string;
   onDragStart?: (absoluteX: number, absoluteY: number) => void;
   onDragEnd?: (
     translationX: number,
@@ -95,6 +96,7 @@ interface PartItemProps {
 
 export function PartItem({
   part,
+  testID,
   onDragStart,
   onDragEnd,
   onTap,
@@ -330,6 +332,7 @@ export function PartItem({
 
   const content = (
     <Animated.View
+      testID={testID}
       style={[
         styles.container,
         {

@@ -12847,6 +12847,7 @@ interface GameContextValue {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
   hydrated: boolean;
+  flushSaveNow: () => void;
   tapSupplier: (supplierId: SupplierId) => SupplierTapStatus;
   getSupplierTapStatus: (
     supplierId: SupplierId,
@@ -14174,6 +14175,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         state,
         dispatch,
         hydrated,
+        flushSaveNow: flushSave,
         tapSupplier,
         getSupplierTapStatus,
         claimMergeMomentum,

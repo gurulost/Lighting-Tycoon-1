@@ -1406,6 +1406,7 @@ export function MergeBoard({
       return (
         <View
           key={index}
+          testID={`board-slot-${index}`}
           style={[
             styles.tile,
             styles.blockedTile,
@@ -1437,6 +1438,7 @@ export function MergeBoard({
     return (
       <Animated.View
         key={index}
+        testID={`board-slot-${index}`}
         entering={tileEnter}
         style={[
           styles.tile,
@@ -1463,9 +1465,13 @@ export function MergeBoard({
           end={{ x: 1, y: 1 }}
         >
           {part ? (
-            <View style={isDragged ? styles.draggedPartHidden : undefined}>
+            <View
+              testID={`board-part-${index}`}
+              style={isDragged ? styles.draggedPartHidden : undefined}
+            >
               <PartItem
                 part={part}
+                testID={`board-part-${index}`}
                 size={tileSize - 10}
                 onDragStart={(ax, ay) =>
                   handleDragStart("board", index, ax, ay)
@@ -1532,6 +1538,7 @@ export function MergeBoard({
       return (
         <View
           key={index}
+          testID={`board-slot-${index}`}
           style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
           <AnimatedStation
@@ -1592,6 +1599,7 @@ export function MergeBoard({
       return (
         <View
           key={index}
+          testID={`board-slot-${index}`}
           style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
           <AnimatedStation
@@ -1633,11 +1641,13 @@ export function MergeBoard({
       return (
         <View
           key={index}
+          testID={`board-slot-${index}`}
           style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
           <AnimatedStation
             isActive={rdUnlocked && state.research > 0}
             forcePulse={tutorialFocus === "rd"}
+            testID="rd-station"
             onPress={rdUnlocked ? onRDBenchPress : () => {}}
             onLongPress={() => onStationLongPress?.("rd")}
             reducedMotion={reducedMotion}
@@ -1827,6 +1837,7 @@ export function MergeBoard({
         </View>
         {mergeEffect ? (
           <View
+            testID="merge-animation-active"
             style={[styles.mergeOverlay, { top: Spacing.md, left: Spacing.md }]}
           >
             <View
@@ -1941,6 +1952,7 @@ export function MergeBoard({
                   >
                     {part ? (
                       <View
+                        testID={`backpack-part-${index}`}
                         style={
                           isBackpackDragged
                             ? styles.draggedPartHidden
@@ -1949,6 +1961,7 @@ export function MergeBoard({
                       >
                         <PartItem
                           part={part}
+                          testID={`backpack-part-${index}`}
                           size={backpackSlotSize - 8}
                           disabled={!state.backpackUnlocked}
                           onTap={
@@ -2180,6 +2193,7 @@ export function MergeBoard({
       </View>
       {dragSource && dragPreviewPart ? (
         <Animated.View
+          testID="drag-preview-item"
           pointerEvents="none"
           style={[
             styles.dragPreviewItem,

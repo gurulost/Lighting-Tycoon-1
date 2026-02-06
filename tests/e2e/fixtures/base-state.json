@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "state": {
+    "board": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "boardSize": 30,
+    "unlockedSlots": [],
+    "blockedSlots": [
+      27,
+      28,
+      29
+    ],
+    "stationSlots": [
+      0,
+      5,
+      24
+    ],
+    "backpackSlots": 4,
+    "backpack": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "backpackUnlocked": false,
+    "firstSessionComplete": false,
+    "firstSessionOrderIndex": 2,
+    "firstSessionOrdersCompleted": 0,
+    "firstSessionForcedDrops": [
+      2,
+      2,
+      3,
+      3
+    ],
+    "firstSessionSecondOfferTriggered": false,
+    "firstSessionChoiceOffered": false,
+    "firstSessionChoiceResolved": false,
+    "cash": 50,
+    "reputation": 0,
+    "research": 0,
+    "dependency": 100,
+    "gamePhase": 1,
+    "liberationComplete": false,
+    "phase2GoalPending": false,
+    "projectsUnlocked": false,
+    "projectOffers": [],
+    "projectsCompleted": [],
+    "projectCompletionLog": {},
+    "projectMilestones": {},
+    "projectRevealQueue": [],
+    "projectRevealSeen": {},
+    "baronPressure": 0,
+    "council": {
+      "unlocked": false,
+      "lobbyPressure": 0,
+      "campaigns": {
+        "camp_residential_open_standard": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_open_only_5": 0,
+            "pilot_compat_2": 0
+          }
+        },
+        "camp_commercial_interop_standard": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_compat_6": 0
+          }
+        },
+        "camp_municipal_procurement_reform": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_eco_3": 0,
+            "pilot_open_only_3": 0
+          }
+        },
+        "camp_safety_certification_framework": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_eco_6": 0
+          }
+        },
+        "camp_emergency_response_standard": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_rush_4": 0,
+            "pilot_open_only_2": 0
+          }
+        },
+        "camp_accessibility_wayfinding_standard": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_compat_4": 0,
+            "pilot_open_only_4": 0
+          }
+        },
+        "camp_sustainability_mandate": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_eco_4": 0,
+            "pilot_open_only_4": 0
+          }
+        },
+        "camp_open_manufacturing_incentives": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_open_only_8": 0
+          }
+        },
+        "camp_interop_labeling_program": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_compat_8": 0,
+            "pilot_eco_2": 0
+          }
+        },
+        "camp_international_harmonization_accord": {
+          "status": "LOCKED",
+          "draftCashInvested": 0,
+          "draftResearchInvested": 0,
+          "pilotObjectiveProgress": {
+            "pilot_open_only_6": 0,
+            "pilot_compat_6": 0,
+            "pilot_eco_4": 0,
+            "pilot_streak_10": 0
+          }
+        }
+      },
+      "installsSinceLastHearingCheck": 0,
+      "refreshCount": 0,
+      "perksUnlocked": []
+    },
+    "baronSupplySpawnsRemaining": 0,
+    "baronRushSpawnsRemaining": 0,
+    "suppliers": {
+      "baron": {
+        "level": 1,
+        "chargesRemaining": 6,
+        "cooldownEndsAt": 0,
+        "overdrawCount": 0
+      },
+      "open": {
+        "level": 0,
+        "chargesRemaining": 0,
+        "cooldownEndsAt": 0,
+        "overdrawCount": 0
+      },
+      "salvage": {
+        "level": 0,
+        "chargesRemaining": 0,
+        "cooldownEndsAt": 0,
+        "overdrawCount": 0
+      }
+    },
+    "upgradeMaterials": 0,
+    "compatibilityComponents": 0,
+    "orders": [
+      {
+        "title": "Warm Welcome",
+        "type": "basic",
+        "requirements": [
+          {
+            "tier": 2,
+            "family": "any",
+            "count": 1
+          }
+        ],
+        "rewards": {
+          "cash": 40,
+          "reputation": 8,
+          "research": 0
+        },
+        "flavorText": "A simple run to get the glow started.",
+        "templateId": "first_session_1",
+        "modifierIds": [
+          "first_session"
+        ],
+        "id": "ud8emzlb9"
+      },
+      {
+        "title": "Corner Mood",
+        "type": "basic",
+        "requirements": [
+          {
+            "tier": 3,
+            "family": "any",
+            "count": 1
+          },
+          {
+            "tier": 2,
+            "family": "any",
+            "count": 1
+          }
+        ],
+        "rewards": {
+          "cash": 70,
+          "reputation": 12,
+          "research": 2
+        },
+        "flavorText": "Add a soft corner and a clean run.",
+        "templateId": "first_session_2",
+        "modifierIds": [
+          "first_session"
+        ],
+        "id": "bggb4hgld"
+      }
+    ],
+    "maxOrders": 2,
+    "upgrades": {},
+    "rdNodes": {},
+    "freedomControllerCount": 0,
+    "tutorialStep": 0,
+    "tutorialComplete": true,
+    "tutorialReplay": true,
+    "tutorialSpawnCount": 0,
+    "tutorialMergeCount": 0,
+    "tutorialStepStartedAt": 1770397959248,
+    "tutorialNudgeCount": 0,
+    "tutorialMetrics": {
+      "stepStartedAt": {
+        "0": 1770397959248
+      },
+      "stepCompletedAt": {
+        "0": 1770397959897
+      },
+      "stepDurationMs": {
+        "0": 649
+      },
+      "skipped": true
+    },
+    "lastRecycleRewardId": 0,
+    "lastRecycleReward": null,
+    "lastBaronShipmentId": 0,
+    "lastCooldownHintId": 0,
+    "baronCooldownHintShown": false,
+    "ordersHelpNudgeSeen": false,
+    "tierDiscovery": {},
+    "lastTierDiscoveryId": 0,
+    "lockedDiscoverySeen": false,
+    "lastLockedDiscoveryId": 0,
+    "compatibleDiscoverySeen": false,
+    "lastCompatibleDiscoveryId": 0,
+    "lockoutActive": false,
+    "lockoutPhase": 0,
+    "lockoutLabOrdersRemaining": 0,
+    "lockoutLabOrdersTarget": 0,
+    "baronOfferAvailable": false,
+    "baronOfferSeen": false,
+    "baronOfferCooldownUntil": 0,
+    "baronContractOrdersRemaining": 0,
+    "tier5ShowcaseSeen": false,
+    "tier5ShowcasePending": false,
+    "tier10ShowcaseSeen": false,
+    "tier10ShowcasePending": false,
+    "settings": {
+      "soundEnabled": true,
+      "hapticsEnabled": true,
+      "reducedMotion": false
+    },
+    "undoCooldownUntil": 0,
+    "mergeChainCount": 0,
+    "mergeChainExpiresAt": 0,
+    "lastMergeBonusId": 0,
+    "lastMergeBonusCash": 0,
+    "mergeMomentumLevel": 0,
+    "mergeMomentumPending": null,
+    "storyQueue": [],
+    "storyLog": [
+      {
+        "id": "tina_intro",
+        "timestamp": 1770397959248
+      }
+    ],
+    "storyLastViewedAt": 1770397959248,
+    "storySeen": {
+      "tina_intro": true
+    },
+    "lastStoryShownAt": 1770397959318,
+    "overlayQueue": [],
+    "overlayTelemetry": {
+      "maxWaitMs": 0
+    },
+    "reputationTier": 0,
+    "currentNeighborhoodId": "starter",
+    "orderMetrics": {
+      "generatedByNeighborhood": {},
+      "generatedByModifier": {},
+      "generatedByNeighborhoodModifier": {},
+      "generatedByType": {}
+    },
+    "orderSpawnCooldownUntil": 0,
+    "lastCriticalEventId": 0,
+    "maxTierCrafted": 1,
+    "marketingBoostOrdersRemaining": 0,
+    "installStreakCurrent": 0,
+    "installStreakBest": 0,
+    "supplierScoutSpawnsRemaining": 0,
+    "mentorClinicMergesRemaining": 0,
+    "mentorIndependenceMergesRemaining": 0,
+    "warrantyStampOrdersRemaining": 0,
+    "missions": [
+      {
+        "id": "5rdxs1x6r",
+        "templateId": "tutorial_first_orders",
+        "giver": "mentor",
+        "type": "complete_order",
+        "label": "Complete 2 more installs",
+        "description": "Keep momentum. Two more installs to open the path.",
+        "target": 2,
+        "progress": 0,
+        "reward": {
+          "cash": 30,
+          "reputation": 6,
+          "research": 0
+        },
+        "completed": false
+      },
+      {
+        "id": "z41jr3is8",
+        "templateId": "customer_install_sprint",
+        "giver": "customer",
+        "type": "complete_order",
+        "label": "Complete 3 installs",
+        "description": "Satisfied clients spread the word. Keep installs flowing.",
+        "target": 3,
+        "progress": 0,
+        "reward": {
+          "cash": 45,
+          "reputation": 10,
+          "research": 0
+        },
+        "completed": false
+      }
+    ],
+    "missionHistory": [],
+    "lastMissionRewardId": 0,
+    "lastMissionReward": null
+  }
+}
