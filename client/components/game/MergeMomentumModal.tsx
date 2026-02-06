@@ -28,7 +28,11 @@ export function MergeMomentumModal({
   const qualityFloor = Math.min(10, 2 + levelIndex);
   const cooldownPercent = levelIndex === 0 ? 30 : levelIndex === 1 ? 45 : 60;
   const refillTarget =
-    state.suppliers.open.level > 0 ? "Open Workshop" : "Baron Depot";
+    state.suppliers.open.level > 0
+      ? "Open Workshop"
+      : state.suppliers.baron.level > 0
+        ? "Baron Depot"
+        : "Salvage Corner";
 
   const handleChoose = (choice: MergeMomentumChoice) => {
     if (hapticsEnabled) {

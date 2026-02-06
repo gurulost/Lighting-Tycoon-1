@@ -463,6 +463,14 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         color: GameColors.ui.primary,
       },
       {
+        id: "order-type-premium",
+        title: "Premium Orders",
+        summary: "Higher-tier installs with bigger base payouts.",
+        detail: "Use tougher part recipes than basic orders.",
+        icon: "award",
+        color: GameColors.currency.cash,
+      },
+      {
         id: "order-type-certified",
         title: "Certified Orders",
         summary: "Locked parts preferred or required.",
@@ -490,15 +498,17 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "order-type-rush",
         title: "Rush Orders",
         summary: "Timed bonus orders.",
-        detail: "Finish sooner for extra cash; no hard fail.",
+        detail:
+          "Finish before expiry for extra cash. Expired rush orders cannot be fulfilled.",
         icon: "clock",
         color: GameColors.ui.danger,
       },
       {
         id: "order-type-lab",
         title: "Lab Requests",
-        summary: "Audit lab jobs during crackdowns.",
-        detail: "Open-only and research-heavy rewards.",
+        summary: "Open-only technical jobs with research-heavy rewards.",
+        detail:
+          "Appear once R&D is online and are used heavily during the lockout lab path.",
         icon: "zap",
         color: GameColors.currency.research,
       },
@@ -594,7 +604,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "merge-refill",
         title: "Refill Charge",
         summary: "+1 supplier charge.",
-        detail: "Targets Open Workshop or Baron Depot if Open is locked.",
+        detail:
+          "Targets the first unlocked supplier in priority order: Open Workshop, then Baron Depot, then Salvage Corner.",
         icon: "battery-charging",
         color: GameColors.openStandard.primary,
       },
@@ -895,7 +906,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "badge-rush",
         title: "Rush",
         summary: "Bonus decays over time.",
-        detail: "No hard fail.",
+        detail: "Expires if not completed in time.",
         icon: "clock",
         color: GameColors.ui.danger,
       },
@@ -918,8 +929,9 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       {
         id: "badge-exact",
         title: "Exact Tiers",
-        summary: "Exact tier required.",
-        detail: "No substitutions allowed.",
+        summary: "No substitutions on certified requirements.",
+        detail:
+          "All orders already require exact tiers; this also blocks compatible-as-locked substitution.",
         icon: "check-circle",
         color: GameColors.text.secondary,
       },
@@ -935,9 +947,28 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "badge-lockout",
         title: "Lockout",
         summary: "Compliance Audit order.",
-        detail: "Locked or compatible kits only.",
+        detail:
+          "Certified (locked) kits required; compatible open kits can substitute unless Exact Tiers is present.",
         icon: "alert-triangle",
         color: GameColors.ui.danger,
+      },
+      {
+        id: "badge-project-stage",
+        title: "Project Stage",
+        summary: "Protected Empire Contract stage order.",
+        detail:
+          "Advances your active project stage and can carry special constraints.",
+        icon: "flag",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "badge-council-showcase",
+        title: "Council Showcase",
+        summary: "Protected Council ratification order.",
+        detail:
+          "Completes a Council campaign once draft and pilot goals are done.",
+        icon: "award",
+        color: GameColors.currency.research,
       },
     ],
   },
