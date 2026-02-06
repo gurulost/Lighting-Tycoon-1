@@ -144,6 +144,7 @@ describe("phase/tier progression reducer coverage", () => {
 
     expect(next.council.unlocked).toBe(true);
     expect(next.gamePhase).toBe(3);
+    expect(next.projectsUnlocked).toBe(true);
   });
 
   it("normalizes loaded saves with unlocked Council to Phase 3", () => {
@@ -168,6 +169,65 @@ describe("phase/tier progression reducer coverage", () => {
 
     expect(next.gamePhase).toBe(3);
     expect(next.council.unlocked).toBe(true);
+    expect(next.projectsUnlocked).toBe(true);
+  });
+
+  it("auto-unlocks Council during load when unlock requirements are already met", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 6).map(
+      (project) => project.id,
+    );
+    const loaded: GameState = {
+      ...initial,
+      gamePhase: 2,
+      liberationComplete: true,
+      projectsCompleted,
+      reputation: 2500,
+      reputationTier: 9,
+      projectsUnlocked: false,
+      council: {
+        ...initial.council,
+        unlocked: false,
+      },
+    };
+
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "LOAD_STATE",
+        state: loaded as any,
+      } as any,
+    );
+
+    expect(next.council.unlocked).toBe(true);
+    expect(next.gamePhase).toBe(3);
+    expect(next.projectsUnlocked).toBe(true);
+  });
+
+  it("repairs stale Phase 3 saves with disabled Council/project flags", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const loaded: GameState = {
+      ...initial,
+      gamePhase: 3,
+      liberationComplete: true,
+      projectsUnlocked: false,
+      council: {
+        ...initial.council,
+        unlocked: false,
+      },
+    };
+
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "LOAD_STATE",
+        state: loaded as any,
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(3);
+    expect(next.council.unlocked).toBe(true);
+    expect(next.projectsUnlocked).toBe(true);
   });
 
   it("inserts pending showcase orders for tiers 10/13/16", () => {

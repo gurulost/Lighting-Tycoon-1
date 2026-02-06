@@ -6570,6 +6570,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             unlocked: true,
           };
           nextGamePhase = 3;
+          nextProjectsUnlocked = true;
+          if (projectOfferRefreshMode !== "force") {
+            projectOfferRefreshMode = "if_empty";
+          }
           councilUnlockedNow = true;
         }
       }
@@ -11869,10 +11873,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? action.state.projectsUnlocked
           : undefined;
       const projectsUnlocked =
-        typeof projectsUnlockedRaw === "boolean"
-          ? projectsUnlockedRaw
-          : gamePhase >= 3
-            ? true
+        gamePhase >= 3
+          ? true
+          : typeof projectsUnlockedRaw === "boolean"
+            ? projectsUnlockedRaw
             : gamePhase === 2 && !hasPhase2GoalOrder && !phase2GoalPending;
       const projectOffers = Array.isArray(action.state.projectOffers)
         ? (action.state.projectOffers as ProjectOffer[]).filter(
@@ -12600,6 +12604,30 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...restoredState,
         storyQueue: filterStoryQueue(restoredState.storyQueue),
       };
+      if (restoredState.gamePhase >= 3 && !restoredState.council.unlocked) {
+        restoredState = {
+          ...restoredState,
+          council: {
+            ...restoredState.council,
+            unlocked: true,
+          },
+        };
+      }
+      if (restoredState.council.unlocked && restoredState.gamePhase < 3) {
+        restoredState = {
+          ...restoredState,
+          gamePhase: 3,
+        };
+      }
+      if (
+        (restoredState.gamePhase >= 3 || restoredState.council.unlocked) &&
+        !restoredState.projectsUnlocked
+      ) {
+        restoredState = {
+          ...restoredState,
+          projectsUnlocked: true,
+        };
+      }
 
       if (restoredState.liberationComplete || restoredState.gamePhase >= 2) {
         restoredState = {
@@ -12803,6 +12831,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           highlightedOrderId: nextHighlightedOrderId,
         };
       }
+      restoredState = reconcileUpgradeState(restoredState);
+      if (restoredState.tutorialComplete) {
+        restoredState = ensureMissions(restoredState);
+      }
+
+      if (!restoredState.council.unlocked && canUnlockCouncil(restoredState)) {
+        restoredState = {
+          ...restoredState,
+          gamePhase: 3,
+          projectsUnlocked: true,
+          council: {
+            ...restoredState.council,
+            unlocked: true,
+          },
+        };
+        restoredState = queueStoryBeat(restoredState, "council_unlock");
+        if (restoredState.tutorialComplete) {
+          restoredState = ensureMissions(restoredState);
+        }
+      }
       if (
         restoredState.projectsUnlocked &&
         !restoredState.activeProject &&
@@ -12818,21 +12866,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             refreshedOffers,
           ),
         };
-      }
-      restoredState = reconcileUpgradeState(restoredState);
-      if (restoredState.tutorialComplete) {
-        restoredState = ensureMissions(restoredState);
-      }
-
-      if (!restoredState.council.unlocked && canUnlockCouncil(restoredState)) {
-        restoredState = {
-          ...restoredState,
-          council: {
-            ...restoredState.council,
-            unlocked: true,
-          },
-        };
-        restoredState = queueStoryBeat(restoredState, "council_unlock");
       }
 
       return restoredState;
