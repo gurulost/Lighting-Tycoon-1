@@ -281,6 +281,7 @@ export interface Upgrade {
   level: number;
   maxLevel: number;
   effect: string;
+  requires?: string[];
 }
 
 export interface RDNode {
@@ -589,6 +590,7 @@ export const UPGRADE_DEFINITIONS: Upgrade[] = [
     level: 0,
     maxLevel: 2,
     effect: "salvage_level_+1",
+    requires: ["salvage_unlock"],
   },
   {
     id: "rd_unlock",

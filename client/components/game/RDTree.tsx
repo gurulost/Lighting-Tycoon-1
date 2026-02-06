@@ -19,20 +19,29 @@ import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
+import { getTuning } from "@/lib/tuning";
 
 interface RDTreeProps {
   onCraftFreedomController: () => void;
 }
 
+type RDNodeCosts = {
+  research: number;
+  materials: number;
+  compatibility: number;
+};
+
 function RDNodeCard({
   node,
   isUnlocked,
   canUnlock,
+  costs,
   onUnlock,
 }: {
   node: RDNode;
   isUnlocked: boolean;
   canUnlock: boolean;
+  costs: RDNodeCosts;
   onUnlock: () => void;
 }) {
   const { state } = useGame();
@@ -93,11 +102,10 @@ function RDNodeCard({
   }));
 
   const isFreedomBuild = node.id === "freedom_build";
-  const materialCost = node.materialCost || 0;
-  const compatibilityCost = node.compatibilityCost || 0;
-  const costLabelParts = [`${node.cost} Research`];
-  if (materialCost > 0) costLabelParts.push(`${materialCost} Materials`);
-  if (compatibilityCost > 0) costLabelParts.push(`${compatibilityCost} Compat`);
+  const costLabelParts = [`${costs.research} Research`];
+  if (costs.materials > 0) costLabelParts.push(`${costs.materials} Materials`);
+  if (costs.compatibility > 0)
+    costLabelParts.push(`${costs.compatibility} Compat`);
 
   return (
     <Animated.View
@@ -191,22 +199,59 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
     useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const insets = useSafeAreaInsets();
+  const tuning = getTuning();
 
-  const canUnlockNode = (node: RDNode): boolean => {
+  const getNodeCosts = React.useCallback(
+    (node: RDNode): RDNodeCosts => ({
+      research: Math.max(
+        0,
+        Math.round(node.cost * tuning.economy.rdCostMultiplier),
+      ),
+      materials:
+        typeof node.materialCost === "number"
+          ? Math.max(
+              0,
+              Math.round(
+                node.materialCost * tuning.economy.rdMaterialCostMultiplier,
+              ),
+            )
+          : 0,
+      compatibility:
+        typeof node.compatibilityCost === "number"
+          ? Math.max(
+              0,
+              Math.round(
+                node.compatibilityCost *
+                  tuning.economy.rdCompatibilityCostMultiplier,
+              ),
+            )
+          : 0,
+    }),
+    [
+      tuning.economy.rdCompatibilityCostMultiplier,
+      tuning.economy.rdCostMultiplier,
+      tuning.economy.rdMaterialCostMultiplier,
+    ],
+  );
+
+  const canUnlockNode = (node: RDNode, costs: RDNodeCosts): boolean => {
+    if ((state.upgrades["rd_unlock"] || 0) < 1) return false;
     if (state.rdNodes[node.id]) return false;
-    if (state.research < node.cost) return false;
-    if (node.materialCost && state.upgradeMaterials < node.materialCost)
+    if (state.research < costs.research) return false;
+    if (costs.materials > 0 && state.upgradeMaterials < costs.materials)
       return false;
     if (
-      node.compatibilityCost &&
-      state.compatibilityComponents < node.compatibilityCost
-    ) {
+      costs.compatibility > 0 &&
+      state.compatibilityComponents < costs.compatibility
+    )
       return false;
-    }
     return node.prerequisites.every((p) => state.rdNodes[p]);
   };
 
-  const canCraft = state.rdNodes["freedom_build"] && state.research >= 300;
+  const canCraft =
+    (state.upgrades["rd_unlock"] || 0) >= 1 &&
+    state.rdNodes["freedom_build"] &&
+    state.research >= 300;
   const canSkipPhase2 = state.gamePhase !== 2 && !state.liberationComplete;
 
   const handleSkipPhase2 = () => {
@@ -253,31 +298,37 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
       </View>
 
       <View style={styles.tree}>
-        {RD_DEFINITIONS.map((node, index) => (
-          <React.Fragment key={node.id}>
-            {index > 0 && (
-              <View
-                style={[
-                  styles.connector,
-                  {
-                    backgroundColor: state.rdNodes[node.prerequisites[0] || ""]
-                      ? GameColors.currency.research
-                      : GameColors.text.disabled,
-                  },
-                ]}
+        {RD_DEFINITIONS.map((node, index) => {
+          const nodeCosts = getNodeCosts(node);
+          return (
+            <React.Fragment key={node.id}>
+              {index > 0 && (
+                <View
+                  style={[
+                    styles.connector,
+                    {
+                      backgroundColor: state.rdNodes[
+                        node.prerequisites[0] || ""
+                      ]
+                        ? GameColors.currency.research
+                        : GameColors.text.disabled,
+                    },
+                  ]}
+                />
+              )}
+              <RDNodeCard
+                node={node}
+                isUnlocked={state.rdNodes[node.id] || false}
+                canUnlock={canUnlockNode(node, nodeCosts)}
+                costs={nodeCosts}
+                onUnlock={() => {
+                  SoundManager.play("rd_unlock");
+                  unlockRDNode(node.id);
+                }}
               />
-            )}
-            <RDNodeCard
-              node={node}
-              isUnlocked={state.rdNodes[node.id] || false}
-              canUnlock={canUnlockNode(node)}
-              onUnlock={() => {
-                SoundManager.play("rd_unlock");
-                unlockRDNode(node.id);
-              }}
-            />
-          </React.Fragment>
-        ))}
+            </React.Fragment>
+          );
+        })}
       </View>
 
       {state.rdNodes["freedom_build"] && (

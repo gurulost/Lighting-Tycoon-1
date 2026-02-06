@@ -356,16 +356,22 @@ export function MergeBoard({
       Math.min(desiredBackpackSlotSize, maxBackpackSlotSize),
     );
     const recycleSize = Math.max(minRecycleSize, backpackSlotSize);
-    const backpackHeaderHeight = 18;
-    const recycleLabelHeight = 16;
+    const backpackHeaderHeight = 20;
+    const recycleLabelHeight = 18;
     const utilityHeight = Math.max(
       backpackHeaderHeight + Spacing.xs + backpackSlotSize,
       recycleLabelHeight + Spacing.xs + recycleSize,
     );
     const containerPadding = Spacing.md * 2;
     const utilityGap = Spacing.md;
+    const utilitySafetyBuffer = Spacing.xs;
     return (
-      containerPadding + gridHeight + boardInset + utilityGap + utilityHeight
+      containerPadding +
+      gridHeight +
+      boardInset +
+      utilityGap +
+      utilityHeight +
+      utilitySafetyBuffer
     );
   };
   let tileSize = baseTileSize;
@@ -2428,7 +2434,7 @@ const styles = StyleSheet.create({
   undoText: {
     fontSize: 11,
     fontWeight: "600",
-    lineHeight: 12,
+    lineHeight: 14,
     includeFontPadding: false,
   },
   backpackSection: {
@@ -2443,6 +2449,7 @@ const styles = StyleSheet.create({
   },
   backpackTitle: {
     fontSize: 13,
+    lineHeight: 16,
     fontWeight: "700",
   },
   backpackLockedTag: {
@@ -2459,6 +2466,7 @@ const styles = StyleSheet.create({
   },
   backpackLockedText: {
     fontSize: 10,
+    lineHeight: 12,
     color: GameColors.text.secondary,
   },
   backpackSlots: {
@@ -2496,6 +2504,7 @@ const styles = StyleSheet.create({
   },
   recycleLabel: {
     fontSize: 13,
+    lineHeight: 16,
     fontWeight: "700",
     color: GameColors.text.secondary,
   },
@@ -2674,6 +2683,7 @@ const styles = StyleSheet.create({
   },
   recycleHintPlus: {
     fontSize: 10,
+    lineHeight: 10,
     fontWeight: "700",
     color: "#D8DEF5",
     marginHorizontal: 1,

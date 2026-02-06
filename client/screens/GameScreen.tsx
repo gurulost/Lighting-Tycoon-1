@@ -306,6 +306,8 @@ export default function GameScreen() {
   const [isDragging, setIsDragging] = useState(false);
   const [debugOverlayVisible, setDebugOverlayVisible] = useState(false);
   const [hudCollapsed, setHudCollapsed] = useState(false);
+  const [showTutorialGlossaryBeacon, setShowTutorialGlossaryBeacon] =
+    useState(false);
   const [tutorialTargets, setTutorialTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
@@ -336,6 +338,10 @@ export default function GameScreen() {
   );
   const baronShipmentRef = useRef(state.lastBaronShipmentId);
   const cooldownHintRef = useRef(state.lastCooldownHintId);
+  const tutorialSkipDismissedRef = useRef(false);
+  const previousTutorialSkippedRef = useRef(
+    state.tutorialComplete && state.tutorialMetrics.skipped,
+  );
   const momentLockTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const momentLockExpiresAtRef = useRef(0);
   const highlightedOrderRef = useRef<string | undefined>(
@@ -503,6 +509,13 @@ export default function GameScreen() {
         typeof latestTimestamp === "number" ? latestTimestamp : Date.now(),
     });
   }, [dispatch, state.storyLog]);
+  const openGlossary = useCallback(() => {
+    if (tutorialSkipped) {
+      tutorialSkipDismissedRef.current = true;
+      setShowTutorialGlossaryBeacon(false);
+    }
+    setActiveModal("glossary");
+  }, [tutorialSkipped]);
   const markProjectRevealSeen = useCallback(
     (projectId: string) => {
       const isOffered = state.projectOffers.some(
@@ -566,10 +579,6 @@ export default function GameScreen() {
     },
     [openProjectBoardForProject],
   );
-  const handleResumeTutorial = () => {
-    dispatch({ type: "RESUME_TUTORIAL" });
-    showToast("Resuming tutorial.", 1800);
-  };
   const setTarget =
     (key: TutorialTarget) =>
     (event?: { nativeEvent?: { layout?: LayoutRect } }) => {
@@ -843,6 +852,34 @@ export default function GameScreen() {
       setHudCollapsed(true);
     }
   }, [state.tutorialComplete]);
+
+  useEffect(() => {
+    const wasSkipped = previousTutorialSkippedRef.current;
+    previousTutorialSkippedRef.current = tutorialSkipped;
+
+    if (!tutorialSkipped) {
+      tutorialSkipDismissedRef.current = false;
+      setShowTutorialGlossaryBeacon(false);
+      return;
+    }
+
+    if (!tutorialSkipDismissedRef.current) {
+      setShowTutorialGlossaryBeacon(true);
+    }
+
+    if (!wasSkipped) {
+      showToast(
+        "Tutorial skipped. Tap ? anytime for help in the Glossary.",
+        3200,
+      );
+    }
+  }, [tutorialSkipped, showToast]);
+
+  useEffect(() => {
+    if (activeModal !== "glossary" || !tutorialSkipped) return;
+    tutorialSkipDismissedRef.current = true;
+    setShowTutorialGlossaryBeacon(false);
+  }, [activeModal, tutorialSkipped]);
 
   useEffect(() => {
     const sources = [
@@ -1260,7 +1297,10 @@ export default function GameScreen() {
             }}
           >
             <Pressable
-              style={topActionButtonStyle}
+              style={[
+                topActionButtonStyle,
+                unreadStoryCount > 0 && styles.topActionBadgeHost,
+              ]}
               onPress={openStoryLog}
               hitSlop={10}
               accessibilityRole="button"
@@ -1293,11 +1333,16 @@ export default function GameScreen() {
             </Pressable>
             <View
               onLayout={setTarget("glossary")}
-              style={[styles.helpButtonWrap, { borderRadius: topActionRadius }]}
+              style={[
+                styles.helpButtonWrap,
+                showTutorialGlossaryBeacon && styles.helpButtonWrapBeacon,
+                showTutorialGlossaryBeacon && styles.topActionBadgeHost,
+                { borderRadius: topActionRadius },
+              ]}
             >
               <Pressable
                 style={topActionButtonStyle}
-                onPress={() => setActiveModal("glossary")}
+                onPress={openGlossary}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Help and glossary"
@@ -1307,6 +1352,7 @@ export default function GameScreen() {
                   style={[
                     styles.settingsGradient,
                     styles.helpGradient,
+                    showTutorialGlossaryBeacon && styles.helpGradientBeacon,
                     topActionGradientSizeStyle,
                   ]}
                   start={{ x: 0, y: 0 }}
@@ -1319,6 +1365,16 @@ export default function GameScreen() {
                   />
                 </LinearGradient>
               </Pressable>
+              {showTutorialGlossaryBeacon ? (
+                <View style={styles.helpGuideBadgeWrap} pointerEvents="none">
+                  <LinearGradient
+                    colors={["#00D9FF", "#4DFF88"]}
+                    style={styles.helpGuideBadge}
+                  >
+                    <Feather name="help-circle" size={9} color="#0A0A14" />
+                  </LinearGradient>
+                </View>
+              ) : null}
             </View>
             <Pressable
               style={topActionButtonStyle}
@@ -1435,29 +1491,6 @@ export default function GameScreen() {
           collapsed={topCondensed}
           style={topStackSideMarginStyle}
         />
-
-        {tutorialSkipped ? (
-          <Pressable
-            style={[styles.resumeBanner, topStackSideMarginStyle]}
-            onPress={handleResumeTutorial}
-          >
-            <View style={styles.resumeBannerContent}>
-              <Feather
-                name="play-circle"
-                size={16}
-                color={GameColors.ui.primary}
-              />
-              <ThemedText style={styles.resumeBannerText}>
-                Tutorial skipped — tap to resume
-              </ThemedText>
-            </View>
-            <Feather
-              name="chevron-right"
-              size={16}
-              color={GameColors.text.secondary}
-            />
-          </Pressable>
-        ) : null}
       </View>
 
       <View
@@ -1877,12 +1910,17 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   settingsButton: {
-    overflow: "hidden",
+    overflow: "visible",
+  },
+  topActionBadgeHost: {
+    position: "relative",
+    zIndex: 3,
   },
   storyBadgeWrap: {
     position: "absolute",
-    top: 2,
-    right: 2,
+    top: -4,
+    right: -4,
+    zIndex: 2,
   },
   storyBadge: {
     minWidth: 18,
@@ -1919,9 +1957,38 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
+  helpButtonWrapBeacon: {
+    shadowOpacity: 0.42,
+    shadowRadius: 14,
+    elevation: 8,
+  },
   helpGradient: {
     borderColor: `${GameColors.ui.primary}70`,
     borderWidth: 1.5,
+  },
+  helpGradientBeacon: {
+    borderColor: "#6EF8FF",
+    borderWidth: 2,
+  },
+  helpGuideBadgeWrap: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    zIndex: 2,
+  },
+  helpGuideBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(10,10,20,0.65)",
+    shadowColor: "#00D9FF",
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   boardContainer: {
     flex: 1,
@@ -1961,30 +2028,6 @@ const styles = StyleSheet.create({
   lockoutHintSubtext: {
     fontSize: 11,
     color: GameColors.text.secondary,
-  },
-  resumeBanner: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-    backgroundColor: "#1A1A2E",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  resumeBannerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  resumeBannerText: {
-    fontSize: 12,
-    color: GameColors.text.secondary,
-    fontWeight: "600",
   },
   bottomBar: {
     flexDirection: "row",

@@ -1029,6 +1029,109 @@ function getSupplierConfigWithPerks(
   };
 }
 
+const SLOT_UPGRADE_RULES: { slot: number; upgradeId: string }[] = [
+  { slot: 27, upgradeId: "space_1" },
+  { slot: 28, upgradeId: "space_2" },
+  { slot: 29, upgradeId: "space_3" },
+];
+
+function reconcileUpgradeState(state: GameState): GameState {
+  let upgradesChanged = false;
+  const nextUpgrades = { ...state.upgrades };
+
+  let slotsChanged = false;
+  let nextUnlockedSlots = state.unlockedSlots;
+  let nextBlockedSlots = state.blockedSlots;
+
+  let suppliersChanged = false;
+  let nextSuppliers = state.suppliers;
+
+  const ensureUpgradeOwned = (upgradeId: string) => {
+    if ((nextUpgrades[upgradeId] || 0) >= 1) return;
+    nextUpgrades[upgradeId] = 1;
+    upgradesChanged = true;
+  };
+
+  const ensureSlotUnlocked = (slot: number) => {
+    if (!nextUnlockedSlots.includes(slot)) {
+      nextUnlockedSlots = [...nextUnlockedSlots, slot];
+      slotsChanged = true;
+    }
+    if (nextBlockedSlots.includes(slot)) {
+      nextBlockedSlots = nextBlockedSlots.filter((blocked) => blocked !== slot);
+      slotsChanged = true;
+    }
+  };
+
+  SLOT_UPGRADE_RULES.forEach(({ slot, upgradeId }) => {
+    const slotOpen =
+      nextUnlockedSlots.includes(slot) || !nextBlockedSlots.includes(slot);
+    const upgradeOwned = (nextUpgrades[upgradeId] || 0) >= 1;
+    if (slotOpen && !upgradeOwned) {
+      ensureUpgradeOwned(upgradeId);
+    }
+    if (upgradeOwned) {
+      ensureSlotUnlocked(slot);
+    }
+  });
+
+  if ((nextUpgrades["salvage_tuning"] || 0) > 0) {
+    ensureUpgradeOwned("salvage_unlock");
+  }
+  if (nextSuppliers.salvage.level > 0) {
+    ensureUpgradeOwned("salvage_unlock");
+  }
+  if (
+    (nextUpgrades["salvage_unlock"] || 0) >= 1 &&
+    nextSuppliers.salvage.level <= 0
+  ) {
+    const speedLevel = nextUpgrades["workbench_speed_1"] || 0;
+    const config = getSupplierConfigWithPerks(
+      {
+        ...state,
+        upgrades: nextUpgrades,
+        unlockedSlots: nextUnlockedSlots,
+        blockedSlots: nextBlockedSlots,
+      },
+      "salvage",
+      1,
+      speedLevel,
+    );
+    nextSuppliers = {
+      ...nextSuppliers,
+      salvage: {
+        level: 1,
+        chargesRemaining: config.maxCharges,
+        cooldownEndsAt: 0,
+        overdrawCount: 0,
+      },
+    };
+    suppliersChanged = true;
+  }
+
+  const hasRdProgress =
+    Object.values(state.rdNodes).some(Boolean) ||
+    nextSuppliers.open.level > 0 ||
+    state.freedomControllerCount > 0 ||
+    state.gamePhase === 2 ||
+    state.liberationComplete;
+  if (hasRdProgress) {
+    ensureUpgradeOwned("rd_unlock");
+  }
+
+  if (!upgradesChanged && !slotsChanged && !suppliersChanged) {
+    return state;
+  }
+
+  return {
+    ...state,
+    upgrades: upgradesChanged ? nextUpgrades : state.upgrades,
+    unlockedSlots: slotsChanged ? nextUnlockedSlots : state.unlockedSlots,
+    blockedSlots: slotsChanged ? nextBlockedSlots : state.blockedSlots,
+    suppliers: suppliersChanged ? nextSuppliers : state.suppliers,
+  };
+}
+
 function canOfferProject(project: ProjectDefinition, state: GameState) {
   if (state.gamePhase < project.unlock.phaseMin) return false;
   if (state.reputationTier < project.unlock.minRepTier) return false;
@@ -1269,6 +1372,155 @@ function sanitizePart(raw: any, position: number): Part | null {
   const id = typeof raw.id === "string" ? raw.id : generateId();
   const compatible = family === "open" ? !!raw.compatible : false;
   return { id, family, tier: tier as PartTier, position, compatible };
+}
+
+function sanitizeOrderRequirement(raw: unknown): OrderRequirement | null {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw as Partial<OrderRequirement>;
+  const family =
+    candidate.family === "open" ||
+    candidate.family === "locked" ||
+    candidate.family === "any"
+      ? candidate.family
+      : undefined;
+  if (!family) return null;
+  const rawTier =
+    typeof candidate.tier === "number" && Number.isFinite(candidate.tier)
+      ? Math.floor(candidate.tier)
+      : NaN;
+  if (!Number.isFinite(rawTier)) return null;
+  const rawCount =
+    typeof candidate.count === "number" && Number.isFinite(candidate.count)
+      ? Math.floor(candidate.count)
+      : NaN;
+  if (!Number.isFinite(rawCount) || rawCount < 1) return null;
+
+  return {
+    tier: Math.max(1, Math.min(MAX_PART_TIER, rawTier)) as PartTier,
+    family,
+    count: rawCount,
+    requiresCompatible: candidate.requiresCompatible ? true : undefined,
+  };
+}
+
+function sanitizeOrder(raw: unknown): Order | null {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw as Partial<Order>;
+  const type = candidate.type;
+  const isValidType = (value: unknown): value is OrderType =>
+    value === "basic" ||
+    value === "style_match" ||
+    value === "rush" ||
+    value === "premium" ||
+    value === "baron_certified" ||
+    value === "locked_required" ||
+    value === "compatibility_required" ||
+    value === "lab_request";
+  if (!isValidType(type)) return null;
+
+  const requirements = Array.isArray(candidate.requirements)
+    ? candidate.requirements
+        .map((requirement) => sanitizeOrderRequirement(requirement))
+        .filter((requirement): requirement is OrderRequirement => !!requirement)
+    : [];
+  if (requirements.length === 0) return null;
+
+  const rawRewards =
+    candidate.rewards && typeof candidate.rewards === "object"
+      ? candidate.rewards
+      : {};
+  const cash =
+    typeof (rawRewards as { cash?: unknown }).cash === "number" &&
+    Number.isFinite((rawRewards as { cash: number }).cash)
+      ? Math.max(0, Math.floor((rawRewards as { cash: number }).cash))
+      : 0;
+  const reputation =
+    typeof (rawRewards as { reputation?: unknown }).reputation === "number" &&
+    Number.isFinite((rawRewards as { reputation: number }).reputation)
+      ? Math.max(
+          0,
+          Math.floor((rawRewards as { reputation: number }).reputation),
+        )
+      : 0;
+  const research =
+    typeof (rawRewards as { research?: unknown }).research === "number" &&
+    Number.isFinite((rawRewards as { research: number }).research)
+      ? Math.max(0, Math.floor((rawRewards as { research: number }).research))
+      : 0;
+
+  const modifierIds = Array.isArray(candidate.modifierIds)
+    ? Array.from(
+        new Set(
+          candidate.modifierIds.filter(
+            (modifierId): modifierId is string =>
+              typeof modifierId === "string" && modifierId.length > 0,
+          ),
+        ),
+      )
+    : undefined;
+  const rushDeadline =
+    typeof candidate.rushDeadline === "number" &&
+    Number.isFinite(candidate.rushDeadline) &&
+    candidate.rushDeadline > 0
+      ? Math.floor(candidate.rushDeadline)
+      : undefined;
+  const rushStartTime =
+    typeof candidate.rushStartTime === "number" &&
+    Number.isFinite(candidate.rushStartTime)
+      ? Math.max(0, Math.floor(candidate.rushStartTime))
+      : undefined;
+
+  return {
+    id:
+      typeof candidate.id === "string" && candidate.id.length > 0
+        ? candidate.id
+        : generateId(),
+    title:
+      typeof candidate.title === "string" && candidate.title.trim().length > 0
+        ? candidate.title.trim()
+        : "Install Request",
+    type,
+    requirements,
+    rewards: {
+      cash,
+      reputation,
+      research,
+    },
+    flavorText:
+      typeof candidate.flavorText === "string"
+        ? candidate.flavorText
+        : undefined,
+    templateId:
+      typeof candidate.templateId === "string"
+        ? candidate.templateId
+        : undefined,
+    modifierIds:
+      modifierIds && modifierIds.length > 0 ? modifierIds : undefined,
+    archetypeId:
+      typeof candidate.archetypeId === "string"
+        ? candidate.archetypeId
+        : undefined,
+    ecoAuditBonusResearch:
+      typeof candidate.ecoAuditBonusResearch === "number" &&
+      Number.isFinite(candidate.ecoAuditBonusResearch)
+        ? Math.max(0, Math.floor(candidate.ecoAuditBonusResearch))
+        : undefined,
+    noSubstitutions: candidate.noSubstitutions ? true : undefined,
+    minNeighborhoodId:
+      typeof candidate.minNeighborhoodId === "string"
+        ? candidate.minNeighborhoodId
+        : undefined,
+    isLockout: candidate.isLockout ? true : undefined,
+    rushDeadline,
+    rushStartTime: rushDeadline ? rushStartTime : undefined,
+    familyPreference:
+      candidate.familyPreference === "open" ||
+      candidate.familyPreference === "locked"
+        ? candidate.familyPreference
+        : undefined,
+    penaltyIfWrongFamily: candidate.penaltyIfWrongFamily ? true : undefined,
+    isTutorial: candidate.isTutorial ? true : undefined,
+  };
 }
 
 function getOrderDifficulty(order: {
@@ -2354,7 +2606,8 @@ function createFirstSessionOrder(index: number): Order | null {
 
 function isProtectedOrder(state: GameState, order: Order) {
   if (order.isTutorial || order.id === state.tutorialOrderId) return true;
-  if (order.isLockout || order.type === "lab_request") return true;
+  if (order.isLockout) return true;
+  if (state.lockoutActive && order.type === "lab_request") return true;
   if (order.modifierIds?.includes("first_session")) return true;
   if (order.modifierIds?.includes("tier5_showcase")) return true;
   if (order.modifierIds?.includes("tier10_showcase")) return true;
@@ -4949,7 +5202,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "FULFILL_ORDER": {
-      const { orderId, partIndices } = action;
+      const { orderId } = action;
       const order = state.orders.find((o) => o.id === orderId);
       if (!order) return state;
       const projectStageInfo = order.modifierIds?.includes("project_stage")
@@ -4967,6 +5220,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         }
       }
+      const partIndices = selectPartsForOrder(order, state.board);
+      if (!partIndices) return state;
 
       const newBoard = [...state.board];
       partIndices.forEach((idx) => {
@@ -6488,6 +6743,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const currentLevel = state.upgrades[upgrade.id] || 0;
       if (currentLevel >= upgrade.maxLevel) return state;
       if (
+        upgrade.requires?.some(
+          (requiredUpgradeId) => (state.upgrades[requiredUpgradeId] || 0) < 1,
+        )
+      ) {
+        return state;
+      }
+      if (
         upgrade.effect.startsWith("dependency_reduce_") &&
         (state.liberationComplete || state.gamePhase === 2)
       ) {
@@ -6545,17 +6807,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (upgrade.effect === "unlock_salvage") {
+        const nextLevel = Math.max(1, newState.suppliers.salvage.level || 0);
         const speedLevel = newState.upgrades["workbench_speed_1"] || 0;
         const config = getSupplierConfigWithPerks(
           newState,
           "salvage",
-          1,
+          nextLevel,
           speedLevel,
         );
         newState.suppliers = {
           ...newState.suppliers,
           salvage: {
-            level: 1,
+            level: nextLevel,
             chargesRemaining: config.maxCharges,
             cooldownEndsAt: 0,
             overdrawCount: 0,
@@ -6655,6 +6918,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "UNLOCK_RD_NODE": {
+      if ((state.upgrades["rd_unlock"] || 0) < 1) return state;
       const node = RD_DEFINITIONS.find((n) => n.id === action.nodeId);
       if (!node) return state;
       if (state.rdNodes[node.id]) return state;
@@ -6758,6 +7022,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "CRAFT_FREEDOM_CONTROLLER": {
+      if ((state.upgrades["rd_unlock"] || 0) < 1) return state;
       if (!state.rdNodes["freedom_build"]) return state;
       if (state.research < 300) return state;
 
@@ -9251,29 +9516,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "RESUME_TUTORIAL": {
-      if (!state.tutorialComplete) return state;
-      const now = Date.now();
-      const nextStorySeen = { ...state.storySeen };
-      delete nextStorySeen.tina_intro;
-      let nextState: GameState = {
+      if (!state.tutorialComplete || !state.tutorialMetrics.skipped) {
+        return state;
+      }
+      // Legacy action: retire "resume in-place" to avoid inconsistent replay state.
+      return {
         ...state,
-        tutorialComplete: false,
-        tutorialReplay: true,
-        tutorialStepStartedAt: now,
-        tutorialNudgeCount: 0,
-        tutorialHint: undefined,
         tutorialMetrics: {
           ...state.tutorialMetrics,
           skipped: false,
-          stepStartedAt: {
-            ...state.tutorialMetrics.stepStartedAt,
-            [state.tutorialStep]: now,
-          },
         },
-        storySeen: nextStorySeen,
       };
-      nextState = queueStoryBeat(nextState, "tina_intro");
-      return nextState;
     }
 
     case "RESET_GAME": {
@@ -10280,12 +10533,48 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               ),
             ]
           : restoredBackpackRaw;
+      const isValidPlayableSlot = (slot: number) =>
+        slot >= 0 && slot < restoredBoardSize && !STATION_SLOTS.includes(slot);
+      const normalizeSlotList = (
+        raw: unknown,
+        fallback: number[],
+      ): number[] => {
+        const source = Array.isArray(raw) ? raw : fallback;
+        const deduped = new Set<number>();
+        source.forEach((value) => {
+          if (typeof value !== "number" || !Number.isFinite(value)) return;
+          const slot = Math.floor(value);
+          if (!isValidPlayableSlot(slot)) return;
+          deduped.add(slot);
+        });
+        return Array.from(deduped).sort((a, b) => a - b);
+      };
+      const normalizedUnlockedSlots = normalizeSlotList(
+        action.state.unlockedSlots,
+        base.unlockedSlots,
+      );
+      const normalizedBlockedSlots = normalizeSlotList(
+        action.state.blockedSlots,
+        base.blockedSlots,
+      ).filter((slot) => !normalizedUnlockedSlots.includes(slot));
       const sanitizedBoard = restoredBoard.map((part, index) =>
         part ? sanitizePart(part, index) : null,
       );
       const sanitizedBackpack = restoredBackpack.map((part) =>
         part ? sanitizePart(part, -1) : null,
       );
+      const rawOrders = Array.isArray(action.state.orders)
+        ? action.state.orders
+        : base.orders;
+      const normalizedOrders: Order[] = [];
+      const seenOrderIds = new Set<string>();
+      rawOrders.forEach((rawOrder) => {
+        const order = sanitizeOrder(rawOrder);
+        if (!order) return;
+        if (seenOrderIds.has(order.id)) return;
+        seenOrderIds.add(order.id);
+        normalizedOrders.push(order);
+      });
       const restoredDependency =
         typeof action.state.dependency === "number"
           ? action.state.dependency
@@ -10320,9 +10609,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         : restoredFirstSessionForcedDrops;
       const highlightedOrderId =
         typeof action.state.highlightedOrderId === "string" &&
-        action.state.orders?.some(
-          (o) => o.id === action.state.highlightedOrderId,
-        )
+        normalizedOrders.some((o) => o.id === action.state.highlightedOrderId)
           ? action.state.highlightedOrderId
           : undefined;
       const firstSessionSecondOfferTriggered =
@@ -10346,9 +10633,43 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? action.state.firstSessionChoiceBaronOrderId
           : base.firstSessionChoiceBaronOrderId;
       const orderSpawnCooldownUntil =
-        typeof action.state.orderSpawnCooldownUntil === "number"
-          ? action.state.orderSpawnCooldownUntil
+        typeof action.state.orderSpawnCooldownUntil === "number" &&
+        Number.isFinite(action.state.orderSpawnCooldownUntil)
+          ? Math.max(0, Math.floor(action.state.orderSpawnCooldownUntil))
           : 0;
+      const rawUpgrades =
+        action.state.upgrades && typeof action.state.upgrades === "object"
+          ? (action.state.upgrades as Record<string, number>)
+          : {};
+      const normalizedUpgrades = UPGRADE_DEFINITIONS.reduce<
+        Record<string, number>
+      >((acc, definition) => {
+        const rawLevel = rawUpgrades[definition.id];
+        if (typeof rawLevel !== "number" || !Number.isFinite(rawLevel)) {
+          return acc;
+        }
+        const normalizedLevel = Math.max(
+          0,
+          Math.min(definition.maxLevel, Math.floor(rawLevel)),
+        );
+        if (normalizedLevel > 0) {
+          acc[definition.id] = normalizedLevel;
+        }
+        return acc;
+      }, {});
+      const rawRdNodes =
+        action.state.rdNodes && typeof action.state.rdNodes === "object"
+          ? (action.state.rdNodes as Record<string, unknown>)
+          : {};
+      const normalizedRdNodes = RD_DEFINITIONS.reduce<Record<string, boolean>>(
+        (acc, definition) => {
+          if (rawRdNodes[definition.id]) {
+            acc[definition.id] = true;
+          }
+          return acc;
+        },
+        {},
+      );
       const lastCriticalEventId =
         typeof action.state.lastCriticalEventId === "number"
           ? action.state.lastCriticalEventId
@@ -10388,8 +10709,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? action.state.baronCooldownHintShown
           : base.baronCooldownHintShown;
       const baronContractOrdersRemaining =
-        typeof action.state.baronContractOrdersRemaining === "number"
-          ? action.state.baronContractOrdersRemaining
+        typeof action.state.baronContractOrdersRemaining === "number" &&
+        Number.isFinite(action.state.baronContractOrdersRemaining)
+          ? Math.max(0, Math.floor(action.state.baronContractOrdersRemaining))
           : base.baronContractOrdersRemaining;
       const baronPressureRaw =
         typeof action.state.baronPressure === "number"
@@ -10447,18 +10769,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         salvage: normalizeSupplier("salvage", base.suppliers.salvage),
       };
       const upgradeMaterials =
-        typeof action.state.upgradeMaterials === "number"
-          ? action.state.upgradeMaterials
+        typeof action.state.upgradeMaterials === "number" &&
+        Number.isFinite(action.state.upgradeMaterials)
+          ? Math.max(0, Math.floor(action.state.upgradeMaterials))
           : base.upgradeMaterials;
       const compatibilityComponents =
-        typeof action.state.compatibilityComponents === "number"
-          ? action.state.compatibilityComponents
+        typeof action.state.compatibilityComponents === "number" &&
+        Number.isFinite(action.state.compatibilityComponents)
+          ? Math.max(0, Math.floor(action.state.compatibilityComponents))
           : base.compatibilityComponents;
-      const hasPhase2GoalOrder =
-        Array.isArray(action.state.orders) &&
-        action.state.orders.some((order) =>
-          order?.modifierIds?.includes("phase2_goal"),
-        );
+      const hasPhase2GoalOrder = normalizedOrders.some((order) =>
+        order.modifierIds?.includes("phase2_goal"),
+      );
       const phase2GoalSeen =
         action.state.storySeen && typeof action.state.storySeen === "object"
           ? !!action.state.storySeen["phase2_goal"]
@@ -10790,9 +11112,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             base.lastCompatibleDiscoveryId + 1,
           )
         : lastCompatibleDiscoveryId;
+      const freedomControllerCount =
+        typeof action.state.freedomControllerCount === "number" &&
+        Number.isFinite(action.state.freedomControllerCount)
+          ? Math.max(0, Math.floor(action.state.freedomControllerCount))
+          : base.freedomControllerCount;
+      const marketingBoostMax = Math.max(
+        0,
+        Math.floor(tuning.boosts.marketingMaxStack),
+      );
       const marketingBoostOrdersRemaining =
-        typeof action.state.marketingBoostOrdersRemaining === "number"
-          ? action.state.marketingBoostOrdersRemaining
+        typeof action.state.marketingBoostOrdersRemaining === "number" &&
+        Number.isFinite(action.state.marketingBoostOrdersRemaining)
+          ? Math.max(
+              0,
+              Math.min(
+                marketingBoostMax,
+                Math.floor(action.state.marketingBoostOrdersRemaining),
+              ),
+            )
           : base.marketingBoostOrdersRemaining;
       const supplierScoutRoute =
         action.state.supplierScoutRoute === "open" ||
@@ -10800,17 +11138,50 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         action.state.supplierScoutRoute === "tier"
           ? action.state.supplierScoutRoute
           : base.supplierScoutRoute;
+      const scoutBoostMax = Math.max(
+        0,
+        Math.floor(tuning.boosts.scoutMaxStack),
+      );
       const supplierScoutSpawnsRemaining =
-        typeof action.state.supplierScoutSpawnsRemaining === "number"
-          ? action.state.supplierScoutSpawnsRemaining
+        typeof action.state.supplierScoutSpawnsRemaining === "number" &&
+        Number.isFinite(action.state.supplierScoutSpawnsRemaining)
+          ? Math.max(
+              0,
+              Math.min(
+                scoutBoostMax,
+                Math.floor(action.state.supplierScoutSpawnsRemaining),
+              ),
+            )
           : base.supplierScoutSpawnsRemaining;
+      const clinicBoostMax = Math.max(
+        0,
+        Math.floor(tuning.boosts.clinicMaxStack),
+      );
       const mentorClinicMergesRemaining =
-        typeof action.state.mentorClinicMergesRemaining === "number"
-          ? action.state.mentorClinicMergesRemaining
+        typeof action.state.mentorClinicMergesRemaining === "number" &&
+        Number.isFinite(action.state.mentorClinicMergesRemaining)
+          ? Math.max(
+              0,
+              Math.min(
+                clinicBoostMax,
+                Math.floor(action.state.mentorClinicMergesRemaining),
+              ),
+            )
           : base.mentorClinicMergesRemaining;
+      const independenceBoostMax = Math.max(
+        0,
+        Math.floor(tuning.boosts.independenceMaxStack),
+      );
       const mentorIndependenceMergesRemaining =
-        typeof action.state.mentorIndependenceMergesRemaining === "number"
-          ? action.state.mentorIndependenceMergesRemaining
+        typeof action.state.mentorIndependenceMergesRemaining === "number" &&
+        Number.isFinite(action.state.mentorIndependenceMergesRemaining)
+          ? Math.max(
+              0,
+              Math.min(
+                independenceBoostMax,
+                Math.floor(action.state.mentorIndependenceMergesRemaining),
+              ),
+            )
           : base.mentorIndependenceMergesRemaining;
       const resolvedMentorBoosts =
         mentorClinicMergesRemaining > 0 && mentorIndependenceMergesRemaining > 0
@@ -10832,9 +11203,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         action.state.warrantyStampMode === "contract"
           ? action.state.warrantyStampMode
           : base.warrantyStampMode;
+      const warrantyBoostMax = Math.max(
+        0,
+        Math.floor(tuning.boosts.warrantyMaxStack),
+      );
       const warrantyStampOrdersRemaining =
-        typeof action.state.warrantyStampOrdersRemaining === "number"
-          ? action.state.warrantyStampOrdersRemaining
+        typeof action.state.warrantyStampOrdersRemaining === "number" &&
+        Number.isFinite(action.state.warrantyStampOrdersRemaining)
+          ? Math.max(
+              0,
+              Math.min(
+                warrantyBoostMax,
+                Math.floor(action.state.warrantyStampOrdersRemaining),
+              ),
+            )
           : base.warrantyStampOrdersRemaining;
       const resolvedScoutRoute =
         supplierScoutSpawnsRemaining > 0
@@ -10849,13 +11231,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ? action.state.ordersHelpNudgeSeen
           : base.ordersHelpNudgeSeen;
       const installStreakCurrent =
-        typeof action.state.installStreakCurrent === "number"
-          ? action.state.installStreakCurrent
+        typeof action.state.installStreakCurrent === "number" &&
+        Number.isFinite(action.state.installStreakCurrent)
+          ? Math.max(0, Math.floor(action.state.installStreakCurrent))
           : base.installStreakCurrent;
       const installStreakBest =
-        typeof action.state.installStreakBest === "number"
-          ? action.state.installStreakBest
-          : base.installStreakBest;
+        typeof action.state.installStreakBest === "number" &&
+        Number.isFinite(action.state.installStreakBest)
+          ? Math.max(
+              installStreakCurrent,
+              Math.floor(action.state.installStreakBest),
+            )
+          : Math.max(base.installStreakBest, installStreakCurrent);
       const mergeChainExpiresAt =
         typeof action.state.mergeChainExpiresAt === "number"
           ? action.state.mergeChainExpiresAt
@@ -10932,10 +11319,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let restoredState: GameState = {
         ...base,
         ...action.state,
+        upgrades: normalizedUpgrades,
         settings: {
           ...base.settings,
           ...(action.state.settings || {}),
         },
+        unlockedSlots: normalizedUnlockedSlots,
+        blockedSlots: normalizedBlockedSlots,
         boardSize: restoredBoardSize,
         board: sanitizedBoard,
         reputation: resolvedReputation,
@@ -10946,6 +11336,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         suppliers,
         upgradeMaterials,
         compatibilityComponents,
+        rdNodes: normalizedRdNodes,
+        freedomControllerCount,
         gamePhase,
         liberationComplete,
         liberationCompletedAt,
@@ -10962,6 +11354,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         council,
         backpackSlots: restoredBackpackSlots,
         backpack: sanitizedBackpack,
+        orders: normalizedOrders,
         backpackUnlocked:
           typeof action.state.backpackUnlocked === "boolean"
             ? action.state.backpackUnlocked
@@ -11297,6 +11690,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ),
         };
       }
+      restoredState = reconcileUpgradeState(restoredState);
       if (restoredState.tutorialComplete) {
         restoredState = ensureMissions(restoredState);
       }

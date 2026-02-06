@@ -11,7 +11,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
-import { Upgrade } from "@/types/game";
+import { Upgrade, UPGRADE_DEFINITIONS } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
@@ -38,6 +38,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   rd: GameColors.currency.research,
 };
 
+const UPGRADE_NAME_BY_ID = UPGRADE_DEFINITIONS.reduce<Record<string, string>>(
+  (acc, definition) => {
+    acc[definition.id] = definition.name;
+    return acc;
+  },
+  {},
+);
+
 export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
@@ -53,10 +61,19 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
     ),
   );
   const canAfford = state.cash >= cost;
+  const missingRequirements = (upgrade.requires || []).filter(
+    (requiredUpgradeId) => (state.upgrades[requiredUpgradeId] || 0) < 1,
+  );
+  const requirementsMet = missingRequirements.length === 0;
+  const missingRequirementName =
+    missingRequirements.length > 0
+      ? UPGRADE_NAME_BY_ID[missingRequirements[0]] || missingRequirements[0]
+      : undefined;
   const dependencyUpgradeObsolete =
     upgrade.effect.startsWith("dependency_reduce_") &&
     (state.liberationComplete || state.gamePhase === 2);
-  const canPurchase = !isMaxed && canAfford && !dependencyUpgradeObsolete;
+  const canPurchase =
+    !isMaxed && canAfford && requirementsMet && !dependencyUpgradeObsolete;
 
   const categoryColor =
     CATEGORY_COLORS[upgrade.category] || GameColors.text.secondary;
@@ -109,6 +126,10 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
           {dependencyUpgradeObsolete ? (
             <ThemedText style={styles.obsoleteNote}>
               Phase 2: Dependency is frozen at 0, so this upgrade has no effect.
+            </ThemedText>
+          ) : !requirementsMet && missingRequirementName ? (
+            <ThemedText style={styles.obsoleteNote}>
+              Requires {missingRequirementName} first.
             </ThemedText>
           ) : null}
         </View>
@@ -171,6 +192,15 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
               style={[styles.purchaseText, { color: GameColors.ui.warning }]}
             >
               Phase 2 Obsolete
+            </ThemedText>
+          </>
+        ) : !requirementsMet ? (
+          <>
+            <Feather name="lock" size={14} color={GameColors.text.disabled} />
+            <ThemedText
+              style={[styles.purchaseText, { color: GameColors.text.disabled }]}
+            >
+              Locked
             </ThemedText>
           </>
         ) : (

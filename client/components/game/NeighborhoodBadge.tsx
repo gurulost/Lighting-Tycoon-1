@@ -77,8 +77,8 @@ export function NeighborhoodBadge({
         <ThemedText
           style={[styles.title, compact && styles.titleCompact]}
           numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={compact ? 0.78 : 0.85}
+          adjustsFontSizeToFit={!compact}
+          minimumFontScale={compact ? 1 : 0.85}
           maxFontSizeMultiplier={1}
           ellipsizeMode="tail"
         >
@@ -107,8 +107,8 @@ export function NeighborhoodBadge({
         <ThemedText
           style={[styles.progressText, compact && styles.progressTextCompact]}
           numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={compact ? 0.8 : 0.9}
+          adjustsFontSizeToFit={!compact}
+          minimumFontScale={compact ? 1 : 0.9}
           maxFontSizeMultiplier={1}
           ellipsizeMode="tail"
         >
@@ -131,11 +131,11 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginHorizontal: 0,
     marginTop: 0,
-    height: 64,
+    height: 68,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: BorderRadius.sm,
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
   },
   header: {
     flexDirection: "row",
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   headerCompact: {
-    marginBottom: Spacing.xs,
+    marginBottom: 2,
   },
   iconWrap: {
     backgroundColor: `${GameColors.currency.reputation}20`,
@@ -157,22 +157,25 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
+    lineHeight: 18,
     fontWeight: "700",
     color: GameColors.text.primary,
     flex: 1,
   },
   titleCompact: {
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 15,
   },
   tierLabel: {
     fontSize: 12,
+    lineHeight: 14,
     color: GameColors.text.secondary,
   },
   progressRow: {
     marginTop: Spacing.sm,
   },
   progressRowCompact: {
-    marginTop: 2,
+    marginTop: 0,
   },
   progressStrip: {
     marginTop: Spacing.xs,
@@ -183,10 +186,12 @@ const styles = StyleSheet.create({
   progressText: {
     marginTop: Spacing.xs,
     fontSize: 11,
+    lineHeight: 14,
     color: GameColors.text.secondary,
   },
   progressTextCompact: {
     marginTop: 0,
-    fontSize: 10,
+    fontSize: 11,
+    lineHeight: 12,
   },
 });

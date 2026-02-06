@@ -108,6 +108,8 @@ export function DependencyMeter({
   const pressureStripHeight = compact ? 3 : 4;
   const pressureStripGap = 2;
   const pressureChipFontSize = compact ? 8 : 9;
+  const statusIconSize = compact ? 20 : 24;
+  const statusIconGlyphSize = compact ? 11 : 12;
 
   useEffect(() => {
     const crossedThreshold = THRESHOLDS.some(
@@ -284,11 +286,16 @@ export function DependencyMeter({
               style={[
                 styles.statusIcon,
                 { backgroundColor: getStatusColor() + "30" },
+                {
+                  width: statusIconSize,
+                  height: statusIconSize,
+                  borderRadius: statusIconSize / 2,
+                },
               ]}
             >
               <Feather
                 name={getStatusIcon()}
-                size={12}
+                size={statusIconGlyphSize}
                 color={getStatusColor()}
               />
             </View>
@@ -495,6 +502,7 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginHorizontal: 0,
     marginVertical: 0,
+    height: 68,
     borderRadius: BorderRadius.sm,
   },
   innerContainer: {
@@ -512,7 +520,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   headerCompact: {
-    marginBottom: Spacing.xs,
+    marginBottom: 2,
   },
   labelContainer: {
     flexDirection: "row",
@@ -530,13 +538,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
+    lineHeight: 16,
     fontWeight: "600",
     color: GameColors.text.secondary,
     flexShrink: 1,
     minWidth: 0,
   },
   labelCompact: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 14,
   },
   statusContainer: {
     flexDirection: "row",
@@ -547,23 +557,27 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
   statusContainerCompact: {
-    gap: 4,
-    flexWrap: "wrap",
+    gap: 3,
+    flexWrap: "nowrap",
     justifyContent: "flex-end",
   },
   status: {
     fontSize: 13,
+    lineHeight: 16,
     fontWeight: "700",
   },
   statusCompact: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 14,
   },
   percentage: {
     fontSize: 14,
+    lineHeight: 16,
     fontWeight: "800",
   },
   percentageCompact: {
-    fontSize: 10,
+    fontSize: 12,
+    lineHeight: 14,
   },
   trackContainer: {
     position: "relative",
@@ -648,6 +662,7 @@ const styles = StyleSheet.create({
   },
   pressureThresholdLabel: {
     fontSize: 7,
+    lineHeight: 8,
     fontWeight: "700",
     color: GameColors.text.secondary,
   },
@@ -667,6 +682,7 @@ const styles = StyleSheet.create({
   pressureChipText: {
     fontWeight: "600",
     color: GameColors.text.secondary,
+    lineHeight: 11,
   },
   pressureValue: {
     flexDirection: "row",
@@ -676,11 +692,14 @@ const styles = StyleSheet.create({
   },
   valueDivider: {
     fontSize: 11,
+    lineHeight: 12,
     fontWeight: "700",
     color: GameColors.text.disabled,
     marginHorizontal: 4,
   },
   valueDividerCompact: {
+    fontSize: 10,
+    lineHeight: 12,
     marginHorizontal: 2,
   },
   baronContainer: {
