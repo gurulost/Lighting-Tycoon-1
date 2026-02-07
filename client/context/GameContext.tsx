@@ -4044,6 +4044,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
     case "DISMISS_OVERLAY": {
       if (state.overlayQueue.length === 0) return state;
+      if (!state.overlayQueue.some((entry) => entry.id === action.id)) {
+        return state;
+      }
       return {
         ...state,
         overlayQueue: state.overlayQueue.filter(
@@ -13908,7 +13911,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const enqueueSave = useCallback((payload: string) => {
+  const enqueueSave = useCallback((payload: string, enqueuedAt: number) => {
     saveQueueRef.current = saveQueueRef.current
       .catch(() => {})
       .then(async () => {
@@ -13919,7 +13922,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         }
         try {
           await AsyncStorage.setItem(STORAGE_KEY, payload);
-          lastSaveAtRef.current = Date.now();
+          lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
         } catch (error) {
           console.warn("Failed to save game state", error);
         }
@@ -13932,8 +13935,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
+    const enqueuedAt = Date.now();
+    lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
     const payload = JSON.stringify(buildSaveEnvelope(stateRef.current));
-    enqueueSave(payload);
+    enqueueSave(payload, enqueuedAt);
   }, [enqueueSave, hydrated]);
 
   useEffect(() => {

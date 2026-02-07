@@ -62,6 +62,7 @@ import SoundManager from "@/audio/SoundManager";
 import { OverlayItem, OVERLAY_PRIORITY } from "@/types/overlay";
 
 const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
+const MAX_MOMENT_LOCK_MS = 2000;
 
 const freedomControllerImage = require("../../assets/images/freedom-controller.webp");
 const stationWorkbenchImage = require("../../assets/images/station-workbench.webp");
@@ -808,6 +809,7 @@ export default function GameScreen() {
     return () => {
       if (momentLockTimeout.current) {
         clearTimeout(momentLockTimeout.current);
+        momentLockTimeout.current = null;
       }
     };
   }, []);
@@ -1042,21 +1044,29 @@ export default function GameScreen() {
       }
       return;
     }
+    if (momentLockTimeout.current) {
+      clearTimeout(momentLockTimeout.current);
+      momentLockTimeout.current = null;
+    }
     const beat = STORY_BEATS[state.activeStoryBeatId];
-    if (!beat?.momentLockMs) {
+    const beatLockMs = beat?.momentLockMs;
+    if (
+      typeof beatLockMs !== "number" ||
+      !Number.isFinite(beatLockMs) ||
+      beatLockMs <= 0
+    ) {
       setMomentLockActive(false);
       momentLockExpiresAtRef.current = 0;
       return;
     }
+    const lockMs = Math.min(MAX_MOMENT_LOCK_MS, Math.floor(beatLockMs));
     setMomentLockActive(true);
-    momentLockExpiresAtRef.current = Date.now() + beat.momentLockMs;
-    if (momentLockTimeout.current) {
-      clearTimeout(momentLockTimeout.current);
-    }
+    momentLockExpiresAtRef.current = Date.now() + lockMs;
     momentLockTimeout.current = setTimeout(() => {
       setMomentLockActive(false);
       momentLockExpiresAtRef.current = 0;
-    }, beat.momentLockMs);
+      momentLockTimeout.current = null;
+    }, lockMs);
   }, [state.activeStoryBeatId]);
 
   useEffect(() => {
