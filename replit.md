@@ -111,18 +111,18 @@ All game assets are stored in `assets/images/`:
   - Tier 3: `part-segment-open.webp`, `part-segment-locked.webp`
   - Tier 4: `part-smartkit-open.webp`, `part-smartkit-locked.webp`
   - Tier 5: `part-premium-open.webp`, `part-premium-locked.webp`
-- Part sprites (Tiers 6-16, png format): `part-{tier}-{family}.png`
-  - Tier 6 (Array): `part-array-open.png`, `part-array-locked.png`
-  - Tier 7 (Spine): `part-spine-open.png`, `part-spine-locked.png`
-  - Tier 8 (Stack): `part-stack-open.png`, `part-stack-locked.png`
-  - Tier 9 (Grid): `part-grid-open.png`, `part-grid-locked.png`
-  - Tier 10 (Kingdom): `part-kingdom-open.png`, `part-kingdom-locked.png`
-  - Tier 11 (Lattice): `part-lattice-open.png`, `part-lattice-locked.png`
-  - Tier 12 (Beacon): `part-beacon-open.png`, `part-beacon-locked.png`
-  - Tier 13 (Nexus): `part-nexus-open.png`, `part-nexus-locked.png`
-  - Tier 14 (Skyline): `part-skyline-open.png`, `part-skyline-locked.png`
-  - Tier 15 (Atlas): `part-atlas-open.png`, `part-atlas-locked.png`
-  - Tier 16 (Legacy): `part-legacy-open.png`, `part-legacy-locked.png`
+- Part sprites (Tiers 6-16, webp format): `part-{tier}-{family}.webp`
+  - Tier 6 (Array): `part-array-open.webp`, `part-array-locked.webp`
+  - Tier 7 (Spine): `part-spine-open.webp`, `part-spine-locked.webp`
+  - Tier 8 (Stack): `part-stack-open.webp`, `part-stack-locked.webp`
+  - Tier 9 (Grid): `part-grid-open.webp`, `part-grid-locked.webp`
+  - Tier 10 (Kingdom): `part-kingdom-open.webp`, `part-kingdom-locked.webp`
+  - Tier 11 (Lattice): `part-lattice-open.webp`, `part-lattice-locked.webp`
+  - Tier 12 (Beacon): `part-beacon-open.webp`, `part-beacon-locked.webp`
+  - Tier 13 (Nexus): `part-nexus-open.webp`, `part-nexus-locked.webp`
+  - Tier 14 (Skyline): `part-skyline-open.webp`, `part-skyline-locked.webp`
+  - Tier 15 (Atlas): `part-atlas-open.webp`, `part-atlas-locked.webp`
+  - Tier 16 (Legacy): `part-legacy-open.webp`, `part-legacy-locked.webp`
 - Station icons: `station-workbench.webp`, `station-inbox.webp`, `station-rd.webp`
 - Characters: `bulb-baron.png`, `freedom-controller.webp`
 - Effects: `particle-merge-open.png`, `particle-merge-locked.png`
