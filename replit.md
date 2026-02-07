@@ -111,12 +111,18 @@ All game assets are stored in `assets/images/`:
   - Tier 3: `part-segment-open.webp`, `part-segment-locked.webp`
   - Tier 4: `part-smartkit-open.webp`, `part-smartkit-locked.webp`
   - Tier 5: `part-premium-open.webp`, `part-premium-locked.webp`
-- Part sprites (Tiers 6-10, png format): `part-{tier}-{family}.png`
+- Part sprites (Tiers 6-16, png format): `part-{tier}-{family}.png`
   - Tier 6 (Array): `part-array-open.png`, `part-array-locked.png`
   - Tier 7 (Spine): `part-spine-open.png`, `part-spine-locked.png`
   - Tier 8 (Stack): `part-stack-open.png`, `part-stack-locked.png`
   - Tier 9 (Grid): `part-grid-open.png`, `part-grid-locked.png`
   - Tier 10 (Kingdom): `part-kingdom-open.png`, `part-kingdom-locked.png`
+  - Tier 11 (Lattice): `part-lattice-open.png`, `part-lattice-locked.png`
+  - Tier 12 (Beacon): `part-beacon-open.png`, `part-beacon-locked.png`
+  - Tier 13 (Nexus): `part-nexus-open.png`, `part-nexus-locked.png`
+  - Tier 14 (Skyline): `part-skyline-open.png`, `part-skyline-locked.png`
+  - Tier 15 (Atlas): `part-atlas-open.png`, `part-atlas-locked.png`
+  - Tier 16 (Legacy): `part-legacy-open.png`, `part-legacy-locked.png`
 - Station icons: `station-workbench.webp`, `station-inbox.webp`, `station-rd.webp`
 - Characters: `bulb-baron.png`, `freedom-controller.webp`
 - Effects: `particle-merge-open.png`, `particle-merge-locked.png`
