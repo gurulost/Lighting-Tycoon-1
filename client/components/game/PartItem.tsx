@@ -43,6 +43,18 @@ const partGridOpen = require("../../../assets/images/part-grid-open.png");
 const partGridLocked = require("../../../assets/images/part-grid-locked.png");
 const partKingdomOpen = require("../../../assets/images/part-kingdom-open.png");
 const partKingdomLocked = require("../../../assets/images/part-kingdom-locked.png");
+const partLatticeOpen = require("../../../assets/images/part-lattice-open.png");
+const partLatticeLocked = require("../../../assets/images/part-lattice-locked.png");
+const partBeaconOpen = require("../../../assets/images/part-beacon-open.png");
+const partBeaconLocked = require("../../../assets/images/part-beacon-locked.png");
+const partNexusOpen = require("../../../assets/images/part-nexus-open.png");
+const partNexusLocked = require("../../../assets/images/part-nexus-locked.png");
+const partSkylineOpen = require("../../../assets/images/part-skyline-open.png");
+const partSkylineLocked = require("../../../assets/images/part-skyline-locked.png");
+const partAtlasOpen = require("../../../assets/images/part-atlas-open.png");
+const partAtlasLocked = require("../../../assets/images/part-atlas-locked.png");
+const partLegacyOpen = require("../../../assets/images/part-legacy-open.png");
+const partLegacyLocked = require("../../../assets/images/part-legacy-locked.png");
 const mergeParticleOpen = require("../../../assets/images/particle-merge-open.png");
 const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.png");
 
@@ -60,13 +72,12 @@ const PART_SPRITES: Record<
   8: { open: partStackOpen, locked: partStackLocked },
   9: { open: partGridOpen, locked: partGridLocked },
   10: { open: partKingdomOpen, locked: partKingdomLocked },
-  // Placeholder art for new tiers until dedicated sprites are delivered.
-  11: { open: partKingdomOpen, locked: partKingdomLocked },
-  12: { open: partKingdomOpen, locked: partKingdomLocked },
-  13: { open: partKingdomOpen, locked: partKingdomLocked },
-  14: { open: partKingdomOpen, locked: partKingdomLocked },
-  15: { open: partKingdomOpen, locked: partKingdomLocked },
-  16: { open: partKingdomOpen, locked: partKingdomLocked },
+  11: { open: partLatticeOpen, locked: partLatticeLocked },
+  12: { open: partBeaconOpen, locked: partBeaconLocked },
+  13: { open: partNexusOpen, locked: partNexusLocked },
+  14: { open: partSkylineOpen, locked: partSkylineLocked },
+  15: { open: partAtlasOpen, locked: partAtlasLocked },
+  16: { open: partLegacyOpen, locked: partLegacyLocked },
 };
 
 interface PartItemProps {
