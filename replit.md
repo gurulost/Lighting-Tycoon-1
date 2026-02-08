@@ -125,4 +125,5 @@ All game assets are stored in `assets/images/`:
   - Tier 16 (Legacy): `part-legacy-open.webp`, `part-legacy-locked.webp`
 - Station icons: `station-workbench.webp`, `station-inbox.webp`, `station-rd.webp`
 - Characters: `bulb-baron.png`, `freedom-controller.webp`
-- Effects: `particle-merge-open.png`, `particle-merge-locked.png`
+- Effects: `particle-merge-open.webp`, `particle-merge-locked.webp`
+- UI runtime icon: `icon-header.webp` (small header/title usage)

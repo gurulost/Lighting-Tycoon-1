@@ -55,8 +55,8 @@ const partAtlasOpen = require("../../../assets/images/part-atlas-open.webp");
 const partAtlasLocked = require("../../../assets/images/part-atlas-locked.webp");
 const partLegacyOpen = require("../../../assets/images/part-legacy-open.webp");
 const partLegacyLocked = require("../../../assets/images/part-legacy-locked.webp");
-const mergeParticleOpen = require("../../../assets/images/particle-merge-open.png");
-const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.png");
+const mergeParticleOpen = require("../../../assets/images/particle-merge-open.webp");
+const mergeParticleLocked = require("../../../assets/images/particle-merge-locked.webp");
 
 const PART_SPRITES: Record<
   PartTier,

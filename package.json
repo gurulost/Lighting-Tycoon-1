@@ -14,6 +14,7 @@
     "lint": "npx expo lint",
     "lint:fix": "npx expo lint --fix",
     "check:types": "tsc --noEmit",
+    "check:assets": "node scripts/check-game-assets.js",
     "with:env": "bash scripts/with-local-env.sh",
     "telemetry:doctor": "bash scripts/with-local-env.sh node scripts/telemetry-doctor.mjs",
     "telemetry:audit": "tsx scripts/telemetry-audit.ts",
