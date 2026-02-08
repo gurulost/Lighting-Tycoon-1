@@ -54,7 +54,7 @@ export function analyzeOrderAgainstBoard(
   let canFulfill = true;
   let shortfall: OrderBoardAnalysis["shortfall"];
 
-  sortedRequirementEntries.forEach(({ req, requirementIndex }) => {
+  for (const { req, requirementIndex } of sortedRequirementEntries) {
     let matchedForRequirement = 0;
     for (let i = 0; i < board.length; i += 1) {
       if (matchedForRequirement >= req.count) break;
@@ -75,7 +75,7 @@ export function analyzeOrderAgainstBoard(
       };
       break;
     }
-  });
+  }
 
   const satisfiedCount = matchedCountByRequirement.reduce(
     (sum, count) => sum + count,
