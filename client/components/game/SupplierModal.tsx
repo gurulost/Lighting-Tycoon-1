@@ -114,7 +114,7 @@ export function SupplierModal({
     [state.upgradeMaterials],
   );
   const compatLabel = useMemo(
-    () => `Compatibility Components: ${state.compatibilityComponents}`,
+    () => `Interop Cores: ${state.compatibilityComponents}`,
     [state.compatibilityComponents],
   );
 
@@ -158,9 +158,9 @@ export function SupplierModal({
               </View>
               <View style={styles.resourcePill}>
                 <Feather
-                  name="shield"
+                  name="cpu"
                   size={12}
-                  color={GameColors.text.secondary}
+                  color={GameColors.currency.research}
                 />
                 <ThemedText style={styles.resourceText}>
                   {compatLabel}

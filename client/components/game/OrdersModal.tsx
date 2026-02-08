@@ -430,6 +430,11 @@ export function OrdersModal({
     canUseWarranty && state.cash >= warrantyCost && !warrantyAtCap;
   const canSelectWarrantyContract =
     canStartWarranty && state.baronContractOrdersRemaining > 0;
+  const compatibilityGuideStep = state.compatibilityGuideStep;
+  const isCompatGuideRequirementStep =
+    state.tutorialComplete && compatibilityGuideStep === 2;
+  const isCompatGuideFulfillStep =
+    state.tutorialComplete && compatibilityGuideStep === 3;
   const phase2GoalOrder = React.useMemo(
     () =>
       state.orders.find((order) => order.modifierIds?.includes("phase2_goal")),
@@ -752,6 +757,26 @@ export function OrdersModal({
           />
         ) : null}
 
+        {isCompatGuideRequirementStep ? (
+          <OnboardingCallout
+            speaker="mentor"
+            tone="info"
+            message={
+              "Guide 2/3: this highlighted order accepts Compatible (C) parts. Requirement chips call out where C is required or can substitute."
+            }
+          />
+        ) : null}
+
+        {isCompatGuideFulfillStep ? (
+          <OnboardingCallout
+            speaker="mentor"
+            tone="info"
+            message={
+              "Guide 3/3: fulfill the highlighted compatibility order now. Bonus on completion: +40 coins and +6 research."
+            }
+          />
+        ) : null}
+
         {showOrdersHint ? (
           <Pressable
             style={styles.helpBanner}
@@ -903,21 +928,41 @@ export function OrdersModal({
           </View>
 
           {state.orders.length > 0 ? (
-            ordersSummary.sorted.map((order, index) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onFulfill={() => handleFulfillOrder(order.id)}
-                onDismiss={() => handleDismissOrder(order.id)}
-                onSelect={() =>
-                  dispatch({ type: "HIGHLIGHT_ORDER", orderId: order.id })
-                }
-                selected={state.highlightedOrderId === order.id}
-                trimPhase={orderTrimPhase}
-                fulfillTestID={`order-fulfill-${index}`}
-                dismissible={isRefreshable(order)}
-              />
-            ))
+            ordersSummary.sorted.map((order, index) => {
+              const isGuideTrackedOrder =
+                compatibilityGuideStep > 0 &&
+                state.highlightedOrderId === order.id;
+              const guideSelectionLocked =
+                compatibilityGuideStep >= 2 &&
+                typeof state.highlightedOrderId === "string";
+              return (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onFulfill={() => handleFulfillOrder(order.id)}
+                  onDismiss={() => handleDismissOrder(order.id)}
+                  onSelect={
+                    guideSelectionLocked && !isGuideTrackedOrder
+                      ? undefined
+                      : () =>
+                          dispatch({
+                            type: "HIGHLIGHT_ORDER",
+                            orderId: order.id,
+                          })
+                  }
+                  selected={state.highlightedOrderId === order.id}
+                  trimPhase={orderTrimPhase}
+                  fulfillTestID={`order-fulfill-${index}`}
+                  dismissible={isRefreshable(order) && !isGuideTrackedOrder}
+                  compatibilityGuideHighlight={
+                    compatibilityGuideStep >= 2 && isGuideTrackedOrder
+                  }
+                  compatibilityGuideFulfillPrompt={
+                    compatibilityGuideStep === 3 && isGuideTrackedOrder
+                  }
+                />
+              );
+            })
           ) : (
             <Animated.View entering={emptyEnterAnim} style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>

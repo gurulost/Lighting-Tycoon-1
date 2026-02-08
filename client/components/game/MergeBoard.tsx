@@ -116,6 +116,7 @@ interface MergeBoardProps {
   layoutVersion?: number;
   boardContainerLayout?: LayoutRect | null;
   suppliersOpen?: boolean;
+  compatibilityGuideActive?: boolean;
 }
 
 function AnimatedStation({
@@ -226,6 +227,7 @@ export function MergeBoard({
   layoutVersion,
   boardContainerLayout,
   suppliersOpen = false,
+  compatibilityGuideActive = false,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
   const workbenchRef = useRef<View>(null);
@@ -1488,6 +1490,7 @@ export function MergeBoard({
                 dragLift={dragLift}
                 dragOffsetX={dragOffsetX}
                 dragOffsetY={dragOffsetY}
+                compatibilityGuideActive={compatibilityGuideActive}
               />
             </View>
           ) : (
@@ -1976,6 +1979,7 @@ export function MergeBoard({
                           dragLift={dragLift}
                           dragOffsetX={dragOffsetX}
                           dragOffsetY={dragOffsetY}
+                          compatibilityGuideActive={compatibilityGuideActive}
                         />
                       </View>
                     ) : (
@@ -2207,6 +2211,7 @@ export function MergeBoard({
             reducedMotion={reducedMotion}
             lightPhase={dragPreviewPhase}
             dragPreview
+            compatibilityGuideActive={compatibilityGuideActive}
           />
         </Animated.View>
       ) : null}

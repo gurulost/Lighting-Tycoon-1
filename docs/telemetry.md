@@ -87,6 +87,10 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `tutorial_complete`
 - `tutorial_skipped`
 - `tutorial_nudge`
+- `compat_glossary_open_after_order_spawn`
+- `compat_order_dismiss_before_first_fulfill`
+- `compat_time_to_first_fulfill`
+- `compat_guide_bonus_awarded`
 
 ### Core Loop
 
@@ -97,11 +101,13 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `order_fulfill`
 - `order_dismiss`
 - `order_refresh`
+- `order_refresh_blocked`
 - `recycle_used`
 - `backpack_used`
 - `board_full`
 - `board_pressure_band`
 - `overlay_wait_max`
+- `compat_fulfill_blocked_missing_c`
 
 ### Strategy
 

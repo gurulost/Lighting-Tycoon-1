@@ -353,6 +353,10 @@ export default function GameScreen() {
   const marketingBoostRef = useRef(state.marketingBoostOrdersRemaining);
   const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
+  const compatibilityGuideStepRef = useRef(-1);
+  const compatibilityGuideAdvanceTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const [momentLockActive, setMomentLockActive] = useState(false);
   const reputationTierRef = useRef(state.reputationTier);
   const canUndoNow =
@@ -413,6 +417,9 @@ export default function GameScreen() {
   }, [state.storyLog, state.storyLastViewedAt]);
   const tutorialSkipped =
     state.tutorialComplete && state.tutorialMetrics.skipped;
+  const compatibilityGuideOrdersLock =
+    state.tutorialComplete &&
+    (state.compatibilityGuideStep === 2 || state.compatibilityGuideStep === 3);
   const overlayDebugTop = useMemo(() => {
     if (overlayQueue.length === 0) return null;
     return overlayQueue.reduce((best, entry) => {
@@ -517,8 +524,19 @@ export default function GameScreen() {
       tutorialSkipDismissedRef.current = true;
       setShowTutorialGlossaryBeacon(false);
     }
+    if (
+      state.compatibleDiscoverySeen ||
+      typeof state.lastCompatibilityOrderSpawnedAt === "number"
+    ) {
+      dispatch({ type: "MARK_COMPAT_GLOSSARY_OPENED" });
+    }
     setActiveModal("glossary");
-  }, [tutorialSkipped]);
+  }, [
+    tutorialSkipped,
+    dispatch,
+    state.compatibleDiscoverySeen,
+    state.lastCompatibilityOrderSpawnedAt,
+  ]);
   const markProjectRevealSeen = useCallback(
     (projectId: string) => {
       const isOffered = state.projectOffers.some(
@@ -811,6 +829,10 @@ export default function GameScreen() {
         clearTimeout(momentLockTimeout.current);
         momentLockTimeout.current = null;
       }
+      if (compatibilityGuideAdvanceTimeoutRef.current) {
+        clearTimeout(compatibilityGuideAdvanceTimeoutRef.current);
+        compatibilityGuideAdvanceTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -884,6 +906,101 @@ export default function GameScreen() {
     tutorialSkipDismissedRef.current = true;
     setShowTutorialGlossaryBeacon(false);
   }, [activeModal, tutorialSkipped]);
+
+  useEffect(() => {
+    const previousStep = compatibilityGuideStepRef.current;
+    const nextStep = state.compatibilityGuideStep;
+    compatibilityGuideStepRef.current = nextStep;
+
+    if (!state.tutorialComplete) return;
+    if (nextStep === previousStep) return;
+
+    if (compatibilityGuideAdvanceTimeoutRef.current) {
+      clearTimeout(compatibilityGuideAdvanceTimeoutRef.current);
+      compatibilityGuideAdvanceTimeoutRef.current = null;
+    }
+
+    if (nextStep === 1) {
+      if (activeModal !== null) {
+        setActiveModal(null);
+      }
+      showToast(
+        "Compatibility guide 1/3: find the part with the C badge on your board.",
+        3200,
+      );
+      compatibilityGuideAdvanceTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: "ADVANCE_COMPATIBILITY_GUIDE" });
+        compatibilityGuideAdvanceTimeoutRef.current = null;
+      }, 1500);
+      return;
+    }
+
+    if (nextStep === 2) {
+      if (selectedPartIndex !== null) {
+        setSelectedPartIndex(null);
+      }
+      setActiveModal("orders");
+      showToast(
+        "Compatibility guide 2/3: requirement chips now show where Compatible (C) is accepted.",
+        3200,
+      );
+      compatibilityGuideAdvanceTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: "ADVANCE_COMPATIBILITY_GUIDE" });
+        compatibilityGuideAdvanceTimeoutRef.current = null;
+      }, 1800);
+      return;
+    }
+
+    if (nextStep === 3) {
+      if (selectedPartIndex !== null) {
+        setSelectedPartIndex(null);
+      }
+      setActiveModal("orders");
+      showToast(
+        "Compatibility guide 3/3: fulfill the highlighted order for a one-time bonus.",
+        3200,
+      );
+      return;
+    }
+
+    if (previousStep === 3 && nextStep === 0) {
+      showToast("Compatibility guide complete.", 2200);
+    }
+  }, [
+    activeModal,
+    dispatch,
+    selectedPartIndex,
+    showToast,
+    state.compatibilityGuideStep,
+    state.tutorialComplete,
+  ]);
+
+  useEffect(() => {
+    if (!state.tutorialComplete) return;
+    if (state.compatibilityGuideStep === 1 && activeModal !== null) {
+      setActiveModal(null);
+      return;
+    }
+    if (
+      (state.compatibilityGuideStep === 2 ||
+        state.compatibilityGuideStep === 3) &&
+      activeModal !== "orders"
+    ) {
+      setActiveModal("orders");
+    }
+    if (
+      (state.compatibilityGuideStep === 2 ||
+        state.compatibilityGuideStep === 3) &&
+      selectedPartIndex !== null
+    ) {
+      setSelectedPartIndex(null);
+    }
+  }, [
+    activeModal,
+    selectedPartIndex,
+    state.compatibilityGuideStep,
+    state.tutorialComplete,
+  ]);
 
   useEffect(() => {
     const sources = [
@@ -1572,6 +1689,7 @@ export default function GameScreen() {
                 ? "orders"
                 : null
           }
+          compatibilityGuideActive={state.compatibilityGuideStep === 1}
         />
       </View>
 
@@ -1696,6 +1814,9 @@ export default function GameScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
+          if (compatibilityGuideOrdersLock) {
+            return;
+          }
           if (state.tutorialComplete || state.tutorialStep !== 3) {
             closeModal();
           }
@@ -1703,7 +1824,10 @@ export default function GameScreen() {
       >
         <OrdersModal
           onClose={closeModal}
-          closeDisabled={!state.tutorialComplete && state.tutorialStep === 3}
+          closeDisabled={
+            (!state.tutorialComplete && state.tutorialStep === 3) ||
+            compatibilityGuideOrdersLock
+          }
           onOpenProjects={() => openProjectBoard()}
         />
       </Modal>
@@ -1816,7 +1940,7 @@ export default function GameScreen() {
       >
         <SettingsModal
           onClose={closeModal}
-          onOpenGlossary={() => setActiveModal("glossary")}
+          onOpenGlossary={openGlossary}
           debugOverlayEnabled={debugOverlayVisible}
           onToggleDebugOverlay={setDebugOverlayVisible}
         />

@@ -102,6 +102,7 @@ interface PartItemProps {
   dragOffsetX?: SharedValue<number>;
   dragOffsetY?: SharedValue<number>;
   lightPhase?: SharedValue<number>;
+  compatibilityGuideActive?: boolean;
 }
 
 export function PartItem({
@@ -121,12 +122,14 @@ export function PartItem({
   dragOffsetX,
   dragOffsetY,
   lightPhase,
+  compatibilityGuideActive = false,
 }: PartItemProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(reducedMotion || dragPreview ? 1 : 0);
   const zIndex = useSharedValue(0);
   const glowPulse = useSharedValue(0);
+  const compatPulse = useSharedValue(0);
   const spawnGlow = useSharedValue(reducedMotion || dragPreview ? 0 : 1);
   const hasSpawned = React.useRef(false);
 
@@ -203,6 +206,37 @@ export function PartItem({
       glowPulse.value = 0;
     };
   }, [reducedMotion, glowPulse]);
+
+  React.useEffect(() => {
+    if (
+      reducedMotion ||
+      dragPreview ||
+      !part.compatible ||
+      !compatibilityGuideActive
+    ) {
+      cancelAnimation(compatPulse);
+      compatPulse.value = 0;
+      return;
+    }
+    compatPulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 550 }),
+        withTiming(0, { duration: 550 }),
+      ),
+      -1,
+      true,
+    );
+    return () => {
+      cancelAnimation(compatPulse);
+      compatPulse.value = 0;
+    };
+  }, [
+    compatibilityGuideActive,
+    dragPreview,
+    part.compatible,
+    reducedMotion,
+    compatPulse,
+  ]);
 
   const handleDragStart = (absoluteX: number, absoluteY: number) => {
     onDragStart?.(absoluteX, absoluteY);
@@ -335,6 +369,21 @@ export function PartItem({
     };
   });
 
+  const compatibleGuideStyle = useAnimatedStyle(() => {
+    if (!compatibilityGuideActive || !part.compatible) {
+      return {
+        transform: [{ scale: 1 }],
+        shadowOpacity: 0,
+        shadowRadius: 0,
+      };
+    }
+    return {
+      transform: [{ scale: 1 + compatPulse.value * 0.18 }],
+      shadowOpacity: 0.35 + compatPulse.value * 0.55,
+      shadowRadius: 6 + compatPulse.value * 8,
+    };
+  });
+
   const sprite =
     part.family === "waste" ? null : PART_SPRITES[part.tier][part.family];
   const showPremiumLights = part.tier >= 5 && !isWaste;
@@ -457,14 +506,16 @@ export function PartItem({
       </View>
 
       {part.compatible && !isWaste ? (
-        <View
+        <Animated.View
           style={[
             styles.compatibleIndicator,
             { backgroundColor: GameColors.ui.success },
+            compatibilityGuideActive ? styles.compatibleIndicatorGuide : null,
+            compatibleGuideStyle,
           ]}
         >
           <ThemedText style={styles.compatibleText}>C</ThemedText>
-        </View>
+        </Animated.View>
       ) : null}
 
       <View style={[styles.glowRing, { borderColor: primaryColor }]} />
@@ -703,6 +754,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+  },
+  compatibleIndicatorGuide: {
+    borderWidth: 1,
+    borderColor: "#C8FFE3",
+    shadowColor: GameColors.ui.success,
   },
   compatibleText: {
     fontSize: 9,

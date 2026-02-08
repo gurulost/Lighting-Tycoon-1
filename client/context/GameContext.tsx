@@ -144,6 +144,8 @@ type GameAction =
   | { type: "CLEAR_RECYCLE_REWARD" }
   | { type: "CLEAR_MISSION_REWARD" }
   | { type: "SET_ORDERS_HELP_SEEN" }
+  | { type: "ADVANCE_COMPATIBILITY_GUIDE" }
+  | { type: "MARK_COMPAT_GLOSSARY_OPENED"; timestamp?: number }
   | { type: "FULFILL_ORDER"; orderId: string }
   | { type: "PURCHASE_UPGRADE"; upgradeId: string }
   | { type: "UNLOCK_RD_NODE"; nodeId: string }
@@ -2137,6 +2139,17 @@ function applyMissionProgress(
         }
         break;
       }
+      case "complete_locked_required_with_compatible": {
+        if (event.type === "fulfill_order") {
+          const usedCompatible = event.parts.some((part) => part.compatible);
+          const isLockedRequired = event.order.type === "locked_required";
+          const substitutionsAllowed = !event.order.noSubstitutions;
+          if (usedCompatible && isLockedRequired && substitutionsAllowed) {
+            nextProgress = Math.min(target, mission.progress + 1);
+          }
+        }
+        break;
+      }
       case "complete_order_compatible": {
         if (event.type === "fulfill_order") {
           const hasCompat = event.parts.some((part) => part.compatible);
@@ -2673,6 +2686,8 @@ const PLAYTEST_PHASE3_BASE_UPGRADE_MATERIALS = 20;
 const PLAYTEST_PHASE3_BASE_COMPATIBILITY_COMPONENTS = 10;
 const PLAYTEST_PHASE3_MIN_OPEN_WORKSHOP_LEVEL = 8;
 const PLAYTEST_PHASE3_MIN_MAX_TIER: PartTier = 13;
+const COMPAT_GUIDE_FULFILL_BONUS_CASH = 40;
+const COMPAT_GUIDE_FULFILL_BONUS_RESEARCH = 6;
 
 function buildLegacyCycleStartState(
   state: GameState,
@@ -3214,6 +3229,39 @@ function createPhase2GoalOrder(state: GameState): Order {
   });
 }
 
+function createCompatibilityGuideOrder(state: GameState): Order {
+  const targetTier = Math.max(3, Math.min(4, state.maxTierCrafted));
+  return withTunedRewards({
+    id: generateId(),
+    title: "Compatibility Walkthrough",
+    type: "compatibility_required",
+    requirements: [
+      {
+        tier: targetTier as PartTier,
+        family: "open",
+        requiresCompatible: true,
+        count: 1,
+      },
+    ],
+    rewards: { cash: 120, reputation: 22, research: 6 },
+    flavorText: "Use a Compatible (C) part to prove interoperability.",
+    modifierIds: ["compat_guide"],
+  });
+}
+
+function findCompatibleGuideOrderId(orders: Order[]): string | undefined {
+  const compatibilityOrder = orders.find(
+    (order) =>
+      order.type === "compatibility_required" ||
+      order.requirements.some((req) => req.requiresCompatible),
+  );
+  if (compatibilityOrder) return compatibilityOrder.id;
+  const substitutableLocked = orders.find(
+    (order) => order.type === "locked_required" && !order.noSubstitutions,
+  );
+  return substitutableLocked?.id;
+}
+
 function getRecycleReward(part: Part) {
   if (part.family === "waste") {
     const table: Record<
@@ -3470,16 +3518,43 @@ function selectPartsForOrder(
   order: Order,
   board: (Part | null)[],
 ): number[] | null {
+  return evaluateOrderFulfillment(order, board).indices;
+}
+
+type OrderFulfillmentShortfall = {
+  requirementIndex: number;
+  missing: number;
+  requirement: OrderRequirement;
+};
+
+type OrderFulfillmentAnalysis = {
+  indices: number[] | null;
+  matchedCountByRequirement: number[];
+  shortfall?: OrderFulfillmentShortfall;
+};
+
+function evaluateOrderFulfillment(
+  order: Order,
+  board: (Part | null)[],
+): OrderFulfillmentAnalysis {
   const used = new Set<number>();
   const selected: number[] = [];
-  const sortedRequirements = [...order.requirements].sort((a, b) => {
-    const familyScore =
-      (a.family === "any" ? 1 : 0) - (b.family === "any" ? 1 : 0);
-    if (familyScore !== 0) return familyScore;
-    return b.tier - a.tier;
-  });
+  const matchedCountByRequirement = Array(order.requirements.length).fill(0);
+  const sortedRequirements = order.requirements
+    .map((requirement, requirementIndex) => ({
+      requirement,
+      requirementIndex,
+    }))
+    .sort((a, b) => {
+      const familyScore =
+        (a.requirement.family === "any" ? 1 : 0) -
+        (b.requirement.family === "any" ? 1 : 0);
+      if (familyScore !== 0) return familyScore;
+      return b.requirement.tier - a.requirement.tier;
+    });
+  let shortfall: OrderFulfillmentShortfall | undefined;
 
-  for (const req of sortedRequirements) {
+  for (const { requirement: req, requirementIndex } of sortedRequirements) {
     const matches: number[] = [];
     for (let i = 0; i < board.length; i++) {
       const part = board[i];
@@ -3497,7 +3572,22 @@ function selectPartsForOrder(
       }
       matches.push(i);
     }
-    if (matches.length < req.count) return null;
+
+    const matchedCount = Math.min(req.count, matches.length);
+    matchedCountByRequirement[requirementIndex] = matchedCount;
+    if (matches.length < req.count) {
+      shortfall = {
+        requirementIndex,
+        missing: req.count - matches.length,
+        requirement: req,
+      };
+      return {
+        indices: null,
+        matchedCountByRequirement,
+        shortfall,
+      };
+    }
+
     for (let i = 0; i < req.count; i++) {
       const index = matches[i];
       used.add(index);
@@ -3505,7 +3595,11 @@ function selectPartsForOrder(
     }
   }
 
-  return selected;
+  return {
+    indices: selected,
+    matchedCountByRequirement,
+    shortfall,
+  };
 }
 
 function createTutorialOrder(): Order {
@@ -3765,6 +3859,12 @@ export function getInitialState(): GameState {
     lastLockedDiscoveryId: 0,
     compatibleDiscoverySeen: false,
     lastCompatibleDiscoveryId: 0,
+    compatibilityGuideStep: 0,
+    compatibilityGuideRewardGranted: false,
+    firstCompatibleDiscoveredAt: undefined,
+    firstCompatibleFulfilledAt: undefined,
+    lastCompatibilityOrderSpawnedAt: undefined,
+    lastCompatGlossaryOpenAt: undefined,
     lockoutActive: false,
     lockoutPhase: 0,
     lockoutOrderId: undefined,
@@ -5241,6 +5341,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           remaining: Math.max(0, state.mentorIndependenceMergesRemaining - 1),
         });
       }
+      const nextFirstCompatibleDiscoveredAt = sawCompatible
+        ? (state.firstCompatibleDiscoveredAt ?? Date.now())
+        : state.firstCompatibleDiscoveredAt;
+      const nextCompatibilityGuideStep =
+        sawCompatible &&
+        state.tutorialComplete &&
+        state.compatibilityGuideStep === 0 &&
+        !state.compatibilityGuideRewardGranted
+          ? 1
+          : state.compatibilityGuideStep;
 
       let nextState: GameState = {
         ...state,
@@ -5280,6 +5390,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastLockedDiscoveryId: nextLockedDiscoveryId,
         compatibleDiscoverySeen: nextCompatibleDiscoverySeen,
         lastCompatibleDiscoveryId: nextCompatibleDiscoveryId,
+        firstCompatibleDiscoveredAt: nextFirstCompatibleDiscoveredAt,
+        compatibilityGuideStep: nextCompatibilityGuideStep,
         maxTierCrafted: nextMaxTierCrafted,
         mentorClinicMergesRemaining: clinicActive
           ? Math.max(0, state.mentorClinicMergesRemaining - 1)
@@ -5720,6 +5832,89 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "ADVANCE_COMPATIBILITY_GUIDE": {
+      if (state.compatibilityGuideStep <= 0) return state;
+      if (state.compatibilityGuideStep === 1) {
+        let nextOrders = state.orders;
+        let nextOrderMetrics = state.orderMetrics;
+        let nextHighlightedOrderId = findCompatibleGuideOrderId(state.orders);
+
+        if (!nextHighlightedOrderId) {
+          const guideOrder = createCompatibilityGuideOrder(state);
+          const insertResult = insertStoryOrder(
+            state,
+            state.orders,
+            guideOrder,
+          );
+          if (insertResult.inserted) {
+            nextOrders = insertResult.orders;
+            nextOrderMetrics = updateOrderMetrics(state, guideOrder);
+            nextHighlightedOrderId =
+              insertResult.highlightedOrderId ?? guideOrder.id;
+          }
+        }
+
+        return {
+          ...state,
+          compatibilityGuideStep: 2,
+          orders: nextOrders,
+          orderMetrics: nextOrderMetrics,
+          highlightedOrderId:
+            nextHighlightedOrderId ?? state.highlightedOrderId,
+          undoSnapshot: undefined,
+        };
+      }
+
+      if (state.compatibilityGuideStep === 2) {
+        return {
+          ...state,
+          compatibilityGuideStep: 3,
+          undoSnapshot: undefined,
+        };
+      }
+
+      return {
+        ...state,
+        compatibilityGuideStep: 0,
+        undoSnapshot: undefined,
+      };
+    }
+
+    case "MARK_COMPAT_GLOSSARY_OPENED": {
+      const timestamp =
+        typeof action.timestamp === "number" ? action.timestamp : Date.now();
+      if (
+        typeof state.lastCompatGlossaryOpenAt === "number" &&
+        state.lastCompatGlossaryOpenAt >= timestamp
+      ) {
+        return state;
+      }
+      const glossaryOpenedSinceLastCompatSpawn =
+        typeof state.lastCompatGlossaryOpenAt === "number" &&
+        typeof state.lastCompatibilityOrderSpawnedAt === "number" &&
+        state.lastCompatGlossaryOpenAt >= state.lastCompatibilityOrderSpawnedAt;
+      if (
+        typeof state.lastCompatibilityOrderSpawnedAt === "number" &&
+        timestamp >= state.lastCompatibilityOrderSpawnedAt &&
+        !glossaryOpenedSinceLastCompatSpawn
+      ) {
+        captureEvent("compat_glossary_open_after_order_spawn", {
+          spawnedAt: state.lastCompatibilityOrderSpawnedAt,
+          openedAt: timestamp,
+          elapsedMs: Math.max(
+            0,
+            timestamp - state.lastCompatibilityOrderSpawnedAt,
+          ),
+          beforeFirstFulfill:
+            typeof state.firstCompatibleFulfilledAt !== "number",
+        });
+      }
+      return {
+        ...state,
+        lastCompatGlossaryOpenAt: timestamp,
+      };
+    }
+
     case "FULFILL_ORDER": {
       const { orderId } = action;
       const order = state.orders.find((o) => o.id === orderId);
@@ -5797,6 +5992,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let legacyUnlockedNow = false;
       let legacyCycleCompletedNow = false;
       let legacyBadgeGrantedId: string | null = null;
+      let nextCompatibilityGuideStep = state.compatibilityGuideStep;
+      let nextCompatibilityGuideRewardGranted =
+        state.compatibilityGuideRewardGranted;
+      let nextFirstCompatibleFulfilledAt = state.firstCompatibleFulfilledAt;
       const contractActive = state.baronContractOrdersRemaining > 0;
       const warrantyActive = state.warrantyStampOrdersRemaining > 0;
       const warrantyMode = warrantyActive ? state.warrantyStampMode : undefined;
@@ -5809,11 +6008,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const hasCompatiblePart = partsUsed.some((p) => p.compatible);
       const usingCompatibleForLockedRequired =
         order.type === "locked_required" && hasCompatiblePart;
+      const usedCompatibleForLockedSubstitution =
+        order.type === "locked_required" &&
+        hasCompatiblePart &&
+        !order.noSubstitutions;
       const openOnly =
         hasOpenPart && !hasLockedPart && !usingCompatibleForLockedRequired;
       const isCompatOrder =
         order.type === "compatibility_required" ||
         order.requirements.some((req) => req.requiresCompatible);
+      const compatGuideFulfillQualifies =
+        hasCompatiblePart &&
+        (isCompatOrder || usedCompatibleForLockedSubstitution);
       const isEcoAuditInstall = !!order.ecoAuditBonusResearch && !hasLockedPart;
       const isRushOrder = Boolean(
         order.rushDeadline ||
@@ -6090,6 +6296,37 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             ? { ...nextProjectDebuff, remainingOrders: remaining }
             : undefined;
       }
+
+      const nowMs = Date.now();
+      if (!nextFirstCompatibleFulfilledAt && compatGuideFulfillQualifies) {
+        nextFirstCompatibleFulfilledAt = nowMs;
+        if (typeof state.firstCompatibleDiscoveredAt === "number") {
+          captureEvent("compat_time_to_first_fulfill", {
+            elapsedMs: Math.max(0, nowMs - state.firstCompatibleDiscoveredAt),
+            discoveredAt: state.firstCompatibleDiscoveredAt,
+            fulfilledAt: nowMs,
+            viaOrderType: order.type,
+          });
+        }
+      }
+
+      if (
+        state.compatibilityGuideStep >= 2 &&
+        !state.compatibilityGuideRewardGranted &&
+        compatGuideFulfillQualifies
+      ) {
+        cashReward += COMPAT_GUIDE_FULFILL_BONUS_CASH;
+        researchReward += COMPAT_GUIDE_FULFILL_BONUS_RESEARCH;
+        nextCompatibilityGuideRewardGranted = true;
+        nextCompatibilityGuideStep = 0;
+        captureEvent("compat_guide_bonus_awarded", {
+          cashBonus: COMPAT_GUIDE_FULFILL_BONUS_CASH,
+          researchBonus: COMPAT_GUIDE_FULFILL_BONUS_RESEARCH,
+          viaOrderType: order.type,
+          usedCompatible: hasCompatiblePart,
+        });
+      }
+
       const firstSessionActive =
         state.tutorialComplete && !state.firstSessionComplete;
       const baronGate =
@@ -7146,6 +7383,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rdNodes: nextRdNodes,
         upgradeMaterials: nextUpgradeMaterials,
         compatibilityComponents: nextCompatibilityComponents,
+        compatibilityGuideStep: nextCompatibilityGuideStep,
+        compatibilityGuideRewardGranted: nextCompatibilityGuideRewardGranted,
+        firstCompatibleFulfilledAt: nextFirstCompatibleFulfilledAt,
         cash: state.cash + cashReward,
         reputation: state.reputation + repReward,
         research: state.research + researchReward,
@@ -7772,6 +8012,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const newBoard = [...state.board];
       newBoard[partIndex] = { ...part, family: "open", compatible: true };
       const sawCompatible = !state.compatibleDiscoverySeen;
+      const firstCompatibleDiscoveredAt = sawCompatible
+        ? Date.now()
+        : state.firstCompatibleDiscoveredAt;
       const allowLockout = state.firstSessionComplete;
       const dependencyOutcome = applyDependency(
         state,
@@ -7797,6 +8040,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastCompatibleDiscoveryId: sawCompatible
           ? state.lastCompatibleDiscoveryId + 1
           : state.lastCompatibleDiscoveryId,
+        firstCompatibleDiscoveredAt,
+        compatibilityGuideStep:
+          sawCompatible &&
+          state.tutorialComplete &&
+          state.compatibilityGuideStep === 0 &&
+          !state.compatibilityGuideRewardGranted
+            ? 1
+            : state.compatibilityGuideStep,
         undoSnapshot: undefined,
         lastCriticalEventId: state.lastCriticalEventId + 1,
       };
@@ -7827,6 +8078,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         orderType: order.type,
         modifiers: order.modifierIds || [],
       });
+      if (
+        (order.type === "compatibility_required" ||
+          order.requirements.some(
+            (requirement) => requirement.requiresCompatible,
+          )) &&
+        typeof state.firstCompatibleFulfilledAt !== "number"
+      ) {
+        captureEvent("compat_order_dismiss_before_first_fulfill", {
+          orderType: order.type,
+          modifiers: order.modifierIds || [],
+          guideStep: state.compatibilityGuideStep,
+          compatibleDiscoverySeen: state.compatibleDiscoverySeen,
+        });
+      }
       return {
         ...state,
         orders: state.orders.filter((o) => o.id !== action.orderId),
@@ -7861,10 +8126,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         (o) => o.id !== action.orderId,
       );
       const rdUnlocked = state.upgrades["rd_unlock"] >= 1;
-      const compatibilityUnlocked =
-        state.compatibleDiscoverySeen ||
-        state.rdNodes["freedom_build"] ||
-        state.freedomControllerCount > 0;
+      const compatibilityUnlocked = state.compatibleDiscoverySeen;
       const councilPerks = getCouncilPerkEffects(state);
       const councilHearing = getCouncilHearingPenalty(state);
       const compatOrderWeightMultiplier =
@@ -7930,6 +8192,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         orders: [...remainingOrders, newOrder],
         orderMetrics: updateOrderMetrics(state, newOrder),
         marketingBoostOrdersRemaining: nextMarketingBoostOrdersRemaining,
+        lastCompatibilityOrderSpawnedAt:
+          newOrder.type === "compatibility_required"
+            ? Date.now()
+            : state.lastCompatibilityOrderSpawnedAt,
         installStreakCurrent: 0,
         council: {
           ...state.council,
@@ -9795,6 +10061,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               highlightedOrderId: insertResult.highlightedOrderId,
               orderMetrics: updateOrderMetrics(workingState, phase2Order),
               phase2GoalPending: false,
+              lastCompatibilityOrderSpawnedAt:
+                phase2Order.type === "compatibility_required"
+                  ? Date.now()
+                  : workingState.lastCompatibilityOrderSpawnedAt,
             };
             nextState = queueStoryBeat(nextState, "phase2_goal");
             nextState = queueStoryBeat(nextState, "tina_compat_order");
@@ -9960,10 +10230,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         pressureBand === "yellow" ? tuning.orderSpawn.yellowMultiplier : 1;
 
       const rdUnlocked = workingState.upgrades["rd_unlock"] >= 1;
-      const compatibilityUnlocked =
-        workingState.compatibleDiscoverySeen ||
-        workingState.rdNodes["freedom_build"] ||
-        workingState.freedomControllerCount > 0;
+      const compatibilityUnlocked = workingState.compatibleDiscoverySeen;
       const councilPerks = getCouncilPerkEffects(workingState);
       const councilHearing = getCouncilHearingPenalty(workingState);
       const activeSiteRule = getActiveSiteRule(workingState);
@@ -10010,6 +10277,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         orders: [...workingState.orders, newOrder],
         orderMetrics: updateOrderMetrics(workingState, newOrder),
         marketingBoostOrdersRemaining: nextMarketingBoostOrdersRemaining,
+        lastCompatibilityOrderSpawnedAt:
+          newOrder.type === "compatibility_required"
+            ? now
+            : workingState.lastCompatibilityOrderSpawnedAt,
         orderSpawnCooldownUntil:
           now +
           Math.round(
@@ -10402,6 +10673,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         },
         upgradeMaterials: 0,
         compatibilityComponents: 0,
+        compatibilityGuideStep: 0,
+        compatibilityGuideRewardGranted: false,
+        firstCompatibleDiscoveredAt: undefined,
+        firstCompatibleFulfilledAt: undefined,
+        lastCompatibilityOrderSpawnedAt: undefined,
+        lastCompatGlossaryOpenAt: undefined,
         orderSpawnCooldownUntil: 0,
         tier5ShowcaseSeen: false,
         tier5ShowcasePending: false,
@@ -11148,6 +11425,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         compatibleSeen && !state.compatibleDiscoverySeen
           ? state.lastCompatibleDiscoveryId + 1
           : state.lastCompatibleDiscoveryId;
+      const nextFirstCompatibleDiscoveredAt = compatibleSeen
+        ? (state.firstCompatibleDiscoveredAt ?? now)
+        : state.firstCompatibleDiscoveredAt;
+      const nextCompatibilityGuideStep =
+        compatibleSeen &&
+        !state.compatibilityGuideRewardGranted &&
+        state.compatibilityGuideStep === 0
+          ? 1
+          : state.compatibilityGuideStep;
 
       const unlockedSlot27 = state.unlockedSlots.includes(27)
         ? state.unlockedSlots
@@ -11207,6 +11493,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastTierDiscovered: nextLastTierDiscovered,
         compatibleDiscoverySeen: compatibleSeen,
         lastCompatibleDiscoveryId: nextCompatibleDiscoveryId,
+        firstCompatibleDiscoveredAt: nextFirstCompatibleDiscoveredAt,
+        compatibilityGuideStep: nextCompatibilityGuideStep,
         tutorialStep: FINAL_TUTORIAL_STEP,
         tutorialComplete: true,
         tutorialReplay: true,
@@ -11418,6 +11706,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const phase3Missions = workingState.missions.filter(
         (mission) => mission.templateId !== TUTORIAL_GOAL_TEMPLATE_ID,
       );
+      const nextFirstCompatibleDiscoveredAt =
+        workingState.compatibleDiscoverySeen
+          ? (workingState.firstCompatibleDiscoveredAt ?? now)
+          : workingState.firstCompatibleDiscoveredAt;
+      const nextCompatibilityGuideStep =
+        workingState.compatibleDiscoverySeen &&
+        !workingState.compatibilityGuideRewardGranted &&
+        workingState.compatibilityGuideStep === 0
+          ? 1
+          : workingState.compatibilityGuideStep;
 
       let nextState: GameState = {
         ...workingState,
@@ -11466,6 +11764,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         maxTierCrafted: nextMaxTierCrafted,
         tierDiscovery: nextTierDiscovery,
         lastTierDiscovered: nextLastTierDiscovered,
+        firstCompatibleDiscoveredAt: nextFirstCompatibleDiscoveredAt,
+        compatibilityGuideStep: nextCompatibilityGuideStep,
         gamePhase: 3,
         liberationComplete: true,
         liberationCompletedAt:
@@ -12232,6 +12532,53 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             base.lastCompatibleDiscoveryId + 1,
           )
         : lastCompatibleDiscoveryId;
+      const rawCompatibilityGuideRewardGranted =
+        typeof action.state.compatibilityGuideRewardGranted === "boolean"
+          ? action.state.compatibilityGuideRewardGranted
+          : base.compatibilityGuideRewardGranted;
+      const rawCompatibilityGuideStep =
+        typeof action.state.compatibilityGuideStep === "number" &&
+        Number.isFinite(action.state.compatibilityGuideStep)
+          ? Math.max(
+              0,
+              Math.min(3, Math.floor(action.state.compatibilityGuideStep)),
+            )
+          : base.compatibilityGuideStep;
+      const rawFirstCompatibleDiscoveredAt =
+        typeof action.state.firstCompatibleDiscoveredAt === "number" &&
+        Number.isFinite(action.state.firstCompatibleDiscoveredAt)
+          ? Math.max(0, Math.floor(action.state.firstCompatibleDiscoveredAt))
+          : undefined;
+      const rawFirstCompatibleFulfilledAt =
+        typeof action.state.firstCompatibleFulfilledAt === "number" &&
+        Number.isFinite(action.state.firstCompatibleFulfilledAt)
+          ? Math.max(0, Math.floor(action.state.firstCompatibleFulfilledAt))
+          : undefined;
+      const normalizedFirstCompatibleDiscoveredAt = resolvedCompatibleSeen
+        ? (rawFirstCompatibleDiscoveredAt ?? rawFirstCompatibleFulfilledAt)
+        : undefined;
+      const normalizedFirstCompatibleFulfilledAt =
+        rawFirstCompatibleFulfilledAt;
+      const compatibilityGuideRewardGranted =
+        rawCompatibilityGuideRewardGranted ||
+        typeof normalizedFirstCompatibleFulfilledAt === "number";
+      const compatibilityGuideStep =
+        !resolvedCompatibleSeen || compatibilityGuideRewardGranted
+          ? 0
+          : rawCompatibilityGuideStep;
+      const lastCompatibilityOrderSpawnedAt =
+        typeof action.state.lastCompatibilityOrderSpawnedAt === "number" &&
+        Number.isFinite(action.state.lastCompatibilityOrderSpawnedAt)
+          ? Math.max(
+              0,
+              Math.floor(action.state.lastCompatibilityOrderSpawnedAt),
+            )
+          : base.lastCompatibilityOrderSpawnedAt;
+      const lastCompatGlossaryOpenAt =
+        typeof action.state.lastCompatGlossaryOpenAt === "number" &&
+        Number.isFinite(action.state.lastCompatGlossaryOpenAt)
+          ? Math.max(0, Math.floor(action.state.lastCompatGlossaryOpenAt))
+          : base.lastCompatGlossaryOpenAt;
       const freedomControllerCount =
         typeof action.state.freedomControllerCount === "number" &&
         Number.isFinite(action.state.freedomControllerCount)
@@ -12550,6 +12897,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastLockedDiscoveryId,
         compatibleDiscoverySeen: resolvedCompatibleSeen,
         lastCompatibleDiscoveryId: resolvedCompatibleId,
+        compatibilityGuideStep,
+        compatibilityGuideRewardGranted,
+        firstCompatibleDiscoveredAt: normalizedFirstCompatibleDiscoveredAt,
+        firstCompatibleFulfilledAt: normalizedFirstCompatibleFulfilledAt,
+        lastCompatibilityOrderSpawnedAt,
+        lastCompatGlossaryOpenAt,
         maxTierCrafted,
         marketingBoostOrdersRemaining,
         ordersHelpNudgeSeen,
@@ -12905,6 +13258,7 @@ interface GameContextValue {
   setLegacyTitle: (titleId?: string) => void;
   canMerge: (fromIndex: number, toIndex: number) => boolean;
   getFulfillmentIndices: (order: Order) => number[] | null;
+  getFulfillmentAnalysis: (order: Order) => OrderFulfillmentAnalysis;
   undoLastMove: () => void;
   canUndo: boolean;
 }
@@ -14206,6 +14560,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [state.board],
   );
 
+  const getFulfillmentAnalysis = useCallback(
+    (order: Order): OrderFulfillmentAnalysis =>
+      evaluateOrderFulfillment(order, state.board),
+    [state.board],
+  );
+
   return (
     <GameContext.Provider
       value={{
@@ -14228,6 +14588,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setLegacyTitle,
         canMerge,
         getFulfillmentIndices,
+        getFulfillmentAnalysis,
         undoLastMove,
         canUndo,
       }}

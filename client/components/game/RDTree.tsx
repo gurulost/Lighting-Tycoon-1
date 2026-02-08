@@ -105,7 +105,7 @@ function RDNodeCard({
   const costLabelParts = [`${costs.research} Research`];
   if (costs.materials > 0) costLabelParts.push(`${costs.materials} Materials`);
   if (costs.compatibility > 0)
-    costLabelParts.push(`${costs.compatibility} Compat`);
+    costLabelParts.push(`${costs.compatibility} Interop Cores`);
 
   return (
     <Animated.View
@@ -303,11 +303,11 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           <ThemedText style={styles.materialLabel}>Materials</ThemedText>
         </View>
         <View style={styles.materialDisplay}>
-          <Feather name="shield" size={18} color={GameColors.text.secondary} />
+          <Feather name="cpu" size={18} color={GameColors.currency.research} />
           <ThemedText style={styles.materialValue}>
             {state.compatibilityComponents}
           </ThemedText>
-          <ThemedText style={styles.materialLabel}>Compat</ThemedText>
+          <ThemedText style={styles.materialLabel}>Interop Cores</ThemedText>
         </View>
       </View>
 

@@ -261,7 +261,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Open Workshop",
         summary: "Open-standard supply.",
         detail:
-          "Unlocked via R&D; scales with upgrades; can drop materials and compatibility components. Overdraws cost research.",
+          "Unlocked via R&D; scales with upgrades; can drop materials and Interop Cores. Overdraws cost research.",
         icon: "tool",
         color: GameColors.openStandard.primary,
       },
@@ -387,7 +387,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "order-type-compat",
         title: "Compatibility Orders",
         summary: "Require compatible open parts.",
-        detail: "Unlocked after Freedom tech is available.",
+        detail:
+          "Compatible (C) parts are open parts that can fulfill compatibility jobs and can substitute for locked-required jobs when substitutions are allowed.",
         icon: "shield",
         color: GameColors.ui.success,
       },
@@ -550,7 +551,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Compatible Parts",
         summary: "Open parts marked with C.",
         detail:
-          "Used for compatibility orders; some locked orders accept them.",
+          "Compatible (C) parts are open parts that can fulfill compatibility jobs and can substitute for locked-required jobs when substitutions are allowed.",
         icon: "shield",
         color: GameColors.ui.success,
       },
@@ -558,7 +559,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "compatibility-orders",
         title: "Compatibility Orders",
         summary: "Orders that require compatible open parts.",
-        detail: "Unlocked after Freedom tech is available.",
+        detail:
+          "Built around Compatible (C) requirements. Highest-tier requirement usually demands a C-marked open part.",
         icon: "check-circle",
         color: GameColors.ui.success,
       },
@@ -603,11 +605,12 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
       },
       {
         id: "currency-compat",
-        title: "Compatibility Components",
-        summary: "Used for Open Workshop IV/V upgrades.",
-        detail: "Rare Open Workshop bonus drop.",
-        icon: "shield",
-        color: GameColors.ui.success,
+        title: "Interop Cores",
+        summary: "Used for Open Workshop IV-VIII upgrades.",
+        detail:
+          "Rare Open Workshop bonus drop spent on higher-tier Open Workshop R&D nodes.",
+        icon: "cpu",
+        color: GameColors.currency.research,
       },
     ],
   },
@@ -778,7 +781,8 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         id: "badge-compatible",
         title: "Compatible",
         summary: "Requires compatible open parts.",
-        detail: "Parts must be marked with C.",
+        detail:
+          "Compatible (C) parts are open parts that can fulfill compatibility jobs and can substitute for locked-required jobs when substitutions are allowed.",
         icon: "shield",
         color: GameColors.ui.success,
       },

@@ -120,6 +120,7 @@ export type MissionType =
   | "complete_order"
   | "complete_order_no_locked"
   | "complete_order_with_locked"
+  | "complete_locked_required_with_compatible"
   | "complete_order_compatible"
   | "reach_tier"
   | "fulfill_tier5_order"
@@ -474,6 +475,12 @@ export interface GameState {
   lastLockedDiscoveryId: number;
   compatibleDiscoverySeen: boolean;
   lastCompatibleDiscoveryId: number;
+  compatibilityGuideStep: number;
+  compatibilityGuideRewardGranted: boolean;
+  firstCompatibleDiscoveredAt?: number;
+  firstCompatibleFulfilledAt?: number;
+  lastCompatibilityOrderSpawnedAt?: number;
+  lastCompatGlossaryOpenAt?: number;
 
   lockoutActive: boolean;
   lockoutPhase: number;

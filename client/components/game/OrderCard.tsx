@@ -19,10 +19,11 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { AvatarImage } from "@/components/game/AvatarImage";
-import { Order, Part, TIER_NAMES, PartTier } from "@/types/game";
+import { Order, TIER_NAMES, PartTier } from "@/types/game";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
+import { captureEvent } from "@/lib/telemetry";
 import { withRepeat } from "@/lib/reanimated";
 import { getPortraitSource } from "@/constants/characters";
 import {
@@ -40,6 +41,8 @@ interface OrderCardProps {
   onSelect?: () => void;
   trimPhase?: SharedValue<number>;
   fulfillTestID?: string;
+  compatibilityGuideHighlight?: boolean;
+  compatibilityGuideFulfillPrompt?: boolean;
 }
 
 const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
@@ -70,8 +73,10 @@ export function OrderCard({
   onSelect,
   trimPhase,
   fulfillTestID,
+  compatibilityGuideHighlight = false,
+  compatibilityGuideFulfillPrompt = false,
 }: OrderCardProps) {
-  const { state, getFulfillmentIndices } = useGame();
+  const { state, getFulfillmentIndices, getFulfillmentAnalysis } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const reducedMotion = state.settings.reducedMotion;
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -84,56 +89,13 @@ export function OrderCard({
   );
   const canFulfill = fulfillmentIndices !== null && !rushExpired;
 
-  const isPartValidForRequirement = (
-    part: Part,
-    req: {
-      tier: PartTier;
-      family: "open" | "locked" | "any";
-      requiresCompatible?: boolean;
-    },
-  ) => {
-    if (part.family === "waste") return false;
-    if (part.tier !== req.tier) return false;
-    if (req.requiresCompatible && !part.compatible) return false;
-    if (req.family === "any") return true;
-    if (part.family === req.family) return true;
-    if (
-      req.family === "locked" &&
-      order.type === "locked_required" &&
-      part.compatible &&
-      !order.noSubstitutions
-    )
-      return true;
-    return false;
-  };
-
+  const fulfillmentAnalysis = getFulfillmentAnalysis(order);
+  const matchedCountByRequirement =
+    fulfillmentAnalysis.matchedCountByRequirement;
   const totalRequired = order.requirements.reduce(
     (sum, req) => sum + req.count,
     0,
   );
-  // Mirror reducer allocation order so progress and requirement checks match fulfillability.
-  const sortedRequirementEntries = order.requirements
-    .map((req, requirementIndex) => ({ req, requirementIndex }))
-    .sort((a, b) => {
-      const familyScore =
-        (a.req.family === "any" ? 1 : 0) - (b.req.family === "any" ? 1 : 0);
-      if (familyScore !== 0) return familyScore;
-      return b.req.tier - a.req.tier;
-    });
-  const matchedCountByRequirement = Array(order.requirements.length).fill(0);
-  const usedProgressIndices = new Set<number>();
-  sortedRequirementEntries.forEach(({ req, requirementIndex }) => {
-    let matchedForRequirement = 0;
-    for (let i = 0; i < state.board.length; i += 1) {
-      if (matchedForRequirement >= req.count) break;
-      const part = state.board[i];
-      if (!part || usedProgressIndices.has(i)) continue;
-      if (!isPartValidForRequirement(part, req)) continue;
-      usedProgressIndices.add(i);
-      matchedForRequirement += 1;
-    }
-    matchedCountByRequirement[requirementIndex] = matchedForRequirement;
-  });
   const satisfied = matchedCountByRequirement.reduce(
     (sum, count) => sum + count,
     0,
@@ -335,6 +297,40 @@ export function OrderCard({
     timeRemaining !== null && order.rushDeadline
       ? Math.floor((1 + (timeRemaining / order.rushDeadline) * 0.5) * 100 - 100)
       : 0;
+  const blockReasonText = rushExpired
+    ? "Rush expired"
+    : (() => {
+        const shortfall = fulfillmentAnalysis.shortfall;
+        if (!shortfall) return "Missing parts";
+        const { requirement, missing } = shortfall;
+        if (requirement.requiresCompatible) {
+          return `Need ${missing} more Tier ${requirement.tier} Compatible (C) part${
+            missing === 1 ? "" : "s"
+          }.`;
+        }
+        if (
+          requirement.family === "locked" &&
+          order.type === "locked_required" &&
+          !order.noSubstitutions
+        ) {
+          return `Need ${missing} more Tier ${requirement.tier} Locked or Compatible (C) part${
+            missing === 1 ? "" : "s"
+          }.`;
+        }
+        if (requirement.family === "open") {
+          return `Need ${missing} more Tier ${requirement.tier} Open part${
+            missing === 1 ? "" : "s"
+          }.`;
+        }
+        if (requirement.family === "locked") {
+          return `Need ${missing} more Tier ${requirement.tier} Locked part${
+            missing === 1 ? "" : "s"
+          }.`;
+        }
+        return `Need ${missing} more Tier ${requirement.tier} part${
+          missing === 1 ? "" : "s"
+        }.`;
+      })();
 
   const projectStageMeta = (() => {
     const tag = order.modifierIds?.find((id) => id.startsWith("project:"));
@@ -585,6 +581,7 @@ export function OrderCard({
           styles.container,
           glowStyle,
           selected && styles.containerSelected,
+          compatibilityGuideHighlight && styles.containerGuide,
           {
             shadowColor: canFulfill ? GameColors.ui.success : typeColor,
             borderColor: `${selectionColor}60`,
@@ -721,9 +718,20 @@ export function OrderCard({
                     ? GameColors.locked.primary
                     : GameColors.text.secondary;
 
-              const showFamily = selected && req.family !== "any";
-              const showCompat = selected && req.requiresCompatible;
+              const showFamily = req.family !== "any";
+              const showCompat = req.requiresCompatible && req.family === "any";
               const compatColor = GameColors.ui.success;
+              const supportsCompatibleSubstitution =
+                req.family === "locked" &&
+                order.type === "locked_required" &&
+                !order.noSubstitutions;
+              const familyLabel = req.requiresCompatible
+                ? "Compatible (C) required"
+                : req.family === "open"
+                  ? "Open"
+                  : supportsCompatibleSubstitution
+                    ? "Locked or Compatible (C)"
+                    : "Locked";
 
               return (
                 <View
@@ -760,16 +768,16 @@ export function OrderCard({
                       style={[
                         styles.reqFamilyPill,
                         { borderColor: `${familyColor}50` },
+                        (selected || compatibilityGuideHighlight) &&
+                        supportsCompatibleSubstitution
+                          ? styles.reqFamilyPillGuide
+                          : null,
                       ]}
                     >
                       <ThemedText
                         style={[styles.reqFamilyText, { color: familyColor }]}
                       >
-                        {req.family === "open"
-                          ? "Open"
-                          : order.type === "locked_required"
-                            ? "Locked/Compat"
-                            : "Locked"}
+                        {familyLabel}
                       </ThemedText>
                     </View>
                   ) : null}
@@ -778,12 +786,15 @@ export function OrderCard({
                       style={[
                         styles.reqFamilyPill,
                         { borderColor: `${compatColor}50` },
+                        selected || compatibilityGuideHighlight
+                          ? styles.reqFamilyPillGuide
+                          : null,
                       ]}
                     >
                       <ThemedText
                         style={[styles.reqFamilyText, { color: compatColor }]}
                       >
-                        Compat
+                        Compatible (C)
                       </ThemedText>
                     </View>
                   ) : null}
@@ -883,6 +894,16 @@ export function OrderCard({
                 }
                 onFulfill();
               } else {
+                const shortfall = fulfillmentAnalysis.shortfall;
+                if (shortfall?.requirement.requiresCompatible) {
+                  captureEvent("compat_fulfill_blocked_missing_c", {
+                    orderType: order.type,
+                    missing: shortfall.missing,
+                    tier: shortfall.requirement.tier,
+                    requirementIndex: shortfall.requirementIndex,
+                    noSubstitutions: !!order.noSubstitutions,
+                  });
+                }
                 SoundManager.play("error");
                 if (hapticsEnabled) {
                   Haptics.notificationAsync(
@@ -906,6 +927,7 @@ export function OrderCard({
                 styles.fulfillButton,
                 { opacity: canFulfill ? 1 : 0.55 },
                 canFulfill && styles.fulfillButtonActive,
+                compatibilityGuideFulfillPrompt && styles.fulfillButtonGuide,
               ]}
             >
               {canFulfill ? <View style={styles.readyDot} /> : null}
@@ -925,8 +947,11 @@ export function OrderCard({
             </LinearGradient>
           </Pressable>
           {!canFulfill ? (
-            <ThemedText style={styles.ctaHint}>
-              {rushExpired ? "Rush expired" : "Missing parts"}
+            <ThemedText style={styles.ctaHint}>{blockReasonText}</ThemedText>
+          ) : null}
+          {compatibilityGuideFulfillPrompt ? (
+            <ThemedText style={styles.guideHint}>
+              Guide bonus on complete: +40 coins and +6 research.
             </ThemedText>
           ) : null}
         </LinearGradient>
@@ -946,6 +971,10 @@ const styles = StyleSheet.create({
   },
   containerSelected: {
     borderWidth: 1.5,
+  },
+  containerGuide: {
+    borderWidth: 2,
+    shadowColor: GameColors.ui.primary,
   },
   gradient: {
     padding: Spacing.lg,
@@ -1087,6 +1116,9 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     borderWidth: 1,
   },
+  reqFamilyPillGuide: {
+    backgroundColor: `${GameColors.ui.primary}12`,
+  },
   reqFamilyText: {
     fontSize: 10,
     fontWeight: "700",
@@ -1153,6 +1185,10 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
+  fulfillButtonGuide: {
+    borderWidth: 2,
+    borderColor: "#A7E8FF",
+  },
   readyDot: {
     width: 8,
     height: 8,
@@ -1168,5 +1204,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.disabled,
     textAlign: "center",
+  },
+  guideHint: {
+    marginTop: Spacing.xs,
+    fontSize: 11,
+    color: GameColors.ui.primary,
+    textAlign: "center",
+    fontWeight: "700",
   },
 });

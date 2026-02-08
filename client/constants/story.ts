@@ -97,8 +97,8 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   tina_compat_component: {
     id: "tina_compat_component",
     speaker: "tina",
-    line1: "Compatibility components.",
-    line2: "Save these for compatibility jobs.",
+    line1: "Interop Cores.",
+    line2: "Spend these on high-tier Open Workshop R&D.",
     onceOnly: true,
     portrait: "focused",
     category: "inner_monologue",
@@ -116,7 +116,7 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
     id: "tina_compat_order",
     speaker: "tina",
     line1:
-      "Compatibility jobs need compatible parts. I should save those components.",
+      "Compatible (C) parts handle compatibility jobs. Interop Cores are for R&D.",
     onceOnly: true,
     portrait: "focused",
     category: "inner_monologue",
@@ -788,8 +788,10 @@ export const STORY_BEATS: Record<string, StoryBeat> = {
   discover_compatible: {
     id: "discover_compatible",
     speaker: "rd",
-    line1: "Compatible kits unlock special compatibility installs.",
-    line2: "Still open. Still flexible.",
+    line1:
+      "Compatible (C) parts are open parts that fulfill compatibility jobs.",
+    line2:
+      "They can also substitute for locked-required jobs when substitutions are allowed.",
     onceOnly: true,
     category: "discovery",
     priority: "high",

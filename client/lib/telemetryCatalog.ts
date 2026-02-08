@@ -147,6 +147,34 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "Freedom Controller crafted.",
     requiredProperties: ["count"],
   },
+  compat_fulfill_blocked_missing_c: {
+    category: "core_loop",
+    description: "Fulfill attempt failed due to missing Compatible (C) parts.",
+    requiredProperties: ["orderType", "missing", "tier", "requirementIndex"],
+  },
+  compat_glossary_open_after_order_spawn: {
+    category: "tutorial",
+    description:
+      "Glossary opened after a compatibility order spawned (confusion indicator).",
+    requiredProperties: ["spawnedAt", "openedAt", "elapsedMs"],
+  },
+  compat_guide_bonus_awarded: {
+    category: "tutorial",
+    description: "Compatibility guide fulfill bonus granted.",
+    requiredProperties: ["cashBonus", "researchBonus", "viaOrderType"],
+  },
+  compat_order_dismiss_before_first_fulfill: {
+    category: "tutorial",
+    description:
+      "A compatibility-related order was dismissed before first compatible fulfill.",
+    requiredProperties: ["orderType"],
+  },
+  compat_time_to_first_fulfill: {
+    category: "tutorial",
+    description:
+      "Elapsed time from first compatible discovery to first compatible fulfill.",
+    requiredProperties: ["elapsedMs", "discoveredAt", "fulfilledAt"],
+  },
   dependency_change: {
     category: "strategy",
     description: "Dependency value changed.",
