@@ -1371,6 +1371,8 @@ const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
 };
 const SAVE_DEBOUNCE_MS = 1200;
 const SAVE_MAX_WAIT_MS = 12000;
+const CRITICAL_SAVE_MIN_INTERVAL_MS = 2500;
+const CRITICAL_SAVE_FALLBACK_DELAY_MS = 400;
 const PHASE_MAX_PART_TIER: Record<GameState["gamePhase"], PartTier> = {
   1: 10,
   2: 13,
@@ -13372,8 +13374,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const supplierTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tutorialNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const criticalSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const saveRequestedRef = useRef(false);
+  const saveInFlightRef = useRef(false);
   const lastSaveAtRef = useRef(0);
+  const lastCriticalSaveAtRef = useRef(0);
   const lastCriticalEventRef = useRef(state.lastCriticalEventId);
   const [hydrated, setHydrated] = React.useState(false);
   const telemetryReadyRef = useRef(false);
@@ -14279,22 +14286,45 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const enqueueSave = useCallback((payload: string, enqueuedAt: number) => {
-    saveQueueRef.current = saveQueueRef.current
-      .catch(() => {})
-      .then(async () => {
-        try {
-          await AsyncStorage.setItem(STORAGE_BACKUP_KEY, payload);
-        } catch (error) {
-          console.warn("Failed to save backup game state", error);
-        }
-        try {
-          await AsyncStorage.setItem(STORAGE_KEY, payload);
-          lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
-        } catch (error) {
-          console.warn("Failed to save game state", error);
-        }
-      });
+  const drainSaveQueue = useCallback(() => {
+    if (saveInFlightRef.current) return;
+    if (!saveRequestedRef.current) return;
+
+    saveRequestedRef.current = false;
+    saveInFlightRef.current = true;
+    const enqueuedAt = Date.now();
+    const snapshot = stateRef.current;
+    const criticalEventIdAtEnqueue = snapshot.lastCriticalEventId;
+    const payload = JSON.stringify(buildSaveEnvelope(snapshot));
+    let savedPrimary = false;
+
+    void (async () => {
+      try {
+        await AsyncStorage.setItem(STORAGE_BACKUP_KEY, payload);
+      } catch (error) {
+        console.warn("Failed to save backup game state", error);
+      }
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, payload);
+        savedPrimary = true;
+        lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
+      } catch (error) {
+        console.warn("Failed to save game state", error);
+      }
+    })().finally(() => {
+      saveInFlightRef.current = false;
+      if (
+        savedPrimary &&
+        criticalSaveTimeoutRef.current &&
+        stateRef.current.lastCriticalEventId <= criticalEventIdAtEnqueue
+      ) {
+        clearTimeout(criticalSaveTimeoutRef.current);
+        criticalSaveTimeoutRef.current = null;
+      }
+      if (saveRequestedRef.current) {
+        drainSaveQueue();
+      }
+    });
   }, []);
 
   const flushSave = useCallback(() => {
@@ -14303,11 +14333,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    const enqueuedAt = Date.now();
-    lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
-    const payload = JSON.stringify(buildSaveEnvelope(stateRef.current));
-    enqueueSave(payload, enqueuedAt);
-  }, [enqueueSave, hydrated]);
+    const requestedAt = Date.now();
+    lastSaveAtRef.current = Math.max(lastSaveAtRef.current, requestedAt);
+    saveRequestedRef.current = true;
+    drainSaveQueue();
+  }, [drainSaveQueue, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -14327,10 +14357,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (state.lastCriticalEventId !== lastCriticalEventRef.current) {
-      lastCriticalEventRef.current = state.lastCriticalEventId;
+    if (state.lastCriticalEventId === lastCriticalEventRef.current) return;
+
+    lastCriticalEventRef.current = state.lastCriticalEventId;
+    const now = Date.now();
+    const elapsed = now - lastCriticalSaveAtRef.current;
+    if (elapsed >= CRITICAL_SAVE_MIN_INTERVAL_MS) {
+      lastCriticalSaveAtRef.current = now;
       flushSave();
+      return;
     }
+    if (criticalSaveTimeoutRef.current) {
+      clearTimeout(criticalSaveTimeoutRef.current);
+    }
+    const delay = Math.max(
+      CRITICAL_SAVE_FALLBACK_DELAY_MS,
+      CRITICAL_SAVE_MIN_INTERVAL_MS - elapsed,
+    );
+    criticalSaveTimeoutRef.current = setTimeout(() => {
+      criticalSaveTimeoutRef.current = null;
+      lastCriticalSaveAtRef.current = Date.now();
+      flushSave();
+    }, delay);
   }, [hydrated, state.lastCriticalEventId, flushSave]);
 
   useEffect(() => {
@@ -14348,6 +14396,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      if (criticalSaveTimeoutRef.current) {
+        clearTimeout(criticalSaveTimeoutRef.current);
       }
     };
   }, []);

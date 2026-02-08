@@ -29,6 +29,7 @@ import {
   TIER_SHORT_CODES,
   WarrantyStampMode,
 } from "@/types/game";
+import { analyzeOrderAgainstBoard } from "@/lib/orders";
 import { getScaledBoostMergeCount, getTuning } from "@/lib/tuning";
 import {
   getActiveSiteRule,
@@ -273,7 +274,7 @@ export function OrdersModal({
   onOpenProjects,
 }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
-  const { state, fulfillOrder, dispatch, getFulfillmentIndices } = useGame();
+  const { state, fulfillOrder, dispatch } = useGame();
   const isTutorialOrdersStep =
     !state.tutorialComplete && state.tutorialStep === 3;
   const tuning = getTuning();
@@ -483,11 +484,19 @@ export function OrdersModal({
     if (!phase2GoalOrder) return;
     dispatch({ type: "HIGHLIGHT_ORDER", orderId: phase2GoalOrder.id });
   }, [dispatch, phase2GoalOrder]);
+  const orderAnalyses = React.useMemo(() => {
+    const byId = new Map<string, ReturnType<typeof analyzeOrderAgainstBoard>>();
+    state.orders.forEach((order) => {
+      byId.set(order.id, analyzeOrderAgainstBoard(order, state.board));
+    });
+    return byId;
+  }, [state.orders, state.board]);
   const ordersSummary = React.useMemo(() => {
     const fulfillable: Order[] = [];
     const waiting: Order[] = [];
     for (const order of state.orders) {
-      if (getFulfillmentIndices(order) !== null) {
+      const analysis = orderAnalyses.get(order.id);
+      if (analysis?.fulfillmentIndices !== null) {
         fulfillable.push(order);
       } else {
         waiting.push(order);
@@ -497,7 +506,7 @@ export function OrdersModal({
       readyCount: fulfillable.length,
       sorted: [...fulfillable, ...waiting],
     };
-  }, [state.orders, getFulfillmentIndices]);
+  }, [state.orders, orderAnalyses]);
   const orderTrimPhase = useSharedPhase({
     active: ordersSummary.readyCount > 0,
     duration: TRIM_LIGHT_ANIMATION_DURATIONS.twinkle,
@@ -588,24 +597,36 @@ export function OrdersModal({
     );
   }, []);
 
-  const handleFulfillOrder = (orderId: string) => {
-    const order = state.orders.find((o) => o.id === orderId);
-    if (!order) return;
-
-    const partsToUse = getFulfillmentIndices(order);
-    if (partsToUse) {
+  const handleFulfillOrder = React.useCallback(
+    (orderId: string) => {
+      const order = state.orders.find((candidate) => candidate.id === orderId);
+      if (!order) return;
+      const analysis = orderAnalyses.get(orderId);
+      if (!analysis?.fulfillmentIndices) return;
       fulfillOrder(orderId);
       triggerInstallMoment(order);
       onOrderFulfilled?.(order);
       if (state.highlightedOrderId === orderId) {
         dispatch({ type: "HIGHLIGHT_ORDER" });
       }
-    }
-  };
+    },
+    [
+      dispatch,
+      fulfillOrder,
+      onOrderFulfilled,
+      orderAnalyses,
+      state.highlightedOrderId,
+      state.orders,
+      triggerInstallMoment,
+    ],
+  );
 
-  const handleDismissOrder = (orderId: string) => {
-    dispatch({ type: "DISMISS_ORDER", orderId });
-  };
+  const handleDismissOrder = React.useCallback(
+    (orderId: string) => {
+      dispatch({ type: "DISMISS_ORDER", orderId });
+    },
+    [dispatch],
+  );
 
   const handleRefreshOrder = () => {
     if (!refreshTarget) return;
@@ -972,12 +993,13 @@ export function OrdersModal({
                 <OrderCard
                   key={order.id}
                   order={order}
-                  onFulfill={() => handleFulfillOrder(order.id)}
-                  onDismiss={() => handleDismissOrder(order.id)}
-                  onSelect={
+                  analysis={orderAnalyses.get(order.id) ?? null}
+                  onFulfillOrder={handleFulfillOrder}
+                  onDismissOrder={handleDismissOrder}
+                  onSelectOrder={
                     guideSelectionLocked && !isGuideTrackedOrder
                       ? undefined
-                      : () => {
+                      : (orderId) => {
                           if (
                             compatibilityGuideStep === 2 &&
                             isGuideTrackedOrder
@@ -996,7 +1018,7 @@ export function OrdersModal({
                           }
                           dispatch({
                             type: "HIGHLIGHT_ORDER",
-                            orderId: order.id,
+                            orderId,
                           });
                         }
                   }
@@ -1010,6 +1032,8 @@ export function OrdersModal({
                   compatibilityGuideFulfillPrompt={
                     compatibilityGuideStep === 3 && isGuideTrackedOrder
                   }
+                  hapticsEnabled={state.settings.hapticsEnabled}
+                  reducedMotion={state.settings.reducedMotion}
                 />
               );
             })

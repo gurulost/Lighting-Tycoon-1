@@ -20,12 +20,12 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { AvatarImage } from "@/components/game/AvatarImage";
 import { Order, TIER_NAMES, PartTier } from "@/types/game";
-import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { captureEvent } from "@/lib/telemetry";
 import { withRepeat } from "@/lib/reanimated";
 import { getPortraitSource } from "@/constants/characters";
+import type { OrderBoardAnalysis } from "@/lib/orders";
 import {
   TrimLightStrip,
   TrimLightPattern,
@@ -34,15 +34,18 @@ import { PROJECT_DEFINITION_BY_ID } from "@/constants/projects";
 
 interface OrderCardProps {
   order: Order;
-  onFulfill: () => void;
-  onDismiss: () => void;
+  analysis: OrderBoardAnalysis | null;
+  onFulfillOrder: (orderId: string) => void;
+  onDismissOrder: (orderId: string) => void;
   dismissible?: boolean;
   selected?: boolean;
-  onSelect?: () => void;
+  onSelectOrder?: (orderId: string) => void;
   trimPhase?: SharedValue<number>;
   fulfillTestID?: string;
   compatibilityGuideHighlight?: boolean;
   compatibilityGuideFulfillPrompt?: boolean;
+  hapticsEnabled: boolean;
+  reducedMotion: boolean;
 }
 
 const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
@@ -64,42 +67,41 @@ const TIER_ICONS: Record<PartTier, keyof typeof Feather.glyphMap> = {
   16: "zap",
 };
 
-export function OrderCard({
+function OrderCardBase({
   order,
-  onFulfill,
-  onDismiss,
+  analysis,
+  onFulfillOrder,
+  onDismissOrder,
   dismissible = true,
   selected = false,
-  onSelect,
+  onSelectOrder,
   trimPhase,
   fulfillTestID,
   compatibilityGuideHighlight = false,
   compatibilityGuideFulfillPrompt = false,
+  hapticsEnabled,
+  reducedMotion,
 }: OrderCardProps) {
-  const { state, getFulfillmentIndices, getFulfillmentAnalysis } = useGame();
-  const hapticsEnabled = state.settings.hapticsEnabled;
-  const reducedMotion = state.settings.reducedMotion;
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const glowPulse = useSharedValue(0);
   const urgentPulse = useSharedValue(0);
 
-  const fulfillmentIndices = getFulfillmentIndices(order);
+  const fulfillmentAnalysis = analysis ?? {
+    fulfillmentIndices: null,
+    matchedCountByRequirement: Array(order.requirements.length).fill(0),
+    totalRequired: order.requirements.reduce((sum, req) => sum + req.count, 0),
+    satisfiedCount: 0,
+    shortfall: undefined,
+  };
+  const fulfillmentIndices = fulfillmentAnalysis.fulfillmentIndices;
+  const matchedCountByRequirement =
+    fulfillmentAnalysis.matchedCountByRequirement;
+  const totalRequired = fulfillmentAnalysis.totalRequired;
+  const satisfied = fulfillmentAnalysis.satisfiedCount;
   const rushExpired = Boolean(
     order.rushDeadline && timeRemaining !== null && timeRemaining <= 0,
   );
   const canFulfill = fulfillmentIndices !== null && !rushExpired;
-
-  const fulfillmentAnalysis = getFulfillmentAnalysis(order);
-  const matchedCountByRequirement =
-    fulfillmentAnalysis.matchedCountByRequirement;
-  const totalRequired = order.requirements.reduce(
-    (sum, req) => sum + req.count,
-    0,
-  );
-  const satisfied = matchedCountByRequirement.reduce(
-    (sum, count) => sum + count,
-    0,
-  );
   const rawProgress = totalRequired > 0 ? satisfied / totalRequired : 0;
   const partialProgress = Math.min(1, rawProgress);
   const visualProgress = canFulfill ? 1 : Math.min(0.95, partialProgress);
@@ -572,7 +574,10 @@ export function OrderCard({
     : FadeOutUp.duration(200);
 
   return (
-    <Pressable onPress={onSelect} disabled={!onSelect}>
+    <Pressable
+      onPress={onSelectOrder ? () => onSelectOrder(order.id) : undefined}
+      disabled={!onSelectOrder}
+    >
       <Animated.View
         entering={enterAnim}
         exiting={exitAnim}
@@ -678,7 +683,10 @@ export function OrderCard({
                 </Animated.View>
               ) : null}
               {dismissible ? (
-                <Pressable onPress={onDismiss} style={styles.dismissButton}>
+                <Pressable
+                  onPress={() => onDismissOrder(order.id)}
+                  style={styles.dismissButton}
+                >
                   <Feather
                     name="x"
                     size={16}
@@ -892,7 +900,7 @@ export function OrderCard({
                     Haptics.NotificationFeedbackType.Success,
                   );
                 }
-                onFulfill();
+                onFulfillOrder(order.id);
               } else {
                 const shortfall = fulfillmentAnalysis.shortfall;
                 if (shortfall?.requirement.requiresCompatible) {
@@ -959,6 +967,8 @@ export function OrderCard({
     </Pressable>
   );
 }
+
+export const OrderCard = React.memo(OrderCardBase);
 
 const styles = StyleSheet.create({
   container: {
