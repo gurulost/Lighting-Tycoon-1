@@ -735,8 +735,13 @@ function queueStoryBeat(state: GameState, beatId: string): GameState {
     ...state,
     storyQueue: nextQueue,
     storyLog: trimmedStoryLog,
-    storySeen: { ...state.storySeen, [beatId]: true },
   };
+}
+
+function isCriticalStoryBeat(beatId: string) {
+  const beat = STORY_BEATS[beatId];
+  if (!beat) return false;
+  return beat.priority === "high" || !!beat.onceOnly;
 }
 
 function enqueueOverlayState(state: GameState, item: OverlayItem): GameState {
@@ -7190,7 +7195,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         );
         if (insertResult.inserted) {
           updatedOrders = insertResult.orders;
-          nextHighlightedOrderId = insertResult.highlightedOrderId;
+          nextHighlightedOrderId = phase2Order.id;
           nextOrderMetrics = updateOrderMetrics(
             { ...state, orderMetrics: nextOrderMetrics },
             phase2Order,
@@ -10058,7 +10063,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             let nextState: GameState = {
               ...workingState,
               orders: insertResult.orders,
-              highlightedOrderId: insertResult.highlightedOrderId,
+              highlightedOrderId: phase2Order.id,
               orderMetrics: updateOrderMetrics(workingState, phase2Order),
               phase2GoalPending: false,
               lastCompatibilityOrderSpawnedAt:
@@ -11128,11 +11133,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "SHOW_STORY_BEAT": {
       if (state.activeStoryBeatId) return state;
+      const beat = STORY_BEATS[action.beatId];
+      const nextStorySeen = beat
+        ? { ...state.storySeen, [action.beatId]: true }
+        : state.storySeen;
       return {
         ...state,
         activeStoryBeatId: action.beatId,
         storyQueue: state.storyQueue.filter((id) => id !== action.beatId),
         lastStoryShownAt: Date.now(),
+        storySeen: nextStorySeen,
       };
     }
 
@@ -11149,9 +11159,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? Math.max(0, Math.floor(action.keepCount))
           : 1;
       if (state.storyQueue.length <= keepCount) return state;
+      const nextQueue = state.storyQueue.filter(
+        (beatId, index) => index < keepCount || isCriticalStoryBeat(beatId),
+      );
+      if (nextQueue.length === state.storyQueue.length) return state;
       return {
         ...state,
-        storyQueue: state.storyQueue.slice(0, keepCount),
+        storyQueue: nextQueue,
       };
     }
 
@@ -11203,7 +11217,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? state.highlightedOrderId
           : undefined;
         const nextHighlightedOrderId = insertResult.inserted
-          ? insertResult.highlightedOrderId
+          ? phase2Order.id
           : baseHighlightedOrderId;
         const nextOrderMetrics = insertResult.inserted
           ? updateOrderMetrics(state, phase2Order)
@@ -11311,7 +11325,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ? state.highlightedOrderId
         : undefined;
       const nextHighlightedOrderId = insertResult?.inserted
-        ? insertResult.highlightedOrderId
+        ? phase2Order?.id
         : baseHighlightedOrderId;
       const nextOrderMetrics =
         insertResult?.inserted && phase2Order

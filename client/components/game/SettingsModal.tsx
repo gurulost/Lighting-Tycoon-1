@@ -70,6 +70,7 @@ export function SettingsModal({
   onToggleDebugOverlay,
 }: SettingsModalProps) {
   const { state, dispatch, skipToPhase2, skipToPhase3 } = useGame();
+  const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
   const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
   const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
@@ -142,6 +143,11 @@ export function SettingsModal({
 
   const handleSkipPhase2 = () => {
     if (!canSkipPhase2) return;
+    if (e2eEnabled) {
+      skipToPhase2();
+      onClose();
+      return;
+    }
     Alert.alert(
       "Playtest: Skip to Phase 2",
       "This applies a Phase 2 playtest bootstrap so you can validate projects and late-game flows from a fresh save.",
@@ -161,6 +167,11 @@ export function SettingsModal({
 
   const handleSkipPhase3 = () => {
     if (!canSkipPhase3) return;
+    if (e2eEnabled) {
+      skipToPhase3();
+      onClose();
+      return;
+    }
     Alert.alert(
       "Playtest: Skip to Phase 3",
       "This bootstraps a Council-unlocked Phase 3 state so you can validate tier-16 progression and campaigns quickly.",
@@ -323,6 +334,7 @@ export function SettingsModal({
                 !canSkipPhase2 && styles.actionRowDisabled,
               ]}
               onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
+              testID="settings-skip-phase2"
             >
               <LinearGradient
                 colors={[
@@ -355,6 +367,7 @@ export function SettingsModal({
                 !canSkipPhase3 && styles.actionRowDisabled,
               ]}
               onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
+              testID="settings-skip-phase3"
             >
               <LinearGradient
                 colors={[

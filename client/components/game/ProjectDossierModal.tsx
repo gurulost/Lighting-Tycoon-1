@@ -35,7 +35,7 @@ const getStageTags = (stage: ProjectStageDefinition): StageTag[] => {
   }
   if (stage.orderSpec.requiresCompatibility) {
     tags.push({
-      label: "Compat",
+      label: "Interop",
       icon: "shield",
       color: GameColors.ui.success,
     });

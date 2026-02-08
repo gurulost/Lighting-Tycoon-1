@@ -11,7 +11,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `npm run web:build && node scripts/serve-static.js dist ${port}`,
+    command: `EXPO_PUBLIC_E2E=1 npm run web:build && node scripts/serve-static.js dist ${port}`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

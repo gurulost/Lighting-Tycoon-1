@@ -305,7 +305,7 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     id: "compat_path_3",
     giver: "rd",
     type: "complete_order_compatible",
-    label: "Compatibility Loop III: Compat install",
+    label: "Compatibility Loop III: Interop install",
     description: "Prove the liberated tech works in the field.",
     target: 1,
     reward: { research: 25, reputation: 15 },

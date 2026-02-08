@@ -26,6 +26,7 @@ interface ModalShellProps {
   variant?: ModalVariant;
   contentStyle?: ViewStyle;
   headerRight?: React.ReactNode;
+  testID?: string;
   children: React.ReactNode;
 }
 
@@ -40,6 +41,7 @@ export function ModalShell({
   variant = "full",
   contentStyle,
   headerRight,
+  testID,
   children,
 }: ModalShellProps) {
   const insets = useSafeAreaInsets();
@@ -58,7 +60,11 @@ export function ModalShell({
   const contentBaseStyle = isCard ? styles.contentCard : styles.content;
 
   return (
-    <LinearGradient colors={ModalTokens.gradient} style={containerStyle}>
+    <LinearGradient
+      colors={ModalTokens.gradient}
+      style={containerStyle}
+      testID={testID}
+    >
       {showHeader ? (
         <View style={[styles.header, isCard && styles.headerCard]}>
           <View style={styles.headerLeft}>

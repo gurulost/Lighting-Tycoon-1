@@ -11,6 +11,7 @@ import {
   Modal,
   Pressable,
   AppState,
+  InteractionManager,
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -46,6 +47,8 @@ import { GlossaryModal } from "@/components/game/GlossaryModal";
 import { SupplierModal } from "@/components/game/SupplierModal";
 import { MergeMomentumModal } from "@/components/game/MergeMomentumModal";
 import { MissionStrip } from "@/components/game/MissionStrip";
+import { Phase2IntroModal } from "@/components/game/Phase2IntroModal";
+import { SplitObjectiveRow } from "@/components/game/SplitObjectiveRow";
 import { MissionDetailModal } from "@/components/game/MissionDetailModal";
 import { DebugOverlay } from "@/components/DebugOverlay";
 import { OverlayManager } from "@/components/game/OverlayManager";
@@ -54,6 +57,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { getCouncilUnlockInfo } from "@/lib/council";
+import { resolvePhaseObjective } from "@/lib/objectives";
 import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
@@ -115,6 +119,12 @@ type ModalType =
   | null;
 
 type ProjectBoardTab = "offers" | "active" | "trophies";
+
+interface PendingProjectsUnlockHandoff {
+  focusProjectId?: string;
+  toastMessage: string;
+  toastDurationMs: number;
+}
 
 type TutorialTarget =
   | "board"
@@ -279,8 +289,11 @@ export default function GameScreen() {
     undoLastMove,
     getFulfillmentIndices,
     claimMergeMomentum,
+    skipToPhase2,
+    skipToPhase3,
     hydrated,
   } = useGame();
+  const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [projectDossierId, setProjectDossierId] = useState<string | null>(null);
   const [projectBoardFocusId, setProjectBoardFocusId] = useState<string | null>(
@@ -289,6 +302,7 @@ export default function GameScreen() {
   const [projectBoardInitialTab, setProjectBoardInitialTab] =
     useState<ProjectBoardTab | null>(null);
   const [projectBoardOpenId, setProjectBoardOpenId] = useState(0);
+  const [phase2IntroVisible, setPhase2IntroVisible] = useState(false);
   const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
     null,
@@ -354,9 +368,22 @@ export default function GameScreen() {
   const contractRef = useRef(state.baronContractOrdersRemaining);
   const orderIdsRef = useRef<string[]>(state.orders.map((order) => order.id));
   const compatibilityGuideStepRef = useRef(-1);
-  const compatibilityGuideAdvanceTimeoutRef = useRef<ReturnType<
-    typeof setTimeout
-  > | null>(null);
+  const phaseTransitionRef = useRef<{
+    initialized: boolean;
+    gamePhase: 1 | 2 | 3;
+  }>({
+    initialized: false,
+    gamePhase: state.gamePhase,
+  });
+  const projectsUnlockTransitionRef = useRef<{
+    initialized: boolean;
+    projectsUnlocked: boolean;
+  }>({
+    initialized: false,
+    projectsUnlocked: state.projectsUnlocked,
+  });
+  const pendingProjectsUnlockHandoffRef =
+    useRef<PendingProjectsUnlockHandoff | null>(null);
   const [momentLockActive, setMomentLockActive] = useState(false);
   const reputationTierRef = useRef(state.reputationTier);
   const canUndoNow =
@@ -443,9 +470,39 @@ export default function GameScreen() {
   const isCompactScreen = screenHeight > 0 && screenHeight < 800;
   const topCondensed = hudCollapsed || isCompactScreen;
   const safeWidth = Math.max(0, windowWidth - insets.left - insets.right);
+  const phaseObjective = useMemo(
+    () =>
+      resolvePhaseObjective({
+        gamePhase: state.gamePhase,
+        orders: state.orders,
+        phase2GoalPending: state.phase2GoalPending,
+        projectsUnlocked: state.projectsUnlocked,
+        projectOffers: state.projectOffers,
+        activeProject: state.activeProject,
+        reputationTier: state.reputationTier,
+        projectsCompleted: state.projectsCompleted,
+      }),
+    [
+      state.gamePhase,
+      state.orders,
+      state.phase2GoalPending,
+      state.projectsUnlocked,
+      state.projectOffers,
+      state.activeProject,
+      state.reputationTier,
+      state.projectsCompleted,
+    ],
+  );
   const isNarrowTopBar = safeWidth > 0 && safeWidth < 520;
   const isTightTopBar = safeWidth > 0 && safeWidth < 450;
   const isUltraNarrowTopBar = safeWidth > 0 && safeWidth < 350;
+  const isSplitObjectiveStacked = safeWidth > 0 && safeWidth < 430;
+  const phase2GoalOrderId = useMemo(
+    () =>
+      state.orders.find((order) => order.modifierIds?.includes("phase2_goal"))
+        ?.id,
+    [state.orders],
+  );
 
   const topBarPaddingX = isUltraNarrowTopBar ? 8 : Spacing.lg;
   const topBarGap = isUltraNarrowTopBar ? 4 : isNarrowTopBar ? 6 : 12;
@@ -581,6 +638,37 @@ export default function GameScreen() {
       state.projectOffers,
     ],
   );
+  const handlePhaseObjectivePress = useCallback(() => {
+    if (!phaseObjective) return;
+    if (phaseObjective.action === "open_orders") {
+      setActiveModal("orders");
+      return;
+    }
+    if (phaseObjective.action === "open_projects_active") {
+      if (phaseObjective.projectId) {
+        openProjectBoardForProject(phaseObjective.projectId, "active");
+      } else {
+        openProjectBoard({ tab: "active" });
+      }
+      return;
+    }
+    if (phaseObjective.projectId) {
+      openProjectBoardForProject(phaseObjective.projectId, "offers");
+      return;
+    }
+    openProjectBoard({ tab: "offers" });
+  }, [phaseObjective, openProjectBoard, openProjectBoardForProject]);
+  const handlePhase2IntroContinue = useCallback(() => {
+    setPhase2IntroVisible(false);
+    if (phase2GoalOrderId) {
+      dispatch({ type: "HIGHLIGHT_ORDER", orderId: phase2GoalOrderId });
+    }
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        handlePhaseObjectivePress();
+      });
+    });
+  }, [dispatch, handlePhaseObjectivePress, phase2GoalOrderId]);
   const dismissProjectReveal = useCallback(() => {
     if (!pendingProjectRevealId) return;
     dispatch({
@@ -778,6 +866,7 @@ export default function GameScreen() {
       !state.lockoutChoice);
   const storyBlocked =
     activeModal !== null ||
+    phase2IntroVisible ||
     state.baronOfferAvailable ||
     showLockoutModal ||
     selectedPartIndex !== null ||
@@ -789,8 +878,101 @@ export default function GameScreen() {
     activeModal === null &&
     selectedPartIndex === null &&
     !showLockoutModal &&
+    !phase2IntroVisible &&
     overlayQueue.length === 0 &&
     !(state.baronOfferAvailable && baronOfferGate);
+  const projectsUnlockHandoffBlocked =
+    phase2IntroVisible ||
+    showLockoutModal ||
+    selectedPartIndex !== null ||
+    Boolean(projectDossierId) ||
+    isDragging ||
+    (activeModal !== null &&
+      activeModal !== "orders" &&
+      activeModal !== "projects");
+  const flushPendingProjectsUnlockHandoff = useCallback(() => {
+    const pending = pendingProjectsUnlockHandoffRef.current;
+    if (!pending || projectsUnlockHandoffBlocked) return;
+    pendingProjectsUnlockHandoffRef.current = null;
+    requestAnimationFrame(() => {
+      openProjectBoard({
+        tab: "offers",
+        focusProjectId: pending.focusProjectId,
+      });
+      showToast(pending.toastMessage, pending.toastDurationMs);
+    });
+  }, [openProjectBoard, projectsUnlockHandoffBlocked, showToast]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!phaseTransitionRef.current.initialized) {
+      phaseTransitionRef.current = {
+        initialized: true,
+        gamePhase: state.gamePhase,
+      };
+      return;
+    }
+    const previousPhase = phaseTransitionRef.current.gamePhase;
+    phaseTransitionRef.current.gamePhase = state.gamePhase;
+    if (previousPhase < 2 && state.gamePhase >= 2) {
+      setActiveModal(null);
+      setPhase2IntroVisible(true);
+      SoundManager.play("rd_unlock");
+    }
+  }, [hydrated, state.gamePhase]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!projectsUnlockTransitionRef.current.initialized) {
+      projectsUnlockTransitionRef.current = {
+        initialized: true,
+        projectsUnlocked: state.projectsUnlocked,
+      };
+      return;
+    }
+    const wasUnlocked = projectsUnlockTransitionRef.current.projectsUnlocked;
+    projectsUnlockTransitionRef.current.projectsUnlocked =
+      state.projectsUnlocked;
+    if (!state.projectsUnlocked || state.gamePhase < 2) {
+      pendingProjectsUnlockHandoffRef.current = null;
+      return;
+    }
+    if (wasUnlocked) return;
+
+    const focusProjectId =
+      state.projectOffers.length > 0
+        ? state.projectOffers[0].projectId
+        : undefined;
+    const toastMessage =
+      phaseObjective?.kind === "project_gate"
+        ? `Contracts unlocked. ${phaseObjective.detail ?? phaseObjective.subtitle}`
+        : "Empire Contracts unlocked. Review offers now.";
+    const toastDurationMs =
+      phaseObjective?.kind === "project_gate" ? 3600 : 2600;
+    pendingProjectsUnlockHandoffRef.current = {
+      focusProjectId,
+      toastMessage,
+      toastDurationMs,
+    };
+    flushPendingProjectsUnlockHandoff();
+  }, [
+    hydrated,
+    state.projectsUnlocked,
+    state.gamePhase,
+    state.projectOffers,
+    phaseObjective,
+    flushPendingProjectsUnlockHandoff,
+  ]);
+
+  useEffect(() => {
+    flushPendingProjectsUnlockHandoff();
+  }, [flushPendingProjectsUnlockHandoff]);
+
+  useEffect(() => {
+    return () => {
+      pendingProjectsUnlockHandoffRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -828,10 +1010,6 @@ export default function GameScreen() {
       if (momentLockTimeout.current) {
         clearTimeout(momentLockTimeout.current);
         momentLockTimeout.current = null;
-      }
-      if (compatibilityGuideAdvanceTimeoutRef.current) {
-        clearTimeout(compatibilityGuideAdvanceTimeoutRef.current);
-        compatibilityGuideAdvanceTimeoutRef.current = null;
       }
     };
   }, []);
@@ -915,23 +1093,17 @@ export default function GameScreen() {
     if (!state.tutorialComplete) return;
     if (nextStep === previousStep) return;
 
-    if (compatibilityGuideAdvanceTimeoutRef.current) {
-      clearTimeout(compatibilityGuideAdvanceTimeoutRef.current);
-      compatibilityGuideAdvanceTimeoutRef.current = null;
-    }
-
     if (nextStep === 1) {
       if (activeModal !== null) {
         setActiveModal(null);
       }
+      if (selectedPartIndex !== null) {
+        setSelectedPartIndex(null);
+      }
       showToast(
-        "Compatibility guide 1/3: find the part with the C badge on your board.",
+        "Compatibility guide 1/3: tap and hold the part with the C badge on your board.",
         3200,
       );
-      compatibilityGuideAdvanceTimeoutRef.current = setTimeout(() => {
-        dispatch({ type: "ADVANCE_COMPATIBILITY_GUIDE" });
-        compatibilityGuideAdvanceTimeoutRef.current = null;
-      }, 1500);
       return;
     }
 
@@ -941,13 +1113,9 @@ export default function GameScreen() {
       }
       setActiveModal("orders");
       showToast(
-        "Compatibility guide 2/3: requirement chips now show where Compatible (C) is accepted.",
+        "Compatibility guide 2/3: requirement chips now show where Compatible (C) is accepted. Tap the highlighted order once to continue.",
         3200,
       );
-      compatibilityGuideAdvanceTimeoutRef.current = setTimeout(() => {
-        dispatch({ type: "ADVANCE_COMPATIBILITY_GUIDE" });
-        compatibilityGuideAdvanceTimeoutRef.current = null;
-      }, 1800);
       return;
     }
 
@@ -971,6 +1139,21 @@ export default function GameScreen() {
     dispatch,
     selectedPartIndex,
     showToast,
+    state.compatibilityGuideStep,
+    state.tutorialComplete,
+  ]);
+
+  useEffect(() => {
+    if (!state.tutorialComplete) return;
+    if (state.compatibilityGuideStep !== 1) return;
+    if (selectedPartIndex === null) return;
+    const selectedPart = state.board[selectedPartIndex];
+    if (!selectedPart?.compatible) return;
+    dispatch({ type: "ADVANCE_COMPATIBILITY_GUIDE" });
+  }, [
+    dispatch,
+    selectedPartIndex,
+    state.board,
     state.compatibilityGuideStep,
     state.tutorialComplete,
   ]);
@@ -1227,7 +1410,13 @@ export default function GameScreen() {
     if (state.storyQueue.length === 0) return;
     const keepCount = state.activeStoryBeatId ? 0 : 1;
     if (state.storyQueue.length <= keepCount) return;
-    const digestCount = state.storyQueue.length - keepCount;
+    const nextQueue = state.storyQueue.filter((beatId, index) => {
+      if (index < keepCount) return true;
+      const beat = STORY_BEATS[beatId];
+      return beat?.priority === "high" || !!beat?.onceOnly;
+    });
+    if (nextQueue.length === state.storyQueue.length) return;
+    const digestCount = state.storyQueue.length - nextQueue.length;
     dispatch({ type: "COLLAPSE_STORY_QUEUE", keepCount });
     showToast(
       digestCount === 1
@@ -1237,7 +1426,7 @@ export default function GameScreen() {
     );
   }, [
     storyBlocked,
-    state.storyQueue.length,
+    state.storyQueue,
     state.activeStoryBeatId,
     showToast,
     dispatch,
@@ -1253,6 +1442,7 @@ export default function GameScreen() {
       if (
         cooldownSatisfied &&
         !activeModal &&
+        !phase2IntroVisible &&
         !state.baronOfferAvailable &&
         !showLockoutModal &&
         selectedPartIndex === null &&
@@ -1266,6 +1456,7 @@ export default function GameScreen() {
     state.storyQueue,
     state.lastStoryShownAt,
     activeModal,
+    phase2IntroVisible,
     state.baronOfferAvailable,
     showLockoutModal,
     selectedPartIndex,
@@ -1609,17 +1800,33 @@ export default function GameScreen() {
           </View>
         ) : null}
 
-        <MissionStrip
-          missions={state.missions}
-          locked={!state.tutorialComplete}
-          onPress={() => setActiveModal("missions")}
-          onLockedPress={() =>
-            showToast("Finish the tutorial to unlock goals.", 2200)
-          }
-          compact={topCondensed}
-          collapsed={topCondensed}
-          style={topStackSideMarginStyle}
-        />
+        {state.gamePhase >= 2 && phaseObjective ? (
+          <SplitObjectiveRow
+            missions={state.missions}
+            missionsLocked={!state.tutorialComplete}
+            objective={phaseObjective}
+            onPressGoals={() => setActiveModal("missions")}
+            onLockedGoalsPress={() =>
+              showToast("Finish the tutorial to unlock goals.", 2200)
+            }
+            onPressObjective={handlePhaseObjectivePress}
+            compact={topCondensed}
+            stacked={isSplitObjectiveStacked}
+            style={topStackSideMarginStyle}
+          />
+        ) : (
+          <MissionStrip
+            missions={state.missions}
+            locked={!state.tutorialComplete}
+            onPress={() => setActiveModal("missions")}
+            onLockedPress={() =>
+              showToast("Finish the tutorial to unlock goals.", 2200)
+            }
+            compact={topCondensed}
+            collapsed={topCondensed}
+            style={topStackSideMarginStyle}
+          />
+        )}
       </View>
 
       <View
@@ -1809,6 +2016,37 @@ export default function GameScreen() {
         onTelemetry={handleOverlayTelemetry}
       />
 
+      {e2eEnabled ? (
+        <View style={styles.e2eControls}>
+          <Pressable
+            style={styles.e2eButton}
+            onPress={skipToPhase2}
+            testID="e2e-skip-phase2"
+          >
+            <ThemedText style={styles.e2eButtonText}>E2E P2</ThemedText>
+          </Pressable>
+          <Pressable
+            style={styles.e2eButton}
+            onPress={skipToPhase3}
+            testID="e2e-skip-phase3"
+          >
+            <ThemedText style={styles.e2eButtonText}>E2E P3</ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <Modal
+        visible={phase2IntroVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={handlePhase2IntroContinue}
+      >
+        <Phase2IntroModal
+          objective={phaseObjective}
+          onContinue={handlePhase2IntroContinue}
+        />
+      </Modal>
+
       <Modal
         visible={activeModal === "orders"}
         animationType="slide"
@@ -1975,6 +2213,7 @@ export default function GameScreen() {
 
       <Modal
         visible={
+          !phase2IntroVisible &&
           state.baronOfferAvailable &&
           baronOfferGate &&
           !showLockoutModal &&
@@ -2033,6 +2272,27 @@ export default function GameScreen() {
 }
 
 const styles = StyleSheet.create({
+  e2eControls: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    zIndex: 3000,
+    gap: 6,
+  },
+  e2eButton: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: "#2A5A87",
+    backgroundColor: "rgba(12, 35, 57, 0.85)",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  e2eButtonText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#CDEBFF",
+    letterSpacing: 0.2,
+  },
   container: {
     flex: 1,
     overflow: "visible",

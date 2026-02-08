@@ -26,6 +26,7 @@ import {
   getProjectDepositCost,
   getProjectOfferRefreshCost,
 } from "@/lib/projects";
+import { resolvePhaseObjective } from "@/lib/objectives";
 import { getTuning } from "@/lib/tuning";
 import {
   getCouncilPerkEffects,
@@ -69,7 +70,7 @@ const getStageTags = (stage: ProjectStageDefinition): StageTag[] => {
   }
   if (stage.orderSpec.requiresCompatibility) {
     tags.push({
-      label: "Compat",
+      label: "Interop",
       icon: "shield",
       color: GameColors.ui.success,
     });
@@ -521,6 +522,45 @@ export function ProjectBoardModal({
   const councilRepProgress = councilUnlockInfo.repProgress;
   const showCouncilGate = state.projectsUnlocked;
   const councilGateCopy = councilUnlockInfo.copy;
+  const offersObjective = React.useMemo(
+    () =>
+      resolvePhaseObjective({
+        gamePhase: state.gamePhase,
+        orders: state.orders,
+        phase2GoalPending: state.phase2GoalPending,
+        projectsUnlocked: state.projectsUnlocked,
+        projectOffers: state.projectOffers,
+        activeProject: state.activeProject,
+        reputationTier: state.reputationTier,
+        projectsCompleted: state.projectsCompleted,
+      }),
+    [
+      state.gamePhase,
+      state.orders,
+      state.phase2GoalPending,
+      state.projectsUnlocked,
+      state.projectOffers,
+      state.activeProject,
+      state.reputationTier,
+      state.projectsCompleted,
+    ],
+  );
+  const emptyOffersTitle =
+    offersObjective?.kind === "project_gate"
+      ? "Contracts locked"
+      : offersObjective?.kind === "project_complete"
+        ? "All contracts cleared"
+        : "No offers yet";
+  const emptyOffersSubtitle =
+    offersObjective?.kind === "project_gate" ||
+    offersObjective?.kind === "project_complete"
+      ? offersObjective.subtitle
+      : "Check back after your next install for new contracts.";
+  const emptyOffersDetail =
+    offersObjective?.kind === "project_gate" ||
+    offersObjective?.kind === "project_complete"
+      ? offersObjective.detail
+      : undefined;
 
   return (
     <ModalShell
@@ -529,6 +569,7 @@ export function ProjectBoardModal({
       icon="flag"
       iconColor={GameColors.ui.primary}
       onClose={onClose}
+      testID="project-board-modal"
     >
       <ScrollView
         contentContainerStyle={[
@@ -711,10 +752,17 @@ export function ProjectBoardModal({
                   size={28}
                   color={GameColors.text.disabled}
                 />
-                <ThemedText style={styles.emptyTitle}>No offers yet</ThemedText>
-                <ThemedText style={styles.emptySubtitle}>
-                  Check back after your next install for new contracts.
+                <ThemedText style={styles.emptyTitle}>
+                  {emptyOffersTitle}
                 </ThemedText>
+                <ThemedText style={styles.emptySubtitle}>
+                  {emptyOffersSubtitle}
+                </ThemedText>
+                {emptyOffersDetail ? (
+                  <ThemedText style={styles.emptyDetail}>
+                    {emptyOffersDetail}
+                  </ThemedText>
+                ) : null}
               </View>
             ) : (
               <View style={styles.offerList}>
@@ -1692,6 +1740,11 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 12,
     color: GameColors.text.secondary,
+    textAlign: "center",
+  },
+  emptyDetail: {
+    fontSize: 11,
+    color: "#BFC6DD",
     textAlign: "center",
   },
   perkList: {

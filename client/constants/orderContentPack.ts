@@ -1685,7 +1685,7 @@ export const ORDER_OVERRIDES: OrderOverride[] = [
     modifierIds: ["mod_compatible"],
     neighborhoodId: "liberation",
     weight: 0.7,
-    titleOverride: "Compat Upgrade",
+    titleOverride: "Interop Upgrade",
     flavorOverride: "Only open‑compatible kits accepted.",
   },
   {
@@ -1705,7 +1705,7 @@ export const ORDER_OVERRIDES: OrderOverride[] = [
     modifierIds: ["mod_compatible"],
     neighborhoodId: "liberation",
     weight: 0.5,
-    titleOverride: "Compat Showcase",
+    titleOverride: "Interop Showcase",
     flavorOverride: "Only liberated systems permitted.",
   },
   {
@@ -1725,7 +1725,7 @@ export const ORDER_OVERRIDES: OrderOverride[] = [
     modifierIds: ["mod_compatible"],
     neighborhoodId: "liberation",
     weight: 0.4,
-    titleOverride: "Compat Network",
+    titleOverride: "Interop Network",
     flavorOverride: "Certified? No. Compatible, yes.",
   },
   {

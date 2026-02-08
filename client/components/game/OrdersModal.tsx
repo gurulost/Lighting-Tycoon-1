@@ -435,6 +435,42 @@ export function OrdersModal({
     state.tutorialComplete && compatibilityGuideStep === 2;
   const isCompatGuideFulfillStep =
     state.tutorialComplete && compatibilityGuideStep === 3;
+  const guideTrackedOrder = React.useMemo(
+    () =>
+      state.highlightedOrderId
+        ? state.orders.find((order) => order.id === state.highlightedOrderId)
+        : undefined,
+    [state.highlightedOrderId, state.orders],
+  );
+  const classifyGuideOrder = React.useCallback(
+    (order?: Order): "compatibility" | "substitution" | "none" => {
+      if (!order) return "none";
+      if (
+        order.type === "compatibility_required" ||
+        order.requirements.some((req) => req.requiresCompatible)
+      ) {
+        return "compatibility";
+      }
+      if (order.type === "locked_required" && !order.noSubstitutions) {
+        return "substitution";
+      }
+      return "none";
+    },
+    [],
+  );
+  const guideTrackedOrderMode = classifyGuideOrder(guideTrackedOrder);
+  const compatGuideStep2Message =
+    guideTrackedOrderMode === "compatibility"
+      ? "Guide 2/3: this highlighted order accepts Compatible (C) parts. Requirement chips call out where C is required or can substitute. Tap the highlighted order once to continue."
+      : guideTrackedOrderMode === "substitution"
+        ? "Guide 2/3: this highlighted locked-required order still allows Compatible (C) substitution. Requirement chips call out where C can substitute. Tap the highlighted order once to continue."
+        : "Guide 2/3: select an order whose requirement chips show Compatible (C), then tap it again to continue.";
+  const compatGuideStep3Message =
+    guideTrackedOrderMode === "compatibility"
+      ? "Guide 3/3: fulfill the highlighted compatibility-required order now. Bonus on completion: +40 coins and +6 research."
+      : guideTrackedOrderMode === "substitution"
+        ? "Guide 3/3: fulfill the highlighted locked-required order with Compatible (C) substitution now. Bonus on completion: +40 coins and +6 research."
+        : "Guide 3/3: fulfill an order using Compatible (C) parts now. Bonus on completion: +40 coins and +6 research.";
   const phase2GoalOrder = React.useMemo(
     () =>
       state.orders.find((order) => order.modifierIds?.includes("phase2_goal")),
@@ -761,9 +797,7 @@ export function OrdersModal({
           <OnboardingCallout
             speaker="mentor"
             tone="info"
-            message={
-              "Guide 2/3: this highlighted order accepts Compatible (C) parts. Requirement chips call out where C is required or can substitute."
-            }
+            message={compatGuideStep2Message}
           />
         ) : null}
 
@@ -771,9 +805,7 @@ export function OrdersModal({
           <OnboardingCallout
             speaker="mentor"
             tone="info"
-            message={
-              "Guide 3/3: fulfill the highlighted compatibility order now. Bonus on completion: +40 coins and +6 research."
-            }
+            message={compatGuideStep3Message}
           />
         ) : null}
 
@@ -934,7 +966,8 @@ export function OrdersModal({
                 state.highlightedOrderId === order.id;
               const guideSelectionLocked =
                 compatibilityGuideStep >= 2 &&
-                typeof state.highlightedOrderId === "string";
+                typeof state.highlightedOrderId === "string" &&
+                guideTrackedOrderMode !== "none";
               return (
                 <OrderCard
                   key={order.id}
@@ -944,11 +977,28 @@ export function OrdersModal({
                   onSelect={
                     guideSelectionLocked && !isGuideTrackedOrder
                       ? undefined
-                      : () =>
+                      : () => {
+                          if (
+                            compatibilityGuideStep === 2 &&
+                            isGuideTrackedOrder
+                          ) {
+                            if (guideTrackedOrderMode === "none") {
+                              return;
+                            }
+                            dispatch({ type: "ADVANCE_COMPATIBILITY_GUIDE" });
+                            return;
+                          }
+                          if (
+                            compatibilityGuideStep >= 2 &&
+                            isGuideTrackedOrder
+                          ) {
+                            return;
+                          }
                           dispatch({
                             type: "HIGHLIGHT_ORDER",
                             orderId: order.id,
-                          })
+                          });
+                        }
                   }
                   selected={state.highlightedOrderId === order.id}
                   trimPhase={orderTrimPhase}
