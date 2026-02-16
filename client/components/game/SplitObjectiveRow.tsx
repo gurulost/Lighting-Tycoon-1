@@ -73,6 +73,9 @@ export function SplitObjectiveRow({
   style,
 }: SplitObjectiveRowProps) {
   const theme = OBJECTIVE_THEME[objective.kind];
+  const titleLines = stacked ? 2 : 1;
+  const subtitleLines = stacked ? 2 : 1;
+  const detailLines = 1;
 
   return (
     <View
@@ -82,8 +85,12 @@ export function SplitObjectiveRow({
         stacked && styles.rowStacked,
         style,
       ]}
+      testID="phase-objective-row"
     >
-      <View style={[styles.cell, stacked && styles.cellStacked]}>
+      <View
+        style={[styles.cell, stacked && styles.cellStacked]}
+        testID="phase-goals-card"
+      >
         <MissionStrip
           missions={missions}
           locked={missionsLocked}
@@ -98,13 +105,17 @@ export function SplitObjectiveRow({
       <Pressable
         style={[styles.cell, stacked && styles.cellStacked]}
         onPress={onPressObjective}
+        testID="phase-objective-card"
       >
         <LinearGradient
           colors={theme.gradient}
           style={[
             styles.objectiveCard,
             compact && styles.objectiveCardCompact,
-            { borderColor: `${theme.accent}50` },
+            {
+              borderColor: `${theme.accent}66`,
+              shadowColor: theme.accent,
+            },
           ]}
         >
           <View style={styles.objectiveHeader}>
@@ -132,14 +143,23 @@ export function SplitObjectiveRow({
           </View>
 
           <View style={styles.objectiveBody}>
-            <ThemedText style={styles.objectiveTitle} numberOfLines={2}>
+            <ThemedText
+              style={styles.objectiveTitle}
+              numberOfLines={titleLines}
+            >
               {objective.title}
             </ThemedText>
-            <ThemedText style={styles.objectiveSubtitle} numberOfLines={2}>
+            <ThemedText
+              style={styles.objectiveSubtitle}
+              numberOfLines={subtitleLines}
+            >
               {objective.subtitle}
             </ThemedText>
             {objective.detail ? (
-              <ThemedText style={styles.objectiveDetail} numberOfLines={2}>
+              <ThemedText
+                style={styles.objectiveDetail}
+                numberOfLines={detailLines}
+              >
                 {objective.detail}
               </ThemedText>
             ) : null}
@@ -182,15 +202,22 @@ const styles = StyleSheet.create({
   },
   objectiveCard: {
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    height: 106,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    minHeight: 102,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    backgroundColor: "#111A2E",
     justifyContent: "space-between",
-    gap: Spacing.xs,
+    gap: 4,
+    overflow: "visible",
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   objectiveCardCompact: {
-    minHeight: 92,
+    height: 96,
     paddingVertical: 6,
   },
   objectiveHeader: {
@@ -221,25 +248,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   objectiveBody: {
-    gap: 2,
+    flex: 1,
+    justifyContent: "center",
+    gap: 3,
+    minWidth: 0,
   },
   objectiveTitle: {
     fontSize: 13,
     fontWeight: "700",
     color: GameColors.text.primary,
+    lineHeight: 16,
   },
   objectiveSubtitle: {
     fontSize: 11,
     color: GameColors.text.secondary,
+    lineHeight: 14,
   },
   objectiveDetail: {
-    fontSize: 11,
+    fontSize: 10,
     color: "#C8CEE8",
+    lineHeight: 13,
   },
   objectiveFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
+    marginTop: 2,
   },
   objectiveCta: {
     fontSize: 11,

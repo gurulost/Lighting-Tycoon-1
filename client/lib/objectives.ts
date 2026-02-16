@@ -52,18 +52,19 @@ const PHASE2_GOAL_MODIFIER = "phase2_goal";
 function formatPhase2GoalDetail(order: Order): string | undefined {
   const requirement = order.requirements[0];
   if (!requirement) return undefined;
-  const countLabel =
-    requirement.count > 1 ? `${requirement.count} installs` : "1 install";
+  const installLabel = requirement.count === 1 ? "install" : "installs";
   const familyLabel =
     requirement.family === "open"
-      ? "open-standard"
+      ? "Open"
       : requirement.family === "locked"
-        ? "locked"
-        : "any-family";
-  const compatibilityLabel = requirement.requiresCompatible
-    ? "compatible "
-    : "";
-  return `${countLabel} • ${compatibilityLabel}${familyLabel} • Tier ${requirement.tier}+`;
+        ? "Locked"
+        : "Any";
+  const parts = [`${requirement.count}x ${installLabel}`, familyLabel];
+  if (requirement.requiresCompatible) {
+    parts.push("Compat");
+  }
+  parts.push(`T${requirement.tier}+`);
+  return parts.join(" · ");
 }
 
 function getNextProjectUnlockGate({
@@ -130,7 +131,7 @@ export function resolvePhaseObjective(
         statusLabel: "Phase 2 Gate",
         ctaLabel: "Open Orders",
         title: phase2GoalOrder.title,
-        subtitle: "Complete this special order to unlock Empire Contracts.",
+        subtitle: "Finish this gate order to unlock Empire Contracts.",
         detail: formatPhase2GoalDetail(phase2GoalOrder),
       };
     }
@@ -141,8 +142,8 @@ export function resolvePhaseObjective(
         statusLabel: "Queued",
         ctaLabel: "Open Orders",
         title: "Open Spark Showcase",
-        subtitle: "Queued: clear one order slot to spawn the Phase 2 gate.",
-        detail: "Complete or remove an order, then check the inbox again.",
+        subtitle: "Queued: clear one order slot to spawn the gate.",
+        detail: "Complete or recycle an order, then reopen Orders.",
       };
     }
     return {
@@ -151,8 +152,8 @@ export function resolvePhaseObjective(
       statusLabel: "Phase 2 Gate",
       ctaLabel: "Open Orders",
       title: "Open Spark Showcase",
-      subtitle: "Complete the gateway order to unlock Empire Contracts.",
-      detail: "Open Orders to find the current Phase 2 objective.",
+      subtitle: "Complete the gate order to unlock Empire Contracts.",
+      detail: "Open Orders to view the current Phase 2 gate.",
     };
   }
 

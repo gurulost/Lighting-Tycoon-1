@@ -52,6 +52,31 @@ test.describe("Tap Responsiveness", () => {
     viewport: { width: 390, height: 844 },
   });
 
+  test("Phase 2 split objective row stays side-by-side and bounded on phone widths", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("e2e-skip-phase2")).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByTestId("e2e-skip-phase2").click({ force: true });
+    await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
+
+    const goalsCard = page.getByTestId("phase-goals-card");
+    const objectiveCard = page.getByTestId("phase-objective-card");
+    await expect(goalsCard).toBeVisible({ timeout: 10_000 });
+    await expect(objectiveCard).toBeVisible({ timeout: 10_000 });
+
+    const goalsBounds = await goalsCard.boundingBox();
+    const objectiveBounds = await objectiveCard.boundingBox();
+    expect(goalsBounds).not.toBeNull();
+    expect(objectiveBounds).not.toBeNull();
+
+    if (!goalsBounds || !objectiveBounds) return;
+    expect(Math.abs(goalsBounds.y - objectiveBounds.y)).toBeLessThan(14);
+    expect(objectiveBounds.height).toBeLessThanOrEqual(goalsBounds.height + 10);
+  });
+
   test("Phase 2 objective row never blocks global taps on narrow layouts", async ({
     page,
   }) => {

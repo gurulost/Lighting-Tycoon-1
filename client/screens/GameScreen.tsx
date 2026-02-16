@@ -496,7 +496,7 @@ export default function GameScreen() {
   const isNarrowTopBar = safeWidth > 0 && safeWidth < 520;
   const isTightTopBar = safeWidth > 0 && safeWidth < 450;
   const isUltraNarrowTopBar = safeWidth > 0 && safeWidth < 350;
-  const isSplitObjectiveStacked = safeWidth > 0 && safeWidth < 430;
+  const isSplitObjectiveStacked = safeWidth > 0 && safeWidth < 320;
   const phase2GoalOrderId = useMemo(
     () =>
       state.orders.find((order) => order.modifierIds?.includes("phase2_goal"))
