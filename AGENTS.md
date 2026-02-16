@@ -75,6 +75,22 @@
 - `sentry-code-review` (`${CODEX_HOME:-$HOME/.codex}/skills/sentry-code-review/SKILL.md`)
 - `intense-job-checklist` (`${CODEX_HOME:-$HOME/.codex}/skills/intense-job-checklist/SKILL.md`)
 - Skill trigger rule: when a task is large/intense (broad audit, multi-file migration/refactor, production hardening, deep balancing pass, or explicit comprehensive sign-off), use `intense-job-checklist` immediately and keep its checklist doc as the source of truth until completion.
+
+### Recurring Bug Lessons (living memory)
+<!-- BUG-LESSONS:START -->
+<!-- BUG-LESSON:prevent-invisible-touch-blockers-on-gamescreen -->
+### Prevent invisible touch blockers on GameScreen
+- First seen: 2026-02-16
+- Last seen: 2026-02-16
+- Recurrence count: 1
+- Severity: high
+- Symptom: Players can reach a state where taps stop registering across the whole game screen, especially around Phase 2 transition moments.
+- Root cause: A transparent full-screen blocker can exist without visible UI when modal visibility is driven by stale/indirect state (for example selectedPartIndex stayed set while selectedPart payload became missing). In narrow layouts, split-objective stacked cells using flex:1 can also create oversized transparent pressable regions that capture taps.
+- Why it recurred: Phase-transition work frequently adds overlays, modals, and pressables. Without an explicit final blocker audit, it is easy to ship a view that still captures pointer events when its content is absent or out of bounds.
+- Fix: Gate modal visibility by concrete renderable payload (selectedPartOpen), auto-clear stale selection state, and constrain stacked split-objective cells to non-growing bounds (flex:0, width:100%).
+- Prevention rule: For every UI flow change, run a modal/blocker pass before sign-off: (1) every full-screen Modal/overlay must satisfy visible => renderable content, (2) no stacked pressable should use unconstrained flex growth, (3) execute the Phase 2 narrow-layout e2e tap test before merge.
+- Verification: `npm run test:e2e -- tests/e2e/phase2-transition.spec.ts`
+<!-- BUG-LESSONS:END -->
 <!-- AGENTS-SYNC:CUSTOM-END -->
 
 ## Auto-update

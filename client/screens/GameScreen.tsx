@@ -859,6 +859,7 @@ export default function GameScreen() {
   }, [state.activeStoryBeatId, dispatch, momentLockActive, openStoryLog]);
   const selectedPart =
     selectedPartIndex !== null ? state.board[selectedPartIndex] : null;
+  const selectedPartOpen = Boolean(selectedPart);
   const showLockoutModal =
     state.lockoutActive &&
     (state.lockoutPhase === 1 ||
@@ -869,14 +870,14 @@ export default function GameScreen() {
     phase2IntroVisible ||
     state.baronOfferAvailable ||
     showLockoutModal ||
-    selectedPartIndex !== null ||
+    selectedPartOpen ||
     isDragging;
   const storyBlockedRef = useRef(storyBlocked);
   const showProjectReveal =
     revealEligible &&
     !projectDossierId &&
     activeModal === null &&
-    selectedPartIndex === null &&
+    !selectedPartOpen &&
     !showLockoutModal &&
     !phase2IntroVisible &&
     overlayQueue.length === 0 &&
@@ -884,7 +885,7 @@ export default function GameScreen() {
   const projectsUnlockHandoffBlocked =
     phase2IntroVisible ||
     showLockoutModal ||
-    selectedPartIndex !== null ||
+    selectedPartOpen ||
     Boolean(projectDossierId) ||
     isDragging ||
     (activeModal !== null &&
@@ -983,10 +984,10 @@ export default function GameScreen() {
   }, [hydrated]);
 
   useEffect(() => {
-    if (selectedPartIndex !== null && !state.board[selectedPartIndex]) {
+    if (selectedPartIndex !== null && !selectedPart) {
       setSelectedPartIndex(null);
     }
-  }, [state.board, selectedPartIndex]);
+  }, [selectedPart, selectedPartIndex]);
 
   useEffect(() => {
     if (!pendingProjectRevealId) return;
@@ -1445,7 +1446,7 @@ export default function GameScreen() {
         !phase2IntroVisible &&
         !state.baronOfferAvailable &&
         !showLockoutModal &&
-        selectedPartIndex === null &&
+        !selectedPartOpen &&
         !isDragging
       ) {
         dispatch({ type: "SHOW_STORY_BEAT", beatId: state.storyQueue[0] });
@@ -1459,7 +1460,7 @@ export default function GameScreen() {
     phase2IntroVisible,
     state.baronOfferAvailable,
     showLockoutModal,
-    selectedPartIndex,
+    selectedPartOpen,
     isDragging,
     dispatch,
   ]);
@@ -2218,7 +2219,7 @@ export default function GameScreen() {
           baronOfferGate &&
           !showLockoutModal &&
           activeModal === null &&
-          selectedPartIndex === null
+          !selectedPartOpen
         }
         animationType="fade"
         transparent
@@ -2243,7 +2244,7 @@ export default function GameScreen() {
         />
       </Modal>
 
-      <Modal visible={selectedPart !== null} animationType="fade" transparent>
+      <Modal visible={selectedPartOpen} animationType="fade" transparent>
         {selectedPart ? (
           <PartDetailModal
             part={selectedPart}

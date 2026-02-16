@@ -46,3 +46,29 @@ test("Phase 3 skip defers project handoff until Phase 2 intro is dismissed", asy
     })
     .toBe(true);
 });
+
+test.describe("Tap Responsiveness", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+  });
+
+  test("Phase 2 objective row never blocks global taps on narrow layouts", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("e2e-skip-phase2")).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByTestId("e2e-skip-phase2").click({ force: true });
+
+    const phase2Intro = page.getByTestId("phase2-intro-modal");
+    await expect(phase2Intro).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
+    await expect(phase2Intro).toBeHidden({ timeout: 10_000 });
+
+    await page.getByText("Shop", { exact: true }).click({ timeout: 10_000 });
+    await expect(page.getByText("Upgrades", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+});

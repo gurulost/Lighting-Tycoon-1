@@ -83,7 +83,7 @@ export function SplitObjectiveRow({
         style,
       ]}
     >
-      <View style={styles.cell}>
+      <View style={[styles.cell, stacked && styles.cellStacked]}>
         <MissionStrip
           missions={missions}
           locked={missionsLocked}
@@ -95,7 +95,10 @@ export function SplitObjectiveRow({
         />
       </View>
 
-      <Pressable style={styles.cell} onPress={onPressObjective}>
+      <Pressable
+        style={[styles.cell, stacked && styles.cellStacked]}
+        onPress={onPressObjective}
+      >
         <LinearGradient
           colors={theme.gradient}
           style={[
@@ -168,6 +171,10 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     minWidth: 0,
+  },
+  cellStacked: {
+    flex: 0,
+    width: "100%",
   },
   missionStripInSplit: {
     marginHorizontal: 0,
