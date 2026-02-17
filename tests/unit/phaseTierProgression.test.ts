@@ -356,6 +356,8 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.lockoutChoice).toBe("lab");
     expect(next.freedomControllerCount).toBeGreaterThanOrEqual(1);
     expect(next.orders.some((order) => order.isLockout)).toBe(true);
+    expect(next.compatibilityGuideStep).toBe(0);
+    expect(next.compatibilityGuideRewardGranted).toBe(true);
   });
 
   it("bootstraps Phase 2 contracts-ready preset with unlocked offers", () => {
@@ -374,6 +376,7 @@ describe("phase/tier progression reducer coverage", () => {
     expect(
       next.orders.some((order) => order.modifierIds?.includes("phase2_goal")),
     ).toBe(false);
+    expect(next.orderMetrics).toEqual(initial.orderMetrics);
   });
 
   it("bootstraps Phase 2 rep-gate preset without eligible contract offers", () => {
@@ -390,6 +393,7 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.projectsUnlocked).toBe(true);
     expect(next.projectOffers.length).toBe(0);
     expect(next.reputationTier).toBeLessThan(4);
+    expect(next.orderMetrics).toEqual(initial.orderMetrics);
   });
 
   it("reapplies deterministic phase presets even from late-game state", () => {

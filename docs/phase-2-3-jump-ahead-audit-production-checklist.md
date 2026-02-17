@@ -5,7 +5,7 @@ Source of truth checklist for a large/intense task.
 ## Metadata
 
 - Created: 2026-02-16T18:52:34
-- Last Updated: 2026-02-16T19:24:29-0500
+- Last Updated: 2026-02-16T19:48:32-0500
 - Workspace: /Users/davedixon/Documents/GitHub/Lighting-Tycoon-1
 - Checklist Doc: /Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/docs/phase-2-3-jump-ahead-audit-production-checklist.md
 
@@ -89,3 +89,4 @@ Source of truth checklist for a large/intense task.
 - 2026-02-16T18:52:34: Checklist initialized.
 - 2026-02-17T00:00:00: Scope and queue updated for preset-based playtest jump architecture and transition rehearsal support.
 - 2026-02-16T19:24:29-0500: Reducer + UI + e2e hardening complete; phase-intro handoff race fixed; validation rerun complete; residual modal-choreography risk retained.
+- 2026-02-16T19:48:32-0500: Post-commit polish pass fixed preset-state edge cases (stale order metrics and compatibility-guide carryover in transition rehearsal) with added reducer tests and full validation rerun.
