@@ -20,6 +20,8 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
 import { getTuning } from "@/lib/tuning";
+import { PlaytestPresetModal } from "./PlaytestPresetModal";
+import { PlaytestPresetId } from "@/constants/playtestPresets";
 
 interface RDTreeProps {
   onCraftFreedomController: () => void;
@@ -195,16 +197,13 @@ function RDNodeCard({
 }
 
 export function RDTree({ onCraftFreedomController }: RDTreeProps) {
-  const {
-    state,
-    unlockRDNode,
-    craftFreedomController,
-    skipToPhase2,
-    skipToPhase3,
-  } = useGame();
+  const { state, unlockRDNode, craftFreedomController, applyPlaytestPreset } =
+    useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const insets = useSafeAreaInsets();
   const tuning = getTuning();
+  const [playtestPresetVisible, setPlaytestPresetVisible] =
+    React.useState(false);
 
   const getNodeCosts = React.useCallback(
     (node: RDNode): RDNodeCosts => ({
@@ -265,7 +264,7 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
     if (hapticsEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    skipToPhase2();
+    applyPlaytestPreset("phase2_gate");
   };
 
   const handleSkipPhase3 = () => {
@@ -273,7 +272,15 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
     if (hapticsEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    skipToPhase3();
+    applyPlaytestPreset("phase3_council_live");
+  };
+
+  const handlePlaytestPresetSelect = (presetId: PlaytestPresetId) => {
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    applyPlaytestPreset(presetId);
+    setPlaytestPresetVisible(false);
   };
 
   return (
@@ -400,6 +407,16 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           Jump directly to late-phase milestones for fast QA loops.
         </ThemedText>
         <Pressable
+          onPress={() => setPlaytestPresetVisible(true)}
+          style={styles.playtestButton}
+          testID="rd-playtest-presets"
+        >
+          <Feather name="map" size={14} color={GameColors.text.secondary} />
+          <ThemedText style={styles.playtestButtonText}>
+            Open Jump Presets
+          </ThemedText>
+        </Pressable>
+        <Pressable
           onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
           style={[
             styles.playtestButton,
@@ -450,6 +467,12 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           </ThemedText>
         </Pressable>
       </View>
+
+      <PlaytestPresetModal
+        visible={playtestPresetVisible}
+        onClose={() => setPlaytestPresetVisible(false)}
+        onSelect={handlePlaytestPresetSelect}
+      />
     </ScrollView>
   );
 }

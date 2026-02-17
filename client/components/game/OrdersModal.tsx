@@ -673,6 +673,7 @@ export function OrdersModal({
       iconColor={GameColors.currency.reputation}
       onClose={closeDisabled ? undefined : onClose}
       closeDisabled={closeDisabled}
+      closeTestID="orders-modal-close"
       contentStyle={styles.modalContent}
       headerRight={
         showProjectsButton ? (

@@ -48,8 +48,12 @@ import {
   TINA_BEATS,
 } from "@/constants/story";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
-import { getReputationTier } from "@/constants/reputation";
+import {
+  getReputationTier,
+  REPUTATION_TIER_THRESHOLDS,
+} from "@/constants/reputation";
 import { getLockoutLabRequestTarget } from "@/constants/lockout";
+import { PlaytestPresetId } from "@/constants/playtestPresets";
 import {
   ORDER_LIBRARY,
   ARCHETYPES,
@@ -215,6 +219,7 @@ type GameAction =
   | { type: "LOCKOUT_CHOOSE_LAB" }
   | { type: "SPAWN_ORDER" }
   | { type: "RESOLVE_LOCKOUT"; choice: "baron" | "freedom" }
+  | { type: "PLAYTEST_APPLY_PRESET"; presetId: PlaytestPresetId }
   | { type: "PLAYTEST_SKIP_PHASE2" }
   | { type: "PLAYTEST_SKIP_PHASE3" }
   | { type: "LOAD_STATE"; state: GameState };
@@ -2693,8 +2698,264 @@ const PLAYTEST_PHASE3_BASE_UPGRADE_MATERIALS = 20;
 const PLAYTEST_PHASE3_BASE_COMPATIBILITY_COMPONENTS = 10;
 const PLAYTEST_PHASE3_MIN_OPEN_WORKSHOP_LEVEL = 8;
 const PLAYTEST_PHASE3_MIN_MAX_TIER: PartTier = 13;
+const PLAYTEST_STABLE_TRANSITION_PRESETS: ReadonlySet<PlaytestPresetId> =
+  new Set([
+    "phase2_gate",
+    "phase2_contracts_ready",
+    "phase2_rep_gate",
+    "phase3_council_live",
+  ]);
 const COMPAT_GUIDE_FULFILL_BONUS_CASH = 40;
 const COMPAT_GUIDE_FULFILL_BONUS_RESEARCH = 6;
+
+function buildPlaytestSeedState(currentState: GameState): GameState {
+  const base = getInitialState();
+  return {
+    ...base,
+    settings: {
+      ...base.settings,
+      ...currentState.settings,
+    },
+  };
+}
+
+function removePhase2GoalOrders(orders: Order[]) {
+  return orders.filter((order) => !order.modifierIds?.includes("phase2_goal"));
+}
+
+function buildPlaytestPhase2GateState(state: GameState): GameState {
+  const existingPhase2Order = state.orders.find((order) =>
+    order.modifierIds?.includes("phase2_goal"),
+  );
+  const phase2Order = existingPhase2Order ?? createPhase2GoalOrder(state);
+  const phase2OrderMetrics = updateOrderMetrics(
+    { ...state, orderMetrics: DEFAULT_ORDER_METRICS },
+    phase2Order,
+  );
+  return {
+    ...state,
+    orders: [phase2Order],
+    highlightedOrderId: phase2Order.id,
+    orderMetrics: phase2OrderMetrics,
+    phase2GoalPending: false,
+    projectsUnlocked: false,
+    projectOffers: [],
+    activeProject: undefined,
+    projectRevealQueue: [],
+    projectDebuff: undefined,
+  };
+}
+
+function buildPlaytestPhase2ContractsReadyState(state: GameState): GameState {
+  const tier4RepThreshold =
+    REPUTATION_TIER_THRESHOLDS[4] ?? PLAYTEST_PHASE2_BASE_REPUTATION;
+  const seededReputation =
+    state.reputationTier >= 4
+      ? state.reputation
+      : Math.max(state.reputation, tier4RepThreshold);
+  const seededNeighborhood = getNeighborhoodByRep(seededReputation);
+  const seededRepTier = getReputationTier(seededReputation);
+  const orders = removePhase2GoalOrders(state.orders);
+  const highlightedOrderId = state.highlightedOrderId
+    ? orders.find((order) => order.id === state.highlightedOrderId)?.id
+    : undefined;
+  let nextState: GameState = {
+    ...state,
+    reputation: seededReputation,
+    reputationTier: seededRepTier,
+    currentNeighborhoodId: seededNeighborhood.id,
+    orders,
+    highlightedOrderId,
+    phase2GoalPending: false,
+    projectsUnlocked: true,
+    projectOffers: [],
+    activeProject: undefined,
+    projectRevealQueue: [],
+    projectDebuff: undefined,
+  };
+  let offers = generateProjectOffers(nextState, 3);
+  if (offers.length === 0) {
+    const fallbackProject = PROJECT_DEFINITIONS.find((project) =>
+      canOfferProject(project, nextState),
+    );
+    if (fallbackProject) {
+      offers = [
+        {
+          projectId: fallbackProject.id,
+          seed: Math.floor(Math.random() * 1_000_000),
+          generatedAt: Date.now(),
+        },
+      ];
+    }
+  }
+  nextState = {
+    ...nextState,
+    projectOffers: offers,
+    projectRevealQueue: updateProjectRevealQueue(
+      [],
+      nextState.projectRevealSeen,
+      offers,
+    ),
+  };
+  return nextState;
+}
+
+function buildPlaytestPhase2RepGateState(state: GameState): GameState {
+  const tier3Index = Math.min(3, REPUTATION_TIER_THRESHOLDS.length - 1);
+  const targetRep = REPUTATION_TIER_THRESHOLDS[tier3Index] ?? 700;
+  const targetRepTier = getReputationTier(targetRep);
+  const targetNeighborhood = getNeighborhoodByRep(targetRep);
+  const orders = removePhase2GoalOrders(state.orders);
+  const highlightedOrderId = state.highlightedOrderId
+    ? orders.find((order) => order.id === state.highlightedOrderId)?.id
+    : undefined;
+  return {
+    ...state,
+    reputation: targetRep,
+    reputationTier: Math.min(targetRepTier, 3),
+    currentNeighborhoodId: targetNeighborhood.id,
+    orders,
+    highlightedOrderId,
+    phase2GoalPending: false,
+    projectsUnlocked: true,
+    projectOffers: [],
+    activeProject: undefined,
+    projectRevealQueue: [],
+    projectDebuff: undefined,
+    projectsCompleted: [],
+  };
+}
+
+function buildPlaytestPrePhase2TransitionState(state: GameState): GameState {
+  const lockoutOrder = createLockoutOrder();
+  const targetRequirement =
+    lockoutOrder.requirements[0]?.tier ?? PLAYTEST_PHASE2_MIN_MAX_TIER;
+  const targetTier = targetRequirement as PartTier;
+  const nextBoard = [...state.board];
+  let hasRequiredCompatible = nextBoard.some(
+    (part) =>
+      !!part &&
+      part.family === "open" &&
+      part.compatible &&
+      part.tier === targetTier,
+  );
+  if (!hasRequiredCompatible) {
+    const emptySlot = findEmptySlot(state, nextBoard);
+    if (emptySlot !== -1) {
+      nextBoard[emptySlot] = createPart(emptySlot, "open", targetTier, true);
+      hasRequiredCompatible = true;
+    }
+  }
+  if (!hasRequiredCompatible) {
+    const mutableIndex = nextBoard.findIndex(
+      (part) => !!part && part.family !== "waste",
+    );
+    if (mutableIndex !== -1) {
+      const mutablePart = nextBoard[mutableIndex];
+      if (mutablePart) {
+        nextBoard[mutableIndex] = {
+          ...mutablePart,
+          family: "open",
+          tier: targetTier,
+          compatible: true,
+        };
+        hasRequiredCompatible = true;
+      }
+    }
+  }
+  const transitionRepThreshold = REPUTATION_TIER_THRESHOLDS[4] ?? 1000;
+  const transitionReputation = Math.max(1000, transitionRepThreshold);
+  const transitionNeighborhood = getNeighborhoodByRep(transitionReputation);
+  const transitionRepTier = getReputationTier(transitionReputation);
+  const lockoutLabOrdersTarget = getLockoutLabRequestTarget(0);
+  const lockoutOrderMetrics = updateOrderMetrics(
+    { ...state, orderMetrics: DEFAULT_ORDER_METRICS },
+    lockoutOrder,
+  );
+  return {
+    ...state,
+    board: nextBoard,
+    reputation: transitionReputation,
+    reputationTier: transitionRepTier,
+    currentNeighborhoodId: transitionNeighborhood.id,
+    gamePhase: 1,
+    liberationComplete: false,
+    liberationCompletedAt: undefined,
+    dependency: Math.max(tuning.baron.crackdownThreshold, 20),
+    baronPressure: 0,
+    lockoutActive: true,
+    lockoutPhase: 3,
+    lockoutOrderId: lockoutOrder.id,
+    lockoutLabOrdersRemaining: 0,
+    lockoutLabOrdersTarget,
+    lockoutChoice: "lab",
+    orders: [lockoutOrder],
+    highlightedOrderId: lockoutOrder.id,
+    orderMetrics: lockoutOrderMetrics,
+    phase2GoalPending: false,
+    projectsUnlocked: false,
+    projectOffers: [],
+    activeProject: undefined,
+    projectRevealQueue: [],
+    projectDebuff: undefined,
+    freedomControllerCount: Math.max(1, state.freedomControllerCount),
+    baronOfferAvailable: false,
+    baronOfferType: undefined,
+    storyQueue: [],
+    activeStoryBeatId: undefined,
+  };
+}
+
+function stabilizePlaytestPresetState(state: GameState): GameState {
+  return {
+    ...state,
+    compatibilityGuideStep: 0,
+    compatibilityGuideRewardGranted: true,
+    lastCompatibilityOrderSpawnedAt: undefined,
+    storyQueue: [],
+    activeStoryBeatId: undefined,
+    overlayQueue: [],
+    overlayTelemetry: {
+      maxWaitMs: 0,
+      lastShownAt: undefined,
+    },
+    baronOfferAvailable: false,
+    baronOfferSeen: true,
+    baronOfferType: undefined,
+  };
+}
+
+function applyPlaytestPresetState(
+  currentState: GameState,
+  presetId: PlaytestPresetId,
+): GameState {
+  const seedState = buildPlaytestSeedState(currentState);
+  let nextState: GameState;
+  if (presetId === "phase3_council_live") {
+    nextState = gameReducer(seedState, { type: "PLAYTEST_SKIP_PHASE3" });
+  } else {
+    const phase2Skipped = gameReducer(seedState, {
+      type: "PLAYTEST_SKIP_PHASE2",
+    });
+    const phase2GateState = buildPlaytestPhase2GateState(phase2Skipped);
+    if (presetId === "pre_phase2_transition") {
+      return buildPlaytestPrePhase2TransitionState(phase2GateState);
+    }
+    if (presetId === "phase2_gate") {
+      nextState = phase2GateState;
+    } else if (presetId === "phase2_contracts_ready") {
+      nextState = buildPlaytestPhase2ContractsReadyState(phase2GateState);
+    } else {
+      nextState = buildPlaytestPhase2RepGateState(
+        buildPlaytestPhase2ContractsReadyState(phase2GateState),
+      );
+    }
+  }
+  if (PLAYTEST_STABLE_TRANSITION_PRESETS.has(presetId)) {
+    return stabilizePlaytestPresetState(nextState);
+  }
+  return nextState;
+}
 
 function buildLegacyCycleStartState(
   state: GameState,
@@ -11255,6 +11516,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
 
+    case "PLAYTEST_APPLY_PRESET": {
+      return applyPlaytestPresetState(state, action.presetId);
+    }
+
     case "PLAYTEST_SKIP_PHASE2": {
       if (state.gamePhase >= 2 || state.liberationComplete) return state;
       const now = Date.now();
@@ -13265,6 +13530,7 @@ interface GameContextValue {
   unlockRDNode: (nodeId: string) => void;
   craftFreedomController: () => void;
   useFreedomController: (partIndex: number) => void;
+  applyPlaytestPreset: (presetId: PlaytestPresetId) => void;
   skipToPhase2: () => void;
   skipToPhase3: () => void;
   startLegacyCycle: (
@@ -14568,12 +14834,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "USE_FREEDOM_CONTROLLER", partIndex });
   }, []);
 
+  const applyPlaytestPreset = useCallback((presetId: PlaytestPresetId) => {
+    dispatch({ type: "PLAYTEST_APPLY_PRESET", presetId });
+  }, []);
+
   const skipToPhase2 = useCallback(() => {
-    dispatch({ type: "PLAYTEST_SKIP_PHASE2" });
+    dispatch({ type: "PLAYTEST_APPLY_PRESET", presetId: "phase2_gate" });
   }, []);
 
   const skipToPhase3 = useCallback(() => {
-    dispatch({ type: "PLAYTEST_SKIP_PHASE3" });
+    dispatch({
+      type: "PLAYTEST_APPLY_PRESET",
+      presetId: "phase3_council_live",
+    });
   }, []);
 
   const startLegacyCycle = useCallback(
@@ -14647,6 +14920,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         unlockRDNode,
         craftFreedomController,
         useFreedomController,
+        applyPlaytestPreset,
         skipToPhase2,
         skipToPhase3,
         startLegacyCycle,

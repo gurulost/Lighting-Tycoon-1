@@ -23,6 +23,7 @@ interface ModalShellProps {
   leading?: React.ReactNode;
   onClose?: () => void;
   closeDisabled?: boolean;
+  closeTestID?: string;
   variant?: ModalVariant;
   contentStyle?: ViewStyle;
   headerRight?: React.ReactNode;
@@ -38,6 +39,7 @@ export function ModalShell({
   leading,
   onClose,
   closeDisabled = false,
+  closeTestID,
   variant = "full",
   contentStyle,
   headerRight,
@@ -91,6 +93,7 @@ export function ModalShell({
                 onPress={closeDisabled ? undefined : onClose}
                 hitSlop={8}
                 pressRetentionOffset={12}
+                testID={closeTestID}
                 style={[
                   styles.closeButton,
                   closeDisabled && styles.closeButtonDisabled,

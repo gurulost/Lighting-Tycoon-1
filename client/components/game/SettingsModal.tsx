@@ -13,7 +13,12 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
 import { ModalShell } from "./ModalShell";
+import { PlaytestPresetModal } from "./PlaytestPresetModal";
 import { BorderRadius, GameColors, Spacing } from "@/constants/theme";
+import {
+  PlaytestPresetId,
+  PLAYTEST_PRESET_META,
+} from "@/constants/playtestPresets";
 import { useGame } from "@/context/GameContext";
 
 interface SettingsModalProps {
@@ -69,11 +74,12 @@ export function SettingsModal({
   debugOverlayEnabled,
   onToggleDebugOverlay,
 }: SettingsModalProps) {
-  const { state, dispatch, skipToPhase2, skipToPhase3 } = useGame();
+  const { state, dispatch, applyPlaytestPreset } = useGame();
   const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
   const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
   const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
+  const [playtestPresetVisible, setPlaytestPresetVisible] = useState(false);
   const [resetChallengeVisible, setResetChallengeVisible] = useState(false);
   const [resetAnswer, setResetAnswer] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -141,11 +147,36 @@ export function SettingsModal({
     onClose();
   };
 
+  const runPlaytestPreset = (presetId: PlaytestPresetId) => {
+    applyPlaytestPreset(presetId);
+    setPlaytestPresetVisible(false);
+    onClose();
+  };
+
+  const handlePlaytestPresetSelect = (presetId: PlaytestPresetId) => {
+    if (e2eEnabled) {
+      runPlaytestPreset(presetId);
+      return;
+    }
+    const preset = PLAYTEST_PRESET_META[presetId];
+    Alert.alert(
+      `Playtest: ${preset.title}`,
+      `${preset.summary}\n\n${preset.detail}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Apply Preset",
+          style: "destructive",
+          onPress: () => runPlaytestPreset(presetId),
+        },
+      ],
+    );
+  };
+
   const handleSkipPhase2 = () => {
     if (!canSkipPhase2) return;
     if (e2eEnabled) {
-      skipToPhase2();
-      onClose();
+      runPlaytestPreset("phase2_gate");
       return;
     }
     Alert.alert(
@@ -157,8 +188,7 @@ export function SettingsModal({
           text: "Skip Now",
           style: "destructive",
           onPress: () => {
-            skipToPhase2();
-            onClose();
+            runPlaytestPreset("phase2_gate");
           },
         },
       ],
@@ -168,8 +198,7 @@ export function SettingsModal({
   const handleSkipPhase3 = () => {
     if (!canSkipPhase3) return;
     if (e2eEnabled) {
-      skipToPhase3();
-      onClose();
+      runPlaytestPreset("phase3_council_live");
       return;
     }
     Alert.alert(
@@ -181,8 +210,7 @@ export function SettingsModal({
           text: "Skip Now",
           style: "destructive",
           onPress: () => {
-            skipToPhase3();
-            onClose();
+            runPlaytestPreset("phase3_council_live");
           },
         },
       ],
@@ -324,6 +352,30 @@ export function SettingsModal({
                 </ThemedText>
                 <ThemedText style={styles.settingDescription}>
                   Erase progress and start from the beginning
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionRow}
+              onPress={() => setPlaytestPresetVisible(true)}
+              testID="settings-playtest-presets"
+            >
+              <LinearGradient
+                colors={[
+                  `${GameColors.ui.primary}30`,
+                  `${GameColors.ui.primary}10`,
+                ]}
+                style={styles.settingIcon}
+              >
+                <Feather name="map" size={20} color={GameColors.ui.primary} />
+              </LinearGradient>
+              <View style={styles.settingContent}>
+                <ThemedText style={styles.settingLabel}>
+                  Playtest: Jump Presets
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  Transition rehearsal + targeted Phase 2/3 scenario bootstraps
                 </ThemedText>
               </View>
             </Pressable>
@@ -494,6 +546,12 @@ export function SettingsModal({
           </Pressable>
         </Pressable>
       ) : null}
+
+      <PlaytestPresetModal
+        visible={playtestPresetVisible}
+        onClose={() => setPlaytestPresetVisible(false)}
+        onSelect={handlePlaytestPresetSelect}
+      />
     </Pressable>
   );
 }

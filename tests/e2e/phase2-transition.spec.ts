@@ -87,9 +87,14 @@ test.describe("Tap Responsiveness", () => {
     await page.getByTestId("e2e-skip-phase2").click({ force: true });
 
     const phase2Intro = page.getByTestId("phase2-intro-modal");
+    const ordersModal = page.getByTestId("orders-modal");
     await expect(phase2Intro).toBeVisible({ timeout: 15_000 });
     await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
     await expect(phase2Intro).toBeHidden({ timeout: 10_000 });
+    if (await ordersModal.isVisible().catch(() => false)) {
+      await page.getByTestId("orders-modal-close").click({ timeout: 10_000 });
+      await expect(ordersModal).toBeHidden({ timeout: 10_000 });
+    }
 
     await page.getByText("Shop", { exact: true }).click({ timeout: 10_000 });
     await expect(page.getByText("Upgrades", { exact: true })).toBeVisible({

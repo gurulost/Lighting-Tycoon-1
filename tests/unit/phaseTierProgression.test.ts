@@ -320,6 +320,102 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.suppliers.open.level).toBeGreaterThanOrEqual(8);
   });
 
+  it("stabilizes fast jump presets to avoid modal-choreography blockers", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase3_council_live",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(3);
+    expect(next.projectsUnlocked).toBe(true);
+    expect(next.projectOffers.length).toBeGreaterThan(0);
+    expect(next.compatibilityGuideStep).toBe(0);
+    expect(next.compatibilityGuideRewardGranted).toBe(true);
+    expect(next.storyQueue).toEqual([]);
+    expect(next.activeStoryBeatId).toBeUndefined();
+    expect(next.overlayQueue).toEqual([]);
+  });
+
+  it("bootstraps pre-Phase-2 transition rehearsal from a single preset action", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "pre_phase2_transition",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(1);
+    expect(next.lockoutActive).toBe(true);
+    expect(next.lockoutPhase).toBe(3);
+    expect(next.lockoutChoice).toBe("lab");
+    expect(next.freedomControllerCount).toBeGreaterThanOrEqual(1);
+    expect(next.orders.some((order) => order.isLockout)).toBe(true);
+  });
+
+  it("bootstraps Phase 2 contracts-ready preset with unlocked offers", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_contracts_ready",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(2);
+    expect(next.projectsUnlocked).toBe(true);
+    expect(next.projectOffers.length).toBeGreaterThan(0);
+    expect(
+      next.orders.some((order) => order.modifierIds?.includes("phase2_goal")),
+    ).toBe(false);
+  });
+
+  it("bootstraps Phase 2 rep-gate preset without eligible contract offers", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_rep_gate",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(2);
+    expect(next.projectsUnlocked).toBe(true);
+    expect(next.projectOffers.length).toBe(0);
+    expect(next.reputationTier).toBeLessThan(4);
+  });
+
+  it("reapplies deterministic phase presets even from late-game state", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const lateState = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_SKIP_PHASE3",
+      } as any,
+    );
+    const next = __TEST_ONLY__.gameReducer(
+      lateState as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_gate",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(2);
+    expect(next.council.unlocked).toBe(false);
+    expect(next.projectsUnlocked).toBe(false);
+    expect(
+      next.orders.some((order) => order.modifierIds?.includes("phase2_goal")),
+    ).toBe(true);
+  });
+
   it("caps spawned order requirements to the active phase tier ceiling", () => {
     const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.42);
     const initial = __TEST_ONLY__.getInitialState();

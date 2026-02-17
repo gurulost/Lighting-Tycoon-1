@@ -382,6 +382,7 @@ export default function GameScreen() {
     initialized: false,
     projectsUnlocked: state.projectsUnlocked,
   });
+  const phase2IntroHandoffLockRef = useRef(false);
   const pendingProjectsUnlockHandoffRef =
     useRef<PendingProjectsUnlockHandoff | null>(null);
   const [momentLockActive, setMomentLockActive] = useState(false);
@@ -659,6 +660,7 @@ export default function GameScreen() {
     openProjectBoard({ tab: "offers" });
   }, [phaseObjective, openProjectBoard, openProjectBoardForProject]);
   const handlePhase2IntroContinue = useCallback(() => {
+    phase2IntroHandoffLockRef.current = false;
     setPhase2IntroVisible(false);
     if (phase2GoalOrderId) {
       dispatch({ type: "HIGHLIGHT_ORDER", orderId: phase2GoalOrderId });
@@ -882,18 +884,29 @@ export default function GameScreen() {
     !phase2IntroVisible &&
     overlayQueue.length === 0 &&
     !(state.baronOfferAvailable && baronOfferGate);
-  const projectsUnlockHandoffBlocked =
-    phase2IntroVisible ||
-    showLockoutModal ||
-    selectedPartOpen ||
-    Boolean(projectDossierId) ||
-    isDragging ||
-    (activeModal !== null &&
-      activeModal !== "orders" &&
-      activeModal !== "projects");
+  const isProjectsUnlockHandoffBlocked = useCallback(
+    () =>
+      phase2IntroHandoffLockRef.current ||
+      phase2IntroVisible ||
+      showLockoutModal ||
+      selectedPartOpen ||
+      Boolean(projectDossierId) ||
+      isDragging ||
+      (activeModal !== null &&
+        activeModal !== "orders" &&
+        activeModal !== "projects"),
+    [
+      phase2IntroVisible,
+      showLockoutModal,
+      selectedPartOpen,
+      projectDossierId,
+      isDragging,
+      activeModal,
+    ],
+  );
   const flushPendingProjectsUnlockHandoff = useCallback(() => {
     const pending = pendingProjectsUnlockHandoffRef.current;
-    if (!pending || projectsUnlockHandoffBlocked) return;
+    if (!pending || isProjectsUnlockHandoffBlocked()) return;
     pendingProjectsUnlockHandoffRef.current = null;
     requestAnimationFrame(() => {
       openProjectBoard({
@@ -902,7 +915,7 @@ export default function GameScreen() {
       });
       showToast(pending.toastMessage, pending.toastDurationMs);
     });
-  }, [openProjectBoard, projectsUnlockHandoffBlocked, showToast]);
+  }, [openProjectBoard, isProjectsUnlockHandoffBlocked, showToast]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -916,6 +929,7 @@ export default function GameScreen() {
     const previousPhase = phaseTransitionRef.current.gamePhase;
     phaseTransitionRef.current.gamePhase = state.gamePhase;
     if (previousPhase < 2 && state.gamePhase >= 2) {
+      phase2IntroHandoffLockRef.current = true;
       setActiveModal(null);
       setPhase2IntroVisible(true);
       SoundManager.play("rd_unlock");
