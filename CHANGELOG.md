@@ -15,6 +15,8 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Refined the Phase 2 split objective row so the gate card stays height-bounded on phones, keeps side-by-side layout for normal mobile widths, and uses tighter copy/spacing to prevent clipping and preserve board space.
 - Added deterministic Phase 2/3 jump presets (including pre-Phase-2 transition rehearsal), wired them into playtest UI, and hardened Phase 2 intro -> project handoff sequencing to eliminate race-driven modal/tap regressions.
 - Polished playtest jump quality by normalizing preset state hygiene (guide/order-metric carryover) and making the jump-preset modal scroll safely on smaller phone heights.
+- Hardened modal/tap reliability on compact layouts: settings close controls now stay safe-area reachable, transparent story lock tap-blockers were removed, and Phase 3 jump intro/brief sequencing is lock-gated to prevent dialog race overlap.
+- Updated Phase 2 skip bootstrap so open + salvage workshops are provisioned at max playtest-ready levels for immediate contract flow testing.
 - Implemented a full Phase 2 onboarding flow with persisted milestone state, a two-step intro/contracts briefing sequence, Orders gate walkthrough guidance, and a first-offer coachmark on the Project Board.
 
 ## [1.0.0] - 2026-01-28

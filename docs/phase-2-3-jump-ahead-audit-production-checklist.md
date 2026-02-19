@@ -5,7 +5,7 @@ Source of truth checklist for a large/intense task.
 ## Metadata
 
 - Created: 2026-02-16T18:52:34
-- Last Updated: 2026-02-19T14:16:24-0500
+- Last Updated: 2026-02-19T14:38:05-0500
 - Workspace: /Users/davedixon/Documents/GitHub/Lighting-Tycoon-1
 - Checklist Doc: /Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/docs/phase-2-3-jump-ahead-audit-production-checklist.md
 
@@ -90,15 +90,15 @@ Source of truth checklist for a large/intense task.
 - [x] V-001 [status:accepted_risk] `npm run check:types`
   - Evidence: no typecheck script is configured in this repository (`AGENTS.md` marks typecheck as "Not detected"); lint + full Jest + targeted e2e run green.
 - [x] V-002 [status:verified] `npm run lint`
-  - Evidence: 2026-02-19 14:11 - pass.
+  - Evidence: 2026-02-19 14:29 - pass.
 - [x] V-003 [status:verified] `npm run test -- --runInBand`
-  - Evidence: 2026-02-19 14:11 - pass (19 suites / 94 tests).
+  - Evidence: 2026-02-19 14:30 - pass (19 suites / 95 tests).
 - [x] V-004 [status:verified] `npm run test:e2e -- tests/e2e/phase2-transition.spec.ts`
-  - Evidence: 2026-02-19 14:11 - pass (4/4).
+  - Evidence: 2026-02-19 14:24 - pass (4/4).
 - [x] V-005 [status:accepted_risk] `npm run build`
   - Evidence: server build passed, Expo static build halted due missing deployment-domain env (`REPLIT_INTERNAL_APP_DOMAIN` / `REPLIT_DEV_DOMAIN` / `EXPO_PUBLIC_DOMAIN`) in local shell.
 - [x] V-006 [status:verified] `npm run test:e2e -- tests/e2e/settings.spec.ts tests/e2e/phase2-transition.spec.ts`
-  - Evidence: 2026-02-19 14:12 - pass (6/6).
+  - Evidence: 2026-02-19 14:37 - pass with `--repeat-each=2` (12/12).
 
 ## Residual Risks
 
@@ -115,3 +115,5 @@ Source of truth checklist for a large/intense task.
 - 2026-02-16T19:48:32-0500: Post-commit polish pass fixed preset-state edge cases (stale order metrics and compatibility-guide carryover in transition rehearsal) with added reducer tests and full validation rerun.
 - 2026-02-16T19:53:01-0500: Alternate hardening approach completed (determinism + small-screen UX pass); playtest contract offers are now deterministic per preset and preset modal is scroll-safe on compact devices.
 - 2026-02-19T14:16:24-0500: Recurrence hardening completed for tap-freeze regressions: Settings modal safe-area/scroll fix, transparent story blocker removal, phase2 preset workshop maxing, recurring bug lesson update, and full validation rerun.
+- 2026-02-19T14:32:04-0500: Added an intro-handoff lock guard preventing contracts brief from racing ahead of Phase 2 intro under fast preset transitions; reran lint, full Jest, and transition/settings e2e suites.
+- 2026-02-19T14:38:05-0500: Added repeated e2e stability run (`--repeat-each=2`) for transition/settings modal choreography to reduce race-condition risk before handoff.

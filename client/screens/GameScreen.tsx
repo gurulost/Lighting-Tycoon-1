@@ -934,6 +934,7 @@ export default function GameScreen() {
   const flushPendingPhase2ContractsBrief = useCallback(() => {
     if (!pendingContractsBriefRef.current) return;
     if (phase2ContractsBriefVisible) return;
+    if (phase2IntroHandoffLockRef.current) return;
     if (
       state.gamePhase < 2 ||
       !state.projectsUnlocked ||
