@@ -5,7 +5,7 @@ Source of truth checklist for a large/intense task.
 ## Metadata
 
 - Created: 2026-02-16T18:52:34
-- Last Updated: 2026-02-16T19:48:32-0500
+- Last Updated: 2026-02-19T14:16:24-0500
 - Workspace: /Users/davedixon/Documents/GitHub/Lighting-Tycoon-1
 - Checklist Doc: /Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/docs/phase-2-3-jump-ahead-audit-production-checklist.md
 
@@ -51,6 +51,18 @@ Source of truth checklist for a large/intense task.
   - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/screens/GameScreen.tsx:894`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/e2e/phase2-transition.spec.ts:21`.
   - Owner: codex
   - Linked Fix: P-003
+- [x] F-004 [status:resolved] [P1] [confidence:0.94] Settings modal close control could drift into unsafe/untappable space on compact iOS layouts, trapping players in the modal.
+  - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/components/game/SettingsModal.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/e2e/settings.spec.ts:50`.
+  - Owner: codex
+  - Linked Fix: P-004
+- [x] F-005 [status:resolved] [P1] [confidence:0.95] Transparent story lock overlay could capture taps globally during dialog states, creating a "frozen" game screen.
+  - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/components/game/OverlayManager.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/screens/GameScreen.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/e2e/settings.spec.ts:64`.
+  - Owner: codex
+  - Linked Fix: P-005
+- [x] F-006 [status:resolved] [P2] [confidence:0.9] Playtest `Skip to Phase 2` did not guarantee fully upgraded Open/Salvage workshops for rapid Phase 2 contract testing.
+  - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/context/GameContext.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/unit/phaseTierProgression.test.ts:519`.
+  - Owner: codex
+  - Linked Fix: P-006
 
 ## Fix Log
 
@@ -63,19 +75,30 @@ Source of truth checklist for a large/intense task.
 - [x] P-003 [status:resolved] Add intro-ack lock for project unlock handoff and stabilize jump presets/tests against modal-choreography blockers.
   - Addresses: F-003
   - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/screens/GameScreen.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/context/GameContext.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/e2e/phase2-transition.spec.ts`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/unit/phaseTierProgression.test.ts`.
+- [x] P-004 [status:resolved] Harden Settings modal ergonomics with safe-area-aware container padding, scrollable body, and deterministic close control targeting.
+  - Addresses: F-004
+  - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/components/game/SettingsModal.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/e2e/settings.spec.ts`.
+- [x] P-005 [status:resolved] Remove global transparent story tap blocker path from overlay rendering so dialog presentation no longer steals all gameplay taps.
+  - Addresses: F-005
+  - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/components/game/OverlayManager.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/screens/GameScreen.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/e2e/settings.spec.ts`.
+- [x] P-006 [status:resolved] Upgrade `PLAYTEST_SKIP_PHASE2` bootstrap to force max Open/Salvage workshop readiness and validate via reducer test.
+  - Addresses: F-006
+  - Evidence: `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/client/context/GameContext.tsx`, `/Users/davedixon/Documents/GitHub/Lighting-Tycoon-1/tests/unit/phaseTierProgression.test.ts`.
 
 ## Validation Log
 
 - [x] V-001 [status:accepted_risk] `npm run check:types`
   - Evidence: no typecheck script is configured in this repository (`AGENTS.md` marks typecheck as "Not detected"); lint + full Jest + targeted e2e run green.
 - [x] V-002 [status:verified] `npm run lint`
-  - Evidence: 2026-02-16 19:23 - pass.
+  - Evidence: 2026-02-19 14:11 - pass.
 - [x] V-003 [status:verified] `npm run test -- --runInBand`
-  - Evidence: 2026-02-16 19:24 - pass (19 suites / 92 tests).
+  - Evidence: 2026-02-19 14:11 - pass (19 suites / 94 tests).
 - [x] V-004 [status:verified] `npm run test:e2e -- tests/e2e/phase2-transition.spec.ts`
-  - Evidence: 2026-02-16 19:23 - pass (4/4).
+  - Evidence: 2026-02-19 14:11 - pass (4/4).
 - [x] V-005 [status:accepted_risk] `npm run build`
   - Evidence: server build passed, Expo static build halted due missing deployment-domain env (`REPLIT_INTERNAL_APP_DOMAIN` / `REPLIT_DEV_DOMAIN` / `EXPO_PUBLIC_DOMAIN`) in local shell.
+- [x] V-006 [status:verified] `npm run test:e2e -- tests/e2e/settings.spec.ts tests/e2e/phase2-transition.spec.ts`
+  - Evidence: 2026-02-19 14:12 - pass (6/6).
 
 ## Residual Risks
 
@@ -90,3 +113,5 @@ Source of truth checklist for a large/intense task.
 - 2026-02-17T00:00:00: Scope and queue updated for preset-based playtest jump architecture and transition rehearsal support.
 - 2026-02-16T19:24:29-0500: Reducer + UI + e2e hardening complete; phase-intro handoff race fixed; validation rerun complete; residual modal-choreography risk retained.
 - 2026-02-16T19:48:32-0500: Post-commit polish pass fixed preset-state edge cases (stale order metrics and compatibility-guide carryover in transition rehearsal) with added reducer tests and full validation rerun.
+- 2026-02-16T19:53:01-0500: Alternate hardening approach completed (determinism + small-screen UX pass); playtest contract offers are now deterministic per preset and preset modal is scroll-safe on compact devices.
+- 2026-02-19T14:16:24-0500: Recurrence hardening completed for tap-freeze regressions: Settings modal safe-area/scroll fix, transparent story blocker removal, phase2 preset workshop maxing, recurring bug lesson update, and full validation rerun.

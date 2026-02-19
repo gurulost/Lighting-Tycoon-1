@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -44,12 +44,21 @@ export function PlaytestPresetModal({
                 Choose a deterministic scenario state for fast QA.
               </ThemedText>
             </View>
-            <Pressable style={styles.closeButton} onPress={onClose}>
+            <Pressable
+              style={styles.closeButton}
+              onPress={onClose}
+              testID="playtest-preset-close"
+            >
               <Feather name="x" size={16} color={GameColors.text.secondary} />
             </Pressable>
           </LinearGradient>
 
-          <View style={styles.list}>
+          <ScrollView
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
             {PLAYTEST_PRESET_ORDER.map((presetId) => {
               const preset = PLAYTEST_PRESET_META[presetId];
               return (
@@ -83,7 +92,7 @@ export function PlaytestPresetModal({
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -101,6 +110,7 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     maxWidth: 560,
+    maxHeight: "88%",
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: "#2F3556",
@@ -136,6 +146,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#191D35",
   },
   list: {
+    flexGrow: 0,
+  },
+  listContent: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     gap: Spacing.sm,

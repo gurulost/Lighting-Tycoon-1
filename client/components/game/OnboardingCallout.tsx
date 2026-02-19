@@ -41,6 +41,7 @@ type OnboardingCalloutProps = {
   tone?: OnboardingTone;
   compact?: boolean;
   inset?: boolean;
+  testID?: string;
 };
 
 export function OnboardingCallout({
@@ -49,6 +50,7 @@ export function OnboardingCallout({
   tone = "info",
   compact = false,
   inset = true,
+  testID,
 }: OnboardingCalloutProps) {
   const accent = SPEAKER_COLOR[speaker];
   const stripe = TONE_STRIPE[tone];
@@ -61,6 +63,7 @@ export function OnboardingCallout({
         inset && styles.wrapInset,
         compact && styles.wrapCompact,
       ]}
+      testID={testID}
     >
       <LinearGradient
         colors={[`${accent}22`, "#141428", "#141428", `${accent}14`]}

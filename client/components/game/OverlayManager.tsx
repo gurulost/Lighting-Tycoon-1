@@ -26,7 +26,6 @@ type OverlayManagerProps = {
   reducedMotion?: boolean;
   onStoryPress?: () => void;
   onStoryDismiss?: () => void;
-  momentLockActive?: boolean;
   onTelemetry?: (maxWaitMs: number) => void;
 };
 
@@ -39,7 +38,6 @@ export function OverlayManager({
   reducedMotion = false,
   onStoryPress,
   onStoryDismiss,
-  momentLockActive,
   onTelemetry,
 }: OverlayManagerProps) {
   const nowRef = useRef(Date.now());
@@ -104,9 +102,6 @@ export function OverlayManager({
   const milestoneExit = reducedMotion
     ? FadeOut.duration(150)
     : FadeOut.duration(400);
-  const hasStory = primary?.type === "story" || secondary?.type === "story";
-  const shouldBlockInput = Boolean(momentLockActive && hasStory);
-
   useEffect(() => {
     if (!primary) return undefined;
     if (primary.sticky) return undefined;
@@ -275,9 +270,6 @@ export function OverlayManager({
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {shouldBlockInput ? (
-        <View style={styles.momentLockBlocker} pointerEvents="auto" />
-      ) : null}
       {primary ? renderOverlay(primary, "primary") : null}
       {secondary ? renderOverlay(secondary, "secondary") : null}
     </View>
@@ -387,12 +379,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
     lineHeight: 16,
-  },
-  momentLockBlocker: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
 });

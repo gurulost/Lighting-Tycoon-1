@@ -123,7 +123,10 @@ import {
   SALVAGE_TOP_ROLL,
   SALVAGE_REFURB_TABLES,
 } from "@/constants/dropTables";
-import { getEffectiveSupplierConfig } from "@/constants/suppliers";
+import {
+  getEffectiveSupplierConfig,
+  SUPPLIER_CONFIG,
+} from "@/constants/suppliers";
 import {
   OverlayItem,
   OVERLAY_QUEUE_MAX,
@@ -145,6 +148,10 @@ type GameAction =
   | { type: "MOVE_BACKPACK_ITEM"; fromIndex: number; toIndex: number }
   | { type: "RECYCLE_PART"; source: "board" | "backpack"; index: number }
   | { type: "HIGHLIGHT_ORDER"; orderId?: string }
+  | { type: "ACK_PHASE2_ONBOARDING_INTRO" }
+  | { type: "ACK_PHASE2_ONBOARDING_GOAL_GUIDE" }
+  | { type: "ACK_PHASE2_ONBOARDING_CONTRACTS_BRIEF" }
+  | { type: "ACK_PHASE2_ONBOARDING_OFFERS_COACHMARK" }
   | { type: "CLEAR_RECYCLE_REWARD" }
   | { type: "CLEAR_MISSION_REWARD" }
   | { type: "SET_ORDERS_HELP_SEEN" }
@@ -1114,6 +1121,12 @@ const OPEN_WORKSHOP_LEVELS = RD_DEFINITIONS.map((node) => {
 })
   .filter((level): level is number => typeof level === "number")
   .sort((a, b) => b - a);
+const SALVAGE_WORKSHOP_LEVELS = Object.keys(SUPPLIER_CONFIG.salvage)
+  .map((entry) => Number(entry))
+  .filter((level) => Number.isFinite(level))
+  .sort((a, b) => b - a);
+const MAX_OPEN_WORKSHOP_LEVEL = OPEN_WORKSHOP_LEVELS[0] ?? 1;
+const MAX_SALVAGE_WORKSHOP_LEVEL = SALVAGE_WORKSHOP_LEVELS[0] ?? 1;
 
 function reconcileUpgradeState(state: GameState): GameState {
   let upgradesChanged = false;
@@ -1374,6 +1387,74 @@ const DEFAULT_ORDER_METRICS: GameState["orderMetrics"] = {
   generatedByNeighborhoodModifier: {},
   generatedByType: {},
 };
+const DEFAULT_PHASE2_ONBOARDING: GameState["phase2Onboarding"] = {
+  introSeen: false,
+  goalGuideSeen: false,
+  contractsBriefSeen: false,
+  offersCoachmarkSeen: false,
+};
+
+function getPhase2OnboardingResetState(): GameState["phase2Onboarding"] {
+  return { ...DEFAULT_PHASE2_ONBOARDING };
+}
+
+function normalizePhase2Onboarding(
+  raw: unknown,
+  fallback: GameState["phase2Onboarding"],
+): GameState["phase2Onboarding"] {
+  if (!raw || typeof raw !== "object") return fallback;
+  const candidate = raw as Partial<GameState["phase2Onboarding"]>;
+  return {
+    introSeen:
+      typeof candidate.introSeen === "boolean"
+        ? candidate.introSeen
+        : fallback.introSeen,
+    goalGuideSeen:
+      typeof candidate.goalGuideSeen === "boolean"
+        ? candidate.goalGuideSeen
+        : fallback.goalGuideSeen,
+    contractsBriefSeen:
+      typeof candidate.contractsBriefSeen === "boolean"
+        ? candidate.contractsBriefSeen
+        : fallback.contractsBriefSeen,
+    offersCoachmarkSeen:
+      typeof candidate.offersCoachmarkSeen === "boolean"
+        ? candidate.offersCoachmarkSeen
+        : fallback.offersCoachmarkSeen,
+  };
+}
+
+function buildLoadedPhase2Onboarding(
+  base: GameState["phase2Onboarding"],
+  raw: unknown,
+  context: {
+    gamePhase: GameState["gamePhase"];
+    projectsUnlocked: boolean;
+    hasPhase2GoalOrder: boolean;
+    phase2GoalPending: boolean;
+    projectOffersCount: number;
+    hasActiveProject: boolean;
+    projectsCompletedCount: number;
+  },
+): GameState["phase2Onboarding"] {
+  const inferred: GameState["phase2Onboarding"] =
+    context.gamePhase < 2
+      ? getPhase2OnboardingResetState()
+      : {
+          introSeen: true,
+          goalGuideSeen: !(
+            context.gamePhase === 2 &&
+            !context.projectsUnlocked &&
+            (context.hasPhase2GoalOrder || context.phase2GoalPending)
+          ),
+          contractsBriefSeen: context.projectsUnlocked,
+          offersCoachmarkSeen:
+            context.projectOffersCount === 0 ||
+            context.hasActiveProject ||
+            context.projectsCompletedCount > 0,
+        };
+  return normalizePhase2Onboarding(raw, { ...base, ...inferred });
+}
 const SAVE_DEBOUNCE_MS = 1200;
 const SAVE_MAX_WAIT_MS = 12000;
 const CRITICAL_SAVE_MIN_INTERVAL_MS = 2500;
@@ -2690,6 +2771,8 @@ const PLAYTEST_PHASE2_BASE_RESEARCH = 1200;
 const PLAYTEST_PHASE2_BASE_UPGRADE_MATERIALS = 6;
 const PLAYTEST_PHASE2_BASE_COMPATIBILITY_COMPONENTS = 2;
 const PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL = 3;
+const PLAYTEST_PHASE2_MAX_OPEN_WORKSHOP_LEVEL = MAX_OPEN_WORKSHOP_LEVEL;
+const PLAYTEST_PHASE2_MAX_SALVAGE_WORKSHOP_LEVEL = MAX_SALVAGE_WORKSHOP_LEVEL;
 const PLAYTEST_PHASE2_MIN_MAX_TIER: PartTier = 4;
 const PLAYTEST_PHASE3_BASE_REPUTATION = 2200;
 const PLAYTEST_PHASE3_BASE_CASH = 90000;
@@ -2698,6 +2781,10 @@ const PLAYTEST_PHASE3_BASE_UPGRADE_MATERIALS = 20;
 const PLAYTEST_PHASE3_BASE_COMPATIBILITY_COMPONENTS = 10;
 const PLAYTEST_PHASE3_MIN_OPEN_WORKSHOP_LEVEL = 8;
 const PLAYTEST_PHASE3_MIN_MAX_TIER: PartTier = 13;
+const PLAYTEST_PRESET_OFFER_COUNT = 3;
+const PLAYTEST_PRESET_OFFER_SEED_BASE = 424200;
+const PLAYTEST_PRESET_OFFER_SEED_STEP = 7919;
+const PLAYTEST_PRESET_GENERATED_AT = 2_000_000_000_000;
 const PLAYTEST_STABLE_TRANSITION_PRESETS: ReadonlySet<PlaytestPresetId> =
   new Set([
     "phase2_gate",
@@ -2738,12 +2825,28 @@ function buildPlaytestPhase2GateState(state: GameState): GameState {
     highlightedOrderId: phase2Order.id,
     orderMetrics: phase2OrderMetrics,
     phase2GoalPending: false,
+    phase2Onboarding: getPhase2OnboardingResetState(),
     projectsUnlocked: false,
     projectOffers: [],
     activeProject: undefined,
     projectRevealQueue: [],
     projectDebuff: undefined,
   };
+}
+
+function buildDeterministicPlaytestProjectOffers(
+  state: GameState,
+  count = PLAYTEST_PRESET_OFFER_COUNT,
+): ProjectOffer[] {
+  const candidates = PROJECT_DEFINITIONS.filter((project) =>
+    canOfferProject(project, state),
+  );
+  return candidates.slice(0, count).map((project, index) => ({
+    projectId: project.id,
+    seed:
+      PLAYTEST_PRESET_OFFER_SEED_BASE + index * PLAYTEST_PRESET_OFFER_SEED_STEP,
+    generatedAt: PLAYTEST_PRESET_GENERATED_AT,
+  }));
 }
 
 function buildPlaytestPhase2ContractsReadyState(state: GameState): GameState {
@@ -2768,27 +2871,20 @@ function buildPlaytestPhase2ContractsReadyState(state: GameState): GameState {
     highlightedOrderId,
     orderMetrics: DEFAULT_ORDER_METRICS,
     phase2GoalPending: false,
+    phase2Onboarding: {
+      ...state.phase2Onboarding,
+      introSeen: true,
+      goalGuideSeen: true,
+      contractsBriefSeen: false,
+      offersCoachmarkSeen: false,
+    },
     projectsUnlocked: true,
     projectOffers: [],
     activeProject: undefined,
     projectRevealQueue: [],
     projectDebuff: undefined,
   };
-  let offers = generateProjectOffers(nextState, 3);
-  if (offers.length === 0) {
-    const fallbackProject = PROJECT_DEFINITIONS.find((project) =>
-      canOfferProject(project, nextState),
-    );
-    if (fallbackProject) {
-      offers = [
-        {
-          projectId: fallbackProject.id,
-          seed: Math.floor(Math.random() * 1_000_000),
-          generatedAt: Date.now(),
-        },
-      ];
-    }
-  }
+  const offers = buildDeterministicPlaytestProjectOffers(nextState);
   nextState = {
     ...nextState,
     projectOffers: offers,
@@ -2819,6 +2915,13 @@ function buildPlaytestPhase2RepGateState(state: GameState): GameState {
     highlightedOrderId,
     orderMetrics: DEFAULT_ORDER_METRICS,
     phase2GoalPending: false,
+    phase2Onboarding: {
+      ...state.phase2Onboarding,
+      introSeen: true,
+      goalGuideSeen: true,
+      contractsBriefSeen: true,
+      offersCoachmarkSeen: false,
+    },
     projectsUnlocked: true,
     projectOffers: [],
     activeProject: undefined,
@@ -2895,6 +2998,7 @@ function buildPlaytestPrePhase2TransitionState(state: GameState): GameState {
     highlightedOrderId: lockoutOrder.id,
     orderMetrics: lockoutOrderMetrics,
     phase2GoalPending: false,
+    phase2Onboarding: getPhase2OnboardingResetState(),
     projectsUnlocked: false,
     projectOffers: [],
     activeProject: undefined,
@@ -2912,8 +3016,17 @@ function buildPlaytestPrePhase2TransitionState(state: GameState): GameState {
 }
 
 function stabilizePlaytestPresetState(state: GameState): GameState {
+  const normalizedOffers = state.projectsUnlocked
+    ? buildDeterministicPlaytestProjectOffers(state)
+    : [];
   return {
     ...state,
+    projectOffers: normalizedOffers,
+    projectRevealQueue: updateProjectRevealQueue(
+      [],
+      state.projectRevealSeen,
+      normalizedOffers,
+    ),
     compatibilityGuideStep: 0,
     compatibilityGuideRewardGranted: true,
     lastCompatibilityOrderSpawnedAt: undefined,
@@ -2923,6 +3036,10 @@ function stabilizePlaytestPresetState(state: GameState): GameState {
     overlayTelemetry: {
       maxWaitMs: 0,
       lastShownAt: undefined,
+    },
+    phase2Onboarding: {
+      ...state.phase2Onboarding,
+      offersCoachmarkSeen: false,
     },
     baronOfferAvailable: false,
     baronOfferSeen: true,
@@ -3123,6 +3240,12 @@ function buildLegacyCycleStartState(
     orderMetrics: DEFAULT_ORDER_METRICS,
     orderSpawnCooldownUntil: 0,
     phase2GoalPending: false,
+    phase2Onboarding: {
+      introSeen: true,
+      goalGuideSeen: true,
+      contractsBriefSeen: true,
+      offersCoachmarkSeen: false,
+    },
     projectsUnlocked: true,
     projectOffers: [],
     activeProject: undefined,
@@ -4067,6 +4190,7 @@ export function getInitialState(): GameState {
     liberationComplete: false,
     liberationCompletedAt: undefined,
     phase2GoalPending: false,
+    phase2Onboarding: getPhase2OnboardingResetState(),
     projectsUnlocked: false,
     projectOffers: [],
     activeProject: undefined,
@@ -6082,6 +6206,62 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "ACK_PHASE2_ONBOARDING_INTRO": {
+      if (state.phase2Onboarding.introSeen) return state;
+      captureEvent("phase2_onboarding_step_complete", {
+        step: "intro_brief",
+      });
+      return {
+        ...state,
+        phase2Onboarding: {
+          ...state.phase2Onboarding,
+          introSeen: true,
+        },
+      };
+    }
+
+    case "ACK_PHASE2_ONBOARDING_GOAL_GUIDE": {
+      if (state.phase2Onboarding.goalGuideSeen) return state;
+      captureEvent("phase2_onboarding_step_complete", {
+        step: "goal_guide",
+      });
+      return {
+        ...state,
+        phase2Onboarding: {
+          ...state.phase2Onboarding,
+          goalGuideSeen: true,
+        },
+      };
+    }
+
+    case "ACK_PHASE2_ONBOARDING_CONTRACTS_BRIEF": {
+      if (state.phase2Onboarding.contractsBriefSeen) return state;
+      captureEvent("phase2_onboarding_step_complete", {
+        step: "contracts_brief",
+      });
+      return {
+        ...state,
+        phase2Onboarding: {
+          ...state.phase2Onboarding,
+          contractsBriefSeen: true,
+        },
+      };
+    }
+
+    case "ACK_PHASE2_ONBOARDING_OFFERS_COACHMARK": {
+      if (state.phase2Onboarding.offersCoachmarkSeen) return state;
+      captureEvent("phase2_onboarding_step_complete", {
+        step: "offers_coachmark",
+      });
+      return {
+        ...state,
+        phase2Onboarding: {
+          ...state.phase2Onboarding,
+          offersCoachmarkSeen: true,
+        },
+      };
+    }
+
     case "CLEAR_RECYCLE_REWARD": {
       return {
         ...state,
@@ -6692,6 +6872,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let nextLiberationCompletedAt = state.liberationCompletedAt;
       let nextBaronPressure = dependencyOutcome.baronPressure;
       let nextPhase2GoalPending = state.phase2GoalPending;
+      let nextPhase2Onboarding = state.phase2Onboarding;
       if (lockoutResolution === "baron") {
         nextDependency = 60;
       }
@@ -6704,6 +6885,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             ? state.liberationCompletedAt
             : Date.now();
         nextBaronPressure = 0;
+        nextPhase2Onboarding = getPhase2OnboardingResetState();
       }
 
       const lockoutActiveValue = lockoutResolution
@@ -7476,6 +7658,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (completedPhase2Goal && state.gamePhase === 2) {
         nextProjectsUnlocked = true;
+        nextPhase2Onboarding = {
+          ...nextPhase2Onboarding,
+          goalGuideSeen: true,
+          contractsBriefSeen: false,
+        };
         if (projectOfferRefreshMode !== "force") {
           projectOfferRefreshMode = "if_empty";
         }
@@ -7542,6 +7729,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           choice: lockoutResolution,
           source: "order",
         });
+        if (lockoutResolution === "freedom") {
+          captureEvent("phase2_onboarding_started", {
+            source: "order_fulfill_transition",
+          });
+        }
       }
       if (cashReward > 0) {
         captureEvent("cash_earned", {
@@ -7670,6 +7862,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         liberationComplete: nextLiberationComplete,
         liberationCompletedAt: nextLiberationCompletedAt,
         phase2GoalPending: nextPhase2GoalPending,
+        phase2Onboarding: nextPhase2Onboarding,
         projectsUnlocked: nextProjectsUnlocked,
         projectOffers: nextProjectOffers,
         activeProject: nextActiveProject,
@@ -8966,6 +9159,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         projectOffers: state.projectOffers.filter(
           (entry) => entry.projectId !== project.id,
         ),
+        phase2Onboarding: {
+          ...state.phase2Onboarding,
+          offersCoachmarkSeen: true,
+        },
         suppliers: nextSuppliers,
         undoSnapshot: undefined,
       };
@@ -11468,6 +11665,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
         nextState = queueStoryBeat(nextState, "liberation_victory");
         nextState = queueStoryBeat(nextState, "tina_phase2");
+        captureEvent("phase2_onboarding_started", {
+          source: "lockout_resolve_action",
+        });
         const filteredOrders = state.orders.filter((o) => !o.isLockout);
         const phase2Order = createPhase2GoalOrder(state);
         const insertResult = insertStoryOrder(
@@ -11514,6 +11714,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           highlightedOrderId: nextHighlightedOrderId,
           orderMetrics: nextOrderMetrics,
           phase2GoalPending,
+          phase2Onboarding: getPhase2OnboardingResetState(),
           mentorIndependenceMergesRemaining: 0,
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
@@ -11553,17 +11754,23 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state.upgrades,
         space_1: Math.max(1, state.upgrades["space_1"] || 0),
         rd_unlock: Math.max(1, state.upgrades["rd_unlock"] || 0),
+        salvage_unlock: Math.max(1, state.upgrades["salvage_unlock"] || 0),
+        salvage_tuning: Math.max(1, state.upgrades["salvage_tuning"] || 0),
       };
       const nextRdNodes: Record<string, boolean> = {
         ...state.rdNodes,
         open_standard_1: true,
         open_standard_2: true,
-        open_workshop_1: true,
-        open_workshop_2: true,
-        open_workshop_3: true,
         freedom_blueprint: true,
         freedom_build: true,
       };
+      for (
+        let level = 1;
+        level <= PLAYTEST_PHASE2_MAX_OPEN_WORKSHOP_LEVEL;
+        level += 1
+      ) {
+        nextRdNodes[`open_workshop_${level}`] = true;
+      }
       const seededState: GameState = {
         ...state,
         reputation: nextReputation,
@@ -11608,9 +11815,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const nextOpenLevel = Math.max(
         state.suppliers.open.level,
         PLAYTEST_PHASE2_MIN_OPEN_WORKSHOP_LEVEL,
+        PLAYTEST_PHASE2_MAX_OPEN_WORKSHOP_LEVEL,
       );
       const baronLevel = Math.max(1, state.suppliers.baron.level || 1);
-      const salvageLevel = Math.max(0, state.suppliers.salvage.level || 0);
+      const salvageLevel = Math.max(
+        state.suppliers.salvage.level || 0,
+        PLAYTEST_PHASE2_MAX_SALVAGE_WORKSHOP_LEVEL,
+      );
       const baronEarlyRelief = nextOpenLevel <= 0 && salvageLevel <= 0;
       const openConfig = getSupplierConfigWithPerks(
         seededState,
@@ -11849,6 +12060,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         highlightedOrderId: nextHighlightedOrderId,
         orderMetrics: nextOrderMetrics,
         phase2GoalPending,
+        phase2Onboarding: getPhase2OnboardingResetState(),
         projectsUnlocked: false,
         projectOffers: [],
         activeProject: undefined,
@@ -11864,6 +12076,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       nextState = queueStoryBeat(nextState, "lockout_resolve_freedom");
       nextState = queueStoryBeat(nextState, "liberation_victory");
       nextState = queueStoryBeat(nextState, "tina_phase2");
+      captureEvent("phase2_onboarding_started", {
+        source: "playtest_skip_phase2",
+      });
       if (!phase2GoalPending) {
         nextState = queueStoryBeat(nextState, "phase2_goal");
         nextState = queueStoryBeat(nextState, "tina_compat_order");
@@ -12590,6 +12805,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         typeof action.state.projectDebuff === "object"
           ? (action.state.projectDebuff as ProjectDebuff)
           : base.projectDebuff;
+      const phase2Onboarding = buildLoadedPhase2Onboarding(
+        base.phase2Onboarding ?? DEFAULT_PHASE2_ONBOARDING,
+        action.state.phase2Onboarding,
+        {
+          gamePhase,
+          projectsUnlocked,
+          hasPhase2GoalOrder,
+          phase2GoalPending,
+          projectOffersCount: projectOffers.length,
+          hasActiveProject: Boolean(activeProject),
+          projectsCompletedCount: projectsCompleted.length,
+        },
+      );
       const baseCouncil = base.council ?? buildInitialCouncilState();
       const rawCouncil =
         action.state.council && typeof action.state.council === "object"
@@ -13102,6 +13330,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         liberationComplete,
         liberationCompletedAt,
         phase2GoalPending,
+        phase2Onboarding,
         projectsUnlocked,
         projectOffers,
         activeProject,

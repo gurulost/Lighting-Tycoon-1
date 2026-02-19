@@ -270,6 +270,16 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "Observed max overlay wait time updated.",
     requiredProperties: ["maxWaitMs"],
   },
+  phase2_onboarding_started: {
+    category: "system",
+    description: "Phase 2 onboarding flow was entered.",
+    requiredProperties: ["source"],
+  },
+  phase2_onboarding_step_complete: {
+    category: "system",
+    description: "A Phase 2 onboarding milestone was acknowledged.",
+    requiredProperties: ["step"],
+  },
   project_accept: {
     category: "projects",
     description: "Project contract accepted.",

@@ -392,6 +392,13 @@ export interface RDNode {
   prerequisites: string[];
 }
 
+export interface Phase2OnboardingState {
+  introSeen: boolean;
+  goalGuideSeen: boolean;
+  contractsBriefSeen: boolean;
+  offersCoachmarkSeen: boolean;
+}
+
 export interface GameState {
   board: (Part | null)[];
   boardSize: number;
@@ -420,6 +427,7 @@ export interface GameState {
   liberationComplete: boolean;
   liberationCompletedAt?: number;
   phase2GoalPending: boolean;
+  phase2Onboarding: Phase2OnboardingState;
   projectsUnlocked: boolean;
   projectOffers: ProjectOffer[];
   activeProject?: ActiveProject;

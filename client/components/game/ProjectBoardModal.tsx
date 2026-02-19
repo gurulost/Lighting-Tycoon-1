@@ -561,6 +561,12 @@ export function ProjectBoardModal({
     offersObjective?.kind === "project_complete"
       ? offersObjective.detail
       : undefined;
+  const showOffersCoachmark =
+    activeTab === "offers" &&
+    state.projectsUnlocked &&
+    orderedOffers.length > 0 &&
+    !state.activeProject &&
+    !state.phase2Onboarding.offersCoachmarkSeen;
 
   return (
     <ModalShell
@@ -711,6 +717,44 @@ export function ProjectBoardModal({
           </View>
         ) : activeTab === "offers" ? (
           <View style={styles.offerSection}>
+            {showOffersCoachmark ? (
+              <LinearGradient
+                colors={["#0E2537", "#18263A", "#1A1A2E"]}
+                style={styles.offersCoachmarkCard}
+                testID="phase2-offers-coachmark"
+              >
+                <View style={styles.offersCoachmarkHeader}>
+                  <View style={styles.offersCoachmarkTitleRow}>
+                    <Feather
+                      name="flag"
+                      size={14}
+                      color={GameColors.ui.primary}
+                    />
+                    <ThemedText style={styles.offersCoachmarkTitle}>
+                      First Contract Checklist
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    style={styles.offersCoachmarkButton}
+                    onPress={() =>
+                      dispatch({
+                        type: "ACK_PHASE2_ONBOARDING_OFFERS_COACHMARK",
+                      })
+                    }
+                    testID="phase2-offers-coachmark-ack"
+                  >
+                    <ThemedText style={styles.offersCoachmarkButtonText}>
+                      Got it
+                    </ThemedText>
+                  </Pressable>
+                </View>
+                <ThemedText style={styles.offersCoachmarkBody}>
+                  Pick one offer, verify deposit + addons, and expect stage
+                  deadlines to tick when you fulfill non-project installs.
+                </ThemedText>
+              </LinearGradient>
+            ) : null}
+
             <View style={styles.offerHeaderRow}>
               <ThemedText style={styles.sectionTitle}>
                 Available offers
@@ -1460,6 +1504,48 @@ const styles = StyleSheet.create({
   },
   offerSection: {
     gap: Spacing.lg,
+  },
+  offersCoachmarkCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}45`,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  offersCoachmarkHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+  offersCoachmarkTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    flex: 1,
+  },
+  offersCoachmarkTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  offersCoachmarkBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: GameColors.text.secondary,
+  },
+  offersCoachmarkButton: {
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}55`,
+    backgroundColor: `${GameColors.ui.primary}1A`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  offersCoachmarkButtonText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.ui.primary,
   },
   offerHeaderRow: {
     flexDirection: "row",

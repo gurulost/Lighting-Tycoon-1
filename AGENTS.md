@@ -81,15 +81,15 @@
 <!-- BUG-LESSON:prevent-invisible-touch-blockers-on-gamescreen -->
 ### Prevent invisible touch blockers on GameScreen
 - First seen: 2026-02-16
-- Last seen: 2026-02-16
-- Recurrence count: 1
+- Last seen: 2026-02-19
+- Recurrence count: 2
 - Severity: high
-- Symptom: Players can reach a state where taps stop registering across the whole game screen, especially around Phase 2 transition moments.
-- Root cause: A transparent full-screen blocker can exist without visible UI when modal visibility is driven by stale/indirect state (for example selectedPartIndex stayed set while selectedPart payload became missing). In narrow layouts, split-objective stacked cells using flex:1 can also create oversized transparent pressable regions that capture taps.
-- Why it recurred: Phase-transition work frequently adds overlays, modals, and pressables. Without an explicit final blocker audit, it is easy to ship a view that still captures pointer events when its content is absent or out of bounds.
-- Fix: Gate modal visibility by concrete renderable payload (selectedPartOpen), auto-clear stale selection state, and constrain stacked split-objective cells to non-growing bounds (flex:0, width:100%).
-- Prevention rule: For every UI flow change, run a modal/blocker pass before sign-off: (1) every full-screen Modal/overlay must satisfy visible => renderable content, (2) no stacked pressable should use unconstrained flex growth, (3) execute the Phase 2 narrow-layout e2e tap test before merge.
-- Verification: `npm run test:e2e -- tests/e2e/phase2-transition.spec.ts`
+- Symptom: Players can become stuck with untappable screens: Settings close X sits in an unreachable unsafe-area region, and dialog moments can leave gameplay feeling frozen when touch-capturing blockers remain active.
+- Root cause: Two patterns combined: (1) modal cards without safe-area-aware top/bottom constraints and scrollability can push critical controls off reachable bounds on small devices, and (2) transparent full-screen overlays used as lock blockers can capture all taps even when they provide no visible affordance.
+- Why it recurred: Phase-transition and modal UX work repeatedly introduces overlay/lock state changes and compact-layout pressure; without a final tap-path audit, hidden blockers or offscreen dismiss controls regress easily.
+- Fix: Made settings modal safe-area aware with scrollable content and deterministic close test IDs; removed global transparent story lock blocker path in OverlayManager so taps are not captured by invisible layers; stabilized e2e around dialog open/close responsiveness.
+- Prevention rule: Before merge on any UI/modal change: (1) ensure every dismiss control remains inside safe-area bounds on small screens, (2) forbid transparent full-screen blockers unless they render a required modal affordance, (3) verify state gates with visible => renderable content, and (4) run narrow-layout tap-responsiveness e2e for transition + settings flows.
+- Verification: `npm run test:e2e -- tests/e2e/settings.spec.ts tests/e2e/phase2-transition.spec.ts`
 <!-- BUG-LESSONS:END -->
 <!-- AGENTS-SYNC:CUSTOM-END -->
 

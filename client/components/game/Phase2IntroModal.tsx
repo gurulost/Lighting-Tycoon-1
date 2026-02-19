@@ -11,6 +11,9 @@ import type { PhaseObjectiveState } from "@/lib/objectives";
 interface Phase2IntroModalProps {
   objective: PhaseObjectiveState | null;
   onContinue: () => void;
+  mode?: "phase_intro" | "contracts_unlock";
+  testID?: string;
+  continueTestID?: string;
 }
 
 const OBJECTIVE_ICON: Record<
@@ -28,22 +31,40 @@ const OBJECTIVE_ICON: Record<
 export function Phase2IntroModal({
   objective,
   onContinue,
+  mode = "phase_intro",
+  testID = "phase2-intro-modal",
+  continueTestID = "phase2-intro-continue",
 }: Phase2IntroModalProps) {
+  const isContractsUnlock = mode === "contracts_unlock";
   const nextIcon = objective ? OBJECTIVE_ICON[objective.kind] : "target";
   const nextTitle = objective?.title ?? "Open Spark Showcase";
   const nextSubtitle =
     objective?.subtitle ??
-    "Complete your Phase 2 objective to open Empire Contracts.";
+    (isContractsUnlock
+      ? "Review offers and choose your first city-scale contract."
+      : "Complete your Phase 2 objective to open Empire Contracts.");
   const nextDetail = objective?.detail;
-  const ctaLabel =
-    objective?.action === "open_projects_active"
+  const ctaLabel = isContractsUnlock
+    ? objective?.action === "open_projects_active"
+      ? "Open Active Contract"
+      : "Open Empire Contracts"
+    : objective?.action === "open_projects_active"
       ? "Open Active Contract"
       : objective?.action === "open_projects_offers"
         ? "Open Empire Contracts"
         : "Start Phase 2 Objective";
+  const kickerText = isContractsUnlock
+    ? "Empire Contracts Unlocked"
+    : "Phase 2 Unlocked";
+  const headerTitle = isContractsUnlock
+    ? "City Scale Starts Now"
+    : "Open Spark Ascends";
+  const headerSubtitle = isContractsUnlock
+    ? "Phase 2 contracts are now live. Every offer is a deposit-heavy, staged commitment with visible risk."
+    : "You have moved beyond survival installs. Phase 2 is about empire contracts, staged landmarks, and city-scale reputation.";
 
   return (
-    <View style={styles.backdrop} testID="phase2-intro-modal">
+    <View style={styles.backdrop} testID={testID}>
       <LinearGradient
         colors={["#060913", "#0B1222", "#060913"]}
         style={StyleSheet.absoluteFillObject}
@@ -73,16 +94,17 @@ export function Phase2IntroModal({
 
         <View style={styles.kickerRow}>
           <View style={styles.kickerIcon}>
-            <Feather name="award" size={16} color={GameColors.ui.primary} />
+            <Feather
+              name={isContractsUnlock ? "flag" : "award"}
+              size={16}
+              color={GameColors.ui.primary}
+            />
           </View>
-          <ThemedText style={styles.kickerText}>Phase 2 Unlocked</ThemedText>
+          <ThemedText style={styles.kickerText}>{kickerText}</ThemedText>
         </View>
 
-        <ThemedText style={styles.title}>Open Spark Ascends</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          You have moved beyond survival installs. Phase 2 is about empire
-          contracts, staged landmarks, and city-scale reputation.
-        </ThemedText>
+        <ThemedText style={styles.title}>{headerTitle}</ThemedText>
+        <ThemedText style={styles.subtitle}>{headerSubtitle}</ThemedText>
 
         <View style={styles.nextCard}>
           <View style={styles.nextHeader}>
@@ -110,38 +132,75 @@ export function Phase2IntroModal({
         </View>
 
         <View style={styles.hintList}>
-          <View style={styles.hintRow}>
-            <Feather name="layers" size={12} color={GameColors.ui.success} />
-            <ThemedText style={styles.hintText}>
-              Contracts use staged objectives and larger rewards.
-            </ThemedText>
-          </View>
-          <View style={styles.hintRow}>
-            <Feather
-              name="trending-up"
-              size={12}
-              color={GameColors.ui.primary}
-            />
-            <ThemedText style={styles.hintText}>
-              If offers are empty, raise Rep Tier to unlock more contracts.
-            </ThemedText>
-          </View>
-          <View style={styles.hintRow}>
-            <Feather
-              name="alert-circle"
-              size={12}
-              color={GameColors.ui.warning}
-            />
-            <ThemedText style={styles.hintText}>
-              Stage deadlines and pressure now matter more than ever.
-            </ThemedText>
-          </View>
+          {isContractsUnlock ? (
+            <>
+              <View style={styles.hintRow}>
+                <Feather
+                  name="shield"
+                  size={12}
+                  color={GameColors.ui.warning}
+                />
+                <ThemedText style={styles.hintText}>
+                  Accepting a contract consumes a large deposit.
+                </ThemedText>
+              </View>
+              <View style={styles.hintRow}>
+                <Feather name="clock" size={12} color={GameColors.ui.danger} />
+                <ThemedText style={styles.hintText}>
+                  Deadlines tick down when you fulfill non-project orders.
+                </ThemedText>
+              </View>
+              <View style={styles.hintRow}>
+                <Feather
+                  name="alert-triangle"
+                  size={12}
+                  color={GameColors.ui.warning}
+                />
+                <ThemedText style={styles.hintText}>
+                  Failure can cost deposit, pressure, or temporary rep.
+                </ThemedText>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.hintRow}>
+                <Feather
+                  name="trending-up"
+                  size={12}
+                  color={GameColors.ui.primary}
+                />
+                <ThemedText style={styles.hintText}>
+                  Tier cap is now 13 and order difficulty is higher.
+                </ThemedText>
+              </View>
+              <View style={styles.hintRow}>
+                <Feather
+                  name="activity"
+                  size={12}
+                  color={GameColors.ui.warning}
+                />
+                <ThemedText style={styles.hintText}>
+                  Dependency is frozen at 0. Baron Pressure now taxes rewards.
+                </ThemedText>
+              </View>
+              <View style={styles.hintRow}>
+                <Feather
+                  name="alert-circle"
+                  size={12}
+                  color={GameColors.ui.warning}
+                />
+                <ThemedText style={styles.hintText}>
+                  At 40+ pressure: -10% cash/research. At 70+: -20%.
+                </ThemedText>
+              </View>
+            </>
+          )}
         </View>
 
         <Pressable
           style={styles.primaryButton}
           onPress={onContinue}
-          testID="phase2-intro-continue"
+          testID={continueTestID}
         >
           <LinearGradient
             colors={["#00D9FF", "#3E8CFF"]}

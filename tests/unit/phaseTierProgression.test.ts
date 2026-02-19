@@ -1,5 +1,7 @@
 import { PROJECT_DEFINITIONS } from "@/constants/projects";
+import { SUPPLIER_CONFIG } from "@/constants/suppliers";
 import { __TEST_ONLY__ } from "@/context/GameContext";
+import { RD_DEFINITIONS } from "@/types/game";
 import type { GameState, Order, Part, PartTier } from "@/types/game";
 
 jest.mock("@react-native-async-storage/async-storage", () =>
@@ -41,6 +43,16 @@ function buildSpawnReadyState(state: GameState): GameState {
     orderSpawnCooldownUntil: 0,
   };
 }
+
+const MAX_OPEN_WORKSHOP_LEVEL = Math.max(
+  ...RD_DEFINITIONS.map((node) => {
+    const match = /^open_workshop_(\d+)$/.exec(node.id);
+    return match ? Number(match[1]) : 0;
+  }),
+);
+const MAX_SALVAGE_LEVEL = Math.max(
+  ...Object.keys(SUPPLIER_CONFIG.salvage).map((level) => Number(level)),
+);
 
 describe("phase/tier progression reducer coverage", () => {
   it("enforces merge caps at 13 in Phase 2 and 16 in Phase 3", () => {
@@ -109,6 +121,42 @@ describe("phase/tier progression reducer coverage", () => {
 
     expect(next.gamePhase).toBe(2);
     expect(next.liberationComplete).toBe(true);
+    expect(next.phase2Onboarding).toEqual({
+      introSeen: false,
+      goalGuideSeen: false,
+      contractsBriefSeen: false,
+      offersCoachmarkSeen: false,
+    });
+  });
+
+  it("hydrates Phase 2 onboarding defaults for legacy saves", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const phase2GoalOrder: Order = {
+      ...createOrder("phase2-goal"),
+      modifierIds: ["phase2_goal"],
+    };
+    const legacyPhase2Save = {
+      ...initial,
+      gamePhase: 2,
+      liberationComplete: true,
+      projectsUnlocked: false,
+      phase2GoalPending: true,
+      orders: [phase2GoalOrder],
+      phase2Onboarding: undefined,
+    };
+
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "LOAD_STATE",
+        state: legacyPhase2Save as any,
+      } as any,
+    );
+
+    expect(next.phase2Onboarding.introSeen).toBe(true);
+    expect(next.phase2Onboarding.goalGuideSeen).toBe(false);
+    expect(next.phase2Onboarding.contractsBriefSeen).toBe(false);
+    expect(next.phase2Onboarding.offersCoachmarkSeen).toBe(true);
   });
 
   it("transitions into Phase 3 when Council unlock conditions are met", () => {
@@ -379,6 +427,25 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.orderMetrics).toEqual(initial.orderMetrics);
   });
 
+  it("bootstraps Phase 2 gate preset with maxed open/salvage workshop setup", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_gate",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(2);
+    expect(next.projectsUnlocked).toBe(false);
+    expect(next.suppliers.open.level).toBe(MAX_OPEN_WORKSHOP_LEVEL);
+    expect(next.suppliers.salvage.level).toBe(MAX_SALVAGE_LEVEL);
+    expect(next.rdNodes[`open_workshop_${MAX_OPEN_WORKSHOP_LEVEL}`]).toBe(true);
+    expect(next.upgrades.salvage_unlock).toBeGreaterThanOrEqual(1);
+    expect(next.upgrades.salvage_tuning).toBeGreaterThanOrEqual(1);
+  });
+
   it("bootstraps Phase 2 rep-gate preset without eligible contract offers", () => {
     const initial = __TEST_ONLY__.getInitialState();
     const next = __TEST_ONLY__.gameReducer(
@@ -418,6 +485,41 @@ describe("phase/tier progression reducer coverage", () => {
     expect(
       next.orders.some((order) => order.modifierIds?.includes("phase2_goal")),
     ).toBe(true);
+  });
+
+  it("keeps preset contract offers deterministic across repeated applications", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const firstPhase2 = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_contracts_ready",
+      } as any,
+    );
+    const secondPhase2 = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_contracts_ready",
+      } as any,
+    );
+    expect(firstPhase2.projectOffers).toEqual(secondPhase2.projectOffers);
+
+    const firstPhase3 = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase3_council_live",
+      } as any,
+    );
+    const secondPhase3 = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase3_council_live",
+      } as any,
+    );
+    expect(firstPhase3.projectOffers).toEqual(secondPhase3.projectOffers);
   });
 
   it("caps spawned order requirements to the active phase tier ceiling", () => {

@@ -28,14 +28,24 @@ test("Phase 3 skip defers project handoff until Phase 2 intro is dismissed", asy
   await page.getByTestId("e2e-skip-phase3").click({ force: true });
 
   const phase2Intro = page.getByTestId("phase2-intro-modal");
+  const contractsBrief = page.getByTestId("phase2-contracts-brief-modal");
   const projectBoardTitle = page.getByText("Project Board", { exact: true });
   const revealTitle = page.getByText("New Empire Contract", { exact: true });
   await expect(phase2Intro).toBeVisible({ timeout: 15_000 });
+  await expect(contractsBrief).toBeHidden();
   await expect(projectBoardTitle).toBeHidden();
   await expect(revealTitle).toBeHidden();
 
   await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
   await expect(phase2Intro).toBeHidden({ timeout: 10_000 });
+  await expect(contractsBrief).toBeVisible({ timeout: 10_000 });
+  await expect(projectBoardTitle).toBeHidden();
+  await expect(revealTitle).toBeHidden();
+
+  await page
+    .getByTestId("phase2-contracts-brief-continue")
+    .click({ timeout: 10_000 });
+  await expect(contractsBrief).toBeHidden({ timeout: 10_000 });
   await expect
     .poll(async () => {
       const boardVisible = await projectBoardTitle

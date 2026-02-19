@@ -344,6 +344,10 @@ export function OrdersModal({
   const showProjectsButton = state.gamePhase >= 2;
   const showPhase1Objective = state.gamePhase === 1 && state.tutorialComplete;
   const showPhase2Objective = state.gamePhase === 2 && !state.projectsUnlocked;
+  const showPhase2GoalGuide =
+    state.gamePhase === 2 &&
+    !state.projectsUnlocked &&
+    !state.phase2Onboarding.goalGuideSeen;
   const marketingRemaining = state.marketingBoostOrdersRemaining;
   const marketingActive = marketingRemaining > 0;
   const marketingAtCap = marketingRemaining >= marketingMax;
@@ -480,6 +484,9 @@ export function OrdersModal({
   const phase2GoalHint = phase2GoalOrder
     ? "Tap to highlight it in your Orders list."
     : "Goal order arrives when there's room in the queue.";
+  const phase2GoalGuideMessage = phase2GoalOrder
+    ? "Phase 2 walkthrough: complete Open Spark Showcase to unlock Empire Contracts. Use this card to highlight it, then fulfill with compatible open parts."
+    : "Phase 2 walkthrough: Open Spark Showcase is queued. Clear one order slot, then return here and fulfill it to unlock Empire Contracts.";
   const handleHighlightPhase2Goal = React.useCallback(() => {
     if (!phase2GoalOrder) return;
     dispatch({ type: "HIGHLIGHT_ORDER", orderId: phase2GoalOrder.id });
@@ -549,6 +556,11 @@ export function OrdersModal({
     }, 3200);
     return () => clearTimeout(timeout);
   }, [showOrdersHint, handleDismissOrdersHint]);
+
+  React.useEffect(() => {
+    if (!showPhase2GoalGuide) return;
+    dispatch({ type: "ACK_PHASE2_ONBOARDING_GOAL_GUIDE" });
+  }, [dispatch, showPhase2GoalGuide]);
 
   React.useEffect(() => {
     return () => {
@@ -803,6 +815,15 @@ export function OrdersModal({
               </View>
             ) : null}
           </Pressable>
+        ) : null}
+
+        {showPhase2GoalGuide ? (
+          <OnboardingCallout
+            speaker="mentor"
+            tone="warning"
+            testID="phase2-goal-guide-callout"
+            message={phase2GoalGuideMessage}
+          />
         ) : null}
 
         {isTutorialOrdersStep ? (

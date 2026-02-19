@@ -3,10 +3,12 @@ import {
   View,
   StyleSheet,
   Pressable,
+  ScrollView,
   Switch,
   Alert,
   TextInput,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
@@ -74,6 +76,7 @@ export function SettingsModal({
   debugOverlayEnabled,
   onToggleDebugOverlay,
 }: SettingsModalProps) {
+  const insets = useSafeAreaInsets();
   const { state, dispatch, applyPlaytestPreset } = useGame();
   const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
   const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
@@ -219,7 +222,13 @@ export function SettingsModal({
 
   return (
     <Pressable
-      style={styles.overlay}
+      style={[
+        styles.overlay,
+        {
+          paddingTop: Math.max(Spacing.xl, insets.top + Spacing.md),
+          paddingBottom: Math.max(Spacing.xl, insets.bottom + Spacing.md),
+        },
+      ]}
       onPress={resetChallengeVisible ? closeResetChallenge : onClose}
       testID="settings-modal"
     >
@@ -233,256 +242,264 @@ export function SettingsModal({
           icon="settings"
           iconColor={GameColors.ui.primary}
           onClose={onClose}
+          closeTestID="settings-modal-close"
           variant="card"
         >
-          <View style={styles.content}>
-            <SettingRow
-              icon="volume-2"
-              label="Sound Effects"
-              description="Play sounds during gameplay"
-              value={soundEnabled}
-              onValueChange={(value) =>
-                dispatch({
-                  type: "UPDATE_SETTINGS",
-                  settings: { soundEnabled: value },
-                })
-              }
-              color={GameColors.ui.primary}
-            />
-
-            <SettingRow
-              icon="smartphone"
-              label="Haptic Feedback"
-              description="Vibrate on actions"
-              value={hapticsEnabled}
-              onValueChange={(value) =>
-                dispatch({
-                  type: "UPDATE_SETTINGS",
-                  settings: { hapticsEnabled: value },
-                })
-              }
-              color={GameColors.currency.research}
-            />
-
-            <SettingRow
-              icon="activity"
-              label="Reduced Motion"
-              description="Tone down animations and effects"
-              value={reducedMotion}
-              onValueChange={(value) =>
-                dispatch({
-                  type: "UPDATE_SETTINGS",
-                  settings: { reducedMotion: value },
-                })
-              }
-              color={GameColors.currency.cash}
-            />
-
-            {__DEV__ && onToggleDebugOverlay ? (
+          <ScrollView
+            style={styles.scrollBody}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.content}>
               <SettingRow
-                icon="cpu"
-                label="Debug Overlay"
-                description="Show live perf + state counters"
-                value={!!debugOverlayEnabled}
-                onValueChange={onToggleDebugOverlay}
-                color={GameColors.ui.success}
+                icon="volume-2"
+                label="Sound Effects"
+                description="Play sounds during gameplay"
+                value={soundEnabled}
+                onValueChange={(value) =>
+                  dispatch({
+                    type: "UPDATE_SETTINGS",
+                    settings: { soundEnabled: value },
+                  })
+                }
+                color={GameColors.ui.primary}
               />
-            ) : null}
 
-            <Pressable
-              style={styles.actionRow}
-              onPress={() =>
-                Alert.alert(
-                  "Replay Tutorial",
-                  "This will restart the tutorial and pause new orders until you finish it.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Replay",
-                      style: "destructive",
-                      onPress: () => {
-                        dispatch({ type: "RESET_TUTORIAL" });
-                        onClose();
-                      },
-                    },
-                  ],
-                )
-              }
-            >
-              <LinearGradient
-                colors={[
-                  `${GameColors.ui.primary}30`,
-                  `${GameColors.ui.primary}10`,
-                ]}
-                style={styles.settingIcon}
-              >
-                <Feather
-                  name="refresh-cw"
-                  size={20}
-                  color={GameColors.ui.primary}
-                />
-              </LinearGradient>
-              <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>
-                  Replay Tutorial
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Restart the guided onboarding steps
-                </ThemedText>
-              </View>
-            </Pressable>
+              <SettingRow
+                icon="smartphone"
+                label="Haptic Feedback"
+                description="Vibrate on actions"
+                value={hapticsEnabled}
+                onValueChange={(value) =>
+                  dispatch({
+                    type: "UPDATE_SETTINGS",
+                    settings: { hapticsEnabled: value },
+                  })
+                }
+                color={GameColors.currency.research}
+              />
 
-            <Pressable style={styles.actionRow} onPress={handleResetGame}>
-              <LinearGradient
-                colors={[
-                  `${GameColors.ui.danger}30`,
-                  `${GameColors.ui.danger}10`,
-                ]}
-                style={styles.settingIcon}
-              >
-                <Feather
-                  name="trash-2"
-                  size={20}
-                  color={GameColors.ui.danger}
-                />
-              </LinearGradient>
-              <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>
-                  Restart Game
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Erase progress and start from the beginning
-                </ThemedText>
-              </View>
-            </Pressable>
+              <SettingRow
+                icon="activity"
+                label="Reduced Motion"
+                description="Tone down animations and effects"
+                value={reducedMotion}
+                onValueChange={(value) =>
+                  dispatch({
+                    type: "UPDATE_SETTINGS",
+                    settings: { reducedMotion: value },
+                  })
+                }
+                color={GameColors.currency.cash}
+              />
 
-            <Pressable
-              style={styles.actionRow}
-              onPress={() => setPlaytestPresetVisible(true)}
-              testID="settings-playtest-presets"
-            >
-              <LinearGradient
-                colors={[
-                  `${GameColors.ui.primary}30`,
-                  `${GameColors.ui.primary}10`,
-                ]}
-                style={styles.settingIcon}
-              >
-                <Feather name="map" size={20} color={GameColors.ui.primary} />
-              </LinearGradient>
-              <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>
-                  Playtest: Jump Presets
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Transition rehearsal + targeted Phase 2/3 scenario bootstraps
-                </ThemedText>
-              </View>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.actionRow,
-                !canSkipPhase2 && styles.actionRowDisabled,
-              ]}
-              onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
-              testID="settings-skip-phase2"
-            >
-              <LinearGradient
-                colors={[
-                  `${GameColors.currency.research}30`,
-                  `${GameColors.currency.research}10`,
-                ]}
-                style={styles.settingIcon}
-              >
-                <Feather
-                  name="skip-forward"
-                  size={20}
-                  color={GameColors.currency.research}
-                />
-              </LinearGradient>
-              <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>
-                  Playtest: Skip to Phase 2
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  {canSkipPhase2
-                    ? "Bootstrap a fresh save into a Phase 2-ready state"
-                    : "Already in Phase 2 or later"}
-                </ThemedText>
-              </View>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.actionRow,
-                !canSkipPhase3 && styles.actionRowDisabled,
-              ]}
-              onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
-              testID="settings-skip-phase3"
-            >
-              <LinearGradient
-                colors={[
-                  `${GameColors.ui.success}30`,
-                  `${GameColors.ui.success}10`,
-                ]}
-                style={styles.settingIcon}
-              >
-                <Feather
-                  name="fast-forward"
-                  size={20}
+              {__DEV__ && onToggleDebugOverlay ? (
+                <SettingRow
+                  icon="cpu"
+                  label="Debug Overlay"
+                  description="Show live perf + state counters"
+                  value={!!debugOverlayEnabled}
+                  onValueChange={onToggleDebugOverlay}
                   color={GameColors.ui.success}
                 />
-              </LinearGradient>
-              <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>
-                  Playtest: Skip to Phase 3
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  {canSkipPhase3
-                    ? "Bootstrap into a Council-unlocked Phase 3 state"
-                    : "Already in Phase 3"}
-                </ThemedText>
-              </View>
-            </Pressable>
+              ) : null}
 
-            <Pressable
-              style={styles.actionRow}
-              onPress={() => {
-                onOpenGlossary?.();
-                onClose();
-              }}
-            >
-              <LinearGradient
-                colors={[
-                  `${GameColors.ui.primary}30`,
-                  `${GameColors.ui.primary}10`,
-                ]}
-                style={styles.settingIcon}
+              <Pressable
+                style={styles.actionRow}
+                onPress={() =>
+                  Alert.alert(
+                    "Replay Tutorial",
+                    "This will restart the tutorial and pause new orders until you finish it.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Replay",
+                        style: "destructive",
+                        onPress: () => {
+                          dispatch({ type: "RESET_TUTORIAL" });
+                          onClose();
+                        },
+                      },
+                    ],
+                  )
+                }
               >
-                <Feather
-                  name="help-circle"
-                  size={20}
-                  color={GameColors.ui.primary}
-                />
-              </LinearGradient>
-              <View style={styles.settingContent}>
-                <ThemedText style={styles.settingLabel}>Glossary</ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Icons, badges, and systems explained
-                </ThemedText>
-              </View>
-            </Pressable>
-          </View>
+                <LinearGradient
+                  colors={[
+                    `${GameColors.ui.primary}30`,
+                    `${GameColors.ui.primary}10`,
+                  ]}
+                  style={styles.settingIcon}
+                >
+                  <Feather
+                    name="refresh-cw"
+                    size={20}
+                    color={GameColors.ui.primary}
+                  />
+                </LinearGradient>
+                <View style={styles.settingContent}>
+                  <ThemedText style={styles.settingLabel}>
+                    Replay Tutorial
+                  </ThemedText>
+                  <ThemedText style={styles.settingDescription}>
+                    Restart the guided onboarding steps
+                  </ThemedText>
+                </View>
+              </Pressable>
 
-          <View style={styles.footer}>
-            <View style={styles.versionContainer}>
-              <ThemedText style={styles.versionLabel}>
-                Lighting Tycoon
-              </ThemedText>
-              <ThemedText style={styles.versionNumber}>v1.0.0</ThemedText>
+              <Pressable style={styles.actionRow} onPress={handleResetGame}>
+                <LinearGradient
+                  colors={[
+                    `${GameColors.ui.danger}30`,
+                    `${GameColors.ui.danger}10`,
+                  ]}
+                  style={styles.settingIcon}
+                >
+                  <Feather
+                    name="trash-2"
+                    size={20}
+                    color={GameColors.ui.danger}
+                  />
+                </LinearGradient>
+                <View style={styles.settingContent}>
+                  <ThemedText style={styles.settingLabel}>
+                    Restart Game
+                  </ThemedText>
+                  <ThemedText style={styles.settingDescription}>
+                    Erase progress and start from the beginning
+                  </ThemedText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={styles.actionRow}
+                onPress={() => setPlaytestPresetVisible(true)}
+                testID="settings-playtest-presets"
+              >
+                <LinearGradient
+                  colors={[
+                    `${GameColors.ui.primary}30`,
+                    `${GameColors.ui.primary}10`,
+                  ]}
+                  style={styles.settingIcon}
+                >
+                  <Feather name="map" size={20} color={GameColors.ui.primary} />
+                </LinearGradient>
+                <View style={styles.settingContent}>
+                  <ThemedText style={styles.settingLabel}>
+                    Playtest: Jump Presets
+                  </ThemedText>
+                  <ThemedText style={styles.settingDescription}>
+                    Transition rehearsal + targeted Phase 2/3 scenario
+                    bootstraps
+                  </ThemedText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.actionRow,
+                  !canSkipPhase2 && styles.actionRowDisabled,
+                ]}
+                onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
+                testID="settings-skip-phase2"
+              >
+                <LinearGradient
+                  colors={[
+                    `${GameColors.currency.research}30`,
+                    `${GameColors.currency.research}10`,
+                  ]}
+                  style={styles.settingIcon}
+                >
+                  <Feather
+                    name="skip-forward"
+                    size={20}
+                    color={GameColors.currency.research}
+                  />
+                </LinearGradient>
+                <View style={styles.settingContent}>
+                  <ThemedText style={styles.settingLabel}>
+                    Playtest: Skip to Phase 2
+                  </ThemedText>
+                  <ThemedText style={styles.settingDescription}>
+                    {canSkipPhase2
+                      ? "Bootstrap a fresh save into a Phase 2-ready state"
+                      : "Already in Phase 2 or later"}
+                  </ThemedText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.actionRow,
+                  !canSkipPhase3 && styles.actionRowDisabled,
+                ]}
+                onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
+                testID="settings-skip-phase3"
+              >
+                <LinearGradient
+                  colors={[
+                    `${GameColors.ui.success}30`,
+                    `${GameColors.ui.success}10`,
+                  ]}
+                  style={styles.settingIcon}
+                >
+                  <Feather
+                    name="fast-forward"
+                    size={20}
+                    color={GameColors.ui.success}
+                  />
+                </LinearGradient>
+                <View style={styles.settingContent}>
+                  <ThemedText style={styles.settingLabel}>
+                    Playtest: Skip to Phase 3
+                  </ThemedText>
+                  <ThemedText style={styles.settingDescription}>
+                    {canSkipPhase3
+                      ? "Bootstrap into a Council-unlocked Phase 3 state"
+                      : "Already in Phase 3"}
+                  </ThemedText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={styles.actionRow}
+                onPress={() => {
+                  onOpenGlossary?.();
+                  onClose();
+                }}
+              >
+                <LinearGradient
+                  colors={[
+                    `${GameColors.ui.primary}30`,
+                    `${GameColors.ui.primary}10`,
+                  ]}
+                  style={styles.settingIcon}
+                >
+                  <Feather
+                    name="help-circle"
+                    size={20}
+                    color={GameColors.ui.primary}
+                  />
+                </LinearGradient>
+                <View style={styles.settingContent}>
+                  <ThemedText style={styles.settingLabel}>Glossary</ThemedText>
+                  <ThemedText style={styles.settingDescription}>
+                    Icons, badges, and systems explained
+                  </ThemedText>
+                </View>
+              </Pressable>
             </View>
-          </View>
+
+            <View style={styles.footer}>
+              <View style={styles.versionContainer}>
+                <ThemedText style={styles.versionLabel}>
+                  Lighting Tycoon
+                </ThemedText>
+                <ThemedText style={styles.versionNumber}>v1.0.0</ThemedText>
+              </View>
+            </View>
+          </ScrollView>
         </ModalShell>
       </Pressable>
 
@@ -567,6 +584,13 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "100%",
     maxWidth: 400,
+    maxHeight: "100%",
+  },
+  scrollBody: {
+    maxHeight: "100%",
+  },
+  scrollContent: {
+    paddingBottom: Spacing.sm,
   },
   content: {
     padding: Spacing.lg,

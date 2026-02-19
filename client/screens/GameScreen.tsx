@@ -303,6 +303,8 @@ export default function GameScreen() {
     useState<ProjectBoardTab | null>(null);
   const [projectBoardOpenId, setProjectBoardOpenId] = useState(0);
   const [phase2IntroVisible, setPhase2IntroVisible] = useState(false);
+  const [phase2ContractsBriefVisible, setPhase2ContractsBriefVisible] =
+    useState(false);
   const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
     null,
@@ -383,6 +385,7 @@ export default function GameScreen() {
     projectsUnlocked: state.projectsUnlocked,
   });
   const phase2IntroHandoffLockRef = useRef(false);
+  const pendingContractsBriefRef = useRef(false);
   const pendingProjectsUnlockHandoffRef =
     useRef<PendingProjectsUnlockHandoff | null>(null);
   const [momentLockActive, setMomentLockActive] = useState(false);
@@ -662,15 +665,35 @@ export default function GameScreen() {
   const handlePhase2IntroContinue = useCallback(() => {
     phase2IntroHandoffLockRef.current = false;
     setPhase2IntroVisible(false);
+    dispatch({ type: "ACK_PHASE2_ONBOARDING_INTRO" });
     if (phase2GoalOrderId) {
       dispatch({ type: "HIGHLIGHT_ORDER", orderId: phase2GoalOrderId });
+    }
+    if (
+      state.projectsUnlocked &&
+      !state.phase2Onboarding.contractsBriefSeen &&
+      !state.phase2Onboarding.introSeen
+    ) {
+      pendingContractsBriefRef.current = true;
+      return;
     }
     InteractionManager.runAfterInteractions(() => {
       requestAnimationFrame(() => {
         handlePhaseObjectivePress();
       });
     });
-  }, [dispatch, handlePhaseObjectivePress, phase2GoalOrderId]);
+  }, [
+    dispatch,
+    handlePhaseObjectivePress,
+    phase2GoalOrderId,
+    state.phase2Onboarding.contractsBriefSeen,
+    state.phase2Onboarding.introSeen,
+    state.projectsUnlocked,
+  ]);
+  const handlePhase2ContractsBriefContinue = useCallback(() => {
+    setPhase2ContractsBriefVisible(false);
+    dispatch({ type: "ACK_PHASE2_ONBOARDING_CONTRACTS_BRIEF" });
+  }, [dispatch]);
   const dismissProjectReveal = useCallback(() => {
     if (!pendingProjectRevealId) return;
     dispatch({
@@ -870,6 +893,7 @@ export default function GameScreen() {
   const storyBlocked =
     activeModal !== null ||
     phase2IntroVisible ||
+    phase2ContractsBriefVisible ||
     state.baronOfferAvailable ||
     showLockoutModal ||
     selectedPartOpen ||
@@ -882,12 +906,14 @@ export default function GameScreen() {
     !selectedPartOpen &&
     !showLockoutModal &&
     !phase2IntroVisible &&
+    !phase2ContractsBriefVisible &&
     overlayQueue.length === 0 &&
     !(state.baronOfferAvailable && baronOfferGate);
   const isProjectsUnlockHandoffBlocked = useCallback(
     () =>
       phase2IntroHandoffLockRef.current ||
       phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
       showLockoutModal ||
       selectedPartOpen ||
       Boolean(projectDossierId) ||
@@ -897,6 +923,7 @@ export default function GameScreen() {
         activeModal !== "projects"),
     [
       phase2IntroVisible,
+      phase2ContractsBriefVisible,
       showLockoutModal,
       selectedPartOpen,
       projectDossierId,
@@ -904,9 +931,56 @@ export default function GameScreen() {
       activeModal,
     ],
   );
+  const flushPendingPhase2ContractsBrief = useCallback(() => {
+    if (!pendingContractsBriefRef.current) return;
+    if (phase2ContractsBriefVisible) return;
+    if (
+      state.gamePhase < 2 ||
+      !state.projectsUnlocked ||
+      state.phase2Onboarding.contractsBriefSeen
+    ) {
+      pendingContractsBriefRef.current = false;
+      return;
+    }
+    if (!state.phase2Onboarding.introSeen) return;
+    if (
+      phase2IntroVisible ||
+      showLockoutModal ||
+      selectedPartOpen ||
+      Boolean(projectDossierId) ||
+      isDragging
+    ) {
+      return;
+    }
+    if (activeModal !== null) {
+      setActiveModal(null);
+      return;
+    }
+    pendingContractsBriefRef.current = false;
+    setPhase2ContractsBriefVisible(true);
+  }, [
+    phase2ContractsBriefVisible,
+    state.gamePhase,
+    state.projectsUnlocked,
+    state.phase2Onboarding.introSeen,
+    state.phase2Onboarding.contractsBriefSeen,
+    phase2IntroVisible,
+    showLockoutModal,
+    selectedPartOpen,
+    projectDossierId,
+    isDragging,
+    activeModal,
+  ]);
   const flushPendingProjectsUnlockHandoff = useCallback(() => {
     const pending = pendingProjectsUnlockHandoffRef.current;
     if (!pending || isProjectsUnlockHandoffBlocked()) return;
+    if (
+      state.gamePhase >= 2 &&
+      state.projectsUnlocked &&
+      !state.phase2Onboarding.contractsBriefSeen
+    ) {
+      return;
+    }
     pendingProjectsUnlockHandoffRef.current = null;
     requestAnimationFrame(() => {
       openProjectBoard({
@@ -915,7 +989,14 @@ export default function GameScreen() {
       });
       showToast(pending.toastMessage, pending.toastDurationMs);
     });
-  }, [openProjectBoard, isProjectsUnlockHandoffBlocked, showToast]);
+  }, [
+    openProjectBoard,
+    isProjectsUnlockHandoffBlocked,
+    showToast,
+    state.gamePhase,
+    state.projectsUnlocked,
+    state.phase2Onboarding.contractsBriefSeen,
+  ]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -924,17 +1005,41 @@ export default function GameScreen() {
         initialized: true,
         gamePhase: state.gamePhase,
       };
+      if (
+        state.gamePhase >= 2 &&
+        !state.phase2Onboarding.introSeen &&
+        !phase2IntroVisible &&
+        !phase2ContractsBriefVisible
+      ) {
+        phase2IntroHandoffLockRef.current = true;
+        setActiveModal(null);
+        setPhase2IntroVisible(true);
+      }
       return;
     }
     const previousPhase = phaseTransitionRef.current.gamePhase;
     phaseTransitionRef.current.gamePhase = state.gamePhase;
-    if (previousPhase < 2 && state.gamePhase >= 2) {
+    const enteredPhase2 = previousPhase < 2 && state.gamePhase >= 2;
+    if (
+      state.gamePhase >= 2 &&
+      !state.phase2Onboarding.introSeen &&
+      !phase2IntroVisible &&
+      !phase2ContractsBriefVisible
+    ) {
       phase2IntroHandoffLockRef.current = true;
       setActiveModal(null);
       setPhase2IntroVisible(true);
-      SoundManager.play("rd_unlock");
+      if (enteredPhase2) {
+        SoundManager.play("rd_unlock");
+      }
     }
-  }, [hydrated, state.gamePhase]);
+  }, [
+    hydrated,
+    state.gamePhase,
+    state.phase2Onboarding.introSeen,
+    phase2IntroVisible,
+    phase2ContractsBriefVisible,
+  ]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -943,14 +1048,18 @@ export default function GameScreen() {
         initialized: true,
         projectsUnlocked: state.projectsUnlocked,
       };
-      return;
     }
     const wasUnlocked = projectsUnlockTransitionRef.current.projectsUnlocked;
     projectsUnlockTransitionRef.current.projectsUnlocked =
       state.projectsUnlocked;
     if (!state.projectsUnlocked || state.gamePhase < 2) {
       pendingProjectsUnlockHandoffRef.current = null;
+      pendingContractsBriefRef.current = false;
+      setPhase2ContractsBriefVisible(false);
       return;
+    }
+    if (!state.phase2Onboarding.contractsBriefSeen) {
+      pendingContractsBriefRef.current = true;
     }
     if (wasUnlocked) return;
 
@@ -969,15 +1078,22 @@ export default function GameScreen() {
       toastMessage,
       toastDurationMs,
     };
+    flushPendingPhase2ContractsBrief();
     flushPendingProjectsUnlockHandoff();
   }, [
     hydrated,
     state.projectsUnlocked,
     state.gamePhase,
     state.projectOffers,
+    state.phase2Onboarding.contractsBriefSeen,
     phaseObjective,
+    flushPendingPhase2ContractsBrief,
     flushPendingProjectsUnlockHandoff,
   ]);
+
+  useEffect(() => {
+    flushPendingPhase2ContractsBrief();
+  }, [flushPendingPhase2ContractsBrief]);
 
   useEffect(() => {
     flushPendingProjectsUnlockHandoff();
@@ -986,6 +1102,7 @@ export default function GameScreen() {
   useEffect(() => {
     return () => {
       pendingProjectsUnlockHandoffRef.current = null;
+      pendingContractsBriefRef.current = false;
     };
   }, []);
 
@@ -2027,7 +2144,6 @@ export default function GameScreen() {
         reducedMotion={state.settings.reducedMotion}
         onStoryPress={handleStoryPress}
         onStoryDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
-        momentLockActive={momentLockActive}
         onTelemetry={handleOverlayTelemetry}
       />
 
@@ -2057,8 +2173,26 @@ export default function GameScreen() {
         onRequestClose={handlePhase2IntroContinue}
       >
         <Phase2IntroModal
+          mode="phase_intro"
+          testID="phase2-intro-modal"
+          continueTestID="phase2-intro-continue"
           objective={phaseObjective}
           onContinue={handlePhase2IntroContinue}
+        />
+      </Modal>
+
+      <Modal
+        visible={phase2ContractsBriefVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={handlePhase2ContractsBriefContinue}
+      >
+        <Phase2IntroModal
+          mode="contracts_unlock"
+          testID="phase2-contracts-brief-modal"
+          continueTestID="phase2-contracts-brief-continue"
+          objective={phaseObjective}
+          onContinue={handlePhase2ContractsBriefContinue}
         />
       </Modal>
 
