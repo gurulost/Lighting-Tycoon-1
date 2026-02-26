@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -26,6 +26,7 @@ type OverlayManagerProps = {
   reducedMotion?: boolean;
   onStoryPress?: () => void;
   onStoryDismiss?: () => void;
+  onUnlockBannerPress?: () => void;
   onTelemetry?: (maxWaitMs: number) => void;
 };
 
@@ -38,6 +39,7 @@ export function OverlayManager({
   reducedMotion = false,
   onStoryPress,
   onStoryDismiss,
+  onUnlockBannerPress,
   onTelemetry,
 }: OverlayManagerProps) {
   const nowRef = useRef(Date.now());
@@ -199,11 +201,13 @@ export function OverlayManager({
       const message =
         (item.payload?.message as string) ??
         "Standards Council is open. Draft standards to shape the city.";
+      const ctaLabel = (item.payload?.ctaLabel as string) ?? "Open Council";
+      const canActionUnlockBanner = typeof onUnlockBannerPress === "function";
       return (
         <View
           key={item.id}
           style={[styles.unlockSlot, { bottom: bottomInset + 140 }]}
-          pointerEvents="none"
+          pointerEvents="box-none"
         >
           <LinearGradient
             colors={["#0F2A3D", "#0F2435", "#101626"]}
@@ -220,6 +224,40 @@ export function OverlayManager({
               <ThemedText style={styles.unlockTitle}>{title}</ThemedText>
             </View>
             <ThemedText style={styles.unlockMessage}>{message}</ThemedText>
+            <View style={styles.unlockActions}>
+              {canActionUnlockBanner ? (
+                <Pressable
+                  style={styles.unlockPrimaryButton}
+                  onPress={() => {
+                    onUnlockBannerPress();
+                    onDismiss(item.id);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={ctaLabel}
+                >
+                  <Feather
+                    name="award"
+                    size={13}
+                    color={GameColors.currency.research}
+                  />
+                  <ThemedText style={styles.unlockPrimaryButtonText}>
+                    {ctaLabel}
+                  </ThemedText>
+                </Pressable>
+              ) : (
+                <ThemedText style={styles.unlockPassiveLabel}>
+                  Council unlocked
+                </ThemedText>
+              )}
+              <Pressable
+                style={styles.unlockDismissButton}
+                onPress={() => onDismiss(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss unlock message"
+              >
+                <Feather name="x" size={13} color={GameColors.text.secondary} />
+              </Pressable>
+            </View>
           </LinearGradient>
         </View>
       );
@@ -379,5 +417,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: GameColors.text.secondary,
     lineHeight: 16,
+  },
+  unlockActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  unlockPrimaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: `${GameColors.currency.research}55`,
+    backgroundColor: `${GameColors.currency.research}14`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  unlockPrimaryButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.currency.research,
+  },
+  unlockPassiveLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: GameColors.text.secondary,
+  },
+  unlockDismissButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#33465A",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10, 19, 30, 0.65)",
   },
 });

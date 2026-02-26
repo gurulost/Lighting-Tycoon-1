@@ -280,6 +280,129 @@ export const TELEMETRY_EVENT_CATALOG = {
     description: "A Phase 2 onboarding milestone was acknowledged.",
     requiredProperties: ["step"],
   },
+  phase2_playbook_opened: {
+    category: "system",
+    description: "Phase 2 playbook help was opened.",
+    requiredProperties: ["source"],
+  },
+  phase2_playbook_item_viewed: {
+    category: "system",
+    description: "Phase 2 playbook state or action was viewed.",
+    requiredProperties: ["item", "stage"],
+  },
+  phase2_rescue_hint_shown: {
+    category: "system",
+    description: "An adaptive Phase 2 rescue hint was shown.",
+    requiredProperties: ["hintId", "stage"],
+  },
+  phase2_rescue_hint_dismissed: {
+    category: "system",
+    description: "An adaptive Phase 2 rescue hint was dismissed.",
+    requiredProperties: ["hintId", "reason"],
+  },
+  phase2_rescue_hint_actioned: {
+    category: "system",
+    description: "Player acted on an adaptive Phase 2 rescue hint.",
+    requiredProperties: ["hintId", "action"],
+  },
+  phase2_first_contract_accepted: {
+    category: "projects",
+    description: "The first Empire Contract was accepted in Phase 2.",
+    requiredProperties: ["projectId"],
+  },
+  phase2_first_stage_completed: {
+    category: "projects",
+    description: "The first project stage completion was recorded in Phase 2.",
+    requiredProperties: ["projectId", "stageIndex"],
+  },
+  phase2_first_stage_failed: {
+    category: "projects",
+    description: "The first project stage failure was recorded in Phase 2.",
+    requiredProperties: ["projectId", "stageIndex", "source"],
+  },
+  phase3_onboarding_started: {
+    category: "system",
+    description: "Phase 3 onboarding flow was entered.",
+    requiredProperties: ["source"],
+  },
+  phase3_onboarding_step_complete: {
+    category: "system",
+    description: "A Phase 3 onboarding milestone was acknowledged.",
+    requiredProperties: ["step"],
+  },
+  phase3_playbook_opened: {
+    category: "system",
+    description: "Phase 3 playbook help was opened.",
+    requiredProperties: ["source"],
+  },
+  phase3_playbook_item_viewed: {
+    category: "system",
+    description: "Phase 3 playbook state or action was viewed.",
+    requiredProperties: ["item", "stage"],
+  },
+  phase3_rescue_hint_shown: {
+    category: "system",
+    description: "An adaptive Phase 3 rescue hint was shown.",
+    requiredProperties: ["hintId", "stage"],
+  },
+  phase3_rescue_hint_dismissed: {
+    category: "system",
+    description: "An adaptive Phase 3 rescue hint was dismissed.",
+    requiredProperties: ["hintId", "reason"],
+  },
+  phase3_rescue_hint_actioned: {
+    category: "system",
+    description: "Player acted on an adaptive Phase 3 rescue hint.",
+    requiredProperties: ["hintId", "action"],
+  },
+  phase3_first_council_opened: {
+    category: "council",
+    description: "First Council open during Phase 3 onboarding.",
+    requiredProperties: ["source"],
+  },
+  phase3_first_campaign_activated: {
+    category: "council",
+    description: "First campaign activation during Phase 3 onboarding.",
+    requiredProperties: ["campaignId"],
+  },
+  phase3_first_draft_invested: {
+    category: "council",
+    description: "First draft investment during Phase 3 onboarding.",
+    requiredProperties: ["campaignId"],
+  },
+  phase3_first_pilot_objective_progress: {
+    category: "council",
+    description: "First pilot objective progress during Phase 3 onboarding.",
+    requiredProperties: ["campaignId"],
+  },
+  phase3_first_hearing_resolved: {
+    category: "council",
+    description: "First hearing resolution during Phase 3 onboarding.",
+    requiredProperties: ["method"],
+  },
+  phase3_unlock_no_council_open_5m: {
+    category: "system",
+    description: "Phase 3 unlock stalled for 5 minutes without Council open.",
+    requiredProperties: ["elapsedMs"],
+  },
+  phase3_campaign_stalled_no_draft_3m: {
+    category: "system",
+    description:
+      "Phase 3 campaign was active for 3 minutes without first draft investment.",
+    requiredProperties: ["elapsedMs"],
+  },
+  phase3_pilot_stalled_10_fulfills: {
+    category: "system",
+    description:
+      "Phase 3 pilot stage had 10 fulfills without first pilot objective progress.",
+    requiredProperties: ["campaignId", "fulfills"],
+  },
+  phase3_hearing_active_3m_no_resolution: {
+    category: "system",
+    description:
+      "A hearing remained active for 3 minutes without first hearing resolution.",
+    requiredProperties: ["hearingId", "elapsedMs"],
+  },
   project_accept: {
     category: "projects",
     description: "Project contract accepted.",

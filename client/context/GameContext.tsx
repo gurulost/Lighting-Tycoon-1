@@ -104,6 +104,11 @@ import {
   TUNING_FLAG_KEY,
 } from "@/lib/tuning";
 import {
+  isPhase3OnboardingVariant,
+  resolvePhase3OnboardingVariant,
+  resolvePhase3OnboardingVariantSource,
+} from "@/lib/phase3OnboardingVariant";
+import {
   canStartLegacyCycle,
   createInitialLegacyState,
   getLegacyBadgeTitle,
@@ -152,6 +157,8 @@ type GameAction =
   | { type: "ACK_PHASE2_ONBOARDING_GOAL_GUIDE" }
   | { type: "ACK_PHASE2_ONBOARDING_CONTRACTS_BRIEF" }
   | { type: "ACK_PHASE2_ONBOARDING_OFFERS_COACHMARK" }
+  | { type: "ACK_PHASE3_ONBOARDING_INTRO" }
+  | { type: "ACK_PHASE3_ONBOARDING_COUNCIL_OPEN" }
   | { type: "CLEAR_RECYCLE_REWARD" }
   | { type: "CLEAR_MISSION_REWARD" }
   | { type: "SET_ORDERS_HELP_SEEN" }
@@ -1392,10 +1399,63 @@ const DEFAULT_PHASE2_ONBOARDING: GameState["phase2Onboarding"] = {
   goalGuideSeen: false,
   contractsBriefSeen: false,
   offersCoachmarkSeen: false,
+  firstContractAcceptedSeen: false,
+  firstProjectStageCompletedSeen: false,
+  firstProjectStageFailedSeen: false,
+};
+const DEFAULT_PHASE3_ONBOARDING: GameState["phase3Onboarding"] = {
+  introSeen: false,
+  councilOpenedSeen: false,
+  campaignSelectedSeen: false,
+  firstDraftInvestSeen: false,
+  firstPilotProgressSeen: false,
+  pilotNoProgressFulfills: 0,
+  pilotStallEventSeen: false,
+  hearingEncounteredSeen: false,
+  hearingResolvedSeen: false,
 };
 
 function getPhase2OnboardingResetState(): GameState["phase2Onboarding"] {
   return { ...DEFAULT_PHASE2_ONBOARDING };
+}
+
+function getPhase3OnboardingResetState(): GameState["phase3Onboarding"] {
+  return { ...DEFAULT_PHASE3_ONBOARDING };
+}
+
+function normalizePhase3OnboardingVariantOverride(
+  raw: unknown,
+  fallback: GameState["settings"]["phase3OnboardingVariantOverride"],
+): GameState["settings"]["phase3OnboardingVariantOverride"] {
+  if (raw === undefined || raw === null) return undefined;
+  if (isPhase3OnboardingVariant(raw)) return raw;
+  return fallback;
+}
+
+function normalizeSettings(
+  raw: unknown,
+  fallback: GameState["settings"],
+): GameState["settings"] {
+  if (!raw || typeof raw !== "object") return { ...fallback };
+  const candidate = raw as Partial<GameState["settings"]>;
+  return {
+    soundEnabled:
+      typeof candidate.soundEnabled === "boolean"
+        ? candidate.soundEnabled
+        : fallback.soundEnabled,
+    hapticsEnabled:
+      typeof candidate.hapticsEnabled === "boolean"
+        ? candidate.hapticsEnabled
+        : fallback.hapticsEnabled,
+    reducedMotion:
+      typeof candidate.reducedMotion === "boolean"
+        ? candidate.reducedMotion
+        : fallback.reducedMotion,
+    phase3OnboardingVariantOverride: normalizePhase3OnboardingVariantOverride(
+      candidate.phase3OnboardingVariantOverride,
+      fallback.phase3OnboardingVariantOverride,
+    ),
+  };
 }
 
 function normalizePhase2Onboarding(
@@ -1421,6 +1481,65 @@ function normalizePhase2Onboarding(
       typeof candidate.offersCoachmarkSeen === "boolean"
         ? candidate.offersCoachmarkSeen
         : fallback.offersCoachmarkSeen,
+    firstContractAcceptedSeen:
+      typeof candidate.firstContractAcceptedSeen === "boolean"
+        ? candidate.firstContractAcceptedSeen
+        : fallback.firstContractAcceptedSeen,
+    firstProjectStageCompletedSeen:
+      typeof candidate.firstProjectStageCompletedSeen === "boolean"
+        ? candidate.firstProjectStageCompletedSeen
+        : fallback.firstProjectStageCompletedSeen,
+    firstProjectStageFailedSeen:
+      typeof candidate.firstProjectStageFailedSeen === "boolean"
+        ? candidate.firstProjectStageFailedSeen
+        : fallback.firstProjectStageFailedSeen,
+  };
+}
+
+function normalizePhase3Onboarding(
+  raw: unknown,
+  fallback: GameState["phase3Onboarding"],
+): GameState["phase3Onboarding"] {
+  if (!raw || typeof raw !== "object") return fallback;
+  const candidate = raw as Partial<GameState["phase3Onboarding"]>;
+  return {
+    introSeen:
+      typeof candidate.introSeen === "boolean"
+        ? candidate.introSeen
+        : fallback.introSeen,
+    councilOpenedSeen:
+      typeof candidate.councilOpenedSeen === "boolean"
+        ? candidate.councilOpenedSeen
+        : fallback.councilOpenedSeen,
+    campaignSelectedSeen:
+      typeof candidate.campaignSelectedSeen === "boolean"
+        ? candidate.campaignSelectedSeen
+        : fallback.campaignSelectedSeen,
+    firstDraftInvestSeen:
+      typeof candidate.firstDraftInvestSeen === "boolean"
+        ? candidate.firstDraftInvestSeen
+        : fallback.firstDraftInvestSeen,
+    firstPilotProgressSeen:
+      typeof candidate.firstPilotProgressSeen === "boolean"
+        ? candidate.firstPilotProgressSeen
+        : fallback.firstPilotProgressSeen,
+    pilotNoProgressFulfills:
+      typeof candidate.pilotNoProgressFulfills === "number" &&
+      Number.isFinite(candidate.pilotNoProgressFulfills)
+        ? Math.max(0, Math.floor(candidate.pilotNoProgressFulfills))
+        : fallback.pilotNoProgressFulfills,
+    pilotStallEventSeen:
+      typeof candidate.pilotStallEventSeen === "boolean"
+        ? candidate.pilotStallEventSeen
+        : fallback.pilotStallEventSeen,
+    hearingEncounteredSeen:
+      typeof candidate.hearingEncounteredSeen === "boolean"
+        ? candidate.hearingEncounteredSeen
+        : fallback.hearingEncounteredSeen,
+    hearingResolvedSeen:
+      typeof candidate.hearingResolvedSeen === "boolean"
+        ? candidate.hearingResolvedSeen
+        : fallback.hearingResolvedSeen,
   };
 }
 
@@ -1434,7 +1553,9 @@ function buildLoadedPhase2Onboarding(
     phase2GoalPending: boolean;
     projectOffersCount: number;
     hasActiveProject: boolean;
+    activeProjectStageHistoryCount: number;
     projectsCompletedCount: number;
+    hasProjectDebuff: boolean;
   },
 ): GameState["phase2Onboarding"] {
   const inferred: GameState["phase2Onboarding"] =
@@ -1452,8 +1573,57 @@ function buildLoadedPhase2Onboarding(
             context.projectOffersCount === 0 ||
             context.hasActiveProject ||
             context.projectsCompletedCount > 0,
+          firstContractAcceptedSeen:
+            context.hasActiveProject || context.projectsCompletedCount > 0,
+          firstProjectStageCompletedSeen:
+            context.activeProjectStageHistoryCount > 0 ||
+            context.projectsCompletedCount > 0,
+          firstProjectStageFailedSeen: context.hasProjectDebuff,
         };
   return normalizePhase2Onboarding(raw, { ...base, ...inferred });
+}
+
+function buildLoadedPhase3Onboarding(
+  base: GameState["phase3Onboarding"],
+  raw: unknown,
+  context: {
+    gamePhase: GameState["gamePhase"];
+    councilUnlocked: boolean;
+    activeCampaignId?: string;
+    hasCampaignProgress: boolean;
+    hasDraftInvestment: boolean;
+    hasPilotProgress: boolean;
+    hasActiveHearing: boolean;
+    hasResolvedHearing: boolean;
+  },
+): GameState["phase3Onboarding"] {
+  const inferred: GameState["phase3Onboarding"] =
+    context.gamePhase < 3 || !context.councilUnlocked
+      ? getPhase3OnboardingResetState()
+      : {
+          introSeen: true,
+          councilOpenedSeen:
+            !!context.activeCampaignId ||
+            context.hasCampaignProgress ||
+            context.hasDraftInvestment ||
+            context.hasPilotProgress ||
+            context.hasActiveHearing ||
+            context.hasResolvedHearing,
+          campaignSelectedSeen:
+            !!context.activeCampaignId ||
+            context.hasCampaignProgress ||
+            context.hasDraftInvestment ||
+            context.hasPilotProgress,
+          firstDraftInvestSeen:
+            context.hasDraftInvestment || context.hasPilotProgress,
+          firstPilotProgressSeen: context.hasPilotProgress,
+          pilotNoProgressFulfills: 0,
+          pilotStallEventSeen: false,
+          hearingEncounteredSeen:
+            context.hasActiveHearing || context.hasResolvedHearing,
+          hearingResolvedSeen: context.hasResolvedHearing,
+        };
+  return normalizePhase3Onboarding(raw, { ...base, ...inferred });
 }
 const SAVE_DEBOUNCE_MS = 1200;
 const SAVE_MAX_WAIT_MS = 12000;
@@ -2791,6 +2961,8 @@ const PLAYTEST_STABLE_TRANSITION_PRESETS: ReadonlySet<PlaytestPresetId> =
     "phase2_contracts_ready",
     "phase2_rep_gate",
     "phase3_council_live",
+    "phase3_hearing_recovery",
+    "phase3_ratify_ready",
   ]);
 const COMPAT_GUIDE_FULFILL_BONUS_CASH = 40;
 const COMPAT_GUIDE_FULFILL_BONUS_RESEARCH = 6;
@@ -2799,10 +2971,10 @@ function buildPlaytestSeedState(currentState: GameState): GameState {
   const base = getInitialState();
   return {
     ...base,
-    settings: {
-      ...base.settings,
-      ...currentState.settings,
-    },
+    settings: normalizeSettings(
+      { ...base.settings, ...currentState.settings },
+      base.settings,
+    ),
   };
 }
 
@@ -2826,6 +2998,7 @@ function buildPlaytestPhase2GateState(state: GameState): GameState {
     orderMetrics: phase2OrderMetrics,
     phase2GoalPending: false,
     phase2Onboarding: getPhase2OnboardingResetState(),
+    phase3Onboarding: getPhase3OnboardingResetState(),
     projectsUnlocked: false,
     projectOffers: [],
     activeProject: undefined,
@@ -2878,6 +3051,7 @@ function buildPlaytestPhase2ContractsReadyState(state: GameState): GameState {
       contractsBriefSeen: false,
       offersCoachmarkSeen: false,
     },
+    phase3Onboarding: getPhase3OnboardingResetState(),
     projectsUnlocked: true,
     projectOffers: [],
     activeProject: undefined,
@@ -2922,12 +3096,196 @@ function buildPlaytestPhase2RepGateState(state: GameState): GameState {
       contractsBriefSeen: true,
       offersCoachmarkSeen: false,
     },
+    phase3Onboarding: getPhase3OnboardingResetState(),
     projectsUnlocked: true,
     projectOffers: [],
     activeProject: undefined,
     projectRevealQueue: [],
     projectDebuff: undefined,
     projectsCompleted: [],
+  };
+}
+
+function buildPlaytestCouncilRatifyOrder(campaignId: string): Order {
+  const campaign = COUNCIL_CAMPAIGN_BY_ID[campaignId];
+  if (!campaign) {
+    return {
+      id: `playtest_council_ratify_${campaignId}`,
+      title: "Council Showcase",
+      type: "basic",
+      requirements: [{ tier: 10, family: "any", count: 1 }],
+      rewards: { cash: 6000, reputation: 220, research: 280 },
+      modifierIds: ["council_ratify", `council:${campaignId}`],
+      templateId: `council:${campaignId}`,
+    };
+  }
+  const spec = campaign.ratifyOrder;
+  const requiresCompatibility = !!spec.requiresCompatibility;
+  const orderType = spec.requiresRush
+    ? "rush"
+    : requiresCompatibility || spec.requiresEcoAudit
+      ? "compatibility_required"
+      : "basic";
+  return {
+    id: `playtest_council_ratify_${campaignId}`,
+    title: spec.title,
+    type: orderType,
+    requirements: [
+      {
+        tier: spec.tierMin,
+        family: spec.requiresOpenOnly ? "open" : "any",
+        count: 1,
+        requiresCompatible: requiresCompatibility,
+      },
+    ],
+    rewards: { cash: 12000, reputation: 260, research: 320 },
+    modifierIds: ["council_ratify", `council:${campaignId}`],
+    templateId: `council:${campaignId}`,
+    noSubstitutions: !!spec.requiresOpenOnly,
+  };
+}
+
+function buildPlaytestPhase3HearingRecoveryState(state: GameState): GameState {
+  const campaign = COUNCIL_CAMPAIGNS[0];
+  if (!campaign) return state;
+  const fallbackHearing = Object.values(COUNCIL_HEARING_BY_ID)[0];
+  const hearing = COUNCIL_HEARING_BY_ID.hear_safety_audit ?? fallbackHearing;
+  if (!hearing) return state;
+  const now = Date.now();
+  const baseProgress = state.council.campaigns[campaign.id];
+  const pilotObjectiveProgress: Record<string, number> = {};
+  campaign.pilotObjectives.forEach((objective) => {
+    pilotObjectiveProgress[objective.id] = 0;
+  });
+  const remainingObjectives: Record<string, number> = {};
+  hearing.clearObjectives.forEach((objective) => {
+    remainingObjectives[objective.id] = objective.target;
+  });
+  const rehearsalOrder: Order = {
+    id: "playtest_hearing_recovery_order",
+    title: "Emergency Retrofit Request",
+    type: "basic",
+    requirements: [{ tier: 10, family: "any", count: 1 }],
+    rewards: { cash: 960, reputation: 72, research: 38 },
+    modifierIds: ["playtest_hearing_recovery"],
+  };
+  const orderMetrics = updateOrderMetrics(
+    { ...state, orderMetrics: DEFAULT_ORDER_METRICS },
+    rehearsalOrder,
+  );
+  return {
+    ...state,
+    orders: [rehearsalOrder],
+    highlightedOrderId: rehearsalOrder.id,
+    orderMetrics,
+    phase2Onboarding: {
+      ...state.phase2Onboarding,
+      introSeen: true,
+      goalGuideSeen: true,
+      contractsBriefSeen: true,
+      offersCoachmarkSeen: true,
+    },
+    phase3Onboarding: {
+      ...getPhase3OnboardingResetState(),
+      introSeen: true,
+      councilOpenedSeen: true,
+      campaignSelectedSeen: true,
+      firstDraftInvestSeen: true,
+      hearingEncounteredSeen: true,
+      hearingResolvedSeen: false,
+    },
+    council: {
+      ...state.council,
+      unlocked: true,
+      lobbyPressure: Math.max(state.council.lobbyPressure, 55),
+      activeCampaignId: campaign.id,
+      activeHearing: {
+        hearingId: hearing.id,
+        remainingObjectives,
+        appliedAt: now - 120000,
+        refreshCountAtStart: state.council.refreshCount,
+      },
+      campaigns: {
+        ...state.council.campaigns,
+        [campaign.id]: {
+          ...(baseProgress ?? {
+            status: "LOCKED",
+            draftCashInvested: 0,
+            draftResearchInvested: 0,
+            pilotObjectiveProgress: {},
+            ratifyOrderId: undefined,
+            completedAt: undefined,
+          }),
+          status: "PILOT",
+          draftCashInvested: campaign.draftCost.cash,
+          draftResearchInvested: campaign.draftCost.research,
+          pilotObjectiveProgress,
+          ratifyOrderId: undefined,
+          completedAt: undefined,
+        },
+      },
+    },
+  };
+}
+
+function buildPlaytestPhase3RatifyReadyState(state: GameState): GameState {
+  const campaign = COUNCIL_CAMPAIGNS[0];
+  if (!campaign) return state;
+  const ratifyOrder = buildPlaytestCouncilRatifyOrder(campaign.id);
+  const baseProgress = state.council.campaigns[campaign.id];
+  const pilotObjectiveProgress: Record<string, number> = {};
+  campaign.pilotObjectives.forEach((objective) => {
+    pilotObjectiveProgress[objective.id] = objective.target;
+  });
+  const orderMetrics = updateOrderMetrics(
+    { ...state, orderMetrics: DEFAULT_ORDER_METRICS },
+    ratifyOrder,
+  );
+  return {
+    ...state,
+    orders: [ratifyOrder],
+    highlightedOrderId: undefined,
+    orderMetrics,
+    phase2Onboarding: {
+      ...state.phase2Onboarding,
+      introSeen: true,
+      goalGuideSeen: true,
+      contractsBriefSeen: true,
+      offersCoachmarkSeen: true,
+    },
+    phase3Onboarding: {
+      ...getPhase3OnboardingResetState(),
+      introSeen: true,
+      councilOpenedSeen: true,
+      campaignSelectedSeen: true,
+      firstDraftInvestSeen: true,
+      firstPilotProgressSeen: true,
+    },
+    council: {
+      ...state.council,
+      unlocked: true,
+      activeCampaignId: campaign.id,
+      activeHearing: undefined,
+      campaigns: {
+        ...state.council.campaigns,
+        [campaign.id]: {
+          ...(baseProgress ?? {
+            status: "LOCKED",
+            draftCashInvested: 0,
+            draftResearchInvested: 0,
+            pilotObjectiveProgress: {},
+            ratifyOrderId: undefined,
+            completedAt: undefined,
+          }),
+          status: "RATIFY",
+          draftCashInvested: campaign.draftCost.cash,
+          draftResearchInvested: campaign.draftCost.research,
+          pilotObjectiveProgress,
+          ratifyOrderId: ratifyOrder.id,
+          completedAt: undefined,
+        },
+      },
+    },
   };
 }
 
@@ -2999,6 +3357,7 @@ function buildPlaytestPrePhase2TransitionState(state: GameState): GameState {
     orderMetrics: lockoutOrderMetrics,
     phase2GoalPending: false,
     phase2Onboarding: getPhase2OnboardingResetState(),
+    phase3Onboarding: getPhase3OnboardingResetState(),
     projectsUnlocked: false,
     projectOffers: [],
     activeProject: undefined,
@@ -3041,6 +3400,10 @@ function stabilizePlaytestPresetState(state: GameState): GameState {
       ...state.phase2Onboarding,
       offersCoachmarkSeen: false,
     },
+    phase3Onboarding:
+      state.gamePhase >= 3
+        ? state.phase3Onboarding
+        : getPhase3OnboardingResetState(),
     baronOfferAvailable: false,
     baronOfferSeen: true,
     baronOfferType: undefined,
@@ -3053,8 +3416,21 @@ function applyPlaytestPresetState(
 ): GameState {
   const seedState = buildPlaytestSeedState(currentState);
   let nextState: GameState;
-  if (presetId === "phase3_council_live") {
-    nextState = gameReducer(seedState, { type: "PLAYTEST_SKIP_PHASE3" });
+  if (
+    presetId === "phase3_council_live" ||
+    presetId === "phase3_hearing_recovery" ||
+    presetId === "phase3_ratify_ready"
+  ) {
+    const phase3BaseState = gameReducer(seedState, {
+      type: "PLAYTEST_SKIP_PHASE3",
+    });
+    if (presetId === "phase3_hearing_recovery") {
+      nextState = buildPlaytestPhase3HearingRecoveryState(phase3BaseState);
+    } else if (presetId === "phase3_ratify_ready") {
+      nextState = buildPlaytestPhase3RatifyReadyState(phase3BaseState);
+    } else {
+      nextState = phase3BaseState;
+    }
   } else {
     const phase2Skipped = gameReducer(seedState, {
       type: "PLAYTEST_SKIP_PHASE2",
@@ -3074,7 +3450,17 @@ function applyPlaytestPresetState(
     }
   }
   if (PLAYTEST_STABLE_TRANSITION_PRESETS.has(presetId)) {
-    return stabilizePlaytestPresetState(nextState);
+    nextState = stabilizePlaytestPresetState(nextState);
+  }
+  if (
+    presetId === "phase3_hearing_recovery" ||
+    presetId === "phase3_ratify_ready"
+  ) {
+    nextState = {
+      ...nextState,
+      projectOffers: [],
+      projectRevealQueue: [],
+    };
   }
   return nextState;
 }
@@ -3245,7 +3631,11 @@ function buildLegacyCycleStartState(
       goalGuideSeen: true,
       contractsBriefSeen: true,
       offersCoachmarkSeen: false,
+      firstContractAcceptedSeen: false,
+      firstProjectStageCompletedSeen: false,
+      firstProjectStageFailedSeen: false,
     },
+    phase3Onboarding: getPhase3OnboardingResetState(),
     projectsUnlocked: true,
     projectOffers: [],
     activeProject: undefined,
@@ -3318,7 +3708,10 @@ function buildLegacyCycleStartState(
     missionHistory: [],
     undoSnapshot: undefined,
     lastCriticalEventId: state.lastCriticalEventId + 1,
-    settings: { ...baseState.settings, ...state.settings },
+    settings: normalizeSettings(
+      { ...baseState.settings, ...state.settings },
+      baseState.settings,
+    ),
     legacy: seededLegacy,
   };
   const refreshedOffers = generateProjectOffers(nextState, 3);
@@ -4191,6 +4584,7 @@ export function getInitialState(): GameState {
     liberationCompletedAt: undefined,
     phase2GoalPending: false,
     phase2Onboarding: getPhase2OnboardingResetState(),
+    phase3Onboarding: getPhase3OnboardingResetState(),
     projectsUnlocked: false,
     projectOffers: [],
     activeProject: undefined,
@@ -6262,6 +6656,37 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "ACK_PHASE3_ONBOARDING_INTRO": {
+      if (state.phase3Onboarding.introSeen) return state;
+      captureEvent("phase3_onboarding_step_complete", {
+        step: "intro_brief",
+      });
+      return {
+        ...state,
+        phase3Onboarding: {
+          ...state.phase3Onboarding,
+          introSeen: true,
+        },
+      };
+    }
+
+    case "ACK_PHASE3_ONBOARDING_COUNCIL_OPEN": {
+      if (state.phase3Onboarding.councilOpenedSeen) return state;
+      captureEvent("phase3_first_council_opened", {
+        source: "council_modal",
+      });
+      captureEvent("phase3_onboarding_step_complete", {
+        step: "council_open",
+      });
+      return {
+        ...state,
+        phase3Onboarding: {
+          ...state.phase3Onboarding,
+          councilOpenedSeen: true,
+        },
+      };
+    }
+
     case "CLEAR_RECYCLE_REWARD": {
       return {
         ...state,
@@ -6873,6 +7298,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let nextBaronPressure = dependencyOutcome.baronPressure;
       let nextPhase2GoalPending = state.phase2GoalPending;
       let nextPhase2Onboarding = state.phase2Onboarding;
+      let nextPhase3Onboarding = state.phase3Onboarding;
       if (lockoutResolution === "baron") {
         nextDependency = 60;
       }
@@ -6886,6 +7312,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             : Date.now();
         nextBaronPressure = 0;
         nextPhase2Onboarding = getPhase2OnboardingResetState();
+        nextPhase3Onboarding = getPhase3OnboardingResetState();
       }
 
       const lockoutActiveValue = lockoutResolution
@@ -7124,6 +7551,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           { stageIndex: stage.stageIndex, completedAt: Date.now() },
         ];
         const isFinalStage = stage.stageIndex >= project.stages.length - 1;
+        const isFirstStageCompletion =
+          stage.stageIndex === 0 &&
+          !nextPhase2Onboarding.firstProjectStageCompletedSeen;
+        if (isFirstStageCompletion) {
+          nextPhase2Onboarding = {
+            ...nextPhase2Onboarding,
+            firstProjectStageCompletedSeen: true,
+          };
+          if (state.gamePhase === 2) {
+            captureEvent("phase2_first_stage_completed", {
+              projectId: project.id,
+              stageIndex: stage.stageIndex,
+            });
+          }
+        }
 
         if (isFinalStage) {
           const completionScale = Math.max(
@@ -7266,6 +7708,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           };
           nextGamePhase = 3;
           nextProjectsUnlocked = true;
+          nextPhase3Onboarding = getPhase3OnboardingResetState();
           if (projectOfferRefreshMode !== "force") {
             projectOfferRefreshMode = "if_empty";
           }
@@ -7356,11 +7799,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
 
-        const activeCampaign =
-          councilActiveCampaignId &&
-          COUNCIL_CAMPAIGN_BY_ID[councilActiveCampaignId];
-        const activeProgress =
-          councilActiveCampaignId && councilCampaigns[councilActiveCampaignId];
+        const activeCampaign = councilActiveCampaignId
+          ? COUNCIL_CAMPAIGN_BY_ID[councilActiveCampaignId]
+          : undefined;
+        const activeProgress = councilActiveCampaignId
+          ? councilCampaigns[councilActiveCampaignId]
+          : undefined;
 
         if (
           activeCampaign &&
@@ -7371,6 +7815,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             ...activeProgress.pilotObjectiveProgress,
           };
           let milestonesCompleted = 0;
+          let pilotProgressAdvanced = false;
 
           activeCampaign.pilotObjectives.forEach((objective) => {
             const current = pilotProgress[objective.id] ?? 0;
@@ -7425,12 +7870,61 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             }
 
             if (nextValue !== current) {
+              pilotProgressAdvanced = true;
               pilotProgress[objective.id] = nextValue;
+              if (
+                nextValue > 0 &&
+                !nextPhase3Onboarding.firstPilotProgressSeen
+              ) {
+                nextPhase3Onboarding = {
+                  ...nextPhase3Onboarding,
+                  firstPilotProgressSeen: true,
+                };
+                if (state.gamePhase >= 3 || nextGamePhase >= 3) {
+                  captureEvent("phase3_first_pilot_objective_progress", {
+                    campaignId: activeCampaign.id,
+                  });
+                  captureEvent("phase3_onboarding_step_complete", {
+                    step: "pilot_progress",
+                  });
+                }
+              }
               if (current < objective.target && nextValue >= objective.target) {
                 milestonesCompleted += 1;
               }
             }
           });
+
+          if (
+            pilotProgressAdvanced ||
+            nextPhase3Onboarding.firstPilotProgressSeen
+          ) {
+            if (nextPhase3Onboarding.pilotNoProgressFulfills !== 0) {
+              nextPhase3Onboarding = {
+                ...nextPhase3Onboarding,
+                pilotNoProgressFulfills: 0,
+              };
+            }
+          } else if (state.gamePhase >= 3 || nextGamePhase >= 3) {
+            const nextNoProgressFulfills =
+              nextPhase3Onboarding.pilotNoProgressFulfills + 1;
+            const shouldEmitPilotStall =
+              nextNoProgressFulfills >= 10 &&
+              !nextPhase3Onboarding.pilotStallEventSeen;
+            nextPhase3Onboarding = {
+              ...nextPhase3Onboarding,
+              pilotNoProgressFulfills: nextNoProgressFulfills,
+              pilotStallEventSeen:
+                nextPhase3Onboarding.pilotStallEventSeen ||
+                shouldEmitPilotStall,
+            };
+            if (shouldEmitPilotStall) {
+              captureEvent("phase3_pilot_stalled_10_fulfills", {
+                campaignId: activeCampaign.id,
+                fulfills: nextNoProgressFulfills,
+              });
+            }
+          }
 
           if (milestonesCompleted > 0) {
             const milestoneGain =
@@ -7487,6 +7981,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               status,
               ratifyOrderId,
             },
+          };
+        } else if (
+          nextPhase3Onboarding.pilotNoProgressFulfills !== 0 &&
+          (nextPhase3Onboarding.firstPilotProgressSeen ||
+            activeProgress?.status !== "PILOT")
+        ) {
+          nextPhase3Onboarding = {
+            ...nextPhase3Onboarding,
+            pilotNoProgressFulfills: 0,
           };
         }
 
@@ -7549,6 +8052,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 hearingClearedThisOrder = true;
                 councilLobbyPressure -= hearingDef.onClear.lobbyPressureDrop;
                 councilHearingClearedId = hearingDef.id;
+                if (!nextPhase3Onboarding.hearingResolvedSeen) {
+                  nextPhase3Onboarding = {
+                    ...nextPhase3Onboarding,
+                    hearingEncounteredSeen: true,
+                    hearingResolvedSeen: true,
+                  };
+                  if (state.gamePhase >= 3 || nextGamePhase >= 3) {
+                    captureEvent("phase3_first_hearing_resolved", {
+                      method: "play",
+                    });
+                    captureEvent("phase3_onboarding_step_complete", {
+                      step: "hearing_resolve",
+                    });
+                  }
+                }
                 const bonus = hearingDef.onClear.bonus;
                 if (bonus?.cash) cashReward += Math.floor(bonus.cash);
                 if (bonus?.research)
@@ -7593,6 +8111,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               };
               installsSinceHearing = 0;
               councilHearingTriggeredId = pick.id;
+              if (!nextPhase3Onboarding.hearingEncounteredSeen) {
+                nextPhase3Onboarding = {
+                  ...nextPhase3Onboarding,
+                  hearingEncounteredSeen: true,
+                };
+                if (state.gamePhase >= 3 || nextGamePhase >= 3) {
+                  captureEvent("phase3_onboarding_step_complete", {
+                    step: "hearing_encounter",
+                  });
+                }
+              }
             }
           }
         }
@@ -7613,6 +8142,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       )
         ? state.highlightedOrderId
         : undefined;
+      if (councilRatifySpawnedId && nextGamePhase >= 3) {
+        const ratifyOrder = updatedOrders.find((orderItem) =>
+          orderItem.modifierIds?.includes(`council:${councilRatifySpawnedId}`),
+        );
+        if (ratifyOrder) {
+          nextHighlightedOrderId = ratifyOrder.id;
+        }
+      }
       let phase2GoalInserted = false;
       if (
         state.tutorialComplete &&
@@ -7781,6 +8318,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           projectsCompleted: nextProjectsCompleted.length,
           reputationTier: getReputationTier(state.reputation + repReward),
         });
+        captureEvent("phase3_onboarding_started", {
+          source: "order_fulfill_transition",
+        });
       }
       if (councilPilotCompletedId) {
         captureEvent("council_pilot_complete", {
@@ -7863,6 +8403,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         liberationCompletedAt: nextLiberationCompletedAt,
         phase2GoalPending: nextPhase2GoalPending,
         phase2Onboarding: nextPhase2Onboarding,
+        phase3Onboarding: nextPhase3Onboarding,
         projectsUnlocked: nextProjectsUnlocked,
         projectOffers: nextProjectOffers,
         activeProject: nextActiveProject,
@@ -7951,6 +8492,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             penalty: active.stage.failPenalty.type,
             source: "deadline",
           });
+          if (
+            state.gamePhase === 2 &&
+            !nextState.phase2Onboarding.firstProjectStageFailedSeen
+          ) {
+            captureEvent("phase2_first_stage_failed", {
+              projectId: active.project.id,
+              stageIndex: active.stage.stageIndex,
+              source: "deadline",
+            });
+          }
           nextState = {
             ...nextState,
             cash: Math.max(0, nextState.cash + penaltyResult.refund),
@@ -7964,6 +8515,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             ),
             activeProject: undefined,
             projectOffers: generateProjectOffers(nextState, 3),
+            phase2Onboarding: {
+              ...nextState.phase2Onboarding,
+              firstProjectStageFailedSeen: true,
+            },
           };
           nextState = {
             ...nextState,
@@ -8023,6 +8578,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             title: "Phase 3 unlocked",
             message:
               "Standards Council is open. Open it from the bottom bar to draft standards.",
+            ctaLabel: "Open Council",
           },
         });
       }
@@ -9148,6 +9704,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         siteLogisticsBonusCharges: addon.siteLogistics ? 2 : 0,
         overtimeCrew: !!addon.overtimeCrew,
       };
+      const firstContractAccepted =
+        !state.phase2Onboarding.firstContractAcceptedSeen;
 
       let nextState: GameState = {
         ...state,
@@ -9162,6 +9720,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase2Onboarding: {
           ...state.phase2Onboarding,
           offersCoachmarkSeen: true,
+          firstContractAcceptedSeen: true,
         },
         suppliers: nextSuppliers,
         undoSnapshot: undefined,
@@ -9176,6 +9735,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         deposit: depositCost,
         addonCost,
       });
+      if (firstContractAccepted && state.gamePhase === 2) {
+        captureEvent("phase2_first_contract_accepted", {
+          projectId: project.id,
+        });
+      }
       captureEvent("cash_spent", {
         amount: totalCost,
         reason: "project_deposit",
@@ -9298,6 +9862,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         highlightedOrderId: nextHighlightedOrderId,
         suppliers: nextSuppliers,
         activeProject: undefined,
+        phase2Onboarding: {
+          ...state.phase2Onboarding,
+          firstProjectStageFailedSeen: true,
+        },
         undoSnapshot: undefined,
       };
       const refreshedOffers = generateProjectOffers(nextStateBase, 3);
@@ -9329,6 +9897,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         stageIndex: active.stage.stageIndex,
         penalty: active.stage.failPenalty.type,
       });
+      if (
+        state.gamePhase === 2 &&
+        !state.phase2Onboarding.firstProjectStageFailedSeen
+      ) {
+        captureEvent("phase2_first_stage_failed", {
+          projectId: active.project.id,
+          stageIndex: active.stage.stageIndex,
+          source: "manual",
+        });
+      }
       if (failCashDelta > 0) {
         captureEvent("cash_earned", {
           amount: failCashDelta,
@@ -9571,11 +10149,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         progress.status !== "LOCKED" ||
         canStartCouncilCampaign(state, campaignId);
       if (!canSelect) return state;
+      const firstCampaignSelected =
+        !state.phase3Onboarding.campaignSelectedSeen;
       captureEvent("council_campaign_set_active", {
         campaignId,
       });
+      if (firstCampaignSelected && state.gamePhase >= 3) {
+        captureEvent("phase3_first_campaign_activated", {
+          campaignId,
+        });
+        captureEvent("phase3_onboarding_step_complete", {
+          step: "campaign_select",
+        });
+      }
       return {
         ...state,
+        phase3Onboarding: firstCampaignSelected
+          ? {
+              ...state.phase3Onboarding,
+              campaignSelectedSeen: true,
+            }
+          : state.phase3Onboarding,
         council: { ...state.council, activeCampaignId: campaignId },
       };
     }
@@ -9688,6 +10282,48 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         activeHearing,
         installsSinceLastHearingCheck: installsSinceHearing,
       };
+      const firstCampaignSelected =
+        !state.phase3Onboarding.campaignSelectedSeen;
+      const firstDraftInvest = !state.phase3Onboarding.firstDraftInvestSeen;
+      const firstHearingEncounter =
+        hearingTriggered && !state.phase3Onboarding.hearingEncounteredSeen;
+      let nextPhase3Onboarding = state.phase3Onboarding;
+      if (firstCampaignSelected) {
+        nextPhase3Onboarding = {
+          ...nextPhase3Onboarding,
+          campaignSelectedSeen: true,
+        };
+        if (state.gamePhase >= 3) {
+          captureEvent("phase3_onboarding_step_complete", {
+            step: "campaign_select",
+          });
+        }
+      }
+      if (firstDraftInvest) {
+        nextPhase3Onboarding = {
+          ...nextPhase3Onboarding,
+          firstDraftInvestSeen: true,
+        };
+        if (state.gamePhase >= 3) {
+          captureEvent("phase3_first_draft_invested", {
+            campaignId: campaign.id,
+          });
+          captureEvent("phase3_onboarding_step_complete", {
+            step: "draft_invest",
+          });
+        }
+      }
+      if (firstHearingEncounter) {
+        nextPhase3Onboarding = {
+          ...nextPhase3Onboarding,
+          hearingEncounteredSeen: true,
+        };
+        if (state.gamePhase >= 3) {
+          captureEvent("phase3_onboarding_step_complete", {
+            step: "hearing_encounter",
+          });
+        }
+      }
 
       captureEvent("cash_spent", {
         amount: spendCash,
@@ -9734,6 +10370,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         cash: state.cash - spendCash,
         research: state.research - spendResearch,
         council: nextCouncil,
+        phase3Onboarding: nextPhase3Onboarding,
         undoSnapshot: undefined,
       };
       if (hearingTriggered) {
@@ -9870,12 +10507,28 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         hearingId: hearing.id,
         method: "pay",
       });
+      const firstHearingResolve = !state.phase3Onboarding.hearingResolvedSeen;
+      if (firstHearingResolve && state.gamePhase >= 3) {
+        captureEvent("phase3_first_hearing_resolved", {
+          method: "pay",
+        });
+        captureEvent("phase3_onboarding_step_complete", {
+          step: "hearing_resolve",
+        });
+      }
       const nextReputation = state.reputation + Math.floor(bonusRep);
       let nextState: GameState = {
         ...state,
         cash: state.cash - cashCost + Math.floor(bonusCash),
         research: state.research - researchCost + Math.floor(bonusResearch),
         reputation: nextReputation,
+        phase3Onboarding: firstHearingResolve
+          ? {
+              ...state.phase3Onboarding,
+              hearingEncounteredSeen: true,
+              hearingResolvedSeen: true,
+            }
+          : state.phase3Onboarding,
         council: {
           ...state.council,
           activeHearing: undefined,
@@ -11072,7 +11725,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const nextState = getInitialState();
       return {
         ...nextState,
-        settings: { ...nextState.settings, ...state.settings },
+        settings: normalizeSettings(
+          { ...nextState.settings, ...state.settings },
+          nextState.settings,
+        ),
       };
     }
 
@@ -11304,12 +11960,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "UPDATE_SETTINGS": {
+      const mergedSettings = {
+        ...state.settings,
+        ...action.settings,
+      };
       return {
         ...state,
-        settings: {
-          ...state.settings,
-          ...action.settings,
-        },
+        settings: normalizeSettings(mergedSettings, state.settings),
         undoSnapshot: undefined,
       };
     }
@@ -11715,6 +12372,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           orderMetrics: nextOrderMetrics,
           phase2GoalPending,
           phase2Onboarding: getPhase2OnboardingResetState(),
+          phase3Onboarding: getPhase3OnboardingResetState(),
           mentorIndependenceMergesRemaining: 0,
           undoSnapshot: undefined,
           lastCriticalEventId: state.lastCriticalEventId + 1,
@@ -12061,6 +12719,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         orderMetrics: nextOrderMetrics,
         phase2GoalPending,
         phase2Onboarding: getPhase2OnboardingResetState(),
+        phase3Onboarding: getPhase3OnboardingResetState(),
         projectsUnlocked: false,
         projectOffers: [],
         activeProject: undefined,
@@ -12289,6 +12948,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           installsSinceLastHearingCheck: 0,
         },
         phase2GoalPending: false,
+        phase3Onboarding: getPhase3OnboardingResetState(),
         lockoutActive: false,
         lockoutPhase: 0,
         lockoutOrderId: undefined,
@@ -12357,6 +13017,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ),
       };
       nextState = queueStoryBeat(nextState, "council_unlock");
+      captureEvent("phase3_onboarding_started", {
+        source: "playtest_skip_phase3",
+      });
       nextState = ensureMissions(nextState);
       return nextState;
     }
@@ -12659,10 +13322,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const hasPhase2GoalOrder = normalizedOrders.some((order) =>
         order.modifierIds?.includes("phase2_goal"),
       );
-      const phase2GoalSeen =
+      const storySeenMap =
         action.state.storySeen && typeof action.state.storySeen === "object"
-          ? !!action.state.storySeen["phase2_goal"]
-          : false;
+          ? (action.state.storySeen as Record<string, boolean>)
+          : {};
+      const phase2GoalSeen = !!storySeenMap["phase2_goal"];
       const phase2GoalPendingRaw =
         typeof action.state.phase2GoalPending === "boolean"
           ? action.state.phase2GoalPending
@@ -12815,7 +13479,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           phase2GoalPending,
           projectOffersCount: projectOffers.length,
           hasActiveProject: Boolean(activeProject),
+          activeProjectStageHistoryCount:
+            activeProject?.stageHistory.length ?? 0,
           projectsCompletedCount: projectsCompleted.length,
+          hasProjectDebuff: Boolean(projectDebuff),
         },
       );
       const baseCouncil = base.council ?? buildInitialCouncilState();
@@ -12941,6 +13608,43 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             : baseCouncil.refreshCount,
         perksUnlocked,
       };
+      const campaignProgressList = Object.values(campaigns);
+      const hasCampaignProgress = campaignProgressList.some(
+        (progress) => progress.status !== "LOCKED",
+      );
+      const hasDraftInvestment = campaignProgressList.some(
+        (progress) =>
+          progress.draftCashInvested > 0 ||
+          progress.draftResearchInvested > 0 ||
+          progress.status === "PILOT" ||
+          progress.status === "RATIFY" ||
+          progress.status === "COMPLETED",
+      );
+      const hasPilotProgress = campaignProgressList.some((progress) => {
+        if (progress.status === "RATIFY" || progress.status === "COMPLETED") {
+          return true;
+        }
+        return Object.values(progress.pilotObjectiveProgress).some(
+          (value) => typeof value === "number" && value > 0,
+        );
+      });
+      const hasActiveHearing = Boolean(council.activeHearing);
+      const hasResolvedHearing =
+        !hasActiveHearing && Boolean(storySeenMap["council_hearing"]);
+      const phase3Onboarding = buildLoadedPhase3Onboarding(
+        base.phase3Onboarding ?? DEFAULT_PHASE3_ONBOARDING,
+        action.state.phase3Onboarding,
+        {
+          gamePhase,
+          councilUnlocked: council.unlocked,
+          activeCampaignId: council.activeCampaignId,
+          hasCampaignProgress,
+          hasDraftInvestment,
+          hasPilotProgress,
+          hasActiveHearing,
+          hasResolvedHearing,
+        },
+      );
       const rawLegacy =
         action.state.legacy && typeof action.state.legacy === "object"
           ? (action.state.legacy as Partial<GameState["legacy"]>)
@@ -13308,10 +14012,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...base,
         ...action.state,
         upgrades: normalizedUpgrades,
-        settings: {
-          ...base.settings,
-          ...(action.state.settings || {}),
-        },
+        settings: normalizeSettings(action.state.settings, base.settings),
         unlockedSlots: normalizedUnlockedSlots,
         blockedSlots: normalizedBlockedSlots,
         boardSize: restoredBoardSize,
@@ -13331,6 +14032,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         liberationCompletedAt,
         phase2GoalPending,
         phase2Onboarding,
+        phase3Onboarding,
         projectsUnlocked,
         projectOffers,
         activeProject,
@@ -14059,6 +14761,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!telemetryReadyRef.current) return;
     if (!playerIdRef.current) return;
     if (sessionActiveRef.current) return;
+    const snapshot = stateRef.current;
+    const phase3OnboardingVariant = resolvePhase3OnboardingVariant(
+      snapshot.settings.phase3OnboardingVariantOverride,
+    );
+    const phase3OnboardingVariantSource = resolvePhase3OnboardingVariantSource(
+      snapshot.settings.phase3OnboardingVariantOverride,
+    );
     const now = Date.now();
     const sessionId = `${now}-${Math.random().toString(36).slice(2, 10)}`;
     const runId = `${now}-${Math.random().toString(36).slice(2, 10)}`;
@@ -14075,6 +14784,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       session_id: sessionId,
       run_id: runId,
       player_id: playerIdRef.current,
+      phase3_onboarding_variant: phase3OnboardingVariant,
+      phase3_onboarding_variant_source: phase3OnboardingVariantSource,
     });
     overdrawSessionMetricsRef.current = { count: 0, totalAddedSeconds: 0 };
     overdrawOutcomePendingRef.current = null;
@@ -14089,7 +14800,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       pulseSessionHeartbeat("interval");
     }, SESSION_HEARTBEAT_MS);
 
-    const snapshot = stateRef.current;
     captureEvent("session_start", {
       sessionId,
       runId,
@@ -14099,6 +14809,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       gamePhase: snapshot.gamePhase,
       reputationTier: snapshot.reputationTier,
       dependency: snapshot.dependency,
+      phase3_onboarding_variant: phase3OnboardingVariant,
+      phase3_onboarding_variant_source: phase3OnboardingVariantSource,
       legacyCycle: snapshot.legacy.currentCycle,
       legacyCyclesCompleted: snapshot.legacy.cyclesCompleted,
     });
@@ -14111,6 +14823,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       game_phase: snapshot.gamePhase,
       dependency: snapshot.dependency,
       reputation_tier: snapshot.reputationTier,
+      phase3_onboarding_variant: phase3OnboardingVariant,
+      phase3_onboarding_variant_source: phase3OnboardingVariantSource,
       legacy_cycle: snapshot.legacy.currentCycle,
       legacy_cycles_completed: snapshot.legacy.cyclesCompleted,
     });
@@ -14179,6 +14893,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       const snapshot = stateRef.current;
+      const phase3OnboardingVariant = resolvePhase3OnboardingVariant(
+        snapshot.settings.phase3OnboardingVariantOverride,
+      );
+      const phase3OnboardingVariantSource =
+        resolvePhase3OnboardingVariantSource(
+          snapshot.settings.phase3OnboardingVariantOverride,
+        );
       captureEvent("session_end", {
         sessionId,
         runId,
@@ -14189,6 +14910,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         overdrawCount: overdrawMetrics.count,
         overdrawAddedSecondsTotal: overdrawMetrics.totalAddedSeconds,
         overdrawAddedSecondsAvg: overdrawAvgAddedSeconds,
+        phase3_onboarding_variant: phase3OnboardingVariant,
+        phase3_onboarding_variant_source: phase3OnboardingVariantSource,
       });
       captureEvent("run_end", {
         run_id: runId,
@@ -14204,6 +14927,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         research: snapshot.research,
         reputation: snapshot.reputation,
         dependency: snapshot.dependency,
+        phase3_onboarding_variant: phase3OnboardingVariant,
+        phase3_onboarding_variant_source: phase3OnboardingVariantSource,
         legacy_cycle: snapshot.legacy.currentCycle,
         legacy_cycles_completed: snapshot.legacy.cyclesCompleted,
       });
@@ -14218,6 +14943,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       clearTelemetryRuntimeContext();
       setTelemetryRuntimeContext({
         player_id: playerIdRef.current ?? undefined,
+        phase3_onboarding_variant: phase3OnboardingVariant,
+        phase3_onboarding_variant_source: phase3OnboardingVariantSource,
       });
       void clearPersistedActiveSession(sessionId, runId);
     },
@@ -14265,7 +14992,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const playerId = await getOrCreatePlayerId();
       if (cancelled || !playerId) return;
       playerIdRef.current = playerId;
-      setTelemetryRuntimeContext({ player_id: playerId });
+      const currentVariant = resolvePhase3OnboardingVariant(
+        stateRef.current.settings.phase3OnboardingVariantOverride,
+      );
+      const currentVariantSource = resolvePhase3OnboardingVariantSource(
+        stateRef.current.settings.phase3OnboardingVariantOverride,
+      );
+      setTelemetryRuntimeContext({
+        player_id: playerId,
+        phase3_onboarding_variant: currentVariant,
+        phase3_onboarding_variant_source: currentVariantSource,
+      });
       identifyUser(playerId, getAppInfo());
       try {
         const firstOpen = await AsyncStorage.getItem(FIRST_OPEN_KEY);
@@ -14315,6 +15052,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               player_id: playerId,
               session_id: sessionId,
               run_id: runId,
+              phase3_onboarding_variant: currentVariant,
+              phase3_onboarding_variant_source: currentVariantSource,
             });
             setActiveTelemetryRun(runId, sessionId, startedAt);
             endSession("timeout_recovery", {
@@ -14349,6 +15088,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [endSession, hydrated, startSession, tuningPayload, tuningVariant]);
+
+  useEffect(() => {
+    if (!hydrated || !telemetryReadyRef.current) return;
+    const phase3OnboardingVariant = resolvePhase3OnboardingVariant(
+      state.settings.phase3OnboardingVariantOverride,
+    );
+    const phase3OnboardingVariantSource = resolvePhase3OnboardingVariantSource(
+      state.settings.phase3OnboardingVariantOverride,
+    );
+    setTelemetryRuntimeContext({
+      phase3_onboarding_variant: phase3OnboardingVariant,
+      phase3_onboarding_variant_source: phase3OnboardingVariantSource,
+    });
+  }, [hydrated, state.settings.phase3OnboardingVariantOverride]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;

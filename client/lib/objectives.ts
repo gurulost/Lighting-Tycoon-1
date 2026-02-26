@@ -2,12 +2,23 @@ import {
   PROJECT_DEFINITIONS,
   PROJECT_DEFINITION_BY_ID,
 } from "@/constants/projects";
-import type { ActiveProject, Order, ProjectOffer } from "@/types/game";
+import {
+  COUNCIL_CAMPAIGNS,
+  COUNCIL_CAMPAIGN_BY_ID,
+} from "@/constants/councilCampaigns";
+import { COUNCIL_HEARING_BY_ID } from "@/constants/councilHearings";
+import type {
+  ActiveProject,
+  GameState,
+  Order,
+  ProjectOffer,
+} from "@/types/game";
 
 type ObjectiveAction =
   | "open_orders"
   | "open_projects_offers"
-  | "open_projects_active";
+  | "open_projects_active"
+  | "open_council";
 
 type ObjectiveKind =
   | "phase2_goal"
@@ -15,7 +26,14 @@ type ObjectiveKind =
   | "project_active"
   | "project_offers"
   | "project_gate"
-  | "project_complete";
+  | "project_complete"
+  | "council_intro"
+  | "council_campaign_select"
+  | "council_draft"
+  | "council_pilot"
+  | "council_ratify"
+  | "council_hearing"
+  | "council_complete";
 
 export interface PhaseObjectiveState {
   kind: ObjectiveKind;
@@ -37,6 +55,19 @@ interface ResolvePhaseObjectiveInput {
   activeProject?: ActiveProject;
   reputationTier: number;
   projectsCompleted: string[];
+  council?: Pick<
+    GameState["council"],
+    "unlocked" | "activeCampaignId" | "campaigns" | "activeHearing"
+  >;
+  phase3Onboarding?: Pick<
+    GameState["phase3Onboarding"],
+    | "councilOpenedSeen"
+    | "campaignSelectedSeen"
+    | "firstDraftInvestSeen"
+    | "firstPilotProgressSeen"
+    | "hearingEncounteredSeen"
+    | "hearingResolvedSeen"
+  >;
 }
 
 interface ProjectUnlockGate {
@@ -48,6 +79,79 @@ interface ProjectUnlockGate {
 }
 
 const PHASE2_GOAL_MODIFIER = "phase2_goal";
+
+function canStartCouncilCampaign(
+  input: ResolvePhaseObjectiveInput,
+  campaignId: string,
+): boolean {
+  const campaign = COUNCIL_CAMPAIGN_BY_ID[campaignId];
+  if (!campaign) return false;
+  const council = input.council;
+  if (!council?.unlocked) return false;
+  if (
+    typeof campaign.unlock.minRepTier === "number" &&
+    input.reputationTier < campaign.unlock.minRepTier
+  ) {
+    return false;
+  }
+  if (
+    typeof campaign.unlock.minProjectsCompleted === "number" &&
+    input.projectsCompleted.length < campaign.unlock.minProjectsCompleted
+  ) {
+    return false;
+  }
+  if (campaign.unlock.requiredProjectIds?.length) {
+    const missingProject = campaign.unlock.requiredProjectIds.some(
+      (projectId) => !input.projectsCompleted.includes(projectId),
+    );
+    if (missingProject) return false;
+  }
+  if (campaign.unlock.requiredCampaignIds?.length) {
+    const missingCampaign = campaign.unlock.requiredCampaignIds.some(
+      (requiredCampaignId) =>
+        council.campaigns[requiredCampaignId]?.status !== "COMPLETED",
+    );
+    if (missingCampaign) return false;
+  }
+  if (typeof campaign.unlock.minCampaignsCompleted === "number") {
+    const completedCount = Object.values(council.campaigns).filter(
+      (progress) => progress.status === "COMPLETED",
+    ).length;
+    if (completedCount < campaign.unlock.minCampaignsCompleted) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function formatCouncilUnlockSummary(
+  input: ResolvePhaseObjectiveInput,
+  campaignId: string,
+): string {
+  const campaign = COUNCIL_CAMPAIGN_BY_ID[campaignId];
+  if (!campaign) return "Open Council to review campaign requirements.";
+  const details: string[] = [];
+  if (typeof campaign.unlock.minRepTier === "number") {
+    details.push(`Rep ${input.reputationTier}/${campaign.unlock.minRepTier}`);
+  }
+  if (typeof campaign.unlock.minProjectsCompleted === "number") {
+    details.push(
+      `Projects ${input.projectsCompleted.length}/${campaign.unlock.minProjectsCompleted}`,
+    );
+  }
+  if (campaign.unlock.requiredCampaignIds?.length) {
+    const completed = campaign.unlock.requiredCampaignIds.filter(
+      (requiredCampaignId) =>
+        input.council?.campaigns?.[requiredCampaignId]?.status === "COMPLETED",
+    ).length;
+    details.push(
+      `Campaigns ${completed}/${campaign.unlock.requiredCampaignIds.length}`,
+    );
+  }
+  return details.length > 0
+    ? details.join(" • ")
+    : "Campaign ready to start from Council.";
+}
 
 function formatPhase2GoalDetail(order: Order): string | undefined {
   const requirement = order.requirements[0];
@@ -118,6 +222,164 @@ export function resolvePhaseObjective(
   input: ResolvePhaseObjectiveInput,
 ): PhaseObjectiveState | null {
   if (input.gamePhase < 2) return null;
+
+  if (input.gamePhase >= 3 && input.council?.unlocked) {
+    const council = input.council;
+    const onboarding = input.phase3Onboarding;
+    if (!onboarding?.councilOpenedSeen) {
+      return {
+        kind: "council_intro",
+        action: "open_council",
+        statusLabel: "Phase 3 Live",
+        ctaLabel: "Open Council",
+        title: "Standards Council Online",
+        subtitle:
+          "Campaigns, hearings, and ratify showcases are now your growth engine.",
+        detail: "Open Council to choose your first campaign.",
+      };
+    }
+
+    if (council.activeHearing) {
+      const hearing = COUNCIL_HEARING_BY_ID[council.activeHearing.hearingId];
+      const remainingCount = Object.values(
+        council.activeHearing.remainingObjectives,
+      ).reduce((sum, value) => sum + Math.max(0, value), 0);
+      return {
+        kind: "council_hearing",
+        action: "open_council",
+        statusLabel: "Council Hearing",
+        ctaLabel: "Open Council",
+        title: hearing?.title ?? "Active Hearing",
+        subtitle:
+          remainingCount > 0
+            ? `${remainingCount} hearing objective${remainingCount === 1 ? "" : "s"} remaining.`
+            : "Resolve hearing pressure in the Council panel.",
+        detail:
+          "Hearings apply penalties until cleared by objectives or pay-to-clear.",
+      };
+    }
+
+    const sortedCampaigns = [...COUNCIL_CAMPAIGNS].sort(
+      (a, b) => a.sortIndex - b.sortIndex,
+    );
+    const activeCampaignId = council.activeCampaignId;
+    const activeCampaign = activeCampaignId
+      ? COUNCIL_CAMPAIGN_BY_ID[activeCampaignId]
+      : undefined;
+    const activeProgress = activeCampaignId
+      ? council.campaigns[activeCampaignId]
+      : undefined;
+    const activeUsable =
+      activeCampaign &&
+      activeProgress &&
+      activeProgress.status !== "COMPLETED" &&
+      activeProgress.status !== "LOCKED";
+    const availableCampaign = sortedCampaigns.find((campaign) => {
+      const progress = council.campaigns[campaign.id];
+      if (!progress || progress.status === "COMPLETED") return false;
+      return canStartCouncilCampaign(input, campaign.id);
+    });
+    const targetCampaign = activeUsable
+      ? activeCampaign
+      : (availableCampaign ?? sortedCampaigns[0]);
+    const targetProgress = targetCampaign
+      ? council.campaigns[targetCampaign.id]
+      : undefined;
+
+    if (!targetCampaign || !targetProgress) {
+      return {
+        kind: "council_complete",
+        action: "open_council",
+        statusLabel: "Council",
+        ctaLabel: "Open Council",
+        title: "Council campaigns complete",
+        subtitle:
+          "All current standards are ratified. Legacy cycles and future content remain.",
+        detail: "Open Council for perks, hearing management, and cycle prep.",
+      };
+    }
+
+    if (
+      !activeCampaignId ||
+      !onboarding?.campaignSelectedSeen ||
+      targetProgress.status === "LOCKED"
+    ) {
+      return {
+        kind: "council_campaign_select",
+        action: "open_council",
+        statusLabel: "Council Campaign",
+        ctaLabel: "Open Council",
+        title: activeCampaignId ? targetCampaign.title : "Select a campaign",
+        subtitle: activeCampaignId
+          ? "Set an active campaign and begin draft investment."
+          : "Choose a campaign to activate your first Phase 3 objective track.",
+        detail: formatCouncilUnlockSummary(input, targetCampaign.id),
+      };
+    }
+
+    if (targetProgress.status === "DRAFTING") {
+      const cashRemaining = Math.max(
+        0,
+        targetCampaign.draftCost.cash - targetProgress.draftCashInvested,
+      );
+      const researchRemaining = Math.max(
+        0,
+        targetCampaign.draftCost.research -
+          targetProgress.draftResearchInvested,
+      );
+      return {
+        kind: "council_draft",
+        action: "open_council",
+        statusLabel: "Draft Stage",
+        ctaLabel: "Open Council",
+        title: `Draft: ${targetCampaign.title}`,
+        subtitle: "Invest cash and research to enter pilot objectives.",
+        detail: `Remaining ${cashRemaining} cash • ${researchRemaining} research`,
+      };
+    }
+
+    if (targetProgress.status === "PILOT") {
+      const objectives = targetCampaign.pilotObjectives;
+      const completeCount = objectives.reduce((sum, objective) => {
+        const value = targetProgress.pilotObjectiveProgress[objective.id] ?? 0;
+        return sum + (value >= objective.target ? 1 : 0);
+      }, 0);
+      const nextObjective = objectives.find((objective) => {
+        const value = targetProgress.pilotObjectiveProgress[objective.id] ?? 0;
+        return value < objective.target;
+      });
+      return {
+        kind: "council_pilot",
+        action: "open_council",
+        statusLabel: "Pilot Stage",
+        ctaLabel: "Open Council",
+        title: `Pilot: ${targetCampaign.title}`,
+        subtitle: `${completeCount}/${objectives.length} pilot objectives complete.`,
+        detail: nextObjective
+          ? `Next objective: ${nextObjective.label}`
+          : "Pilot objectives in progress.",
+      };
+    }
+
+    if (targetProgress.status === "RATIFY") {
+      const ratifyOrderExists = input.orders.some((order) =>
+        order.modifierIds?.includes(`council:${targetCampaign.id}`),
+      );
+      return {
+        kind: "council_ratify",
+        action: ratifyOrderExists ? "open_orders" : "open_council",
+        statusLabel: "Ratify Stage",
+        ctaLabel: ratifyOrderExists ? "Open Orders" : "Open Council",
+        title: `Ratify: ${targetCampaign.title}`,
+        subtitle: ratifyOrderExists
+          ? "Council showcase order is live. Complete it to ratify the standard."
+          : "Spawn the Council showcase order, then complete it to ratify.",
+        detail: ratifyOrderExists
+          ? "The showcase order appears in Orders with council tags."
+          : "Use the Ratify section in Council to generate the showcase order.",
+      };
+    }
+  }
 
   const phase2GoalOrder = input.orders.find((order) =>
     order.modifierIds?.includes(PHASE2_GOAL_MODIFIER),

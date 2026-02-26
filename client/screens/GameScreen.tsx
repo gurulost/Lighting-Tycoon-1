@@ -48,6 +48,9 @@ import { SupplierModal } from "@/components/game/SupplierModal";
 import { MergeMomentumModal } from "@/components/game/MergeMomentumModal";
 import { MissionStrip } from "@/components/game/MissionStrip";
 import { Phase2IntroModal } from "@/components/game/Phase2IntroModal";
+import { Phase3IntroModal } from "@/components/game/Phase3IntroModal";
+import { Phase3HearingIntroModal } from "@/components/game/Phase3HearingIntroModal";
+import { Phase3RatifyReadyModal } from "@/components/game/Phase3RatifyReadyModal";
 import { SplitObjectiveRow } from "@/components/game/SplitObjectiveRow";
 import { MissionDetailModal } from "@/components/game/MissionDetailModal";
 import { DebugOverlay } from "@/components/DebugOverlay";
@@ -57,7 +60,17 @@ import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { getCouncilUnlockInfo } from "@/lib/council";
-import { resolvePhaseObjective } from "@/lib/objectives";
+import {
+  resolvePhaseObjective,
+  type PhaseObjectiveState,
+} from "@/lib/objectives";
+import { buildPhasePlaybookSnapshot } from "@/lib/phase2Playbook";
+import { captureEvent } from "@/lib/telemetry";
+import {
+  resolvePhase3OnboardingBuildVariant,
+  resolvePhase3OnboardingVariant,
+  resolvePhase3OnboardingVariantSource,
+} from "@/lib/phase3OnboardingVariant";
 import { withRepeat } from "@/lib/reanimated";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
@@ -119,6 +132,7 @@ type ModalType =
   | null;
 
 type ProjectBoardTab = "offers" | "active" | "trophies";
+type CouncilEntryHint = "hearing_play" | "hearing_lobby" | null;
 
 interface PendingProjectsUnlockHandoff {
   focusProjectId?: string;
@@ -140,6 +154,32 @@ interface LayoutRect {
   y: number;
   width: number;
   height: number;
+}
+
+type Phase2RescueHintId =
+  | "goal_hesitation"
+  | "queue_blocker"
+  | "offers_hesitation"
+  | "deadline_risk"
+  | "pressure_mid"
+  | "pressure_high";
+
+interface Phase2RescueHint {
+  id: Phase2RescueHintId;
+  message: string;
+}
+
+type Phase3RescueHintId =
+  | "open_council"
+  | "select_campaign"
+  | "draft_stall"
+  | "pilot_stall"
+  | "hearing_alert"
+  | "ratify_ready";
+
+interface Phase3RescueHint {
+  id: Phase3RescueHintId;
+  message: string;
 }
 
 function layoutRectEqual(a: LayoutRect, b: LayoutRect) {
@@ -294,7 +334,22 @@ export default function GameScreen() {
     hydrated,
   } = useGame();
   const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
+  const phase3RatifyReadyDelayMs = e2eEnabled ? 1200 : 20000;
+  const phase3OnboardingBuildVariant = resolvePhase3OnboardingBuildVariant();
+  const phase3OnboardingVariant = resolvePhase3OnboardingVariant(
+    state.settings.phase3OnboardingVariantOverride,
+  );
+  const phase3OnboardingVariantSource = resolvePhase3OnboardingVariantSource(
+    state.settings.phase3OnboardingVariantOverride,
+  );
+  const phase3HandoffEnabled = phase3OnboardingVariant !== "control";
+  const phase3AdaptiveEnabled =
+    phase3OnboardingVariant === "phase3_full_adaptive";
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [glossaryInitialSectionId, setGlossaryInitialSectionId] = useState<
+    string | null
+  >(null);
+  const [glossaryOpenToken, setGlossaryOpenToken] = useState(0);
   const [projectDossierId, setProjectDossierId] = useState<string | null>(null);
   const [projectBoardFocusId, setProjectBoardFocusId] = useState<string | null>(
     null,
@@ -305,6 +360,13 @@ export default function GameScreen() {
   const [phase2IntroVisible, setPhase2IntroVisible] = useState(false);
   const [phase2ContractsBriefVisible, setPhase2ContractsBriefVisible] =
     useState(false);
+  const [phase3IntroVisible, setPhase3IntroVisible] = useState(false);
+  const [phase3HearingIntroVisible, setPhase3HearingIntroVisible] =
+    useState(false);
+  const [phase3RatifyReadyVisible, setPhase3RatifyReadyVisible] =
+    useState(false);
+  const [councilEntryHint, setCouncilEntryHint] =
+    useState<CouncilEntryHint>(null);
   const [baronOfferGate, setBaronOfferGate] = useState(false);
   const [selectedPartIndex, setSelectedPartIndex] = useState<number | null>(
     null,
@@ -327,6 +389,12 @@ export default function GameScreen() {
   const [hudCollapsed, setHudCollapsed] = useState(false);
   const [showTutorialGlossaryBeacon, setShowTutorialGlossaryBeacon] =
     useState(false);
+  const [phase2RescueHint, setPhase2RescueHint] =
+    useState<Phase2RescueHint | null>(null);
+  const [phase2HintTick, setPhase2HintTick] = useState(0);
+  const [phase3RescueHint, setPhase3RescueHint] =
+    useState<Phase3RescueHint | null>(null);
+  const [phase3HintTick, setPhase3HintTick] = useState(0);
   const [tutorialTargets, setTutorialTargets] = useState<
     Partial<Record<TutorialTarget, LayoutRect>>
   >({});
@@ -388,11 +456,52 @@ export default function GameScreen() {
   const pendingContractsBriefRef = useRef(false);
   const pendingProjectsUnlockHandoffRef =
     useRef<PendingProjectsUnlockHandoff | null>(null);
+  const pendingCouncilOpenRef = useRef(false);
+  const phase3HearingIntroShownRef = useRef(false);
+  const phase3RatifyReadyShownRef = useRef(false);
+  const introModalVisibleRef = useRef(false);
+  const gamePhaseRef = useRef<1 | 2 | 3>(state.gamePhase);
+  const projectsUnlockHandoffBlockedRef = useRef(true);
+  const phase2PlaybookStageRef = useRef<string | null>(null);
+  const phase2PlaybookStageStartedAtRef = useRef<number>(Date.now());
+  const phase2HintsSeenRef = useRef<Record<Phase2RescueHintId, boolean>>({
+    goal_hesitation: false,
+    queue_blocker: false,
+    offers_hesitation: false,
+    deadline_risk: false,
+    pressure_mid: false,
+    pressure_high: false,
+  });
+  const phase3PlaybookStageRef = useRef<string | null>(null);
+  const phase3PlaybookStageStartedAtRef = useRef<number>(Date.now());
+  const phase3HintsSeenRef = useRef<Record<Phase3RescueHintId, boolean>>({
+    open_council: false,
+    select_campaign: false,
+    draft_stall: false,
+    pilot_stall: false,
+    hearing_alert: false,
+    ratify_ready: false,
+  });
+  const phase3UnlockStartedAtRef = useRef<number | null>(null);
+  const phase3HearingStartedAtRef = useRef<number | null>(null);
+  const phase3FailureEventsSeenRef = useRef({
+    unlockNoCouncil: false,
+    campaignNoDraft: false,
+    hearingNoResolve: false,
+  });
+  const phase3VariantLoggedRef = useRef(false);
   const [momentLockActive, setMomentLockActive] = useState(false);
   const reputationTierRef = useRef(state.reputationTier);
   const canUndoNow =
     state.undoSnapshot !== undefined &&
     Date.now() + undoTick >= state.undoCooldownUntil;
+  introModalVisibleRef.current =
+    phase2IntroVisible ||
+    phase2ContractsBriefVisible ||
+    phase3IntroVisible ||
+    phase3HearingIntroVisible ||
+    phase3RatifyReadyVisible;
+  gamePhaseRef.current = state.gamePhase;
   const boardPressureBand = getBoardPressureBand(countFreeSlots(state));
   const effectiveMaxOrders =
     state.maxOrders + (state.activeProject?.overtimeCrew ? 1 : 0);
@@ -485,6 +594,8 @@ export default function GameScreen() {
         activeProject: state.activeProject,
         reputationTier: state.reputationTier,
         projectsCompleted: state.projectsCompleted,
+        council: state.council,
+        phase3Onboarding: state.phase3Onboarding,
       }),
     [
       state.gamePhase,
@@ -495,8 +606,47 @@ export default function GameScreen() {
       state.activeProject,
       state.reputationTier,
       state.projectsCompleted,
+      state.council,
+      state.phase3Onboarding,
     ],
   );
+  const phase2Playbook = useMemo(
+    () =>
+      buildPhasePlaybookSnapshot({
+        state: {
+          gamePhase: state.gamePhase,
+          orders: state.orders,
+          phase2GoalPending: state.phase2GoalPending,
+          projectsUnlocked: state.projectsUnlocked,
+          projectOffers: state.projectOffers,
+          activeProject: state.activeProject,
+          projectsCompleted: state.projectsCompleted,
+          reputationTier: state.reputationTier,
+          phase2Onboarding: state.phase2Onboarding,
+          phase3Onboarding: state.phase3Onboarding,
+          council: state.council,
+        },
+        objective: phaseObjective,
+      }),
+    [
+      state.gamePhase,
+      state.orders,
+      state.phase2GoalPending,
+      state.projectsUnlocked,
+      state.projectOffers,
+      state.activeProject,
+      state.projectsCompleted,
+      state.reputationTier,
+      state.phase2Onboarding,
+      state.phase3Onboarding,
+      state.council,
+      phaseObjective,
+    ],
+  );
+  const phasePlaybookHint =
+    state.gamePhase >= 3
+      ? phase3RescueHint?.message
+      : phase2RescueHint?.message;
   const isNarrowTopBar = safeWidth > 0 && safeWidth < 520;
   const isTightTopBar = safeWidth > 0 && safeWidth < 450;
   const isUltraNarrowTopBar = safeWidth > 0 && safeWidth < 350;
@@ -556,10 +706,14 @@ export default function GameScreen() {
       setProjectBoardFocusId(null);
       setProjectBoardInitialTab(null);
     }
+    if (activeModal === "council") {
+      setCouncilEntryHint(null);
+    }
     setActiveModal(null);
   };
   const openProjectBoard = useCallback(
     (options?: { focusProjectId?: string; tab?: ProjectBoardTab }) => {
+      if (introModalVisibleRef.current) return;
       setProjectBoardFocusId(options?.focusProjectId ?? null);
       setProjectBoardInitialTab(options?.tab ?? null);
       setProjectBoardOpenId((prev) => prev + 1);
@@ -580,24 +734,91 @@ export default function GameScreen() {
         typeof latestTimestamp === "number" ? latestTimestamp : Date.now(),
     });
   }, [dispatch, state.storyLog]);
-  const openGlossary = useCallback(() => {
-    if (tutorialSkipped) {
-      tutorialSkipDismissedRef.current = true;
-      setShowTutorialGlossaryBeacon(false);
-    }
-    if (
-      state.compatibleDiscoverySeen ||
-      typeof state.lastCompatibilityOrderSpawnedAt === "number"
-    ) {
-      dispatch({ type: "MARK_COMPAT_GLOSSARY_OPENED" });
-    }
-    setActiveModal("glossary");
-  }, [
-    tutorialSkipped,
-    dispatch,
-    state.compatibleDiscoverySeen,
-    state.lastCompatibilityOrderSpawnedAt,
-  ]);
+  const openGlossary = useCallback(
+    (options?: { sectionId?: string; source?: string }) => {
+      const targetSectionId = options?.sectionId ?? null;
+      setGlossaryInitialSectionId(targetSectionId);
+      setGlossaryOpenToken((prev) => prev + 1);
+      if (targetSectionId === "phase-playbook" && state.gamePhase >= 2) {
+        captureEvent(
+          state.gamePhase >= 3
+            ? "phase3_playbook_opened"
+            : "phase2_playbook_opened",
+          {
+            source: options?.source ?? "hud_help",
+          },
+        );
+      }
+      if (phase2RescueHint) {
+        captureEvent("phase2_rescue_hint_actioned", {
+          hintId: phase2RescueHint.id,
+          action: "open_glossary",
+        });
+        setPhase2RescueHint(null);
+      }
+      if (phase3RescueHint) {
+        captureEvent("phase3_rescue_hint_actioned", {
+          hintId: phase3RescueHint.id,
+          action: "open_glossary",
+        });
+        setPhase3RescueHint(null);
+      }
+      if (tutorialSkipped) {
+        tutorialSkipDismissedRef.current = true;
+        setShowTutorialGlossaryBeacon(false);
+      }
+      if (
+        state.compatibleDiscoverySeen ||
+        typeof state.lastCompatibilityOrderSpawnedAt === "number"
+      ) {
+        dispatch({ type: "MARK_COMPAT_GLOSSARY_OPENED" });
+      }
+      setActiveModal("glossary");
+    },
+    [
+      tutorialSkipped,
+      dispatch,
+      phase2RescueHint,
+      phase3RescueHint,
+      state.compatibleDiscoverySeen,
+      state.lastCompatibilityOrderSpawnedAt,
+      state.gamePhase,
+    ],
+  );
+  const requestCouncilOpen = useCallback(
+    (hint: CouncilEntryHint = null) => {
+      if (gamePhaseRef.current < 3 || !state.council.unlocked) return;
+      setCouncilEntryHint(hint);
+      pendingCouncilOpenRef.current = true;
+      if (
+        phase2IntroVisible ||
+        phase2ContractsBriefVisible ||
+        phase3IntroVisible ||
+        phase3HearingIntroVisible ||
+        phase3RatifyReadyVisible ||
+        Boolean(projectDossierId) ||
+        isDragging
+      )
+        return;
+      if (activeModal !== null && activeModal !== "council") {
+        setActiveModal(null);
+        return;
+      }
+      pendingCouncilOpenRef.current = false;
+      setActiveModal("council");
+    },
+    [
+      state.council.unlocked,
+      activeModal,
+      phase2IntroVisible,
+      phase2ContractsBriefVisible,
+      phase3IntroVisible,
+      phase3HearingIntroVisible,
+      phase3RatifyReadyVisible,
+      projectDossierId,
+      isDragging,
+    ],
+  );
   const markProjectRevealSeen = useCallback(
     (projectId: string) => {
       const isOffered = state.projectOffers.some(
@@ -642,26 +863,76 @@ export default function GameScreen() {
       state.projectOffers,
     ],
   );
-  const handlePhaseObjectivePress = useCallback(() => {
-    if (!phaseObjective) return;
-    if (phaseObjective.action === "open_orders") {
-      setActiveModal("orders");
-      return;
-    }
-    if (phaseObjective.action === "open_projects_active") {
-      if (phaseObjective.projectId) {
-        openProjectBoardForProject(phaseObjective.projectId, "active");
-      } else {
-        openProjectBoard({ tab: "active" });
+  const runObjectiveAction = useCallback(
+    (action: PhaseObjectiveState["action"], projectId?: string) => {
+      if (action === "open_orders") {
+        setActiveModal("orders");
+        return;
       }
-      return;
+      if (action === "open_projects_active") {
+        if (projectId) {
+          openProjectBoardForProject(projectId, "active");
+        } else {
+          openProjectBoard({ tab: "active" });
+        }
+        return;
+      }
+      if (action === "open_council") {
+        requestCouncilOpen();
+        return;
+      }
+      if (projectId) {
+        openProjectBoardForProject(projectId, "offers");
+        return;
+      }
+      openProjectBoard({ tab: "offers" });
+    },
+    [openProjectBoard, openProjectBoardForProject, requestCouncilOpen],
+  );
+  const handlePhaseObjectivePress = useCallback(() => {
+    const action = phase2Playbook.primaryAction;
+    if (phase2RescueHint && state.gamePhase === 2) {
+      captureEvent("phase2_rescue_hint_actioned", {
+        hintId: phase2RescueHint.id,
+        action,
+      });
+      setPhase2RescueHint(null);
     }
-    if (phaseObjective.projectId) {
-      openProjectBoardForProject(phaseObjective.projectId, "offers");
-      return;
+    if (phase3RescueHint && state.gamePhase >= 3) {
+      captureEvent("phase3_rescue_hint_actioned", {
+        hintId: phase3RescueHint.id,
+        action,
+      });
+      setPhase3RescueHint(null);
     }
-    openProjectBoard({ tab: "offers" });
-  }, [phaseObjective, openProjectBoard, openProjectBoardForProject]);
+    if (state.gamePhase === 2) {
+      captureEvent("phase2_playbook_item_viewed", {
+        item: "primary_action",
+        stage: phase2Playbook.stageId,
+        action,
+      });
+    } else if (state.gamePhase >= 3) {
+      captureEvent("phase3_playbook_item_viewed", {
+        item: "primary_action",
+        stage: phase2Playbook.stageId,
+        action,
+      });
+    }
+    runObjectiveAction(action, phaseObjective?.projectId);
+  }, [
+    phase2Playbook,
+    phase2RescueHint,
+    phase3RescueHint,
+    phaseObjective,
+    runObjectiveAction,
+    state.gamePhase,
+  ]);
+  const handlePhasePlaybookHelp = useCallback(() => {
+    openGlossary({
+      sectionId: "phase-playbook",
+      source: "playbook_card",
+    });
+  }, [openGlossary]);
   const handlePhase2IntroContinue = useCallback(() => {
     phase2IntroHandoffLockRef.current = false;
     setPhase2IntroVisible(false);
@@ -694,6 +965,41 @@ export default function GameScreen() {
     setPhase2ContractsBriefVisible(false);
     dispatch({ type: "ACK_PHASE2_ONBOARDING_CONTRACTS_BRIEF" });
   }, [dispatch]);
+  const handlePhase3IntroContinue = useCallback(() => {
+    setPhase3IntroVisible(false);
+    dispatch({ type: "ACK_PHASE3_ONBOARDING_INTRO" });
+    setCouncilEntryHint(null);
+    pendingCouncilOpenRef.current = true;
+    if (activeModal !== null && activeModal !== "council") {
+      setActiveModal(null);
+    }
+  }, [dispatch, activeModal]);
+  const handlePhase3HearingClearByPlay = useCallback(() => {
+    setPhase3HearingIntroVisible(false);
+    requestCouncilOpen("hearing_play");
+  }, [requestCouncilOpen]);
+  const handlePhase3HearingLobbyBack = useCallback(() => {
+    setPhase3HearingIntroVisible(false);
+    requestCouncilOpen("hearing_lobby");
+  }, [requestCouncilOpen]);
+  const handlePhase3HearingIntroDismiss = useCallback(() => {
+    setPhase3HearingIntroVisible(false);
+  }, []);
+  const handlePhase3RatifyReadyDismiss = useCallback(() => {
+    setPhase3RatifyReadyVisible(false);
+    captureEvent("phase3_rescue_hint_dismissed", {
+      hintId: "ratify_ready",
+      reason: "dismiss",
+    });
+  }, []);
+  const handlePhase3RatifyReadyOpenOrders = useCallback(() => {
+    setPhase3RatifyReadyVisible(false);
+    captureEvent("phase3_rescue_hint_actioned", {
+      hintId: "ratify_ready",
+      action: "open_orders",
+    });
+    setActiveModal("orders");
+  }, []);
   const dismissProjectReveal = useCallback(() => {
     if (!pendingProjectRevealId) return;
     dispatch({
@@ -894,43 +1200,49 @@ export default function GameScreen() {
     activeModal !== null ||
     phase2IntroVisible ||
     phase2ContractsBriefVisible ||
+    phase3IntroVisible ||
+    phase3HearingIntroVisible ||
+    phase3RatifyReadyVisible ||
     state.baronOfferAvailable ||
     showLockoutModal ||
     selectedPartOpen ||
     isDragging;
+  const overlaySuppressed =
+    phase2IntroVisible ||
+    phase2ContractsBriefVisible ||
+    phase3IntroVisible ||
+    phase3HearingIntroVisible ||
+    phase3RatifyReadyVisible;
   const storyBlockedRef = useRef(storyBlocked);
   const showProjectReveal =
     revealEligible &&
     !projectDossierId &&
     activeModal === null &&
+    !pendingCouncilOpenRef.current &&
     !selectedPartOpen &&
     !showLockoutModal &&
     !phase2IntroVisible &&
     !phase2ContractsBriefVisible &&
+    !phase3IntroVisible &&
+    !phase3HearingIntroVisible &&
+    !phase3RatifyReadyVisible &&
     overlayQueue.length === 0 &&
     !(state.baronOfferAvailable && baronOfferGate);
-  const isProjectsUnlockHandoffBlocked = useCallback(
-    () =>
-      phase2IntroHandoffLockRef.current ||
-      phase2IntroVisible ||
-      phase2ContractsBriefVisible ||
-      showLockoutModal ||
-      selectedPartOpen ||
-      Boolean(projectDossierId) ||
-      isDragging ||
-      (activeModal !== null &&
-        activeModal !== "orders" &&
-        activeModal !== "projects"),
-    [
-      phase2IntroVisible,
-      phase2ContractsBriefVisible,
-      showLockoutModal,
-      selectedPartOpen,
-      projectDossierId,
-      isDragging,
-      activeModal,
-    ],
-  );
+  const projectsUnlockHandoffBlocked =
+    phase2IntroHandoffLockRef.current ||
+    phase2IntroVisible ||
+    phase2ContractsBriefVisible ||
+    phase3IntroVisible ||
+    phase3HearingIntroVisible ||
+    phase3RatifyReadyVisible ||
+    showLockoutModal ||
+    selectedPartOpen ||
+    Boolean(projectDossierId) ||
+    isDragging ||
+    (activeModal !== null &&
+      activeModal !== "orders" &&
+      activeModal !== "projects");
+  projectsUnlockHandoffBlockedRef.current = projectsUnlockHandoffBlocked;
   const flushPendingPhase2ContractsBrief = useCallback(() => {
     if (!pendingContractsBriefRef.current) return;
     if (phase2ContractsBriefVisible) return;
@@ -946,6 +1258,9 @@ export default function GameScreen() {
     if (!state.phase2Onboarding.introSeen) return;
     if (
       phase2IntroVisible ||
+      phase3IntroVisible ||
+      phase3HearingIntroVisible ||
+      phase3RatifyReadyVisible ||
       showLockoutModal ||
       selectedPartOpen ||
       Boolean(projectDossierId) ||
@@ -966,6 +1281,9 @@ export default function GameScreen() {
     state.phase2Onboarding.introSeen,
     state.phase2Onboarding.contractsBriefSeen,
     phase2IntroVisible,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
     showLockoutModal,
     selectedPartOpen,
     projectDossierId,
@@ -974,7 +1292,12 @@ export default function GameScreen() {
   ]);
   const flushPendingProjectsUnlockHandoff = useCallback(() => {
     const pending = pendingProjectsUnlockHandoffRef.current;
-    if (!pending || isProjectsUnlockHandoffBlocked()) return;
+    if (!pending) return;
+    if (gamePhaseRef.current >= 3) {
+      pendingProjectsUnlockHandoffRef.current = null;
+      return;
+    }
+    if (projectsUnlockHandoffBlockedRef.current) return;
     if (
       state.gamePhase >= 2 &&
       state.projectsUnlocked &&
@@ -984,6 +1307,11 @@ export default function GameScreen() {
     }
     pendingProjectsUnlockHandoffRef.current = null;
     requestAnimationFrame(() => {
+      if (gamePhaseRef.current >= 3) return;
+      if (projectsUnlockHandoffBlockedRef.current) {
+        pendingProjectsUnlockHandoffRef.current = pending;
+        return;
+      }
       openProjectBoard({
         tab: "offers",
         focusProjectId: pending.focusProjectId,
@@ -992,7 +1320,6 @@ export default function GameScreen() {
     });
   }, [
     openProjectBoard,
-    isProjectsUnlockHandoffBlocked,
     showToast,
     state.gamePhase,
     state.projectsUnlocked,
@@ -1001,36 +1328,58 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (!hydrated) return;
+    const shouldShowPhase2Intro =
+      state.gamePhase >= 2 &&
+      !state.phase2Onboarding.introSeen &&
+      !phase2IntroVisible &&
+      !phase2ContractsBriefVisible &&
+      !phase3IntroVisible &&
+      !phase3HearingIntroVisible &&
+      !phase3RatifyReadyVisible;
+    const shouldShowPhase3Intro =
+      phase3HandoffEnabled &&
+      state.gamePhase >= 3 &&
+      state.phase2Onboarding.introSeen &&
+      state.phase2Onboarding.contractsBriefSeen &&
+      !state.phase3Onboarding.introSeen &&
+      !phase2IntroVisible &&
+      !phase2ContractsBriefVisible &&
+      !phase3IntroVisible &&
+      !phase3HearingIntroVisible &&
+      !phase3RatifyReadyVisible;
+
     if (!phaseTransitionRef.current.initialized) {
       phaseTransitionRef.current = {
         initialized: true,
         gamePhase: state.gamePhase,
       };
-      if (
-        state.gamePhase >= 2 &&
-        !state.phase2Onboarding.introSeen &&
-        !phase2IntroVisible &&
-        !phase2ContractsBriefVisible
-      ) {
+      if (shouldShowPhase2Intro) {
         phase2IntroHandoffLockRef.current = true;
         setActiveModal(null);
         setPhase2IntroVisible(true);
+      } else if (shouldShowPhase3Intro) {
+        setActiveModal(null);
+        setPhase3IntroVisible(true);
       }
       return;
     }
     const previousPhase = phaseTransitionRef.current.gamePhase;
     phaseTransitionRef.current.gamePhase = state.gamePhase;
     const enteredPhase2 = previousPhase < 2 && state.gamePhase >= 2;
-    if (
-      state.gamePhase >= 2 &&
-      !state.phase2Onboarding.introSeen &&
-      !phase2IntroVisible &&
-      !phase2ContractsBriefVisible
-    ) {
+    const enteredPhase3 = previousPhase < 3 && state.gamePhase >= 3;
+    if (shouldShowPhase2Intro) {
       phase2IntroHandoffLockRef.current = true;
       setActiveModal(null);
       setPhase2IntroVisible(true);
       if (enteredPhase2) {
+        SoundManager.play("rd_unlock");
+      }
+      return;
+    }
+    if (shouldShowPhase3Intro) {
+      setActiveModal(null);
+      setPhase3IntroVisible(true);
+      if (enteredPhase3) {
         SoundManager.play("rd_unlock");
       }
     }
@@ -1038,8 +1387,175 @@ export default function GameScreen() {
     hydrated,
     state.gamePhase,
     state.phase2Onboarding.introSeen,
+    state.phase2Onboarding.contractsBriefSeen,
+    state.phase3Onboarding.introSeen,
+    phase3HandoffEnabled,
     phase2IntroVisible,
     phase2ContractsBriefVisible,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
+  ]);
+
+  useEffect(() => {
+    if (!pendingCouncilOpenRef.current) return;
+    if (state.gamePhase < 3 || !state.council.unlocked) {
+      pendingCouncilOpenRef.current = false;
+      return;
+    }
+    if (activeModal !== null && activeModal !== "council") return;
+    if (
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      phase3IntroVisible ||
+      phase3HearingIntroVisible ||
+      phase3RatifyReadyVisible ||
+      showLockoutModal ||
+      selectedPartOpen ||
+      Boolean(projectDossierId) ||
+      isDragging
+    ) {
+      return;
+    }
+    if (activeModal === "council") {
+      pendingCouncilOpenRef.current = false;
+      return;
+    }
+    pendingCouncilOpenRef.current = false;
+    setActiveModal("council");
+  }, [
+    state.gamePhase,
+    state.council.unlocked,
+    activeModal,
+    phase2IntroVisible,
+    phase2ContractsBriefVisible,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
+    showLockoutModal,
+    selectedPartOpen,
+    projectDossierId,
+    isDragging,
+  ]);
+
+  useEffect(() => {
+    phase3VariantLoggedRef.current = false;
+    if (state.gamePhase >= 3 && phase3AdaptiveEnabled) return;
+    phase3HearingIntroShownRef.current = false;
+    phase3RatifyReadyShownRef.current = false;
+    setPhase3HearingIntroVisible(false);
+    setPhase3RatifyReadyVisible(false);
+  }, [state.gamePhase, phase3AdaptiveEnabled, phase3OnboardingVariant]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (phase3VariantLoggedRef.current) return;
+    phase3VariantLoggedRef.current = true;
+    captureEvent("phase3_onboarding_started", {
+      source: phase3OnboardingVariantSource,
+      variant: phase3OnboardingVariant,
+      buildVariant: phase3OnboardingBuildVariant,
+      overrideVariant: state.settings.phase3OnboardingVariantOverride ?? null,
+    });
+  }, [
+    state.gamePhase,
+    phase3OnboardingVariant,
+    phase3OnboardingVariantSource,
+    phase3OnboardingBuildVariant,
+    state.settings.phase3OnboardingVariantOverride,
+  ]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (!phase3AdaptiveEnabled) return;
+    if (state.phase3Onboarding.hearingResolvedSeen) {
+      setPhase3HearingIntroVisible(false);
+      return;
+    }
+    if (!state.council.activeHearing) return;
+    if (phase3HearingIntroVisible || phase3HearingIntroShownRef.current) {
+      return;
+    }
+    if (
+      activeModal !== null ||
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      phase3IntroVisible ||
+      showLockoutModal ||
+      selectedPartOpen ||
+      Boolean(projectDossierId) ||
+      isDragging
+    ) {
+      return;
+    }
+    phase3HearingIntroShownRef.current = true;
+    setPhase3HearingIntroVisible(true);
+  }, [
+    state.gamePhase,
+    state.council.activeHearing,
+    state.phase3Onboarding.hearingResolvedSeen,
+    phase3HearingIntroVisible,
+    activeModal,
+    phase2IntroVisible,
+    phase2ContractsBriefVisible,
+    phase3IntroVisible,
+    showLockoutModal,
+    selectedPartOpen,
+    projectDossierId,
+    isDragging,
+    phase3AdaptiveEnabled,
+  ]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (!phase3AdaptiveEnabled) return;
+    if (
+      phase2Playbook.stageId !== "council_ratify" ||
+      phase2Playbook.primaryAction !== "open_orders"
+    ) {
+      phase3RatifyReadyShownRef.current = false;
+      setPhase3RatifyReadyVisible(false);
+      return;
+    }
+    if (phase3RatifyReadyShownRef.current || phase3RatifyReadyVisible) return;
+    if (
+      activeModal !== null ||
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      phase3IntroVisible ||
+      phase3HearingIntroVisible ||
+      showLockoutModal ||
+      selectedPartOpen ||
+      Boolean(projectDossierId) ||
+      isDragging
+    ) {
+      return;
+    }
+    const elapsedMs = Date.now() - phase3PlaybookStageStartedAtRef.current;
+    if (elapsedMs < phase3RatifyReadyDelayMs) return;
+    phase3RatifyReadyShownRef.current = true;
+    setPhase3RatifyReadyVisible(true);
+    captureEvent("phase3_rescue_hint_shown", {
+      hintId: "ratify_ready",
+      stage: phase2Playbook.stageId,
+    });
+  }, [
+    state.gamePhase,
+    phase3AdaptiveEnabled,
+    phase2Playbook.stageId,
+    phase2Playbook.primaryAction,
+    phase3RatifyReadyVisible,
+    phase3HintTick,
+    phase3RatifyReadyDelayMs,
+    activeModal,
+    phase2IntroVisible,
+    phase2ContractsBriefVisible,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    showLockoutModal,
+    selectedPartOpen,
+    projectDossierId,
+    isDragging,
   ]);
 
   useEffect(() => {
@@ -1057,6 +1573,10 @@ export default function GameScreen() {
       pendingProjectsUnlockHandoffRef.current = null;
       pendingContractsBriefRef.current = false;
       setPhase2ContractsBriefVisible(false);
+      return;
+    }
+    if (state.gamePhase >= 3) {
+      pendingProjectsUnlockHandoffRef.current = null;
       return;
     }
     if (!state.phase2Onboarding.contractsBriefSeen) {
@@ -1099,6 +1619,400 @@ export default function GameScreen() {
   useEffect(() => {
     flushPendingProjectsUnlockHandoff();
   }, [flushPendingProjectsUnlockHandoff]);
+
+  const activatePhase2RescueHint = useCallback(
+    (hint: Phase2RescueHint) => {
+      if (phase2HintsSeenRef.current[hint.id]) return;
+      phase2HintsSeenRef.current[hint.id] = true;
+      setPhase2RescueHint(hint);
+      showToast(hint.message, 3600);
+      captureEvent("phase2_rescue_hint_shown", {
+        hintId: hint.id,
+        stage: phase2Playbook.stageId,
+      });
+    },
+    [phase2Playbook.stageId, showToast],
+  );
+
+  useEffect(() => {
+    if (state.gamePhase === 2) return;
+    phase2PlaybookStageRef.current = null;
+    phase2PlaybookStageStartedAtRef.current = Date.now();
+    phase2HintsSeenRef.current = {
+      goal_hesitation: false,
+      queue_blocker: false,
+      offers_hesitation: false,
+      deadline_risk: false,
+      pressure_mid: false,
+      pressure_high: false,
+    };
+    setPhase2RescueHint((current) => {
+      if (!current) return current;
+      captureEvent("phase2_rescue_hint_dismissed", {
+        hintId: current.id,
+        reason: "phase_reset",
+      });
+      return null;
+    });
+  }, [state.gamePhase]);
+
+  useEffect(() => {
+    if (state.gamePhase !== 2) return;
+    const previousStage = phase2PlaybookStageRef.current;
+    const nextStage = phase2Playbook.stageId;
+    if (previousStage === nextStage) return;
+    phase2PlaybookStageRef.current = nextStage;
+    phase2PlaybookStageStartedAtRef.current = Date.now();
+    captureEvent("phase2_playbook_item_viewed", {
+      item: "stage",
+      stage: nextStage,
+      progress: phase2Playbook.progressLabel,
+    });
+    setPhase2RescueHint((current) => {
+      if (!current) return current;
+      captureEvent("phase2_rescue_hint_dismissed", {
+        hintId: current.id,
+        reason: "stage_change",
+      });
+      return null;
+    });
+  }, [phase2Playbook.stageId, phase2Playbook.progressLabel, state.gamePhase]);
+
+  useEffect(() => {
+    if (state.gamePhase !== 2) return;
+    const interval = setInterval(() => {
+      setPhase2HintTick((tick) => tick + 1);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [state.gamePhase]);
+
+  useEffect(() => {
+    if (state.gamePhase !== 2) return;
+    const blocked =
+      activeModal !== null ||
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      showLockoutModal ||
+      selectedPartOpen;
+    if (blocked || phase2RescueHint) return;
+
+    const elapsedMs = Date.now() - phase2PlaybookStageStartedAtRef.current;
+    if (state.baronPressure >= 70) {
+      activatePhase2RescueHint({
+        id: "pressure_high",
+        message:
+          "Baron Pressure 70+: Phase 2 rewards are heavily taxed. Prioritize open-only installs and waste recycling.",
+      });
+      return;
+    }
+    if (state.baronPressure >= 40) {
+      activatePhase2RescueHint({
+        id: "pressure_mid",
+        message:
+          "Baron Pressure 40+: rewards are taxed. Open-only installs and waste recycling reduce pressure.",
+      });
+      return;
+    }
+    if (phase2Playbook.stageId === "gate_queue" && elapsedMs >= 10000) {
+      activatePhase2RescueHint({
+        id: "queue_blocker",
+        message:
+          "Open Spark Showcase is waiting for a free order slot. Complete or dismiss one order, then reopen Orders.",
+      });
+      return;
+    }
+    if (phase2Playbook.stageId === "gate_order" && elapsedMs >= 18000) {
+      activatePhase2RescueHint({
+        id: "goal_hesitation",
+        message:
+          "Track Open Spark Showcase now. It is your only path to unlocking Empire Contracts.",
+      });
+      return;
+    }
+    if (phase2Playbook.stageId === "offers_ready" && elapsedMs >= 12000) {
+      activatePhase2RescueHint({
+        id: "offers_hesitation",
+        message:
+          "Empire contract offers are live. Open Project Board and accept one to start Phase 2 progression.",
+      });
+      return;
+    }
+    if (
+      phase2Playbook.stageId === "contract_active" &&
+      typeof state.activeProject?.stageDeadlineRemaining === "number" &&
+      state.activeProject.stageDeadlineRemaining <= 2
+    ) {
+      activatePhase2RescueHint({
+        id: "deadline_risk",
+        message:
+          "Active project deadline is critical. Avoid side orders until this stage is secured.",
+      });
+    }
+  }, [
+    activeModal,
+    activatePhase2RescueHint,
+    phase2ContractsBriefVisible,
+    phase2IntroVisible,
+    phase2Playbook.stageId,
+    phase2RescueHint,
+    selectedPartOpen,
+    showLockoutModal,
+    state.activeProject?.stageDeadlineRemaining,
+    state.baronPressure,
+    state.gamePhase,
+    phase2HintTick,
+  ]);
+
+  const activatePhase3RescueHint = useCallback(
+    (hint: Phase3RescueHint) => {
+      if (phase3HintsSeenRef.current[hint.id]) return;
+      phase3HintsSeenRef.current[hint.id] = true;
+      setPhase3RescueHint(hint);
+      showToast(hint.message, 3600);
+      captureEvent("phase3_rescue_hint_shown", {
+        hintId: hint.id,
+        stage: phase2Playbook.stageId,
+      });
+    },
+    [phase2Playbook.stageId, showToast],
+  );
+
+  useEffect(() => {
+    if (state.gamePhase >= 3 && phase3AdaptiveEnabled) return;
+    phase3PlaybookStageRef.current = null;
+    phase3PlaybookStageStartedAtRef.current = Date.now();
+    phase3UnlockStartedAtRef.current = null;
+    phase3HearingStartedAtRef.current = null;
+    phase3FailureEventsSeenRef.current = {
+      unlockNoCouncil: false,
+      campaignNoDraft: false,
+      hearingNoResolve: false,
+    };
+    phase3HintsSeenRef.current = {
+      open_council: false,
+      select_campaign: false,
+      draft_stall: false,
+      pilot_stall: false,
+      hearing_alert: false,
+      ratify_ready: false,
+    };
+    setPhase3RescueHint((current) => {
+      if (!current) return current;
+      captureEvent("phase3_rescue_hint_dismissed", {
+        hintId: current.id,
+        reason: phase3AdaptiveEnabled ? "phase_reset" : "variant_disabled",
+      });
+      return null;
+    });
+  }, [state.gamePhase, phase3AdaptiveEnabled]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (!phase3AdaptiveEnabled) return;
+    const previousStage = phase3PlaybookStageRef.current;
+    const nextStage = phase2Playbook.stageId;
+    if (previousStage === nextStage) return;
+    phase3PlaybookStageRef.current = nextStage;
+    phase3PlaybookStageStartedAtRef.current = Date.now();
+    captureEvent("phase3_playbook_item_viewed", {
+      item: "stage",
+      stage: nextStage,
+      progress: phase2Playbook.progressLabel,
+    });
+    setPhase3RescueHint((current) => {
+      if (!current) return current;
+      captureEvent("phase3_rescue_hint_dismissed", {
+        hintId: current.id,
+        reason: "stage_change",
+      });
+      return null;
+    });
+  }, [
+    phase2Playbook.stageId,
+    phase2Playbook.progressLabel,
+    state.gamePhase,
+    phase3AdaptiveEnabled,
+  ]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (phase3UnlockStartedAtRef.current === null) {
+      phase3UnlockStartedAtRef.current = Date.now();
+    }
+    if (state.council.activeHearing) {
+      if (phase3HearingStartedAtRef.current === null) {
+        phase3HearingStartedAtRef.current = Date.now();
+      }
+    } else {
+      phase3HearingStartedAtRef.current = null;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const failureSeen = phase3FailureEventsSeenRef.current;
+      if (
+        !failureSeen.unlockNoCouncil &&
+        !state.phase3Onboarding.councilOpenedSeen &&
+        phase3UnlockStartedAtRef.current !== null
+      ) {
+        const elapsedMs = now - phase3UnlockStartedAtRef.current;
+        if (elapsedMs >= 5 * 60 * 1000) {
+          failureSeen.unlockNoCouncil = true;
+          captureEvent("phase3_unlock_no_council_open_5m", {
+            elapsedMs,
+          });
+        }
+      }
+
+      if (
+        !failureSeen.campaignNoDraft &&
+        !state.phase3Onboarding.firstDraftInvestSeen &&
+        (phase2Playbook.stageId === "council_campaign_select" ||
+          phase2Playbook.stageId === "council_draft")
+      ) {
+        const elapsedMs = now - phase3PlaybookStageStartedAtRef.current;
+        if (elapsedMs >= 3 * 60 * 1000) {
+          failureSeen.campaignNoDraft = true;
+          captureEvent("phase3_campaign_stalled_no_draft_3m", {
+            elapsedMs,
+          });
+        }
+      }
+
+      if (
+        !failureSeen.hearingNoResolve &&
+        state.council.activeHearing &&
+        !state.phase3Onboarding.hearingResolvedSeen &&
+        phase3HearingStartedAtRef.current !== null
+      ) {
+        const elapsedMs = now - phase3HearingStartedAtRef.current;
+        if (elapsedMs >= 3 * 60 * 1000) {
+          failureSeen.hearingNoResolve = true;
+          captureEvent("phase3_hearing_active_3m_no_resolution", {
+            hearingId: state.council.activeHearing.hearingId,
+            elapsedMs,
+          });
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [
+    state.gamePhase,
+    state.council.activeHearing,
+    state.phase3Onboarding.councilOpenedSeen,
+    state.phase3Onboarding.firstDraftInvestSeen,
+    state.phase3Onboarding.hearingResolvedSeen,
+    phase2Playbook.stageId,
+  ]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (!phase3AdaptiveEnabled) return;
+    const interval = setInterval(() => {
+      setPhase3HintTick((tick) => tick + 1);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [state.gamePhase, phase3AdaptiveEnabled]);
+
+  useEffect(() => {
+    if (state.gamePhase < 3) return;
+    if (!phase3AdaptiveEnabled) return;
+    const blocked =
+      activeModal !== null ||
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      phase3IntroVisible ||
+      phase3HearingIntroVisible ||
+      phase3RatifyReadyVisible ||
+      showLockoutModal ||
+      selectedPartOpen;
+    if (blocked || phase3RescueHint) return;
+
+    const elapsedMs = Date.now() - phase3PlaybookStageStartedAtRef.current;
+    if (phase2Playbook.stageId === "council_hearing") {
+      activatePhase3RescueHint({
+        id: "hearing_alert",
+        message:
+          "Council hearing is active. Open Council to resolve objectives or pay to clear penalties.",
+      });
+      return;
+    }
+    if (phase2Playbook.stageId === "council_intro" && elapsedMs >= 15000) {
+      activatePhase3RescueHint({
+        id: "open_council",
+        message:
+          "Phase 3 starts in Council. Open it now to choose your first campaign.",
+      });
+      return;
+    }
+    if (
+      phase2Playbook.stageId === "council_campaign_select" &&
+      elapsedMs >= 20000
+    ) {
+      activatePhase3RescueHint({
+        id: "select_campaign",
+        message:
+          "Set an active campaign in Council to begin draft and pilot progression.",
+      });
+      return;
+    }
+    if (phase2Playbook.stageId === "council_draft" && elapsedMs >= 30000) {
+      activatePhase3RescueHint({
+        id: "draft_stall",
+        message:
+          "Invest draft costs in Council. Draft completion unlocks pilot objectives.",
+      });
+      return;
+    }
+    if (
+      phase2Playbook.stageId === "council_pilot" &&
+      state.phase3Onboarding.pilotNoProgressFulfills >= 8
+    ) {
+      activatePhase3RescueHint({
+        id: "pilot_stall",
+        message:
+          "Pilot objectives progress through normal installs. Open Council to review exact targets.",
+      });
+      return;
+    }
+  }, [
+    activeModal,
+    activatePhase3RescueHint,
+    phase2ContractsBriefVisible,
+    phase2IntroVisible,
+    phase2Playbook.stageId,
+    phase3HintTick,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
+    phase3RescueHint,
+    selectedPartOpen,
+    showLockoutModal,
+    state.gamePhase,
+    state.phase3Onboarding.pilotNoProgressFulfills,
+    phase3AdaptiveEnabled,
+  ]);
+
+  useEffect(() => {
+    if (activeModal !== "council") return;
+    if (state.gamePhase >= 3 && !state.phase3Onboarding.councilOpenedSeen) {
+      dispatch({ type: "ACK_PHASE3_ONBOARDING_COUNCIL_OPEN" });
+    }
+    if (phase3RescueHint) {
+      captureEvent("phase3_rescue_hint_actioned", {
+        hintId: phase3RescueHint.id,
+        action: "open_council",
+      });
+      setPhase3RescueHint(null);
+    }
+  }, [
+    activeModal,
+    dispatch,
+    phase3RescueHint,
+    state.gamePhase,
+    state.phase3Onboarding.councilOpenedSeen,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1576,6 +2490,10 @@ export default function GameScreen() {
         cooldownSatisfied &&
         !activeModal &&
         !phase2IntroVisible &&
+        !phase2ContractsBriefVisible &&
+        !phase3IntroVisible &&
+        !phase3HearingIntroVisible &&
+        !phase3RatifyReadyVisible &&
         !state.baronOfferAvailable &&
         !showLockoutModal &&
         !selectedPartOpen &&
@@ -1590,6 +2508,10 @@ export default function GameScreen() {
     state.lastStoryShownAt,
     activeModal,
     phase2IntroVisible,
+    phase2ContractsBriefVisible,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
     state.baronOfferAvailable,
     showLockoutModal,
     selectedPartOpen,
@@ -1608,6 +2530,16 @@ export default function GameScreen() {
     const storyOverlays = overlayQueue.filter(
       (entry) => entry.type === "story",
     );
+    const storyUiBlocked =
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      phase3IntroVisible ||
+      phase3HearingIntroVisible ||
+      phase3RatifyReadyVisible;
+    if (storyUiBlocked) {
+      storyOverlays.forEach((entry) => dismissOverlay(entry.id));
+      return;
+    }
 
     if (!desiredOverlayId) {
       storyOverlays.forEach((entry) => dismissOverlay(entry.id));
@@ -1631,7 +2563,17 @@ export default function GameScreen() {
         payload: { beatId: desiredBeatId },
       });
     }
-  }, [state.activeStoryBeatId, overlayQueue, dismissOverlay, enqueueOverlay]);
+  }, [
+    state.activeStoryBeatId,
+    overlayQueue,
+    dismissOverlay,
+    enqueueOverlay,
+    phase2IntroVisible,
+    phase2ContractsBriefVisible,
+    phase3IntroVisible,
+    phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
+  ]);
 
   useEffect(() => {
     if (state.tutorialComplete) return;
@@ -1795,7 +2737,7 @@ export default function GameScreen() {
             >
               <Pressable
                 style={topActionButtonStyle}
-                onPress={openGlossary}
+                onPress={() => openGlossary()}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Help and glossary"
@@ -1938,11 +2880,14 @@ export default function GameScreen() {
             missions={state.missions}
             missionsLocked={!state.tutorialComplete}
             objective={phaseObjective}
+            playbook={phase2Playbook}
+            playbookHint={phasePlaybookHint}
             onPressGoals={() => setActiveModal("missions")}
             onLockedGoalsPress={() =>
               showToast("Finish the tutorial to unlock goals.", 2200)
             }
             onPressObjective={handlePhaseObjectivePress}
+            onPressPlaybookHelp={handlePhasePlaybookHelp}
             compact={topCondensed}
             stacked={isSplitObjectiveStacked}
             style={topStackSideMarginStyle}
@@ -2137,7 +3082,7 @@ export default function GameScreen() {
       </LinearGradient>
 
       <OverlayManager
-        queue={overlayQueue}
+        queue={overlaySuppressed ? [] : overlayQueue}
         onDismiss={dismissOverlay}
         topOffset={(topStackLayout?.height ?? 0) + Spacing.xs}
         storyTopOffset={insets.top + (topBarLayout?.height ?? 0) + Spacing.xs}
@@ -2145,6 +3090,9 @@ export default function GameScreen() {
         reducedMotion={state.settings.reducedMotion}
         onStoryPress={handleStoryPress}
         onStoryDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
+        onUnlockBannerPress={
+          phase3HandoffEnabled ? requestCouncilOpen : undefined
+        }
         onTelemetry={handleOverlayTelemetry}
       />
 
@@ -2198,6 +3146,43 @@ export default function GameScreen() {
       </Modal>
 
       <Modal
+        visible={phase3IntroVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={handlePhase3IntroContinue}
+      >
+        <Phase3IntroModal
+          objective={phaseObjective}
+          onContinue={handlePhase3IntroContinue}
+        />
+      </Modal>
+
+      <Modal
+        visible={phase3HearingIntroVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={handlePhase3HearingIntroDismiss}
+      >
+        <Phase3HearingIntroModal
+          onClearByPlay={handlePhase3HearingClearByPlay}
+          onLobbyBack={handlePhase3HearingLobbyBack}
+          onDismiss={handlePhase3HearingIntroDismiss}
+        />
+      </Modal>
+
+      <Modal
+        visible={phase3RatifyReadyVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={handlePhase3RatifyReadyDismiss}
+      >
+        <Phase3RatifyReadyModal
+          onOpenOrders={handlePhase3RatifyReadyOpenOrders}
+          onDismiss={handlePhase3RatifyReadyDismiss}
+        />
+      </Modal>
+
+      <Modal
         visible={activeModal === "orders"}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -2217,6 +3202,7 @@ export default function GameScreen() {
             compatibilityGuideOrdersLock
           }
           onOpenProjects={() => openProjectBoard()}
+          onOpenCouncil={requestCouncilOpen}
         />
       </Modal>
 
@@ -2229,6 +3215,7 @@ export default function GameScreen() {
         <ProjectBoardModal
           onClose={closeModal}
           onOpenDossier={openProjectDossier}
+          onOpenCouncil={requestCouncilOpen}
           focusProjectId={projectBoardFocusId}
           initialTab={projectBoardInitialTab}
           openId={projectBoardOpenId}
@@ -2258,6 +3245,8 @@ export default function GameScreen() {
       >
         <CouncilModal
           onClose={closeModal}
+          onOpenOrders={() => setActiveModal("orders")}
+          entryHint={councilEntryHint}
           onOpenLegacyCycle={() => setActiveModal("legacy")}
         />
       </Modal>
@@ -2328,7 +3317,7 @@ export default function GameScreen() {
       >
         <SettingsModal
           onClose={closeModal}
-          onOpenGlossary={openGlossary}
+          onOpenGlossary={() => openGlossary()}
           debugOverlayEnabled={debugOverlayVisible}
           onToggleDebugOverlay={setDebugOverlayVisible}
         />
@@ -2349,7 +3338,11 @@ export default function GameScreen() {
         presentationStyle="pageSheet"
         onRequestClose={closeModal}
       >
-        <GlossaryModal onClose={closeModal} />
+        <GlossaryModal
+          onClose={closeModal}
+          initialSectionId={glossaryInitialSectionId}
+          openToken={glossaryOpenToken}
+        />
       </Modal>
 
       <Modal
@@ -2364,6 +3357,10 @@ export default function GameScreen() {
       <Modal
         visible={
           !phase2IntroVisible &&
+          !phase2ContractsBriefVisible &&
+          !phase3IntroVisible &&
+          !phase3HearingIntroVisible &&
+          !phase3RatifyReadyVisible &&
           state.baronOfferAvailable &&
           baronOfferGate &&
           !showLockoutModal &&

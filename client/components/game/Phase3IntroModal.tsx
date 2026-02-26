@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -9,10 +9,9 @@ import { TrimLightStrip } from "@/components/game/TrimLightStrip";
 import { BorderRadius, GameColors, Spacing } from "@/constants/theme";
 import type { PhaseObjectiveState } from "@/lib/objectives";
 
-interface Phase2IntroModalProps {
+interface Phase3IntroModalProps {
   objective: PhaseObjectiveState | null;
   onContinue: () => void;
-  mode?: "phase_intro" | "contracts_unlock";
   testID?: string;
   continueTestID?: string;
 }
@@ -36,41 +35,21 @@ const OBJECTIVE_ICON: Record<
   council_complete: "check-circle",
 };
 
-export function Phase2IntroModal({
+export function Phase3IntroModal({
   objective,
   onContinue,
-  mode = "phase_intro",
-  testID = "phase2-intro-modal",
-  continueTestID = "phase2-intro-continue",
-}: Phase2IntroModalProps) {
+  testID = "phase3-intro-modal",
+  continueTestID = "phase3-intro-continue",
+}: Phase3IntroModalProps) {
   const insets = useSafeAreaInsets();
-  const isContractsUnlock = mode === "contracts_unlock";
-  const nextIcon = objective ? OBJECTIVE_ICON[objective.kind] : "target";
-  const nextTitle = objective?.title ?? "Open Spark Showcase";
+  const nextIcon = objective ? OBJECTIVE_ICON[objective.kind] : "award";
+  const nextTitle = objective?.title ?? "Open the Standards Council";
   const nextSubtitle =
     objective?.subtitle ??
-    (isContractsUnlock
-      ? "Review offers and choose your first city-scale contract."
-      : "Complete your Phase 2 objective to open Empire Contracts.");
-  const nextDetail = objective?.detail;
-  const ctaLabel = isContractsUnlock
-    ? objective?.action === "open_projects_active"
-      ? "Open Active Contract"
-      : "Open Empire Contracts"
-    : objective?.action === "open_projects_active"
-      ? "Open Active Contract"
-      : objective?.action === "open_projects_offers"
-        ? "Open Empire Contracts"
-        : "Start Phase 2 Objective";
-  const kickerText = isContractsUnlock
-    ? "Empire Contracts Unlocked"
-    : "Phase 2 Unlocked";
-  const headerTitle = isContractsUnlock
-    ? "City Scale Starts Now"
-    : "Open Spark Ascends";
-  const headerSubtitle = isContractsUnlock
-    ? "Phase 2 contracts are now live. Every offer is a deposit-heavy, staged commitment with visible risk."
-    : "You have moved beyond survival installs. Phase 2 is about empire contracts, staged landmarks, and city-scale reputation.";
+    "Draft campaigns, handle hearings, and ratify standards to unlock permanent perks.";
+  const nextDetail =
+    objective?.detail ??
+    "Phase 3 shifts progression from contracts-only into governance and policy pressure.";
 
   return (
     <View
@@ -88,13 +67,13 @@ export function Phase2IntroModal({
         style={StyleSheet.absoluteFillObject}
       />
       <LinearGradient
-        colors={["#00D9FF26", "transparent", "transparent"]}
+        colors={["#7A5CFF24", "transparent", "transparent"]}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.8, y: 0.7 }}
         style={[styles.glowOrb, styles.glowOrbTop]}
       />
       <LinearGradient
-        colors={["#4DFF8824", "transparent", "transparent"]}
+        colors={["#4DFF8820", "transparent", "transparent"]}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 0.7 }}
         style={[styles.glowOrb, styles.glowOrbBottom]}
@@ -118,21 +97,22 @@ export function Phase2IntroModal({
 
           <View style={styles.kickerRow}>
             <View style={styles.kickerIcon}>
-              <Feather
-                name={isContractsUnlock ? "flag" : "award"}
-                size={16}
-                color={GameColors.ui.primary}
-              />
+              <Feather name="award" size={16} color="#B39DFF" />
             </View>
-            <ThemedText style={styles.kickerText}>{kickerText}</ThemedText>
+            <ThemedText style={styles.kickerText}>Phase 3 Unlocked</ThemedText>
           </View>
 
-          <ThemedText style={styles.title}>{headerTitle}</ThemedText>
-          <ThemedText style={styles.subtitle}>{headerSubtitle}</ThemedText>
+          <ThemedText style={styles.title}>
+            Standards Council Is Live
+          </ThemedText>
+          <ThemedText style={styles.subtitle}>
+            Empire contracts remain important, but Phase 3 progression now
+            depends on Council campaigns, hearings, and ratify showcases.
+          </ThemedText>
 
           <View
             style={styles.nextCard}
-            accessibilityLabel={`Progress status ${objective?.statusLabel ?? "Phase 2"}`}
+            accessibilityLabel={`Progress status ${objective?.statusLabel ?? "Phase 3"}`}
           >
             <View style={styles.nextHeader}>
               <View style={styles.nextHeaderLeft}>
@@ -143,89 +123,44 @@ export function Phase2IntroModal({
                     color={GameColors.ui.primary}
                   />
                 </View>
-                <ThemedText style={styles.nextKicker}>
-                  Your Next Objective
-                </ThemedText>
+                <ThemedText style={styles.nextKicker}>Start Here</ThemedText>
               </View>
               <ThemedText style={styles.nextStatus}>
-                {objective?.statusLabel ?? "Phase 2"}
+                {objective?.statusLabel ?? "Phase 3"}
               </ThemedText>
             </View>
             <ThemedText style={styles.nextTitle}>{nextTitle}</ThemedText>
             <ThemedText style={styles.nextSubtitle}>{nextSubtitle}</ThemedText>
-            {nextDetail ? (
-              <ThemedText style={styles.nextDetail}>{nextDetail}</ThemedText>
-            ) : null}
+            <ThemedText style={styles.nextDetail}>{nextDetail}</ThemedText>
           </View>
 
           <View style={styles.hintList}>
-            {isContractsUnlock ? (
-              <>
-                <View style={styles.hintRow}>
-                  <Feather
-                    name="shield"
-                    size={12}
-                    color={GameColors.ui.warning}
-                  />
-                  <ThemedText style={styles.hintText}>
-                    Accepting a contract consumes a large deposit.
-                  </ThemedText>
-                </View>
-                <View style={styles.hintRow}>
-                  <Feather
-                    name="clock"
-                    size={12}
-                    color={GameColors.ui.danger}
-                  />
-                  <ThemedText style={styles.hintText}>
-                    Deadlines tick down when you fulfill non-project orders.
-                  </ThemedText>
-                </View>
-                <View style={styles.hintRow}>
-                  <Feather
-                    name="alert-triangle"
-                    size={12}
-                    color={GameColors.ui.warning}
-                  />
-                  <ThemedText style={styles.hintText}>
-                    Failure can cost deposit, pressure, or temporary rep.
-                  </ThemedText>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={styles.hintRow}>
-                  <Feather
-                    name="trending-up"
-                    size={12}
-                    color={GameColors.ui.primary}
-                  />
-                  <ThemedText style={styles.hintText}>
-                    Tier cap is now 13 and order difficulty is higher.
-                  </ThemedText>
-                </View>
-                <View style={styles.hintRow}>
-                  <Feather
-                    name="activity"
-                    size={12}
-                    color={GameColors.ui.warning}
-                  />
-                  <ThemedText style={styles.hintText}>
-                    Dependency is frozen at 0. Baron Pressure now taxes rewards.
-                  </ThemedText>
-                </View>
-                <View style={styles.hintRow}>
-                  <Feather
-                    name="alert-circle"
-                    size={12}
-                    color={GameColors.ui.warning}
-                  />
-                  <ThemedText style={styles.hintText}>
-                    At 40+ pressure: -10% cash/research. At 70+: -20%.
-                  </ThemedText>
-                </View>
-              </>
-            )}
+            <View style={styles.hintRow}>
+              <Feather
+                name="edit-3"
+                size={12}
+                color={GameColors.currency.cash}
+              />
+              <ThemedText style={styles.hintText}>
+                Invest draft costs to unlock campaign pilots.
+              </ThemedText>
+            </View>
+            <View style={styles.hintRow}>
+              <Feather
+                name="alert-triangle"
+                size={12}
+                color={GameColors.ui.warning}
+              />
+              <ThemedText style={styles.hintText}>
+                Hearings can apply penalties until you resolve them.
+              </ThemedText>
+            </View>
+            <View style={styles.hintRow}>
+              <Feather name="bookmark" size={12} color="#B39DFF" />
+              <ThemedText style={styles.hintText}>
+                Ratify showcases lock in permanent Council perks.
+              </ThemedText>
+            </View>
           </View>
 
           <Pressable
@@ -233,15 +168,15 @@ export function Phase2IntroModal({
             onPress={onContinue}
             testID={continueTestID}
             accessibilityRole="button"
-            accessibilityLabel={ctaLabel}
+            accessibilityLabel="Open Council"
           >
             <LinearGradient
-              colors={["#00D9FF", "#3E8CFF"]}
+              colors={["#7A5CFF", "#00D9FF"]}
               style={styles.primaryButtonFill}
             >
-              <Feather name="chevrons-right" size={15} color="#041018" />
+              <Feather name="chevrons-right" size={15} color="#070C1C" />
               <ThemedText style={styles.primaryButtonText}>
-                {ctaLabel}
+                Open Council
               </ThemedText>
             </LinearGradient>
           </Pressable>
@@ -282,8 +217,8 @@ const styles = StyleSheet.create({
     borderRadius: 180,
   },
   glowOrbTop: {
-    top: -130,
-    left: -70,
+    top: -120,
+    left: -60,
   },
   glowOrbBottom: {
     bottom: -150,
@@ -309,15 +244,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: `${GameColors.ui.primary}66`,
-    backgroundColor: `${GameColors.ui.primary}18`,
+    borderColor: "#A892FF66",
+    backgroundColor: "#A892FF1A",
   },
   kickerText: {
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.5,
     textTransform: "uppercase",
-    color: "#A8EFFF",
+    color: "#D3C9FF",
   },
   title: {
     fontSize: 26,
@@ -333,8 +268,8 @@ const styles = StyleSheet.create({
   nextCard: {
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: "#2D4468",
-    backgroundColor: "rgba(14, 27, 46, 0.9)",
+    borderColor: "#3A3A6A",
+    backgroundColor: "rgba(20, 24, 46, 0.92)",
     padding: Spacing.sm,
     gap: 4,
   },
@@ -383,37 +318,37 @@ const styles = StyleSheet.create({
   },
   nextDetail: {
     fontSize: 11,
-    color: "#A4BCD9",
+    color: "#9FB2DD",
   },
   hintList: {
     gap: 6,
   },
   hintRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: Spacing.xs,
+    alignItems: "center",
+    gap: 6,
   },
   hintText: {
     flex: 1,
-    fontSize: 11,
-    color: "#C4CCDF",
-    lineHeight: 15,
+    fontSize: 12,
+    color: "#C7D2F1",
   },
   primaryButton: {
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.md,
     overflow: "hidden",
   },
   primaryButtonFill: {
+    minHeight: 48,
+    borderRadius: BorderRadius.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    gap: 8,
   },
   primaryButtonText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#041018",
+    color: "#070C1C",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 0.3,
   },
 });

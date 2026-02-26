@@ -18,7 +18,7 @@ test("Phase 2 skip shows full-screen intro and routes to Orders objective", asyn
   });
 });
 
-test("Phase 3 skip defers project handoff until Phase 2 intro is dismissed", async ({
+test("Phase 3 skip chains Phase 2 and Phase 3 onboarding handoff", async ({
   page,
 }) => {
   await page.goto("/");
@@ -29,32 +29,58 @@ test("Phase 3 skip defers project handoff until Phase 2 intro is dismissed", asy
 
   const phase2Intro = page.getByTestId("phase2-intro-modal");
   const contractsBrief = page.getByTestId("phase2-contracts-brief-modal");
-  const projectBoardTitle = page.getByText("Project Board", { exact: true });
-  const revealTitle = page.getByText("New Empire Contract", { exact: true });
+  const phase3Intro = page.getByTestId("phase3-intro-modal");
+  const councilTitle = page.getByText("Standards Council", { exact: true });
   await expect(phase2Intro).toBeVisible({ timeout: 15_000 });
   await expect(contractsBrief).toBeHidden();
-  await expect(projectBoardTitle).toBeHidden();
-  await expect(revealTitle).toBeHidden();
+  await expect(phase3Intro).toBeHidden();
 
   await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
   await expect(phase2Intro).toBeHidden({ timeout: 10_000 });
   await expect(contractsBrief).toBeVisible({ timeout: 10_000 });
-  await expect(projectBoardTitle).toBeHidden();
-  await expect(revealTitle).toBeHidden();
+  await expect(phase3Intro).toBeHidden();
 
   await page
     .getByTestId("phase2-contracts-brief-continue")
     .click({ timeout: 10_000 });
   await expect(contractsBrief).toBeHidden({ timeout: 10_000 });
-  await expect
-    .poll(async () => {
-      const boardVisible = await projectBoardTitle
-        .isVisible()
-        .catch(() => false);
-      const revealVisible = await revealTitle.isVisible().catch(() => false);
-      return boardVisible || revealVisible;
-    })
-    .toBe(true);
+  await expect(phase3Intro).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId("phase3-intro-continue").click({ timeout: 10_000 });
+  await expect(phase3Intro).toBeHidden({ timeout: 10_000 });
+  await expect(councilTitle).toBeVisible({ timeout: 10_000 });
+});
+
+test("Phase 2 playbook guide deep-links into glossary playbook section", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("e2e-skip-phase2")).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByTestId("e2e-skip-phase2").click({ force: true });
+  await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
+
+  const ordersModal = page.getByTestId("orders-modal");
+  const ordersVisible = await ordersModal
+    .waitFor({ state: "visible", timeout: 6_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (ordersVisible) {
+    await page.getByTestId("orders-modal-close").click({ timeout: 10_000 });
+    await expect(ordersModal).toBeHidden({ timeout: 10_000 });
+  }
+
+  const playbookHelp = page.getByTestId("phase-playbook-help");
+  await expect(playbookHelp).toBeVisible({ timeout: 10_000 });
+  await playbookHelp.click({ timeout: 10_000 });
+
+  await expect(page.getByText("Glossary", { exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId("glossary-section-phase-playbook")).toBeVisible(
+    { timeout: 10_000 },
+  );
 });
 
 test.describe("Tap Responsiveness", () => {

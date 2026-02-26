@@ -86,4 +86,33 @@ test.describe("Settings Modal", () => {
       timeout: 10_000,
     });
   });
+
+  test("Phase 3 onboarding mode can be changed in playtest settings", async ({
+    page,
+  }) => {
+    await bootstrapInteractiveState(page);
+    await page.getByTestId("settings-button").click({ timeout: 10_000 });
+
+    const settingsModal = page.getByTestId("settings-modal");
+    await expect(settingsModal).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("settings-phase3-onboarding-mode"),
+    ).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await page
+      .getByTestId("settings-phase3-variant-control")
+      .click({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("settings-phase3-variant-current"),
+    ).toContainText("Control override active", { timeout: 10_000 });
+
+    await page
+      .getByTestId("settings-phase3-variant-build_default")
+      .click({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("settings-phase3-variant-current"),
+    ).toContainText("via build default", { timeout: 10_000 });
+  });
 });

@@ -1,4 +1,5 @@
 import { PROJECT_DEFINITIONS } from "@/constants/projects";
+import { COUNCIL_CAMPAIGNS } from "@/constants/councilCampaigns";
 import { SUPPLIER_CONFIG } from "@/constants/suppliers";
 import { __TEST_ONLY__ } from "@/context/GameContext";
 import { RD_DEFINITIONS } from "@/types/game";
@@ -126,6 +127,9 @@ describe("phase/tier progression reducer coverage", () => {
       goalGuideSeen: false,
       contractsBriefSeen: false,
       offersCoachmarkSeen: false,
+      firstContractAcceptedSeen: false,
+      firstProjectStageCompletedSeen: false,
+      firstProjectStageFailedSeen: false,
     });
   });
 
@@ -388,6 +392,54 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.overlayQueue).toEqual([]);
   });
 
+  it("bootstraps a hearing-active Phase 3 recovery preset", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase3_hearing_recovery",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(3);
+    expect(next.council.unlocked).toBe(true);
+    expect(next.council.activeHearing?.hearingId).toBe("hear_safety_audit");
+    expect(next.phase3Onboarding.introSeen).toBe(true);
+    expect(next.phase3Onboarding.hearingResolvedSeen).toBe(false);
+    expect(next.orders.length).toBeGreaterThan(0);
+    expect(next.projectOffers).toEqual([]);
+    expect(next.projectRevealQueue).toEqual([]);
+  });
+
+  it("bootstraps a ratify-ready Phase 3 handoff preset", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase3_ratify_ready",
+      } as any,
+    );
+
+    const firstCampaignId = COUNCIL_CAMPAIGNS[0]?.id;
+    expect(firstCampaignId).toBeDefined();
+    if (!firstCampaignId) return;
+
+    expect(next.gamePhase).toBe(3);
+    expect(next.council.unlocked).toBe(true);
+    expect(next.council.activeCampaignId).toBe(firstCampaignId);
+    expect(next.council.campaigns[firstCampaignId]?.status).toBe("RATIFY");
+    expect(
+      next.orders.some((order) =>
+        order.modifierIds?.includes("council_ratify"),
+      ),
+    ).toBe(true);
+    expect(next.phase3Onboarding.firstPilotProgressSeen).toBe(true);
+    expect(next.projectOffers).toEqual([]);
+    expect(next.projectRevealQueue).toEqual([]);
+  });
+
   it("bootstraps pre-Phase-2 transition rehearsal from a single preset action", () => {
     const initial = __TEST_ONLY__.getInitialState();
     const next = __TEST_ONLY__.gameReducer(
@@ -406,6 +458,84 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.orders.some((order) => order.isLockout)).toBe(true);
     expect(next.compatibilityGuideStep).toBe(0);
     expect(next.compatibilityGuideRewardGranted).toBe(true);
+  });
+
+  it("preserves and clears Phase 3 onboarding mode override through reducer flows", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const withOverride = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "UPDATE_SETTINGS",
+        settings: { phase3OnboardingVariantOverride: "control" },
+      } as any,
+    );
+    expect(withOverride.settings.phase3OnboardingVariantOverride).toBe(
+      "control",
+    );
+
+    const jumped = __TEST_ONLY__.gameReducer(
+      withOverride as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase3_council_live",
+      } as any,
+    );
+    expect(jumped.settings.phase3OnboardingVariantOverride).toBe("control");
+
+    const reset = __TEST_ONLY__.gameReducer(
+      jumped as any,
+      {
+        type: "RESET_GAME",
+      } as any,
+    );
+    expect(reset.settings.phase3OnboardingVariantOverride).toBe("control");
+
+    const cleared = __TEST_ONLY__.gameReducer(
+      reset as any,
+      {
+        type: "UPDATE_SETTINGS",
+        settings: { phase3OnboardingVariantOverride: undefined },
+      } as any,
+    );
+    expect(cleared.settings.phase3OnboardingVariantOverride).toBeUndefined();
+  });
+
+  it("restores valid onboarding mode overrides and drops invalid values on load", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+
+    const validLoaded = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "LOAD_STATE",
+        state: {
+          ...initial,
+          settings: {
+            ...initial.settings,
+            phase3OnboardingVariantOverride: "phase3_handoff_only",
+          },
+        },
+      } as any,
+    );
+    expect(validLoaded.settings.phase3OnboardingVariantOverride).toBe(
+      "phase3_handoff_only",
+    );
+
+    const invalidLoaded = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "LOAD_STATE",
+        state: {
+          ...initial,
+          settings: {
+            ...initial.settings,
+            phase3OnboardingVariantOverride: "broken_variant",
+          },
+        },
+      } as any,
+    );
+    expect(
+      invalidLoaded.settings.phase3OnboardingVariantOverride,
+    ).toBeUndefined();
   });
 
   it("bootstraps Phase 2 contracts-ready preset with unlocked offers", () => {

@@ -30,6 +30,8 @@ import type { CouncilCampaignStatus } from "@/types/game";
 interface CouncilModalProps {
   onClose: () => void;
   onOpenLegacyCycle?: () => void;
+  onOpenOrders?: () => void;
+  entryHint?: "hearing_play" | "hearing_lobby" | null;
 }
 
 type StatusMeta = {
@@ -243,6 +245,8 @@ function CampaignCard({
 export function CouncilModal({
   onClose,
   onOpenLegacyCycle,
+  onOpenOrders,
+  entryHint = null,
 }: CouncilModalProps) {
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useGame();
@@ -285,14 +289,71 @@ export function CouncilModal({
     ? Math.max(1, state.legacy.cyclesCompleted + 1)
     : Math.max(1, state.legacy.currentCycle || 1);
 
+  const canStartCampaign = React.useCallback(
+    (campaign: CouncilCampaignDefinition) => {
+      if (!state.council.unlocked) return false;
+      if (typeof campaign.unlock.minRepTier === "number") {
+        if (state.reputationTier < campaign.unlock.minRepTier) return false;
+      }
+      if (typeof campaign.unlock.minProjectsCompleted === "number") {
+        if (
+          state.projectsCompleted.length < campaign.unlock.minProjectsCompleted
+        ) {
+          return false;
+        }
+      }
+      if (typeof campaign.unlock.minCampaignsCompleted === "number") {
+        const completedCount = Object.values(state.council.campaigns).filter(
+          (progress) => progress.status === "COMPLETED",
+        ).length;
+        if (completedCount < campaign.unlock.minCampaignsCompleted) {
+          return false;
+        }
+      }
+      if (campaign.unlock.requiredProjectIds?.length) {
+        const missingProject = campaign.unlock.requiredProjectIds.some(
+          (id) => !state.projectsCompleted.includes(id),
+        );
+        if (missingProject) return false;
+      }
+      if (campaign.unlock.requiredCampaignIds?.length) {
+        const missingCampaign = campaign.unlock.requiredCampaignIds.some(
+          (id) => {
+            const progress = state.council.campaigns[id];
+            return !progress || progress.status !== "COMPLETED";
+          },
+        );
+        if (missingCampaign) return false;
+      }
+      return true;
+    },
+    [
+      state.council.unlocked,
+      state.council.campaigns,
+      state.reputationTier,
+      state.projectsCompleted,
+    ],
+  );
+
   const getDefaultCampaignId = React.useCallback(() => {
     if (state.council.activeCampaignId) return state.council.activeCampaignId;
-    const firstAvailable = campaignList.find((campaign) => {
+    const firstEligible = campaignList.find((campaign) => {
+      const progress = state.council.campaigns[campaign.id];
+      if (!progress || progress.status === "COMPLETED") return false;
+      return canStartCampaign(campaign);
+    });
+    if (firstEligible) return firstEligible.id;
+    const firstUnlocked = campaignList.find((campaign) => {
       const progress = state.council.campaigns[campaign.id];
       return progress && progress.status !== "LOCKED";
     });
-    return firstAvailable?.id ?? campaignList[0]?.id;
-  }, [campaignList, state.council.activeCampaignId, state.council.campaigns]);
+    return firstUnlocked?.id ?? campaignList[0]?.id;
+  }, [
+    campaignList,
+    canStartCampaign,
+    state.council.activeCampaignId,
+    state.council.campaigns,
+  ]);
 
   const [selectedCampaignId, setSelectedCampaignId] = React.useState<
     string | undefined
@@ -302,7 +363,16 @@ export function CouncilModal({
     if (!selectedCampaignId || !COUNCIL_CAMPAIGN_BY_ID[selectedCampaignId]) {
       setSelectedCampaignId(getDefaultCampaignId());
     }
-  }, [selectedCampaignId, getDefaultCampaignId]);
+  }, [
+    getDefaultCampaignId,
+    selectedCampaignId,
+    campaignList,
+    state.council.activeCampaignId,
+    state.council.campaigns,
+    state.council.unlocked,
+    state.reputationTier,
+    state.projectsCompleted,
+  ]);
 
   const selectedCampaign = selectedCampaignId
     ? COUNCIL_CAMPAIGN_BY_ID[selectedCampaignId]
@@ -363,40 +433,6 @@ export function CouncilModal({
       unlocks.push("Complete prerequisite Council campaigns");
     }
     return unlocks;
-  };
-
-  const canStartCampaign = (campaign: CouncilCampaignDefinition) => {
-    if (!state.council.unlocked) return false;
-    if (typeof campaign.unlock.minRepTier === "number") {
-      if (state.reputationTier < campaign.unlock.minRepTier) return false;
-    }
-    if (typeof campaign.unlock.minProjectsCompleted === "number") {
-      if (
-        state.projectsCompleted.length < campaign.unlock.minProjectsCompleted
-      ) {
-        return false;
-      }
-    }
-    if (typeof campaign.unlock.minCampaignsCompleted === "number") {
-      const completedCount = Object.values(state.council.campaigns).filter(
-        (progress) => progress.status === "COMPLETED",
-      ).length;
-      if (completedCount < campaign.unlock.minCampaignsCompleted) return false;
-    }
-    if (campaign.unlock.requiredProjectIds?.length) {
-      const missingProject = campaign.unlock.requiredProjectIds.some(
-        (id) => !state.projectsCompleted.includes(id),
-      );
-      if (missingProject) return false;
-    }
-    if (campaign.unlock.requiredCampaignIds?.length) {
-      const missingCampaign = campaign.unlock.requiredCampaignIds.some((id) => {
-        const progress = state.council.campaigns[id];
-        return !progress || progress.status !== "COMPLETED";
-      });
-      if (missingCampaign) return false;
-    }
-    return true;
   };
 
   const formatPenaltyList = () => {
@@ -528,7 +564,20 @@ export function CouncilModal({
       (!selectedCampaign.draftCost.allowPartial
         ? state.cash >= cashRemaining && state.research >= researchRemaining
         : true);
+    const cashShortfall = Math.max(0, cashRemaining - state.cash);
+    const researchShortfall = Math.max(0, researchRemaining - state.research);
+    const needsDraftResourceRecovery =
+      canStart &&
+      !canInvest &&
+      (selectedProgress.status === "LOCKED" ||
+        selectedProgress.status === "DRAFTING") &&
+      (cashRemaining > 0 || researchRemaining > 0);
     const canSetActive = selectedProgress.status !== "LOCKED" || canStart;
+    const showCampaignActivationCoachmark =
+      state.gamePhase >= 3 &&
+      !state.phase3Onboarding.campaignSelectedSeen &&
+      canSetActive &&
+      state.council.activeCampaignId !== selectedCampaign.id;
 
     const perk = COUNCIL_PERKS[selectedCampaign.perkId];
 
@@ -669,6 +718,7 @@ export function CouncilModal({
                       })
                   : undefined
               }
+              testID="council-invest-draft"
             >
               <Feather
                 name="edit-3"
@@ -679,6 +729,30 @@ export function CouncilModal({
                 Invest in Draft
               </ThemedText>
             </Pressable>
+            {needsDraftResourceRecovery ? (
+              <View style={styles.draftRecoveryWrap}>
+                <ThemedText style={styles.draftRecoveryText}>
+                  {selectedCampaign.draftCost.allowPartial
+                    ? `Remaining ${cashRemaining} cash • ${researchRemaining} research. Build resources from Orders to keep draft momentum.`
+                    : `Shortfall ${cashShortfall} cash • ${researchShortfall} research. Finish installs to fund draft requirements.`}
+                </ThemedText>
+                {onOpenOrders ? (
+                  <Pressable
+                    style={styles.draftRecoveryButton}
+                    onPress={onOpenOrders}
+                  >
+                    <Feather
+                      name="inbox"
+                      size={13}
+                      color={GameColors.ui.primary}
+                    />
+                    <ThemedText style={styles.draftRecoveryButtonText}>
+                      Open Orders
+                    </ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -868,26 +942,45 @@ export function CouncilModal({
         ) : null}
 
         {state.council.activeCampaignId !== selectedCampaign.id ? (
-          <Pressable
-            style={[
-              styles.secondaryButton,
-              !canSetActive && styles.buttonDisabled,
-            ]}
-            onPress={
-              canSetActive
-                ? () =>
-                    dispatch({
-                      type: "COUNCIL_SET_ACTIVE_CAMPAIGN",
-                      campaignId: selectedCampaign.id,
-                    })
-                : undefined
-            }
-          >
-            <Feather name="target" size={14} color={GameColors.text.primary} />
-            <ThemedText style={styles.secondaryButtonText}>
-              Set Active Campaign
-            </ThemedText>
-          </Pressable>
+          <View style={styles.setActiveWrap}>
+            {showCampaignActivationCoachmark ? (
+              <View style={styles.setActiveCoachmark}>
+                <Feather
+                  name="target"
+                  size={12}
+                  color={GameColors.ui.primary}
+                />
+                <ThemedText style={styles.setActiveCoachmarkText}>
+                  Start here: set this as your active campaign.
+                </ThemedText>
+              </View>
+            ) : null}
+            <Pressable
+              style={[
+                styles.secondaryButton,
+                !canSetActive && styles.buttonDisabled,
+              ]}
+              onPress={
+                canSetActive
+                  ? () =>
+                      dispatch({
+                        type: "COUNCIL_SET_ACTIVE_CAMPAIGN",
+                        campaignId: selectedCampaign.id,
+                      })
+                  : undefined
+              }
+              testID={`council-set-active-${selectedCampaign.id}`}
+            >
+              <Feather
+                name="target"
+                size={14}
+                color={GameColors.text.primary}
+              />
+              <ThemedText style={styles.secondaryButtonText}>
+                Set Active Campaign
+              </ThemedText>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.noticeRow}>
             <Feather
@@ -911,6 +1004,8 @@ export function CouncilModal({
       icon="award"
       iconColor={GameColors.currency.research}
       onClose={onClose}
+      closeTestID="council-modal-close"
+      testID="council-modal"
     >
       <ScrollView
         contentContainerStyle={[
@@ -1040,7 +1135,7 @@ export function CouncilModal({
           ) : null}
         </View>
 
-        <View style={styles.sectionCard}>
+        <View style={styles.sectionCard} testID="council-hearing-section">
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.sectionTitle}>Hearings</ThemedText>
             <View style={styles.sectionBadge}>
@@ -1056,6 +1151,23 @@ export function CouncilModal({
               </ThemedText>
             </View>
           </View>
+          {entryHint ? (
+            <View
+              style={styles.hearingEntryHintCard}
+              testID="council-hearing-entry-hint"
+            >
+              <Feather
+                name={entryHint === "hearing_lobby" ? "credit-card" : "list"}
+                size={13}
+                color={GameColors.currency.research}
+              />
+              <ThemedText style={styles.hearingEntryHintText}>
+                {entryHint === "hearing_lobby"
+                  ? "Lobby Back is in this Hearings panel. Pay costs to clear penalties instantly."
+                  : "Clear by play from this Hearings panel: complete listed objectives to remove penalties."}
+              </ThemedText>
+            </View>
+          ) : null}
           {activeHearing ? (
             <View>
               <ThemedText style={styles.hearingTitle}>
@@ -1107,6 +1219,7 @@ export function CouncilModal({
                     ? () => dispatch({ type: "COUNCIL_PAY_CLEAR_HEARING" })
                     : undefined
                 }
+                testID="council-hearing-lobby-back"
               >
                 <Feather
                   name="credit-card"
@@ -1295,6 +1408,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2A2A4A",
   },
+  setActiveWrap: {
+    gap: Spacing.xs,
+  },
+  setActiveCoachmark: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}55`,
+    backgroundColor: `${GameColors.ui.primary}14`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  setActiveCoachmarkText: {
+    fontSize: 12,
+    color: GameColors.text.primary,
+    lineHeight: 16,
+  },
   buttonDisabled: {
     opacity: 0.5,
   },
@@ -1328,6 +1460,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GameColors.text.secondary,
     lineHeight: 18,
+  },
+  hearingEntryHintCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.xs,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.currency.research}55`,
+    backgroundColor: `${GameColors.currency.research}14`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  hearingEntryHintText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: GameColors.text.primary,
   },
   hearingPenaltyList: {
     marginTop: Spacing.sm,
@@ -1422,6 +1571,32 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     backgroundColor: GameColors.currency.cash,
+  },
+  draftRecoveryWrap: {
+    marginTop: Spacing.xs,
+    gap: Spacing.xs,
+  },
+  draftRecoveryText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: GameColors.text.secondary,
+  },
+  draftRecoveryButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.primary}55`,
+    backgroundColor: `${GameColors.ui.primary}14`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 7,
+  },
+  draftRecoveryButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.ui.primary,
   },
   objectiveRow: {
     flexDirection: "row",

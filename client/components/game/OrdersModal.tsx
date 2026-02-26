@@ -265,6 +265,7 @@ interface OrdersModalProps {
   closeDisabled?: boolean;
   onOrderFulfilled?: (order: Order) => void;
   onOpenProjects?: () => void;
+  onOpenCouncil?: () => void;
 }
 
 export function OrdersModal({
@@ -272,6 +273,7 @@ export function OrdersModal({
   closeDisabled = false,
   onOrderFulfilled,
   onOpenProjects,
+  onOpenCouncil,
 }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch } = useGame();
@@ -902,6 +904,22 @@ export function OrdersModal({
               <ThemedText style={styles.refreshBlockedHint}>
                 {refreshBlockedHint}
               </ThemedText>
+            ) : null}
+            {refreshBlockReason === "hearing" && onOpenCouncil ? (
+              <Pressable
+                style={styles.hearingRecoveryButton}
+                onPress={onOpenCouncil}
+                testID="orders-hearing-open-council"
+              >
+                <Feather
+                  name="award"
+                  size={14}
+                  color={GameColors.currency.research}
+                />
+                <ThemedText style={styles.hearingRecoveryButtonText}>
+                  Open Council
+                </ThemedText>
+              </Pressable>
             ) : null}
 
             <View style={styles.refreshRow}>
@@ -1662,6 +1680,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: GameColors.ui.warning,
     marginTop: -2,
+  },
+  hearingRecoveryButton: {
+    alignSelf: "flex-start",
+    marginTop: -2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: `${GameColors.currency.research}55`,
+    backgroundColor: `${GameColors.currency.research}14`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 7,
+  },
+  hearingRecoveryButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.currency.research,
   },
   legendCard: {
     marginHorizontal: Spacing.lg,

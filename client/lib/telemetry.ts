@@ -29,6 +29,8 @@ type TelemetryRuntimeContext = {
   run_id?: string;
   session_id?: string;
   player_id?: string;
+  phase3_onboarding_variant?: string;
+  phase3_onboarding_variant_source?: string;
 };
 let telemetryRuntimeContext: TelemetryRuntimeContext = {};
 

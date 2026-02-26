@@ -23,6 +23,10 @@ export type PartTier =
 export type SupplierScoutRoute = "open" | "locked" | "tier";
 
 export type WarrantyStampMode = "refund" | "contract";
+export type Phase3OnboardingVariant =
+  | "control"
+  | "phase3_handoff_only"
+  | "phase3_full_adaptive";
 
 export type OrderFamily = "open" | "locked" | "any";
 export type OrderFamilyPreference = "open" | "locked";
@@ -397,6 +401,21 @@ export interface Phase2OnboardingState {
   goalGuideSeen: boolean;
   contractsBriefSeen: boolean;
   offersCoachmarkSeen: boolean;
+  firstContractAcceptedSeen: boolean;
+  firstProjectStageCompletedSeen: boolean;
+  firstProjectStageFailedSeen: boolean;
+}
+
+export interface Phase3OnboardingState {
+  introSeen: boolean;
+  councilOpenedSeen: boolean;
+  campaignSelectedSeen: boolean;
+  firstDraftInvestSeen: boolean;
+  firstPilotProgressSeen: boolean;
+  pilotNoProgressFulfills: number;
+  pilotStallEventSeen: boolean;
+  hearingEncounteredSeen: boolean;
+  hearingResolvedSeen: boolean;
 }
 
 export interface GameState {
@@ -428,6 +447,7 @@ export interface GameState {
   liberationCompletedAt?: number;
   phase2GoalPending: boolean;
   phase2Onboarding: Phase2OnboardingState;
+  phase3Onboarding: Phase3OnboardingState;
   projectsUnlocked: boolean;
   projectOffers: ProjectOffer[];
   activeProject?: ActiveProject;
@@ -517,6 +537,7 @@ export interface GameState {
     soundEnabled: boolean;
     hapticsEnabled: boolean;
     reducedMotion: boolean;
+    phase3OnboardingVariantOverride?: Phase3OnboardingVariant;
   };
 
   undoSnapshot?: {

@@ -30,6 +30,8 @@ import {
 } from "@/types/game";
 import { PartItem } from "./PartItem";
 import { useGame } from "@/context/GameContext";
+import { resolvePhaseObjective } from "@/lib/objectives";
+import { buildPhasePlaybookSnapshot } from "@/lib/phase2Playbook";
 
 const stationWorkbench = require("../../../assets/images/station-workbench.webp");
 const stationInbox = require("../../../assets/images/station-inbox.webp");
@@ -41,6 +43,8 @@ const baronPortrait = require("../../../assets/images/baron/baron-portrait-256.w
 
 interface GlossaryModalProps {
   onClose: () => void;
+  initialSectionId?: string | null;
+  openToken?: number;
 }
 
 type GlossaryTier = "basics" | "core" | "advanced" | "endgame";
@@ -89,6 +93,7 @@ const SECTION_ORDER: Record<GlossaryTier, string[]> = {
     "characters",
   ],
   core: [
+    "phase-playbook",
     "suppliers",
     "currencies",
     "dependency",
@@ -107,6 +112,11 @@ const getSectionSortIndex = (tier: GlossaryTier, id: string) => {
 };
 const PIN_STORAGE_KEY = "lighting_tycoon_glossary_pins_v1";
 const CONTROLS_COLLAPSE_KEY = "lighting_tycoon_glossary_controls_collapsed_v1";
+const DYNAMIC_GLOSSARY_ITEM_IDS = [
+  "phase-playbook-now",
+  "phase-playbook-next",
+  "phase-playbook-progress",
+];
 
 const makePart = (tier: PartTier, family: PartFamily): Part => ({
   id: `glossary-${family}-${tier}`,
@@ -133,6 +143,53 @@ function buildTierLegendDetail() {
       (tier) => `${TIER_SHORT_CODES[tier]}=${TIER_NAMES[tier].split(" ")[0]}`,
     ).join(", ") + "."
   );
+}
+
+function buildPhasePlaybookSection(
+  playbook: ReturnType<typeof buildPhasePlaybookSnapshot>,
+): GlossarySection {
+  const playbookTitle = playbook.stageId.startsWith("council_")
+    ? "Phase 3 Playbook"
+    : playbook.stageId === "pre_phase2"
+      ? "Phase Transition Playbook"
+      : "Phase 2 Playbook";
+  const milestoneSummary = playbook.milestones
+    .map((milestone) => `${milestone.completed ? "✓" : "•"} ${milestone.title}`)
+    .join("  ");
+  return {
+    id: "phase-playbook",
+    title: playbookTitle,
+    tier: "core",
+    items: [
+      {
+        id: "phase-playbook-now",
+        title: "Now",
+        summary: playbook.nowTitle,
+        detail: playbook.nowDetail,
+        icon: "navigation",
+        color: GameColors.ui.primary,
+      },
+      {
+        id: "phase-playbook-next",
+        title: "Next",
+        summary: playbook.nextTitle,
+        detail:
+          playbook.blocker && playbook.blocker.length > 0
+            ? `Current blocker: ${playbook.blocker}`
+            : "No blocker detected. Continue progressing through the current step.",
+        icon: "arrow-right-circle",
+        color: GameColors.ui.success,
+      },
+      {
+        id: "phase-playbook-progress",
+        title: "Progress",
+        summary: playbook.progressLabel,
+        detail: `${milestoneSummary}`,
+        icon: "check-circle",
+        color: GameColors.currency.reputation,
+      },
+    ],
+  };
 }
 
 const GLOSSARY_SECTIONS: GlossarySection[] = [
@@ -882,7 +939,11 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
   },
 ];
 
-export function GlossaryModal({ onClose }: GlossaryModalProps) {
+export function GlossaryModal({
+  onClose,
+  initialSectionId = null,
+  openToken = 0,
+}: GlossaryModalProps) {
   const { state } = useGame();
   const reducedMotion = state.settings.reducedMotion;
   const insets = useSafeAreaInsets();
@@ -896,6 +957,72 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
   const [controlsCollapsed, setControlsCollapsed] = useState(true);
   const [collapseLoaded, setCollapseLoaded] = useState(false);
   const listRef = useRef<SectionList<GlossaryRow, GlossarySectionHeader>>(null);
+  const pendingInitialJumpRef = useRef<string | null>(null);
+
+  const phaseObjective = useMemo(
+    () =>
+      resolvePhaseObjective({
+        gamePhase: state.gamePhase,
+        orders: state.orders,
+        phase2GoalPending: state.phase2GoalPending,
+        projectsUnlocked: state.projectsUnlocked,
+        projectOffers: state.projectOffers,
+        activeProject: state.activeProject,
+        reputationTier: state.reputationTier,
+        projectsCompleted: state.projectsCompleted,
+        council: state.council,
+        phase3Onboarding: state.phase3Onboarding,
+      }),
+    [
+      state.gamePhase,
+      state.orders,
+      state.phase2GoalPending,
+      state.projectsUnlocked,
+      state.projectOffers,
+      state.activeProject,
+      state.reputationTier,
+      state.projectsCompleted,
+      state.council,
+      state.phase3Onboarding,
+    ],
+  );
+  const phasePlaybook = useMemo(
+    () =>
+      buildPhasePlaybookSnapshot({
+        state: {
+          gamePhase: state.gamePhase,
+          orders: state.orders,
+          phase2GoalPending: state.phase2GoalPending,
+          projectsUnlocked: state.projectsUnlocked,
+          projectOffers: state.projectOffers,
+          activeProject: state.activeProject,
+          projectsCompleted: state.projectsCompleted,
+          reputationTier: state.reputationTier,
+          phase2Onboarding: state.phase2Onboarding,
+          phase3Onboarding: state.phase3Onboarding,
+          council: state.council,
+        },
+        objective: phaseObjective,
+      }),
+    [
+      state.gamePhase,
+      state.orders,
+      state.phase2GoalPending,
+      state.projectsUnlocked,
+      state.projectOffers,
+      state.activeProject,
+      state.projectsCompleted,
+      state.reputationTier,
+      state.phase2Onboarding,
+      state.phase3Onboarding,
+      state.council,
+      phaseObjective,
+    ],
+  );
+  const glossarySections = useMemo(
+    () => [buildPhasePlaybookSection(phasePlaybook), ...GLOSSARY_SECTIONS],
+    [phasePlaybook],
+  );
 
   const pinnedSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
 
@@ -908,9 +1035,12 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
             const validIds = new Set(
-              GLOSSARY_SECTIONS.flatMap((section) =>
-                section.items.map((item) => item.id),
-              ),
+              [
+                ...GLOSSARY_SECTIONS.flatMap((section) =>
+                  section.items.map((item) => item.id),
+                ),
+                ...DYNAMIC_GLOSSARY_ITEM_IDS,
+              ].flatMap((id) => (typeof id === "string" ? [id] : [])),
             );
             const filtered = parsed.filter(
               (id) => typeof id === "string" && validIds.has(id),
@@ -972,9 +1102,8 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
       activeFilter !== "all" && activeFilter !== "pinned" ? activeFilter : null;
     const pinnedOnly = activeFilter === "pinned";
 
-    return GLOSSARY_SECTIONS.filter((section) =>
-      tierFilter ? section.tier === tierFilter : true,
-    )
+    return glossarySections
+      .filter((section) => (tierFilter ? section.tier === tierFilter : true))
       .map((section) => {
         const items = section.items
           .map((item, index) => ({ item, index }))
@@ -995,7 +1124,7 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
         return { ...section, items };
       })
       .filter((section) => section.items.length > 0);
-  }, [activeFilter, normalizedQuery, pinnedSet]);
+  }, [activeFilter, glossarySections, normalizedQuery, pinnedSet]);
 
   const groupedSections = useMemo(
     () =>
@@ -1034,17 +1163,38 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
     return map;
   }, [listSections]);
 
-  const handleJumpTo = (sectionId: string) => {
-    const target = sectionIndexMap[sectionId];
-    if (!target) return;
-    listRef.current?.scrollToLocation({
-      sectionIndex: target.sectionIndex,
-      itemIndex: target.itemIndex,
-      animated: true,
-      viewOffset: Spacing.md,
+  const handleJumpTo = React.useCallback(
+    (sectionId: string, animated = true) => {
+      const target = sectionIndexMap[sectionId];
+      if (!target) return;
+      listRef.current?.scrollToLocation({
+        sectionIndex: target.sectionIndex,
+        itemIndex: target.itemIndex,
+        animated,
+        viewOffset: Spacing.md,
+      });
+      setControlsCollapsed(true);
+    },
+    [sectionIndexMap],
+  );
+
+  useEffect(() => {
+    pendingInitialJumpRef.current = initialSectionId;
+    if (initialSectionId) {
+      setActiveFilter("all");
+      setQuery("");
+    }
+  }, [initialSectionId, openToken]);
+
+  useEffect(() => {
+    const targetSectionId = pendingInitialJumpRef.current;
+    if (!targetSectionId) return;
+    if (!sectionIndexMap[targetSectionId]) return;
+    requestAnimationFrame(() => {
+      handleJumpTo(targetSectionId, false);
     });
-    setControlsCollapsed(true);
-  };
+    pendingInitialJumpRef.current = null;
+  }, [handleJumpTo, sectionIndexMap]);
 
   const togglePin = (id: string) => {
     setPinnedIds((prev) =>
@@ -1085,6 +1235,13 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
         sections={listSections}
         keyExtractor={(item) => item.section.id}
         style={styles.list}
+        onScrollToIndexFailed={() => {
+          const targetSectionId = pendingInitialJumpRef.current;
+          if (!targetSectionId) return;
+          setTimeout(() => {
+            handleJumpTo(targetSectionId, false);
+          }, 80);
+        }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         ListHeaderComponent={
@@ -1223,7 +1380,10 @@ export function GlossaryModal({ onClose }: GlossaryModalProps) {
           </View>
         )}
         renderItem={({ item }) => (
-          <View style={styles.section}>
+          <View
+            style={styles.section}
+            testID={`glossary-section-${item.section.id}`}
+          >
             <ThemedText style={styles.sectionTitle}>
               {item.section.title}
             </ThemedText>

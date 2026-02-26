@@ -22,6 +22,40 @@ import {
   PLAYTEST_PRESET_META,
 } from "@/constants/playtestPresets";
 import { useGame } from "@/context/GameContext";
+import type { Phase3OnboardingVariant } from "@/types/game";
+import {
+  getPhase3OnboardingVariantLabel,
+  resolvePhase3OnboardingBuildVariant,
+} from "@/lib/phase3OnboardingVariant";
+
+type Phase3OnboardingVariantOption = "build_default" | Phase3OnboardingVariant;
+
+const PHASE3_ONBOARDING_VARIANT_OPTIONS: {
+  id: Phase3OnboardingVariantOption;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "build_default",
+    label: "Build Default",
+    description: "Use the mode configured in app env.",
+  },
+  {
+    id: "control",
+    label: "Control",
+    description: "Story/banner only with no guided handoff.",
+  },
+  {
+    id: "phase3_handoff_only",
+    label: "Handoff Only",
+    description: "Phase 3 intro plus Council-open handoff only.",
+  },
+  {
+    id: "phase3_full_adaptive",
+    label: "Full Adaptive",
+    description: "Complete adaptive guidance and rescue hints.",
+  },
+];
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -79,7 +113,25 @@ export function SettingsModal({
   const insets = useSafeAreaInsets();
   const { state, dispatch, applyPlaytestPreset } = useGame();
   const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
-  const { soundEnabled, hapticsEnabled, reducedMotion } = state.settings;
+  const {
+    soundEnabled,
+    hapticsEnabled,
+    reducedMotion,
+    phase3OnboardingVariantOverride,
+  } = state.settings;
+  const phase3OnboardingBuildVariant = resolvePhase3OnboardingBuildVariant();
+  const effectivePhase3OnboardingVariant =
+    phase3OnboardingVariantOverride ?? phase3OnboardingBuildVariant;
+  const phase3ModeSummary = phase3OnboardingVariantOverride
+    ? `${getPhase3OnboardingVariantLabel(effectivePhase3OnboardingVariant)} override active`
+    : `${getPhase3OnboardingVariantLabel(effectivePhase3OnboardingVariant)} via build default`;
+  const selectedPhase3VariantOption = PHASE3_ONBOARDING_VARIANT_OPTIONS.find(
+    (option) =>
+      option.id ===
+      (phase3OnboardingVariantOverride === undefined
+        ? "build_default"
+        : phase3OnboardingVariantOverride),
+  );
   const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
   const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
   const [playtestPresetVisible, setPlaytestPresetVisible] = useState(false);
@@ -218,6 +270,18 @@ export function SettingsModal({
         },
       ],
     );
+  };
+
+  const handlePhase3VariantSelect = (
+    variant: Phase3OnboardingVariantOption,
+  ) => {
+    dispatch({
+      type: "UPDATE_SETTINGS",
+      settings: {
+        phase3OnboardingVariantOverride:
+          variant === "build_default" ? undefined : variant,
+      },
+    });
   };
 
   return (
@@ -395,6 +459,65 @@ export function SettingsModal({
                   </ThemedText>
                 </View>
               </Pressable>
+
+              <View
+                style={styles.phase3ModeCard}
+                testID="settings-phase3-onboarding-mode"
+              >
+                <View style={styles.phase3ModeHeader}>
+                  <View style={styles.phase3ModeTitleRow}>
+                    <Feather
+                      name="sliders"
+                      size={14}
+                      color={GameColors.currency.research}
+                    />
+                    <ThemedText style={styles.phase3ModeTitle}>
+                      Playtest: Phase 3 Onboarding
+                    </ThemedText>
+                  </View>
+                  <ThemedText
+                    style={styles.phase3ModeSummary}
+                    testID="settings-phase3-variant-current"
+                  >
+                    {phase3ModeSummary}
+                  </ThemedText>
+                </View>
+                <View style={styles.phase3ModeOptionList}>
+                  {PHASE3_ONBOARDING_VARIANT_OPTIONS.map((option) => {
+                    const selected =
+                      option.id === "build_default"
+                        ? phase3OnboardingVariantOverride === undefined
+                        : phase3OnboardingVariantOverride === option.id;
+                    return (
+                      <Pressable
+                        key={option.id}
+                        style={[
+                          styles.phase3ModeOption,
+                          selected && styles.phase3ModeOptionSelected,
+                        ]}
+                        onPress={() => handlePhase3VariantSelect(option.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        testID={`settings-phase3-variant-${option.id}`}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.phase3ModeOptionLabel,
+                            selected && styles.phase3ModeOptionLabelSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {selectedPhase3VariantOption ? (
+                  <ThemedText style={styles.phase3ModeOptionDescription}>
+                    {selectedPhase3VariantOption.description}
+                  </ThemedText>
+                ) : null}
+              </View>
 
               <Pressable
                 style={[
@@ -630,6 +753,64 @@ const styles = StyleSheet.create({
   },
   settingDescription: {
     fontSize: 12,
+    color: GameColors.text.secondary,
+    marginTop: 2,
+  },
+  phase3ModeCard: {
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    borderRadius: BorderRadius.lg,
+    backgroundColor: "rgba(20, 24, 44, 0.72)",
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  phase3ModeHeader: {
+    gap: 2,
+  },
+  phase3ModeTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  phase3ModeTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  phase3ModeSummary: {
+    fontSize: 12,
+    color: GameColors.text.secondary,
+  },
+  phase3ModeOptionList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  phase3ModeOption: {
+    width: "48%",
+    borderWidth: 1,
+    borderColor: "#2A2A4A",
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    backgroundColor: "rgba(26, 26, 46, 0.72)",
+    minHeight: 34,
+    justifyContent: "center",
+  },
+  phase3ModeOptionSelected: {
+    borderColor: GameColors.currency.research,
+    backgroundColor: "rgba(155, 92, 255, 0.14)",
+  },
+  phase3ModeOptionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  phase3ModeOptionLabelSelected: {
+    color: GameColors.currency.research,
+  },
+  phase3ModeOptionDescription: {
+    fontSize: 11,
     color: GameColors.text.secondary,
     marginTop: 2,
   },

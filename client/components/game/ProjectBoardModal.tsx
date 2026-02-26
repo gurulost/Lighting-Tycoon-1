@@ -309,12 +309,14 @@ function ProjectOfferCard({
 export function ProjectBoardModal({
   onClose,
   onOpenDossier,
+  onOpenCouncil,
   focusProjectId,
   initialTab,
   openId = 0,
 }: {
   onClose: () => void;
   onOpenDossier?: (projectId: string) => void;
+  onOpenCouncil?: () => void;
   focusProjectId?: string | null;
   initialTab?: TabKey | null;
   openId?: number;
@@ -533,6 +535,8 @@ export function ProjectBoardModal({
         activeProject: state.activeProject,
         reputationTier: state.reputationTier,
         projectsCompleted: state.projectsCompleted,
+        council: state.council,
+        phase3Onboarding: state.phase3Onboarding,
       }),
     [
       state.gamePhase,
@@ -543,6 +547,8 @@ export function ProjectBoardModal({
       state.activeProject,
       state.reputationTier,
       state.projectsCompleted,
+      state.council,
+      state.phase3Onboarding,
     ],
   );
   const emptyOffersTitle =
@@ -567,6 +573,10 @@ export function ProjectBoardModal({
     orderedOffers.length > 0 &&
     !state.activeProject &&
     !state.phase2Onboarding.offersCoachmarkSeen;
+  const showHearingRecoveryCard =
+    activeTab === "offers" &&
+    Boolean(state.council.activeHearing) &&
+    Boolean(onOpenCouncil);
 
   return (
     <ModalShell
@@ -751,6 +761,43 @@ export function ProjectBoardModal({
                 <ThemedText style={styles.offersCoachmarkBody}>
                   Pick one offer, verify deposit + addons, and expect stage
                   deadlines to tick when you fulfill non-project installs.
+                </ThemedText>
+              </LinearGradient>
+            ) : null}
+            {showHearingRecoveryCard ? (
+              <LinearGradient
+                colors={["#2C1E18", "#261A1A", "#1A1A2E"]}
+                style={styles.hearingRecoveryCard}
+              >
+                <View style={styles.hearingRecoveryHeader}>
+                  <View style={styles.hearingRecoveryTitleRow}>
+                    <Feather
+                      name="alert-triangle"
+                      size={14}
+                      color={GameColors.ui.warning}
+                    />
+                    <ThemedText style={styles.hearingRecoveryTitle}>
+                      Council Hearing Active
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    style={styles.hearingRecoveryButton}
+                    onPress={onOpenCouncil}
+                    testID="projects-hearing-open-council"
+                  >
+                    <Feather
+                      name="award"
+                      size={12}
+                      color={GameColors.currency.research}
+                    />
+                    <ThemedText style={styles.hearingRecoveryButtonText}>
+                      Open Council
+                    </ThemedText>
+                  </Pressable>
+                </View>
+                <ThemedText style={styles.hearingRecoveryBody}>
+                  Hearing penalties are raising costs and can stall offers.
+                  Resolve objectives or lobby back to stabilize contracts.
                 </ThemedText>
               </LinearGradient>
             ) : null}
@@ -1546,6 +1593,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: GameColors.ui.primary,
+  },
+  hearingRecoveryCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: `${GameColors.ui.warning}55`,
+    padding: Spacing.md,
+    gap: Spacing.xs,
+  },
+  hearingRecoveryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+  hearingRecoveryTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    flex: 1,
+  },
+  hearingRecoveryTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GameColors.text.primary,
+  },
+  hearingRecoveryBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: GameColors.text.secondary,
+  },
+  hearingRecoveryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: `${GameColors.currency.research}55`,
+    backgroundColor: `${GameColors.currency.research}12`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  hearingRecoveryButtonText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: GameColors.currency.research,
   },
   offerHeaderRow: {
     flexDirection: "row",

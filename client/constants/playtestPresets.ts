@@ -3,7 +3,9 @@ export type PlaytestPresetId =
   | "phase2_gate"
   | "phase2_contracts_ready"
   | "phase2_rep_gate"
-  | "phase3_council_live";
+  | "phase3_council_live"
+  | "phase3_hearing_recovery"
+  | "phase3_ratify_ready";
 
 export type PlaytestPresetMeta = {
   title: string;
@@ -18,6 +20,8 @@ export const PLAYTEST_PRESET_ORDER: PlaytestPresetId[] = [
   "phase2_contracts_ready",
   "phase2_rep_gate",
   "phase3_council_live",
+  "phase3_hearing_recovery",
+  "phase3_ratify_ready",
 ];
 
 export const PLAYTEST_PRESET_META: Record<
@@ -57,6 +61,20 @@ export const PLAYTEST_PRESET_META: Record<
     summary: "Start in Council-unlocked Phase 3.",
     detail:
       "Bootstraps into a late-game state tuned for tier 16 progression, campaigns, and council flows.",
+    phaseLabel: "Phase 3",
+  },
+  phase3_hearing_recovery: {
+    title: "Phase 3 Hearing Recovery",
+    summary: "Start with an active hearing and blocked refresh pressure.",
+    detail:
+      "Bootstraps directly into a hearing-active Phase 3 state for validating explainer flow and Council recovery CTAs.",
+    phaseLabel: "Phase 3",
+  },
+  phase3_ratify_ready: {
+    title: "Phase 3 Ratify Ready",
+    summary: "Start at ratify handoff with showcase order ready.",
+    detail:
+      "Bootstraps a ratify-ready Council state for validating reminder nudges and Orders handoff behavior.",
     phaseLabel: "Phase 3",
   },
 };

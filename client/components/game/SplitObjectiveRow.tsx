@@ -14,12 +14,24 @@ interface SplitObjectiveRowProps {
   missions: Mission[];
   missionsLocked?: boolean;
   objective: PhaseObjectiveState;
+  playbook?: SplitObjectivePlaybookState | null;
+  playbookHint?: string;
   onPressGoals?: () => void;
   onLockedGoalsPress?: () => void;
   onPressObjective: () => void;
+  onPressPlaybookHelp?: () => void;
   compact?: boolean;
   stacked?: boolean;
   style?: StyleProp<ViewStyle>;
+}
+
+interface SplitObjectivePlaybookState {
+  nowTitle: string;
+  nowDetail: string;
+  nextTitle: string;
+  blocker?: string;
+  progressLabel: string;
+  primaryActionLabel: string;
 }
 
 type ObjectiveTheme = {
@@ -59,15 +71,53 @@ const OBJECTIVE_THEME: Record<PhaseObjectiveState["kind"], ObjectiveTheme> = {
     accent: "#9DD8FF",
     gradient: ["#18243A", "#1A1A2E", "#162338"],
   },
+  council_intro: {
+    icon: "award",
+    accent: "#6CF0FF",
+    gradient: ["#102B38", "#1A1A2E", "#123041"],
+  },
+  council_campaign_select: {
+    icon: "map",
+    accent: "#8BC4FF",
+    gradient: ["#15263A", "#1A1A2E", "#152941"],
+  },
+  council_draft: {
+    icon: "edit-3",
+    accent: "#FBCB5A",
+    gradient: ["#302611", "#1A1A2E", "#2D2412"],
+  },
+  council_pilot: {
+    icon: "activity",
+    accent: "#4DFF88",
+    gradient: ["#132A1D", "#1A1A2E", "#123022"],
+  },
+  council_ratify: {
+    icon: "bookmark",
+    accent: "#A68BFF",
+    gradient: ["#1F1A38", "#1A1A2E", "#231C3A"],
+  },
+  council_hearing: {
+    icon: "alert-octagon",
+    accent: "#FF8B7A",
+    gradient: ["#331B1B", "#1A1A2E", "#2F1B1B"],
+  },
+  council_complete: {
+    icon: "check-circle",
+    accent: "#86F7CE",
+    gradient: ["#163129", "#1A1A2E", "#163428"],
+  },
 };
 
 export function SplitObjectiveRow({
   missions,
   missionsLocked = false,
   objective,
+  playbook,
+  playbookHint,
   onPressGoals,
   onLockedGoalsPress,
   onPressObjective,
+  onPressPlaybookHelp,
   compact = false,
   stacked = false,
   style,
@@ -76,6 +126,18 @@ export function SplitObjectiveRow({
   const titleLines = stacked ? 2 : 1;
   const subtitleLines = stacked ? 2 : 1;
   const detailLines = 1;
+  const objectiveTitle = playbook?.nowTitle ?? objective.title;
+  const objectiveSubtitle = playbook?.nowDetail ?? objective.subtitle;
+  const objectiveDetail =
+    playbookHint ??
+    playbook?.blocker ??
+    playbook?.nextTitle ??
+    objective.detail;
+  const objectiveDetailColor = playbookHint
+    ? GameColors.ui.warning
+    : GameColors.text.secondary;
+  const objectiveCta = playbook?.primaryActionLabel ?? objective.ctaLabel;
+  const showPlaybookHelp = Boolean(playbook && onPressPlaybookHelp);
 
   return (
     <View
@@ -102,9 +164,8 @@ export function SplitObjectiveRow({
         />
       </View>
 
-      <Pressable
+      <View
         style={[styles.cell, stacked && styles.cellStacked]}
-        onPress={onPressObjective}
         testID="phase-objective-card"
       >
         <LinearGradient
@@ -118,60 +179,96 @@ export function SplitObjectiveRow({
             },
           ]}
         >
-          <View style={styles.objectiveHeader}>
-            <View style={styles.objectiveKickerRow}>
-              <View
-                style={[
-                  styles.objectiveIconWrap,
-                  {
-                    borderColor: `${theme.accent}50`,
-                    backgroundColor: `${theme.accent}1A`,
-                  },
-                ]}
-              >
-                <Feather name={theme.icon} size={13} color={theme.accent} />
+          <Pressable
+            style={styles.objectiveTapArea}
+            onPress={onPressObjective}
+            accessibilityRole="button"
+          >
+            <View style={styles.objectiveHeader} pointerEvents="none">
+              <View style={styles.objectiveKickerRow}>
+                <View
+                  style={[
+                    styles.objectiveIconWrap,
+                    {
+                      borderColor: `${theme.accent}50`,
+                      backgroundColor: `${theme.accent}1A`,
+                    },
+                  ]}
+                >
+                  <Feather name={theme.icon} size={13} color={theme.accent} />
+                </View>
+                <ThemedText style={styles.objectiveKicker} numberOfLines={1}>
+                  {objective.statusLabel}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.objectiveKicker} numberOfLines={1}>
-                {objective.statusLabel}
-              </ThemedText>
+              <View style={styles.objectiveHeaderRight}>
+                {playbook?.progressLabel ? (
+                  <ThemedText style={styles.objectiveProgress}>
+                    {playbook.progressLabel}
+                  </ThemedText>
+                ) : null}
+                <Feather
+                  name="chevron-right"
+                  size={15}
+                  color={GameColors.text.secondary}
+                />
+              </View>
             </View>
-            <Feather
-              name="chevron-right"
-              size={15}
-              color={GameColors.text.secondary}
-            />
-          </View>
 
-          <View style={styles.objectiveBody}>
-            <ThemedText
-              style={styles.objectiveTitle}
-              numberOfLines={titleLines}
-            >
-              {objective.title}
-            </ThemedText>
-            <ThemedText
-              style={styles.objectiveSubtitle}
-              numberOfLines={subtitleLines}
-            >
-              {objective.subtitle}
-            </ThemedText>
-            {objective.detail ? (
+            <View style={styles.objectiveBody} pointerEvents="none">
               <ThemedText
-                style={styles.objectiveDetail}
-                numberOfLines={detailLines}
+                style={styles.objectiveTitle}
+                numberOfLines={titleLines}
               >
-                {objective.detail}
+                {objectiveTitle}
               </ThemedText>
-            ) : null}
-          </View>
+              <ThemedText
+                style={styles.objectiveSubtitle}
+                numberOfLines={subtitleLines}
+              >
+                {objectiveSubtitle}
+              </ThemedText>
+              {objectiveDetail ? (
+                <ThemedText
+                  style={[
+                    styles.objectiveDetail,
+                    { color: objectiveDetailColor },
+                  ]}
+                  numberOfLines={detailLines}
+                >
+                  {objectiveDetail}
+                </ThemedText>
+              ) : null}
+            </View>
+          </Pressable>
 
           <View style={styles.objectiveFooter}>
-            <ThemedText style={[styles.objectiveCta, { color: theme.accent }]}>
-              {objective.ctaLabel}
-            </ThemedText>
+            {showPlaybookHelp ? (
+              <Pressable
+                style={styles.objectiveHelp}
+                onPress={onPressPlaybookHelp}
+                testID="phase-playbook-help"
+              >
+                <Feather
+                  name="help-circle"
+                  size={11}
+                  color={GameColors.text.secondary}
+                />
+                <ThemedText style={styles.objectiveHelpText}>Guide</ThemedText>
+              </Pressable>
+            ) : (
+              <View />
+            )}
+            <Pressable onPress={onPressObjective} accessibilityRole="button">
+              <ThemedText
+                style={[styles.objectiveCta, { color: theme.accent }]}
+              >
+                {objectiveCta}
+              </ThemedText>
+            </Pressable>
           </View>
         </LinearGradient>
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -220,10 +317,19 @@ const styles = StyleSheet.create({
     height: 96,
     paddingVertical: 6,
   },
+  objectiveTapArea: {
+    flex: 1,
+  },
   objectiveHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  objectiveHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: Spacing.xs,
   },
   objectiveKickerRow: {
     flexDirection: "row",
@@ -246,6 +352,12 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     textTransform: "uppercase",
     letterSpacing: 0.4,
+  },
+  objectiveProgress: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: GameColors.text.secondary,
+    letterSpacing: 0.2,
   },
   objectiveBody: {
     flex: 1,
@@ -272,8 +384,18 @@ const styles = StyleSheet.create({
   objectiveFooter: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     marginTop: 2,
+    zIndex: 2,
+  },
+  objectiveHelp: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  objectiveHelpText: {
+    fontSize: 10,
+    color: GameColors.text.secondary,
   },
   objectiveCta: {
     fontSize: 11,

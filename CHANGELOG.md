@@ -18,6 +18,14 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Hardened modal/tap reliability on compact layouts: settings close controls now stay safe-area reachable, transparent story lock tap-blockers were removed, and Phase 3 jump intro/brief sequencing is lock-gated to prevent dialog race overlap.
 - Updated Phase 2 skip bootstrap so open + salvage workshops are provisioned at max playtest-ready levels for immediate contract flow testing.
 - Implemented a full Phase 2 onboarding flow with persisted milestone state, a two-step intro/contracts briefing sequence, Orders gate walkthrough guidance, and a first-offer coachmark on the Project Board.
+- Implemented adaptive Phase 3 onboarding with a full-screen unlock intro, Council-first guided handoff, phase-aware playbook/glossary guidance, and hardened modal race guards to prevent transition tap interception/freezes.
+- Completed Phase 3 execution spec hardening: intro/hearing modals now enforce safe-area + scroll reachability, ratify-ready handoff uses a compact actionable modal, unlock-banner CTA behavior is variant-safe, and the Phase 3 intro -> Council open handoff is deterministic in e2e/runtime.
+- Added deterministic Phase 3 playtest presets for Hearing Recovery and Ratify Ready, hardened hearing explainer action handoffs, and expanded e2e transition coverage to include Council activation, hearing recovery CTAs, and ratify reminder routing.
+- Closed remaining Phase 3 tap-freeze risk by adding e2e coverage for hearing `Lobby Back`/pay-clear and ratify-dismiss unblock paths, and by isolating focused Phase 3 presets from unrelated project reveal modal overlap.
+- Added a playtest-facing Phase 3 onboarding mode selector in Settings (Build Default / Control / Handoff Only / Full Adaptive), persisted as a settings override and wired into runtime variant telemetry for in-session A/B rehearsal without rebuilds.
+- Hardened onboarding variant reliability by normalizing settings on load/update/reset/playtest seed paths (invalid overrides are dropped safely) and adding e2e assertions for `control` and `handoff_only` mode behavior gates.
+- Refined the Phase 3 mode selector into a compact two-column control with selected-description copy so all options remain reachable on narrow settings layouts while preserving tap reliability.
+- Centralized Phase 3 onboarding variant resolution in a shared utility and propagated `phase3_onboarding_variant` + source into telemetry runtime context/session events so experiment KPI queries are consistently attributable by variant across the run.
 
 ## [1.0.0] - 2026-01-28
 
