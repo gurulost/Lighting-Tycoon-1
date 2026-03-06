@@ -24,6 +24,7 @@ PostHog is the analytics source of truth for gameplay telemetry and live tuning.
    - `npm run with:env -- npm run telemetry:doctor`
 
 Notes:
+
 - Telemetry is currently enabled for mobile builds (`posthog-react-native`); web is intentionally disabled.
 - Feature flag payloads (for tuning) are reloaded at app startup and on identify.
 
@@ -149,8 +150,28 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `mission_complete`
 - `mission_skip`
 
+### Phase Onboarding
+
+- `phase2_onboarding_started`
+- `phase2_onboarding_step_complete`
+- `phase2_playbook_opened`
+- `phase2_playbook_item_viewed`
+- `phase2_rescue_hint_shown`
+- `phase2_rescue_hint_actioned`
+- `phase2_rescue_hint_dismissed`
+- `phase3_onboarding_started`
+- `phase3_onboarding_step_complete`
+- `phase3_playbook_opened`
+- `phase3_playbook_item_viewed`
+- `phase3_rescue_hint_shown`
+- `phase3_rescue_hint_actioned`
+- `phase3_rescue_hint_dismissed`
+
 ### Projects
 
+- `phase2_first_contract_accepted`
+- `phase2_first_stage_completed`
+- `phase2_first_stage_failed`
 - `project_offer_refresh`
 - `project_accept`
 - `project_cancel`
@@ -172,6 +193,15 @@ The event catalog is canonical in `client/lib/telemetryCatalog.ts`.
 - `council_hearing_trigger`
 - `council_hearing_clear`
 - `council_municipal_grant`
+- `phase3_first_council_opened`
+- `phase3_first_campaign_activated`
+- `phase3_first_draft_invested`
+- `phase3_first_pilot_objective_progress`
+- `phase3_first_hearing_resolved`
+- `phase3_unlock_no_council_open_5m`
+- `phase3_campaign_stalled_no_draft_3m`
+- `phase3_pilot_stalled_10_fulfills`
+- `phase3_hearing_active_3m_no_resolution`
 
 ### System
 

@@ -47,6 +47,40 @@ test.describe("Settings Modal", () => {
     viewport: { width: 390, height: 844 },
   });
 
+  test("phase 2 intro handoff does not steal focus back from settings", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("e2e-skip-phase2")).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByTestId("e2e-skip-phase2").click({ force: true });
+
+    const phase2Intro = page.getByTestId("phase2-intro-modal");
+    await expect(phase2Intro).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("phase2-intro-continue").click({ timeout: 10_000 });
+
+    const ordersModal = page.getByTestId("orders-modal");
+    const ordersVisible = await ordersModal
+      .waitFor({ state: "visible", timeout: 1_500 })
+      .then(() => true)
+      .catch(() => false);
+    if (ordersVisible) {
+      await page.getByTestId("orders-modal-close").click({ timeout: 10_000 });
+      await expect(ordersModal).toBeHidden({ timeout: 10_000 });
+    }
+
+    await page
+      .getByTestId("settings-button")
+      .click({ timeout: 10_000, force: true });
+
+    const settingsModal = page.getByTestId("settings-modal");
+    await expect(settingsModal).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(1_500);
+    await expect(settingsModal).toBeVisible({ timeout: 10_000 });
+    await expect(ordersModal).toBeHidden({ timeout: 10_000 });
+  });
+
   test("opens and closes settings via reachable close button", async ({
     page,
   }) => {

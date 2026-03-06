@@ -453,6 +453,7 @@ export default function GameScreen() {
     projectsUnlocked: state.projectsUnlocked,
   });
   const phase2IntroHandoffLockRef = useRef(false);
+  const phase2ObjectiveHandoffRequestIdRef = useRef(0);
   const pendingContractsBriefRef = useRef(false);
   const pendingProjectsUnlockHandoffRef =
     useRef<PendingProjectsUnlockHandoff | null>(null);
@@ -709,11 +710,17 @@ export default function GameScreen() {
     if (activeModal === "council") {
       setCouncilEntryHint(null);
     }
+    phase2ObjectiveHandoffRequestIdRef.current += 1;
     setActiveModal(null);
   };
+  const openModalFromUser = useCallback((modal: Exclude<ModalType, null>) => {
+    phase2ObjectiveHandoffRequestIdRef.current += 1;
+    setActiveModal(modal);
+  }, []);
   const openProjectBoard = useCallback(
     (options?: { focusProjectId?: string; tab?: ProjectBoardTab }) => {
       if (introModalVisibleRef.current) return;
+      phase2ObjectiveHandoffRequestIdRef.current += 1;
       setProjectBoardFocusId(options?.focusProjectId ?? null);
       setProjectBoardInitialTab(options?.tab ?? null);
       setProjectBoardOpenId((prev) => prev + 1);
@@ -723,6 +730,7 @@ export default function GameScreen() {
     [],
   );
   const openStoryLog = useCallback(() => {
+    phase2ObjectiveHandoffRequestIdRef.current += 1;
     setActiveModal("story");
     const latestTimestamp =
       state.storyLog.length > 0
@@ -740,14 +748,12 @@ export default function GameScreen() {
       setGlossaryInitialSectionId(targetSectionId);
       setGlossaryOpenToken((prev) => prev + 1);
       if (targetSectionId === "phase-playbook" && state.gamePhase >= 2) {
-        captureEvent(
-          state.gamePhase >= 3
-            ? "phase3_playbook_opened"
-            : "phase2_playbook_opened",
-          {
-            source: options?.source ?? "hud_help",
-          },
-        );
+        const source = options?.source ?? "hud_help";
+        if (state.gamePhase >= 3) {
+          captureEvent("phase3_playbook_opened", { source });
+        } else {
+          captureEvent("phase2_playbook_opened", { source });
+        }
       }
       if (phase2RescueHint) {
         captureEvent("phase2_rescue_hint_actioned", {
@@ -773,6 +779,7 @@ export default function GameScreen() {
       ) {
         dispatch({ type: "MARK_COMPAT_GLOSSARY_OPENED" });
       }
+      phase2ObjectiveHandoffRequestIdRef.current += 1;
       setActiveModal("glossary");
     },
     [
@@ -788,6 +795,7 @@ export default function GameScreen() {
   const requestCouncilOpen = useCallback(
     (hint: CouncilEntryHint = null) => {
       if (gamePhaseRef.current < 3 || !state.council.unlocked) return;
+      phase2ObjectiveHandoffRequestIdRef.current += 1;
       setCouncilEntryHint(hint);
       pendingCouncilOpenRef.current = true;
       if (
@@ -948,8 +956,14 @@ export default function GameScreen() {
       pendingContractsBriefRef.current = true;
       return;
     }
+    const handoffRequestId = phase2ObjectiveHandoffRequestIdRef.current + 1;
+    phase2ObjectiveHandoffRequestIdRef.current = handoffRequestId;
     InteractionManager.runAfterInteractions(() => {
       requestAnimationFrame(() => {
+        if (phase2ObjectiveHandoffRequestIdRef.current !== handoffRequestId) {
+          return;
+        }
+        phase2ObjectiveHandoffRequestIdRef.current = 0;
         handlePhaseObjectivePress();
       });
     });
@@ -2661,7 +2675,7 @@ export default function GameScreen() {
               onCashPress={
                 !state.tutorialComplete && state.tutorialStep < 4
                   ? undefined
-                  : () => setActiveModal("upgrades")
+                  : () => openModalFromUser("upgrades")
               }
               onCashLongPress={() =>
                 showToast("Cash buys upgrades and expansions.", 2400)
@@ -2773,7 +2787,7 @@ export default function GameScreen() {
             </View>
             <Pressable
               style={topActionButtonStyle}
-              onPress={() => setActiveModal("settings")}
+              onPress={() => openModalFromUser("settings")}
               testID="settings-button"
               hitSlop={10}
               accessibilityRole="button"
@@ -2882,7 +2896,7 @@ export default function GameScreen() {
             objective={phaseObjective}
             playbook={phase2Playbook}
             playbookHint={phasePlaybookHint}
-            onPressGoals={() => setActiveModal("missions")}
+            onPressGoals={() => openModalFromUser("missions")}
             onLockedGoalsPress={() =>
               showToast("Finish the tutorial to unlock goals.", 2200)
             }
@@ -2896,7 +2910,7 @@ export default function GameScreen() {
           <MissionStrip
             missions={state.missions}
             locked={!state.tutorialComplete}
-            onPress={() => setActiveModal("missions")}
+            onPress={() => openModalFromUser("missions")}
             onLockedPress={() =>
               showToast("Finish the tutorial to unlock goals.", 2200)
             }
@@ -2921,21 +2935,21 @@ export default function GameScreen() {
           maxHeight={boardContainerLayout?.height}
           suppliersOpen={activeModal === "suppliers"}
           onWorkbenchPress={() => {
-            setActiveModal("suppliers");
+            openModalFromUser("suppliers");
           }}
           onOrderInboxPress={() => {
             if (!state.tutorialComplete && state.tutorialStep < 3) {
               showToast("Finish Step 3 to unlock Orders.", 2200);
               return;
             }
-            setActiveModal("orders");
+            openModalFromUser("orders");
           }}
           onRDBenchPress={() => {
             if (state.upgrades["rd_unlock"] < 1) {
               showToast("Unlock R&D via upgrades to access the lab.", 2200);
               return;
             }
-            setActiveModal("rd");
+            openModalFromUser("rd");
           }}
           onStationLongPress={(station) => {
             if (station === "workbench") {
@@ -3000,7 +3014,7 @@ export default function GameScreen() {
           icon="inbox"
           label="Orders"
           color={GameColors.currency.reputation}
-          onPress={() => setActiveModal("orders")}
+          onPress={() => openModalFromUser("orders")}
           onDisabledPress={() =>
             showToast("Finish the tutorial to unlock Orders.", 2200)
           }
@@ -3030,7 +3044,7 @@ export default function GameScreen() {
             icon="award"
             label="Council"
             color={GameColors.currency.research}
-            onPress={() => setActiveModal("council")}
+            onPress={() => openModalFromUser("council")}
             onDisabledPress={() => showToast(councilTooltipMessage, 3200)}
             disabled={!state.council.unlocked}
             badge={councilBadge}
@@ -3043,7 +3057,7 @@ export default function GameScreen() {
           icon="shopping-cart"
           label="Shop"
           color={GameColors.currency.cash}
-          onPress={() => setActiveModal("upgrades")}
+          onPress={() => openModalFromUser("upgrades")}
           onDisabledPress={() =>
             showToast("Finish the tutorial to unlock the Shop.", 2200)
           }
@@ -3057,7 +3071,7 @@ export default function GameScreen() {
           icon="cpu"
           label="R&D"
           color={GameColors.currency.research}
-          onPress={() => setActiveModal("rd")}
+          onPress={() => openModalFromUser("rd")}
           onDisabledPress={() =>
             showToast("Unlock R&D via upgrades to access the lab.", 2200)
           }
@@ -3245,9 +3259,9 @@ export default function GameScreen() {
       >
         <CouncilModal
           onClose={closeModal}
-          onOpenOrders={() => setActiveModal("orders")}
+          onOpenOrders={() => openModalFromUser("orders")}
           entryHint={councilEntryHint}
-          onOpenLegacyCycle={() => setActiveModal("legacy")}
+          onOpenLegacyCycle={() => openModalFromUser("legacy")}
         />
       </Modal>
 
