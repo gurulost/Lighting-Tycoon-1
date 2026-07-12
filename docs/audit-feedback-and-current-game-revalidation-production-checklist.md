@@ -212,6 +212,10 @@ Source of truth checklist for a large/intense task.
   - Rationale: deterministic and visual automation can establish invariants, accessibility surfaces, and release safety, but not pacing satisfaction.
   - Owner: product/playtest follow-up
   - Follow-up trigger/date: collect tester sentiment and gameplay telemetry after distributing the playtest-channel build.
+- [x] R-103 [status:accepted_risk] The current Expo 54 dependency graph reports 28 production-tree advisories under `npm audit --omit=dev` (1 low, 18 moderate, 8 high, 1 critical).
+  - Rationale: the critical `shell-quote` path is nested under React Native DevTools, while direct high findings in Drizzle, `http-proxy-middleware`, and `ws` are not imported by the active server bundle; cloud-save/database code is disabled and the bundle audit confirms no active database/proxy/socket path. Registry-recommended fixes require an Expo 57 major upgrade or a separate production dependency change, both explicitly outside this packet's dependency authorization.
+  - Owner: security/dependency follow-up
+  - Follow-up trigger/date: authorize a dedicated dependency-remediation packet or the next Expo SDK major upgrade; re-run the full native/browser matrix after any resolution or override.
 
 ### Implementation Change Log
 - 2026-07-12T07:15:00: Full automated-first implementation authorized; implementation phase appended without altering completed audit evidence.
@@ -287,6 +291,8 @@ Source of truth checklist for a large/intense task.
   - Evidence: 2026-07-12 16:51 MDT PASS; Expo Doctor 18/18, SDK dependency check aligned, server bundle plus iOS/Android bundles and 160 assets completed after the final source edit.
 - [x] V-203 [status:verified] Final native iOS and Android smoke flows pass after the last source edit.
   - Evidence: 2026-07-12 16:51 MDT PASS; both platforms completed launch, supplier/audio action, background/foreground resume, sandbox restart, main-save restore, volume controls, and modal dismissal. Native launch logs are clear of the corrected PostHog navigation-context errors.
+- [x] V-204 [status:accepted_risk] Production-tree dependency audit completed and classified without expanding the authorized dependency scope.
+  - Evidence: 2026-07-12 17:03 MDT EXPECTED FAIL (accepted risk); `npm audit --omit=dev --json` reported 28 advisories. Active route/bundle inspection found no database, proxy, or WebSocket import in the shipped server bundle; remaining Expo/React Native toolchain advisories are tracked in R-103.
 
 ### Pre-Push Change Log
 - 2026-07-12T16:32:00-06:00: Completed adversarial pre-push review, fixed F-200..F-213, corrected aggregate Council cadence measurement without changing balance, refreshed automated screenshots, and passed the final web/unit/build/native matrix.
