@@ -224,12 +224,14 @@ Source of truth checklist for a large/intense task.
 ### Pre-Push Gates
 - [x] G-200 [status:verified] All confirmed final-review defects are fixed and covered.
 - [x] G-201 [status:verified] Final validation passes after the last source edit.
-- [ ] G-202 [status:open] Intended files only are committed and the branch is pushed in sync with origin.
+- [x] G-202 [status:verified] Intended files only are committed and the branch is pushed in sync with its GitHub upstream.
+  - Evidence: implementation commit `0f5278e`; unrelated `.claude/launch.json` remains untracked. The first HTTPS push was rejected because its OAuth token lacked `workflow` scope; the verified SSH transport then pushed the same branch successfully.
 
 ### Pre-Push Queue
 - [x] Q-200 [status:verified] Complete adversarial persistence, progression, native UI, CI, API-contract, and commit-hygiene review.
 - [x] Q-201 [status:verified] Apply and verify confirmed fixes.
-- [ ] Q-202 [status:open] Stage intentionally, commit, push, and verify upstream truth.
+- [x] Q-202 [status:verified] Stage intentionally, commit, push, and verify upstream truth.
+  - Evidence: `codex/automated-p1-p2-gameplay` exists on `github.com:gurulost/Lighting-Tycoon-1.git`; final ahead/behind and remote-object verification are recorded in the evidence commit.
 
 ### Pre-Push Findings
 - [x] F-200 [status:verified] [P1] [confidence:0.95] A transient storage read failure enables fresh-state autosave and can overwrite normal progress.
