@@ -37,4 +37,9 @@ fi
 export JAVA_HOME
 export PATH="$JAVA_HOME/bin:$PATH"
 
-exec maestro test .maestro/smoke.yaml
+FLOW="${MAESTRO_FLOW:-.maestro/smoke.yaml}"
+if [ -n "${MAESTRO_DEVICE_ID:-}" ]; then
+  exec maestro --udid "$MAESTRO_DEVICE_ID" test "$FLOW"
+fi
+
+exec maestro test "$FLOW"

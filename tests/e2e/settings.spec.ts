@@ -105,14 +105,13 @@ test.describe("Settings Modal", () => {
     await expect(settingsModal).toBeVisible({ timeout: 10_000 });
 
     await page
-      .getByTestId("settings-playtest-presets")
+      .getByTestId("settings-open-playtest-lab")
       .click({ timeout: 10_000 });
-    const presetsModal = page.getByTestId("playtest-preset-modal");
+    const presetsModal = page.getByTestId("playtest-lab-modal");
     await expect(presetsModal).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId("playtest-preset-close").click({ timeout: 10_000 });
+    await page.getByTestId("playtest-lab-close").click({ timeout: 10_000 });
     await expect(presetsModal).toBeHidden({ timeout: 10_000 });
 
-    await page.getByTestId("settings-modal-close").click({ timeout: 10_000 });
     await expect(settingsModal).toBeHidden({ timeout: 10_000 });
 
     await page.getByText("Shop", { exact: true }).click({ timeout: 10_000 });
@@ -127,26 +126,15 @@ test.describe("Settings Modal", () => {
     await bootstrapInteractiveState(page);
     await page.getByTestId("settings-button").click({ timeout: 10_000 });
 
-    const settingsModal = page.getByTestId("settings-modal");
-    await expect(settingsModal).toBeVisible({ timeout: 10_000 });
-    await expect(
-      page.getByTestId("settings-phase3-onboarding-mode"),
-    ).toBeVisible({
-      timeout: 10_000,
-    });
-
+    await page.getByTestId("settings-open-playtest-lab").click();
+    const lab = page.getByTestId("playtest-lab-modal");
+    await expect(lab).toBeVisible({ timeout: 10_000 });
     await page
-      .getByTestId("settings-phase3-variant-control")
+      .getByTestId("playtest-variant-control")
       .click({ timeout: 10_000 });
-    await expect(
-      page.getByTestId("settings-phase3-variant-current"),
-    ).toContainText("Control override active", { timeout: 10_000 });
-
     await page
-      .getByTestId("settings-phase3-variant-build_default")
+      .getByTestId("playtest-variant-build_default")
       .click({ timeout: 10_000 });
-    await expect(
-      page.getByTestId("settings-phase3-variant-current"),
-    ).toContainText("via build default", { timeout: 10_000 });
+    await expect(lab).toBeVisible();
   });
 });

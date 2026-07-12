@@ -681,9 +681,18 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Dependency Meter",
         summary: "Tracks reliance on locked supply.",
         detail:
-          "Locked work raises it; open-only orders can reduce it. At 20, Compliance Audit triggers.",
+          "Locked work raises it; open-only orders can reduce it. Read your current percentage against the named bands below. Reaching 20 triggers the Compliance Audit and liberation sequence.",
         icon: "activity",
         color: GameColors.ui.warning,
+      },
+      {
+        id: "dependency-bands",
+        title: "Dependency Bands",
+        summary: "80, 60, 40, and 20 mark each change in control.",
+        detail:
+          "81–100 Indentured: locked control is strongest. 61–80 Resistance: open work starts pushing back. 41–60 Breakthrough: independence is taking hold. 21–40 Retaliation: the Baron reacts as liberation nears. 0–20 Liberation: the Compliance Audit and final break-free sequence govern progress.",
+        icon: "bar-chart-2",
+        color: GameColors.ui.primary,
       },
       {
         id: "baron-pressure",
@@ -773,7 +782,7 @@ const GLOSSARY_SECTIONS: GlossarySection[] = [
         title: "Council Unlock",
         summary: "Phase 3 governance layer.",
         detail:
-          "Unlocked after the Expo capstone or 6 contracts plus a high reputation tier. Phase 3 raises the tier cap to 16 and opens Council campaigns.",
+          "Complete 6 contracts and reach reputation tier 9 to qualify for the International Expo capstone. Completing it opens Council campaigns and raises the tier cap to 16.",
         icon: "award",
         color: GameColors.currency.research,
       },

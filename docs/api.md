@@ -1,111 +1,23 @@
 # API Reference
 
-Base URL is derived from `EXPO_PUBLIC_DOMAIN` in the client. The client currently builds the API base as
-`https://${EXPO_PUBLIC_DOMAIN}`. For local development, set `EXPO_PUBLIC_DOMAIN=localhost:5000` and use HTTPS
-or update the client to use HTTP.
+The Express server hosts web build assets and exposes a liveness endpoint. Game
+progress is stored locally on the device; cloud saves are deliberately disabled
+until an authenticated, versioned save contract is implemented.
 
-## Auth and Session Model
+## Health
 
-- No authentication is implemented.
-- `sessionId` is client-generated and used as the primary key for saves.
-- Treat this API as trusted/internal unless auth is added.
+### `GET /healthz`
 
-## Data Model
+- **Response 200**: `{ "status": "ok" }`
+- Does not require `DATABASE_URL` or test database connectivity.
 
-### GameSave
+## Disabled cloud-save contract
 
-Fields (from `shared/schema.ts`):
+Every HTTP method on `/api/game` and `/api/game/:sessionId` returns:
 
-- `sessionId` (string)
-- `cash` (number)
-- `reputation` (number)
-- `research` (number)
-- `dependency` (number)
-- `boardState` (array)
-- `unlockedSlots` (array)
-- `upgrades` (object)
-- `rdNodes` (object)
-- `freedomControllerCount` (number)
-- `maxOrders` (number)
-- `tutorialComplete` (boolean)
-- `createdAt` (timestamp, server-managed)
-- `updatedAt` (timestamp, server-managed)
+- **Response 410**: `{ "error": "Cloud saves are disabled; progress is stored locally." }`
 
-Example payload:
-
-```json
-{
-  "sessionId": "demo-session-1",
-  "cash": 50,
-  "reputation": 0,
-  "research": 0,
-  "dependency": 100,
-  "boardState": [],
-  "unlockedSlots": [],
-  "upgrades": {},
-  "rdNodes": {},
-  "freedomControllerCount": 0,
-  "maxOrders": 2,
-  "tutorialComplete": false
-}
-```
-
-## Endpoints
-
-### GET /api/game/:sessionId
-
-Fetch an existing save by `sessionId`.
-
-- **Response 200**: `GameSave`
-- **Response 404**: `{ "error": "Game save not found" }`
-
-### POST /api/game
-
-Create a new game save.
-
-- **Body**: `InsertGameSave`
-- **Response 201**: `GameSave`
-- **Response 400**: invalid payload
-- **Response 409**: save already exists
-
-Example request body:
-
-```json
-{
-  "sessionId": "demo-session-1",
-  "cash": 50,
-  "reputation": 0,
-  "research": 0,
-  "dependency": 100,
-  "boardState": [],
-  "unlockedSlots": [],
-  "upgrades": {},
-  "rdNodes": {},
-  "freedomControllerCount": 0,
-  "maxOrders": 2,
-  "tutorialComplete": false
-}
-```
-
-### PUT /api/game/:sessionId
-
-Update or create a game save.
-
-- **Body**: `UpdateGameSave`
-- **Response 200**: `GameSave` (updated)
-- **Response 201**: `GameSave` (created)
-- **Response 400**: invalid payload
-
-### DELETE /api/game/:sessionId
-
-Delete a game save.
-
-- **Response 200**: `{ "success": true }`
-- **Response 404**: `{ "error": "Game save not found" }`
-
-## Error Responses
-
-- `400` invalid payloads (includes `details` from Zod)
-- `404` missing save
-- `409` conflicting save
-- `500` server error
+The server does not read, create, update, or delete game progress. The schemas in
+`shared/schema.ts` and database implementation in `server/storage.ts` are dormant
+legacy scaffolding and must not be connected without authentication and a schema
+that represents the complete current game state.

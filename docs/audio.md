@@ -2,7 +2,12 @@
 
 Source: `client/audio/sounds.ts`
 
+Runtime: `expo-audio` direct players managed by `client/audio/SoundManager.ts`.
+Players are preloaded, paused when the app backgrounds, and explicitly released
+when the game screen unmounts. The persisted SFX volume scales the per-effect mix.
+
 ## SFX List + Triggers
+
 - `spawn` — Workbench tap
 - `merge_1..5` — Merge by tier
 - `order_complete` — Order fulfilled
@@ -18,13 +23,14 @@ Source: `client/audio/sounds.ts`
 - `rd_craft` — Freedom Controller crafted
 
 ## Mix Principles
+
 - Avoid dense stacking: global throttle limits to 6 plays per 220ms.
 - Each SFX has its own cooldown to prevent chatter.
 - Use light pitch variance for repeated actions (`rateRange`).
 - Prioritize “merge” and “order complete” as the loudest confirmation.
 
 ## QA Checklist
+
 - Merges never clip or overlap badly.
 - Workbench tap never silent when enabled.
 - Lockout SFX only triggers once per event.
-

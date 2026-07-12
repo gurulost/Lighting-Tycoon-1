@@ -16,12 +16,14 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Part, PartTier, PartFamily } from "@/types/game";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
 import { TrimLightStrip } from "@/components/game/TrimLightStrip";
+import { getPartAccessibilityLabel } from "@/lib/gameplayFeedback";
 
 const partClipOpen = require("../../../assets/images/part-clip-open.webp");
 const partClipLocked = require("../../../assets/images/part-clip-locked.webp");
@@ -103,6 +105,7 @@ interface PartItemProps {
   dragOffsetY?: SharedValue<number>;
   lightPhase?: SharedValue<number>;
   compatibilityGuideActive?: boolean;
+  enhancedPartCues?: boolean;
 }
 
 export function PartItem({
@@ -123,6 +126,7 @@ export function PartItem({
   dragOffsetY,
   lightPhase,
   compatibilityGuideActive = false,
+  enhancedPartCues = false,
 }: PartItemProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -387,9 +391,33 @@ export function PartItem({
   const sprite =
     part.family === "waste" ? null : PART_SPRITES[part.tier][part.family];
   const showPremiumLights = part.tier >= 5 && !isWaste;
+  const familyIcon: keyof typeof Feather.glyphMap = isWaste
+    ? "trash-2"
+    : isOpen
+      ? "unlock"
+      : "lock";
+  const familyLabel = isWaste ? "W" : isOpen ? "O" : "L";
+  const accessibilityActivation = onTap ?? onLongPress;
 
   const content = (
     <Animated.View
+      accessible={!dragPreview}
+      accessibilityRole={accessibilityActivation ? "button" : "image"}
+      accessibilityLabel={getPartAccessibilityLabel(part)}
+      accessibilityHint={
+        disabled
+          ? undefined
+          : onTap
+            ? "Activate to move this part"
+            : onLongPress
+              ? "Activate for part details, or drag to move or merge"
+              : "Drag to move or merge this part"
+      }
+      onAccessibilityTap={
+        disabled || !accessibilityActivation
+          ? undefined
+          : accessibilityActivation
+      }
       style={[
         styles.container,
         {
@@ -406,6 +434,27 @@ export function PartItem({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
+        {enhancedPartCues ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.enhancedCueFrame,
+              isWaste
+                ? styles.enhancedCueWaste
+                : isOpen
+                  ? styles.enhancedCueOpen
+                  : styles.enhancedCueLocked,
+              { borderColor: primaryColor },
+            ]}
+          >
+            {!isOpen && !isWaste ? (
+              <>
+                <View style={[styles.lockedCueBar, styles.lockedCueBarX]} />
+                <View style={[styles.lockedCueBar, styles.lockedCueBarY]} />
+              </>
+            ) : null}
+          </View>
+        ) : null}
         {isOpen ? (
           <LinearGradient
             colors={[
@@ -484,6 +533,13 @@ export function PartItem({
       <View
         style={[
           styles.familyIndicator,
+          enhancedPartCues && styles.familyIndicatorEnhanced,
+          enhancedPartCues &&
+            (isWaste
+              ? styles.familyIndicatorWasteEnhanced
+              : isOpen
+                ? styles.familyIndicatorOpenEnhanced
+                : styles.familyIndicatorLockedEnhanced),
           part.family === "locked"
             ? { backgroundColor: GameColors.locked.accent + "80" }
             : part.family === "waste"
@@ -491,6 +547,19 @@ export function PartItem({
               : styles.familyIndicatorOpen,
         ]}
       >
+        {enhancedPartCues ? (
+          <Feather
+            name={familyIcon}
+            size={8}
+            color={
+              isWaste
+                ? "#1A1A2E"
+                : isOpen
+                  ? GameColors.openStandard.primary
+                  : "#FFFFFF"
+            }
+          />
+        ) : null}
         <ThemedText
           style={[
             styles.familyText,
@@ -501,7 +570,7 @@ export function PartItem({
                 : styles.familyTextOpen,
           ]}
         >
-          {part.family === "locked" ? "L" : part.family === "waste" ? "W" : "O"}
+          {familyLabel}
         </ThemedText>
       </View>
 
@@ -509,11 +578,15 @@ export function PartItem({
         <Animated.View
           style={[
             styles.compatibleIndicator,
+            enhancedPartCues && styles.compatibleIndicatorEnhanced,
             { backgroundColor: GameColors.ui.success },
             compatibilityGuideActive ? styles.compatibleIndicatorGuide : null,
             compatibleGuideStyle,
           ]}
         >
+          {enhancedPartCues ? (
+            <Feather name="check" size={8} color="#0F0F1F" />
+          ) : null}
           <ThemedText style={styles.compatibleText}>C</ThemedText>
         </Animated.View>
       ) : null}
@@ -655,6 +728,50 @@ const styles = StyleSheet.create({
     opacity: 0.35,
     transform: [{ rotate: "-25deg" }],
   },
+  enhancedCueFrame: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderWidth: 2,
+    opacity: 0.72,
+    zIndex: 1,
+  },
+  enhancedCueOpen: {
+    borderRadius: 10,
+    borderStyle: "dashed",
+    transform: [{ rotate: "-4deg" }],
+  },
+  enhancedCueLocked: {
+    borderRadius: 1,
+    borderStyle: "solid",
+  },
+  enhancedCueWaste: {
+    top: "18%",
+    right: "18%",
+    bottom: "18%",
+    left: "18%",
+    borderRadius: 2,
+    borderStyle: "dotted",
+    transform: [{ rotate: "45deg" }],
+  },
+  lockedCueBar: {
+    position: "absolute",
+    backgroundColor: "rgba(255, 255, 255, 0.28)",
+  },
+  lockedCueBarX: {
+    left: 3,
+    right: 3,
+    top: "50%",
+    height: 1,
+  },
+  lockedCueBarY: {
+    top: 3,
+    bottom: 3,
+    left: "50%",
+    width: 1,
+  },
   sprite: {
     zIndex: 1,
   },
@@ -723,6 +840,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#0F0F1F",
   },
+  familyIndicatorEnhanced: {
+    width: 23,
+    height: 18,
+    flexDirection: "row",
+    gap: 2,
+    borderWidth: 2,
+  },
+  familyIndicatorOpenEnhanced: {
+    borderRadius: 9,
+    borderStyle: "dashed",
+  },
+  familyIndicatorLockedEnhanced: {
+    borderRadius: 2,
+    borderStyle: "solid",
+  },
+  familyIndicatorWasteEnhanced: {
+    borderRadius: 1,
+    borderStyle: "dotted",
+  },
   familyIndicatorOpen: {
     backgroundColor: "#0F0F1F",
     borderColor: GameColors.openStandard.primary,
@@ -754,6 +890,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+  },
+  compatibleIndicatorEnhanced: {
+    width: 23,
+    height: 18,
+    flexDirection: "row",
+    gap: 1,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: "#0F0F1F",
   },
   compatibleIndicatorGuide: {
     borderWidth: 1,

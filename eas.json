@@ -1,0 +1,22 @@
+{
+  "build": {
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "production"
+      }
+    },
+    "playtest": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "playtest"
+      }
+    },
+    "e2e": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "e2e"
+      }
+    }
+  }
+}

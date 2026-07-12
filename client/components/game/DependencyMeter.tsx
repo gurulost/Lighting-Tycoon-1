@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -33,6 +33,7 @@ interface DependencyMeterProps {
   compact?: boolean;
   reducedMotion?: boolean;
   lockoutActive?: boolean;
+  onInfoPress?: () => void;
 }
 
 const THRESHOLDS = [20, 40, 60, 80];
@@ -47,6 +48,7 @@ export function DependencyMeter({
   compact = false,
   reducedMotion = false,
   lockoutActive = false,
+  onInfoPress,
 }: DependencyMeterProps) {
   const tuning = getTuning();
   const pressureCap = Math.max(
@@ -304,8 +306,29 @@ export function DependencyMeter({
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              Dependency
+              {compact ? getStatusText() : "Dependency"}
             </ThemedText>
+            {onInfoPress ? (
+              <Pressable
+                onPress={onInfoPress}
+                accessibilityRole="button"
+                accessibilityLabel={`Explain dependency and Baron pressure. Current dependency band: ${getStatusText()}, ${Math.round(value)} percent`}
+                accessibilityHint="Opens the dependency bands, thresholds, and effects guide"
+                hitSlop={10}
+                testID="dependency-info-button"
+                style={({ pressed }) => [
+                  styles.infoButton,
+                  compact && styles.infoButtonCompact,
+                  pressed && styles.infoButtonPressed,
+                ]}
+              >
+                <Feather
+                  name="info"
+                  size={compact ? 11 : 12}
+                  color={GameColors.ui.primary}
+                />
+              </Pressable>
+            ) : null}
           </View>
           <View
             style={[
@@ -547,6 +570,25 @@ const styles = StyleSheet.create({
   labelCompact: {
     fontSize: 12,
     lineHeight: 14,
+  },
+  infoButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 217, 255, 0.09)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 217, 255, 0.44)",
+  },
+  infoButtonCompact: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  infoButtonPressed: {
+    backgroundColor: "rgba(0, 217, 255, 0.22)",
+    borderColor: GameColors.ui.primary,
   },
   statusContainer: {
     flexDirection: "row",

@@ -20,8 +20,6 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
 import { getTuning } from "@/lib/tuning";
-import { PlaytestPresetModal } from "./PlaytestPresetModal";
-import { PlaytestPresetId } from "@/constants/playtestPresets";
 
 interface RDTreeProps {
   onCraftFreedomController: () => void;
@@ -197,13 +195,10 @@ function RDNodeCard({
 }
 
 export function RDTree({ onCraftFreedomController }: RDTreeProps) {
-  const { state, unlockRDNode, craftFreedomController, applyPlaytestPreset } =
-    useGame();
+  const { state, unlockRDNode, craftFreedomController } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const insets = useSafeAreaInsets();
   const tuning = getTuning();
-  const [playtestPresetVisible, setPlaytestPresetVisible] =
-    React.useState(false);
 
   const getNodeCosts = React.useCallback(
     (node: RDNode): RDNodeCosts => ({
@@ -256,32 +251,6 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
     (state.upgrades["rd_unlock"] || 0) >= 1 &&
     state.rdNodes["freedom_build"] &&
     state.research >= 300;
-  const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
-  const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
-
-  const handleSkipPhase2 = () => {
-    if (!canSkipPhase2) return;
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    applyPlaytestPreset("phase2_gate");
-  };
-
-  const handleSkipPhase3 = () => {
-    if (!canSkipPhase3) return;
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    applyPlaytestPreset("phase3_council_live");
-  };
-
-  const handlePlaytestPresetSelect = (presetId: PlaytestPresetId) => {
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    applyPlaytestPreset(presetId);
-    setPlaytestPresetVisible(false);
-  };
 
   return (
     <ScrollView
@@ -400,79 +369,6 @@ export function RDTree({ onCraftFreedomController }: RDTreeProps) {
           </Pressable>
         </View>
       )}
-
-      <View style={styles.playtestSection}>
-        <ThemedText style={styles.playtestLabel}>Playtest</ThemedText>
-        <ThemedText style={styles.playtestDescription}>
-          Jump directly to late-phase milestones for fast QA loops.
-        </ThemedText>
-        <Pressable
-          onPress={() => setPlaytestPresetVisible(true)}
-          style={styles.playtestButton}
-          testID="rd-playtest-presets"
-        >
-          <Feather name="map" size={14} color={GameColors.text.secondary} />
-          <ThemedText style={styles.playtestButtonText}>
-            Open Jump Presets
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
-          style={[
-            styles.playtestButton,
-            !canSkipPhase2 && styles.playtestButtonDisabled,
-          ]}
-        >
-          <Feather
-            name="skip-forward"
-            size={14}
-            color={
-              canSkipPhase2
-                ? GameColors.text.secondary
-                : GameColors.text.disabled
-            }
-          />
-          <ThemedText
-            style={[
-              styles.playtestButtonText,
-              !canSkipPhase2 && styles.playtestButtonTextDisabled,
-            ]}
-          >
-            Skip to Phase 2
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
-          style={[
-            styles.playtestButton,
-            !canSkipPhase3 && styles.playtestButtonDisabled,
-          ]}
-        >
-          <Feather
-            name="fast-forward"
-            size={14}
-            color={
-              canSkipPhase3
-                ? GameColors.text.secondary
-                : GameColors.text.disabled
-            }
-          />
-          <ThemedText
-            style={[
-              styles.playtestButtonText,
-              !canSkipPhase3 && styles.playtestButtonTextDisabled,
-            ]}
-          >
-            Skip to Phase 3
-          </ThemedText>
-        </Pressable>
-      </View>
-
-      <PlaytestPresetModal
-        visible={playtestPresetVisible}
-        onClose={() => setPlaytestPresetVisible(false)}
-        onSelect={handlePlaytestPresetSelect}
-      />
     </ScrollView>
   );
 }
@@ -631,48 +527,5 @@ const styles = StyleSheet.create({
   craftButtonText: {
     fontSize: 16,
     fontWeight: "600",
-  },
-  playtestSection: {
-    marginTop: Spacing["3xl"],
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: `${GameColors.text.disabled}30`,
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  playtestLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: GameColors.text.disabled,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  playtestDescription: {
-    fontSize: 12,
-    color: GameColors.text.secondary,
-    textAlign: "center",
-    paddingHorizontal: Spacing.lg,
-  },
-  playtestButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: `${GameColors.text.disabled}50`,
-    backgroundColor: GameColors.ui.surface,
-  },
-  playtestButtonDisabled: {
-    opacity: 0.45,
-  },
-  playtestButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: GameColors.text.secondary,
-  },
-  playtestButtonTextDisabled: {
-    color: GameColors.text.disabled,
   },
 });

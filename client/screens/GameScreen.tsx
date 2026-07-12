@@ -40,12 +40,15 @@ import { UpgradesModal } from "@/components/game/UpgradesModal";
 import { RDModal } from "@/components/game/RDModal";
 import { LockoutModal } from "@/components/game/LockoutModal";
 import { SettingsModal } from "@/components/game/SettingsModal";
+import { PlaytestLabModal } from "@/components/game/PlaytestPresetModal";
+import { PlaytestSessionBanner } from "@/components/game/PlaytestSessionBanner";
 import { BaronOfferModal } from "@/components/game/BaronOfferModal";
 import { PartDetailModal } from "@/components/game/PartDetailModal";
 import { StoryLogModal } from "@/components/game/StoryLogModal";
 import { GlossaryModal } from "@/components/game/GlossaryModal";
 import { SupplierModal } from "@/components/game/SupplierModal";
 import { MergeMomentumModal } from "@/components/game/MergeMomentumModal";
+import { MergeChainIndicator } from "@/components/game/MergeChainIndicator";
 import { MissionStrip } from "@/components/game/MissionStrip";
 import { Phase2IntroModal } from "@/components/game/Phase2IntroModal";
 import { Phase3IntroModal } from "@/components/game/Phase3IntroModal";
@@ -73,11 +76,19 @@ import {
   resolvePhase3OnboardingVariantSource,
 } from "@/lib/phase3OnboardingVariant";
 import { withRepeat } from "@/lib/reanimated";
+import { getTuning } from "@/lib/tuning";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
 import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
 import { OverlayItem, OVERLAY_PRIORITY } from "@/types/overlay";
+import type { Phase3OnboardingVariant } from "@/types/game";
+import type { PlaytestPresetId } from "@/constants/playtestPresets";
+import {
+  hasE2EShortcuts,
+  hasPlaytestCapability,
+  resolveReleaseChannel,
+} from "@/lib/releaseChannel";
 
 const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
 const MAX_MOMENT_LOCK_MS = 2000;
@@ -332,9 +343,20 @@ export default function GameScreen() {
     claimMergeMomentum,
     skipToPhase2,
     skipToPhase3,
+    playtestSession,
+    playtestBusy,
+    playtestError,
+    startPlaytestPreset,
+    restartPlaytestPreset,
+    restoreMainSave,
+    offlineCashNotice,
+    dismissOfflineCashNotice,
     hydrated,
   } = useGame();
-  const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
+  const releaseChannel = resolveReleaseChannel();
+  const playtestEnabled = hasPlaytestCapability(releaseChannel);
+  const e2eEnabled = hasE2EShortcuts(releaseChannel);
+  const mergeChainWindowMs = getTuning().merge.chainWindowMs;
   const phase3RatifyReadyDelayMs = e2eEnabled ? 1200 : 20000;
   const phase3OnboardingBuildVariant = resolvePhase3OnboardingBuildVariant();
   const phase3OnboardingVariant = resolvePhase3OnboardingVariant(
@@ -347,6 +369,10 @@ export default function GameScreen() {
   const phase3AdaptiveEnabled =
     phase3OnboardingVariant === "phase3_full_adaptive";
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [playtestLabVisible, setPlaytestLabVisible] = useState(false);
+  const [pendingPhase3Variant, setPendingPhase3Variant] = useState<
+    Phase3OnboardingVariant | undefined
+  >(undefined);
   const [glossaryInitialSectionId, setGlossaryInitialSectionId] = useState<
     string | null
   >(null);
@@ -1212,6 +1238,15 @@ export default function GameScreen() {
     },
     [enqueueOverlay],
   );
+
+  useEffect(() => {
+    if (!offlineCashNotice) return;
+    showToast(
+      `Welcome back — +${offlineCashNotice.cashAward} coins for ${offlineCashNotice.creditedMinutes} minutes away`,
+      3200,
+    );
+    dismissOfflineCashNotice();
+  }, [dismissOfflineCashNotice, offlineCashNotice, showToast]);
 
   const measureBoardContainer = useCallback(() => {
     boardContainerRef.current?.measureInWindow((x, y, width, height) => {
@@ -2134,9 +2169,14 @@ export default function GameScreen() {
   }, [momentLockActive]);
 
   useEffect(() => {
-    SoundManager.init();
+    void SoundManager.setAppActive(AppState.currentState === "active");
+    void SoundManager.init();
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      void SoundManager.setAppActive(nextState === "active");
+    });
     return () => {
-      SoundManager.unload();
+      subscription.remove();
+      void SoundManager.unload();
     };
   }, []);
 
@@ -2313,6 +2353,10 @@ export default function GameScreen() {
   useEffect(() => {
     SoundManager.setEnabled(state.settings.soundEnabled);
   }, [state.settings.soundEnabled]);
+
+  useEffect(() => {
+    SoundManager.setMasterVolume(state.settings.sfxVolume);
+  }, [state.settings.sfxVolume]);
 
   useEffect(() => {
     if (
@@ -2643,6 +2687,52 @@ export default function GameScreen() {
     enqueueOverlay,
   ]);
 
+  const openPlaytestLab = useCallback(() => {
+    setActiveModal(null);
+    setPlaytestLabVisible(true);
+  }, []);
+
+  const handlePlaytestPresetSelect = useCallback(
+    async (presetId: PlaytestPresetId) => {
+      try {
+        await startPlaytestPreset(presetId, pendingPhase3Variant);
+        setPlaytestLabVisible(false);
+      } catch {
+        // GameContext exposes the storage-safe failure through playtestError.
+        // Keep the Lab open so the tester can read it and retry or restore.
+      }
+    },
+    [pendingPhase3Variant, startPlaytestPreset],
+  );
+
+  const handlePlaytestRestart = useCallback(async () => {
+    try {
+      await restartPlaytestPreset();
+    } catch {
+      setPlaytestLabVisible(true);
+    }
+  }, [restartPlaytestPreset]);
+
+  const handlePlaytestRestore = useCallback(async () => {
+    try {
+      await restoreMainSave();
+    } catch {
+      setPlaytestLabVisible(true);
+    }
+  }, [restoreMainSave]);
+
+  const handlePlaytestVariantChange = useCallback(
+    (variant?: Phase3OnboardingVariant) => {
+      setPendingPhase3Variant(variant);
+      if (!playtestSession) return;
+      dispatch({
+        type: "UPDATE_SETTINGS",
+        settings: { phase3OnboardingVariantOverride: variant },
+      });
+    },
+    [dispatch, playtestSession],
+  );
+
   return (
     <LinearGradient
       colors={["#0A0A14", "#0F0F1F", "#0A0A14"]}
@@ -2677,6 +2767,15 @@ export default function GameScreen() {
           );
         }}
       >
+        {playtestSession ? (
+          <PlaytestSessionBanner
+            presetId={playtestSession.presetId}
+            busy={playtestBusy}
+            onChange={openPlaytestLab}
+            onRestart={() => void handlePlaytestRestart()}
+            onRestore={() => void handlePlaytestRestore()}
+          />
+        ) : null}
         <View
           style={topBarStyle}
           onLayout={(event) => {
@@ -2857,16 +2956,7 @@ export default function GameScreen() {
             topCondensed && styles.statusRowCompact,
           ]}
         >
-          <Pressable
-            style={styles.statusItem}
-            onLongPress={() =>
-              showToast(
-                "Dependency starts maxed. Open work lowers it; locked work reinforces it. Baron Pressure taxes Phase 2 rewards: 40+ = -10%, 70+ = -20%. Open-only installs reduce Pressure.",
-                3400,
-              )
-            }
-            delayLongPress={350}
-          >
+          <View style={styles.statusItem}>
             <View ref={dependencyTargetRef} onLayout={measureDependencyTarget}>
               <DependencyMeter
                 value={state.dependency}
@@ -2874,9 +2964,15 @@ export default function GameScreen() {
                 compact
                 reducedMotion={state.settings.reducedMotion}
                 lockoutActive={state.lockoutActive}
+                onInfoPress={() =>
+                  openGlossary({
+                    sectionId: "dependency",
+                    source: "dependency_meter",
+                  })
+                }
               />
             </View>
-          </Pressable>
+          </View>
           <View style={styles.statusItem}>
             <NeighborhoodBadge
               reputation={state.reputation}
@@ -2885,6 +2981,13 @@ export default function GameScreen() {
             />
           </View>
         </View>
+
+        <MergeChainIndicator
+          count={state.mergeChainCount}
+          expiresAt={state.mergeChainExpiresAt}
+          windowMs={mergeChainWindowMs}
+          reducedMotion={state.settings.reducedMotion}
+        />
 
         {state.lockoutActive ? (
           <View
@@ -2951,6 +3054,7 @@ export default function GameScreen() {
         }}
       >
         <MergeBoard
+          enhancedPartCues={state.settings.enhancedPartCues}
           layoutVersion={storyLayoutTick}
           boardContainerLayout={boardContainerLayout}
           maxHeight={boardContainerLayout?.height}
@@ -3131,23 +3235,21 @@ export default function GameScreen() {
         onTelemetry={handleOverlayTelemetry}
       />
 
-      {e2eEnabled ? (
-        <View style={styles.e2eControls}>
-          <Pressable
-            style={styles.e2eButton}
-            onPress={skipToPhase2}
-            testID="e2e-skip-phase2"
-          >
-            <ThemedText style={styles.e2eButtonText}>E2E P2</ThemedText>
-          </Pressable>
-          <Pressable
-            style={styles.e2eButton}
-            onPress={skipToPhase3}
-            testID="e2e-skip-phase3"
-          >
-            <ThemedText style={styles.e2eButtonText}>E2E P3</ThemedText>
-          </Pressable>
-        </View>
+      {playtestEnabled ? (
+        <PlaytestLabModal
+          visible={playtestLabVisible}
+          busy={playtestBusy}
+          error={playtestError}
+          activePresetId={playtestSession?.presetId}
+          phase3Variant={
+            playtestSession
+              ? state.settings.phase3OnboardingVariantOverride
+              : pendingPhase3Variant
+          }
+          onClose={() => setPlaytestLabVisible(false)}
+          onSelect={handlePlaytestPresetSelect}
+          onVariantChange={handlePlaytestVariantChange}
+        />
       ) : null}
 
       <Modal
@@ -3358,6 +3460,8 @@ export default function GameScreen() {
           onOpenGlossary={() => openGlossary()}
           debugOverlayEnabled={debugOverlayVisible}
           onToggleDebugOverlay={setDebugOverlayVisible}
+          playtestEnabled={playtestEnabled}
+          onOpenPlaytestLab={openPlaytestLab}
         />
       </Modal>
 
@@ -3452,6 +3556,29 @@ export default function GameScreen() {
           safeBottom={bottomBarLayout?.height}
         />
       ) : null}
+
+      {e2eEnabled && !playtestSession ? (
+        <View style={[styles.e2eControls, { top: insets.top + Spacing.sm }]}>
+          <Pressable
+            style={styles.e2eButton}
+            onPress={skipToPhase2}
+            testID="e2e-skip-phase2"
+            accessibilityRole="button"
+            accessibilityLabel="Skip to Phase 2 playtest scenario"
+          >
+            <ThemedText style={styles.e2eButtonText}>E2E P2</ThemedText>
+          </Pressable>
+          <Pressable
+            style={styles.e2eButton}
+            onPress={skipToPhase3}
+            testID="e2e-skip-phase3"
+            accessibilityRole="button"
+            accessibilityLabel="Skip to Phase 3 playtest scenario"
+          >
+            <ThemedText style={styles.e2eButtonText}>E2E P3</ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
     </LinearGradient>
   );
 }
@@ -3459,10 +3586,10 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   e2eControls: {
     position: "absolute",
-    top: 8,
-    left: 8,
+    right: 8,
     zIndex: 3000,
     gap: 6,
+    alignItems: "flex-end",
   },
   e2eButton: {
     borderRadius: BorderRadius.sm,

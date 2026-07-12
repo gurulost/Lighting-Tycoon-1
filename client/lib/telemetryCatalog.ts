@@ -85,12 +85,31 @@ export const TELEMETRY_EVENT_CATALOG = {
   council_hearing_clear: {
     category: "council",
     description: "Council hearing was cleared.",
-    requiredProperties: ["hearingId"],
+    requiredProperties: [
+      "hearingId",
+      "method",
+      "campaignId",
+      "durationMs",
+      "cashCost",
+      "researchCost",
+      "pressureBefore",
+      "pressureAfter",
+      "actionsToResolve",
+      "resolution",
+    ],
   },
   council_hearing_trigger: {
     category: "council",
     description: "Council hearing was triggered.",
-    requiredProperties: ["hearingId"],
+    requiredProperties: [
+      "hearingId",
+      "source",
+      "campaignId",
+      "pressureBefore",
+      "pressureAfter",
+      "threshold",
+      "actionsSincePreviousHearing",
+    ],
   },
   council_municipal_grant: {
     category: "council",
@@ -115,7 +134,11 @@ export const TELEMETRY_EVENT_CATALOG = {
   council_unlock: {
     category: "council",
     description: "Council system unlocked.",
-    requiredProperties: ["projectsCompleted", "reputationTier"],
+    requiredProperties: [
+      "projectsCompleted",
+      "reputationTier",
+      "council_unlock_path",
+    ],
   },
   legacy_cycle_complete: {
     category: "system",
@@ -406,7 +429,13 @@ export const TELEMETRY_EVENT_CATALOG = {
   project_accept: {
     category: "projects",
     description: "Project contract accepted.",
-    requiredProperties: ["projectId", "deposit", "addonCost"],
+    requiredProperties: [
+      "projectId",
+      "deposit",
+      "addonCost",
+      "isCapstone",
+      "projectsCompletedCount",
+    ],
   },
   project_addon_purchase: {
     category: "projects",

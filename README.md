@@ -17,7 +17,7 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 ## Scripts
 
 - `npm run expo:dev` - run the Expo client locally
-- `npm run server:dev` - run the API server (optional)
+- `npm run server:dev` - run the optional static/health server
 - `npm run check:types` - TypeScript typecheck
 - `npm run lint` - lint
 - `npm run with:env -- <command>` - run command with `.env.local`/`.env` auto-loaded
@@ -30,7 +30,7 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 ## Repo Structure
 
 - `client/` - React Native (Expo) app
-- `server/` - API server (optional)
+- `server/` - optional static host and health server; cloud saves are disabled
 - `shared/` - shared schemas/types
 - `assets/` - images and audio
 - `docs/` - production documentation
@@ -64,6 +64,8 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 
 ## Requirements
 
-- Node.js 18+ recommended
+- Node.js 22 LTS
 - Expo CLI via `npx`
-- PostgreSQL (for server persistence)
+
+Game progress is stored locally on the device. PostgreSQL/Drizzle files remain
+as dormant scaffolding and are not required for ordinary server or client use.

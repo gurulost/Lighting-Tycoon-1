@@ -1,6 +1,6 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerRoutes, shouldHandleGenericPreflight } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -44,7 +44,7 @@ function setupCors(app: express.Application) {
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
-    if (req.method === "OPTIONS") {
+    if (shouldHandleGenericPreflight(req.method, req.path)) {
       return res.sendStatus(200);
     }
 

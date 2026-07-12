@@ -378,9 +378,8 @@ const DEFAULT_TUNING: TuningConfig = {
     addonChangeOrderCost: 220,
   },
   council: {
-    // Must sit ABOVE the capstone's own offer gate (6 projects + rep tier 9,
-    // see proj_international_expo.unlock) or the fallback fires before the
-    // capstone can ever be accepted, silently skipping the Phase 2 finale.
+    // Load-time recovery only for older saves that reached the former numeric
+    // Council gate without completing the now-required Expo capstone.
     unlockMinProjectsCompleted: 8,
     unlockMinRepTier: 9,
     unlockAfterCapstoneProjectId: "proj_international_expo",

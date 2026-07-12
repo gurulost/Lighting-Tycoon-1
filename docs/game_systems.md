@@ -85,7 +85,7 @@ Mentor framing: You didn't just win contracts - you changed minds. Now you can c
 
 Tina intent: We're not just building installs anymore; we're writing the rulebook. Every campaign we pass makes the open way the default, and the lobby has to keep up.
 
-- Unlocks after the Phase 2 capstone (or fallback: 8 projects + rep tier gate; the fallback sits above the capstone's own offer gate of 6 projects so the capstone finale is reachable).
+- Unlocks after the International Expo capstone. Once eligible, the capstone remains pinned until accepted and completed. The old 8-project path is load-time recovery for historical saves only, not a live player objective.
 - One active Council campaign at a time; you can switch without losing progress.
 - Campaigns are three steps:
   - Draft: invest cash + research (partial investment allowed).
@@ -149,9 +149,17 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
 - Lab request target scales with Baron Pressure at lockout start
 
 ## Persistence
+- Saves use a versioned `{ version, savedAt, state }` envelope with deterministic migration from older formats.
 - Saves are debounced to reduce disk writes.
 - Critical actions (orders, upgrades, R&D, lockout choices) flush immediately.
 - Story log is capped to a rolling window to prevent unbounded growth.
+- Internal playtest builds use separate primary/backup sandbox keys; normal progress is validated before entry and restored without being overwritten.
+
+## Player Continuity
+- Lifetime merges, completed installs, best merge chain, and highest crafted tier appear on the Profile screen.
+- Lifetime totals survive Legacy cycles and clear only on a full restart.
+- After the first session, absences of at least 5 minutes can award cash; credited time is capped at 4 hours and never advances gameplay systems.
+- One deterministic local-date Daily Goal appears on Profile after the first session. Clock rollback never replaces a newer goal.
 
 ## First Session Track
 - Forced drops and scripted orders

@@ -35,6 +35,14 @@ This creates `static-build/` which the server can host for web access.
 
 See `docs/configuration.md` for required variables.
 
+## Release Channels
+
+- Production builds use `EXPO_PUBLIC_RELEASE_CHANNEL=production` and expose no Playtest Lab UI.
+- Internal tester builds use `EXPO_PUBLIC_RELEASE_CHANNEL=playtest`; Lab scenarios save into an isolated sandbox.
+- Browser automation uses `EXPO_PUBLIC_RELEASE_CHANNEL=e2e`.
+- `npm run web:build:production` and `npm run web:build:playtest` build explicit web bundles without deploying them.
+- `eas.json` defines explicit `production`, internal `playtest`, and internal development-client `e2e` profiles; implementation does not trigger a cloud build.
+
 ## Release Checklist
 
 Follow the release checklist in `docs/release_checklist.md`.

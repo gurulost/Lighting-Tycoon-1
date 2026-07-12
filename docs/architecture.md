@@ -5,40 +5,40 @@ This document describes the high-level technical architecture of Lighting Tycoon
 ## System Overview
 
 ```
-[Expo Client] --(HTTPS)--> [Express API] --(SQL)--> [Postgres]
-       |                        |
-       |                        +--> [Static build assets]
-       +--> [Local assets bundle]
+[Expo Client] --(local storage)--> [Device progress]
+       |
+       +--(optional hosting)--> [Express static server + /healthz]
 ```
 
 ## Components
 
 ### Client (Expo + React Native)
+
 - App entry: `client/index.js`
 - UI and gameplay logic live in `client/`
 - Shared theme and constants live in `client/constants/`
-- Uses React Query for server state and caching
-- Communicates with the API server via `client/lib/query-client.ts`
+- Persists authoritative game progress locally on the device
 
 ### Server (Express)
+
 - Entry: `server/index.ts`
 - Routes: `server/routes.ts`
-- Storage abstraction: `server/storage.ts`
 - Reads the Expo static build from `static-build/` for web hosting
+- Returns `410 Gone` from every cloud-save route
 
 ### Shared Types
-- `shared/schema.ts` defines database schema and Zod validation
-- Types are imported by both the server and the client
 
-### Database (PostgreSQL + Drizzle)
-- Schema defined in `shared/schema.ts`
-- Migrations managed by Drizzle (`drizzle.config.ts`)
+- `shared/schema.ts` contains dormant legacy database scaffolding
+
+### Dormant Database Scaffolding
+
+- PostgreSQL/Drizzle files are retained for possible future authenticated services
+- They are not imported by active routes and `DATABASE_URL` is not required
 
 ## Key Design Choices
 
-- **Thin API**: Server provides CRUD for saves; gameplay state lives on the client.
-- **Shared schema**: Zod and Drizzle share the same schema file for consistency.
-- **JSONB state**: Complex board state is stored as JSONB for flexibility.
+- **Local progress authority**: Game state is stored on the device.
+- **Disabled cloud saves**: Incomplete unauthenticated CRUD returns `410 Gone`.
 - **Expo web hosting**: Server can serve static Expo builds and manifests.
 
 ## Build Artifacts

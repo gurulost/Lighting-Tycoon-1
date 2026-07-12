@@ -1,17 +1,42 @@
-import { Audio } from "expo-av";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+  type AudioMode,
+  type AudioPlayer,
+} from "expo-audio";
+import { Platform } from "react-native";
 
 import { SFX, SfxId } from "./sounds";
 
 type SoundInstance = {
-  sound: Audio.Sound;
+  player: AudioPlayer;
   volume: number;
   cooldownMs: number;
 };
 
+export type SoundPlayOptions = {
+  rateScale?: number;
+  volumeScale?: number;
+};
+
+export function buildSfxAudioMode(platform: string): Partial<AudioMode> {
+  return {
+    allowsRecording: false,
+    playsInSilentMode: false,
+    shouldPlayInBackground: false,
+    // expo-audio rejects silent-mode-off + ducking on iOS. Preserve Android's
+    // existing ducking behavior while letting short iOS/web SFX mix safely.
+    interruptionMode: platform === "android" ? "duckOthers" : "mixWithOthers",
+    shouldRouteThroughEarpiece: false,
+  };
+}
+
 class SoundManager {
   private static initialized = false;
   private static enabled = true;
-  private static masterVolume = 1;
+  private static appActive = true;
+  private static masterVolume = 0.8;
   private static sounds = new Map<SfxId, SoundInstance>();
   private static lastPlayedAt = new Map<SfxId, number>();
   private static recentPlays: number[] = [];
@@ -22,15 +47,11 @@ class SoundManager {
     if (this.initialized) return;
     this.initialized = true;
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: false,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
+      await setAudioModeAsync(buildSfxAudioMode(Platform.OS));
+      await setIsAudioActiveAsync(this.appActive);
       await this.preload();
     } catch (error) {
+      this.initialized = false;
       console.warn("SoundManager init failed", error);
     }
   }
@@ -38,9 +59,10 @@ class SoundManager {
   static setEnabled(enabled: boolean) {
     this.enabled = enabled;
     if (!enabled) {
-      this.sounds.forEach(async ({ sound }) => {
+      this.sounds.forEach(({ player }) => {
         try {
-          await sound.stopAsync();
+          player.pause();
+          void player.seekTo(0).catch(() => undefined);
         } catch {
           return;
         }
@@ -52,33 +74,41 @@ class SoundManager {
     this.masterVolume = Math.max(0, Math.min(1, volume));
   }
 
-  static async preload() {
-    const entries = Object.entries(SFX) as [SfxId, (typeof SFX)[SfxId]][];
-    await Promise.all(
-      entries.map(async ([id, config]) => {
-        if (this.sounds.has(id)) return;
-        try {
-          const { sound } = await Audio.Sound.createAsync(config.file, {
-            shouldPlay: false,
-            volume: config.volume,
-          });
-          this.sounds.set(id, {
-            sound,
-            volume: config.volume,
-            cooldownMs: config.cooldownMs ?? 80,
-          });
-        } catch (error) {
-          console.warn(`Failed to load sound ${id}`, error);
-        }
-      }),
-    );
+  static async setAppActive(active: boolean) {
+    this.appActive = active;
+    if (!this.initialized) return;
+    try {
+      await setIsAudioActiveAsync(active);
+    } catch (error) {
+      console.warn("Failed to update audio lifecycle state", error);
+    }
   }
 
-  static async play(id: SfxId) {
+  static async preload() {
+    const entries = Object.entries(SFX) as [SfxId, (typeof SFX)[SfxId]][];
+    entries.forEach(([id, config]) => {
+      if (this.sounds.has(id)) return;
+      try {
+        const player = createAudioPlayer(config.file, {
+          keepAudioSessionActive: false,
+        });
+        player.volume = config.volume;
+        this.sounds.set(id, {
+          player,
+          volume: config.volume,
+          cooldownMs: config.cooldownMs ?? 80,
+        });
+      } catch (error) {
+        console.warn(`Failed to load sound ${id}`, error);
+      }
+    });
+  }
+
+  static async play(id: SfxId, options: SoundPlayOptions = {}) {
     if (!this.initialized) {
       await this.init();
     }
-    if (!this.enabled) return;
+    if (!this.enabled || !this.appActive) return;
     const now = Date.now();
     this.recentPlays = this.recentPlays.filter((t) => now - t < this.windowMs);
     if (this.recentPlays.length >= this.maxPlaysInWindow) return;
@@ -90,12 +120,11 @@ class SoundManager {
 
     if (!this.sounds.has(id)) {
       try {
-        const { sound } = await Audio.Sound.createAsync(SFX[id].file, {
-          shouldPlay: false,
-          volume: SFX[id].volume,
+        const player = createAudioPlayer(SFX[id].file, {
+          keepAudioSessionActive: false,
         });
         this.sounds.set(id, {
-          sound,
+          player,
           volume: SFX[id].volume,
           cooldownMs,
         });
@@ -110,30 +139,43 @@ class SoundManager {
     const config = SFX[id];
     try {
       const rateRange = config.rateRange;
-      const rate =
+      const randomizedRate =
         rateRange && rateRange.length === 2
           ? Math.random() * (rateRange[1] - rateRange[0]) + rateRange[0]
           : 1;
-      const volume = instance.volume * this.masterVolume;
-      await instance.sound.setRateAsync(rate, true);
-      await instance.sound.setVolumeAsync(volume);
-      await instance.sound.replayAsync();
+      const rate = Math.max(
+        0.1,
+        Math.min(2, randomizedRate * (options.rateScale ?? 1)),
+      );
+      const volume = Math.max(
+        0,
+        Math.min(
+          1,
+          instance.volume * this.masterVolume * (options.volumeScale ?? 1),
+        ),
+      );
+      instance.player.shouldCorrectPitch = true;
+      instance.player.setPlaybackRate(rate, "medium");
+      instance.player.volume = volume;
+      await instance.player.seekTo(0);
+      instance.player.play();
     } catch (error) {
       console.warn(`Failed to play sound ${id}`, error);
     }
   }
 
   static async unload() {
-    const unloads = Array.from(this.sounds.values()).map(async ({ sound }) => {
+    this.sounds.forEach(({ player }) => {
       try {
-        await sound.unloadAsync();
+        player.pause();
+        player.remove();
       } catch {
         return;
       }
     });
-    await Promise.all(unloads);
     this.sounds.clear();
     this.lastPlayedAt.clear();
+    this.recentPlays = [];
     this.initialized = false;
   }
 }

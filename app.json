@@ -46,7 +46,10 @@
           "project": "lighting_tycoon",
           "organization": "dave-dixon"
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-localization"
     ],
     "experiments": {
       "reactCompiler": true

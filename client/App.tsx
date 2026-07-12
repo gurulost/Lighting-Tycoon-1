@@ -78,7 +78,16 @@ function App() {
     return content;
   }
 
-  return <PostHogProvider client={posthog}>{content}</PostHogProvider>;
+  return (
+    <PostHogProvider
+      client={posthog}
+      // PostHog's hook-based screen autocapture is incompatible with React
+      // Navigation 7. Gameplay navigation is tracked explicitly instead.
+      autocapture={{ captureScreens: false }}
+    >
+      {content}
+    </PostHogProvider>
+  );
 }
 
 export default Sentry.wrap(App);

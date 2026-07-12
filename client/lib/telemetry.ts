@@ -31,6 +31,8 @@ type TelemetryRuntimeContext = {
   player_id?: string;
   phase3_onboarding_variant?: string;
   phase3_onboarding_variant_source?: string;
+  release_channel?: string;
+  playtest_preset_id?: string;
 };
 let telemetryRuntimeContext: TelemetryRuntimeContext = {};
 

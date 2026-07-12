@@ -35,6 +35,7 @@ import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import type { SfxId } from "@/audio/sounds";
+import { getMergeFeedback } from "@/lib/gameplayFeedback";
 import { withRepeat } from "@/lib/reanimated";
 import { useSharedPhase } from "@/hooks/useSharedPhase";
 import {
@@ -117,6 +118,7 @@ interface MergeBoardProps {
   boardContainerLayout?: LayoutRect | null;
   suppliersOpen?: boolean;
   compatibilityGuideActive?: boolean;
+  enhancedPartCues?: boolean;
 }
 
 function AnimatedStation({
@@ -228,6 +230,7 @@ export function MergeBoard({
   boardContainerLayout,
   suppliersOpen = false,
   compatibilityGuideActive = false,
+  enhancedPartCues = false,
 }: MergeBoardProps) {
   const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
   const workbenchRef = useRef<View>(null);
@@ -308,11 +311,35 @@ export function MergeBoard({
     }
   }, [boardContainerLayout]);
 
-  const playMergeSound = useCallback((tier: number) => {
-    const clamped = Math.max(1, Math.min(5, tier));
-    const id = `merge_${clamped}` as SfxId;
-    SoundManager.play(id);
-  }, []);
+  const playMergeFeedback = useCallback(
+    (tier: number) => {
+      const clamped = Math.max(1, Math.min(5, tier));
+      const id = `merge_${clamped}` as SfxId;
+      const feedback = getMergeFeedback({
+        currentCount: state.mergeChainCount,
+        expiresAt: state.mergeChainExpiresAt,
+        now: Date.now(),
+      });
+      void SoundManager.play(id, {
+        rateScale: feedback.rateScale,
+        volumeScale: feedback.volumeScale,
+      });
+
+      if (!hapticsEnabled) return;
+      if (feedback.haptic === "medium") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } else if (feedback.haptic === "heavy") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      } else if (feedback.haptic === "success") {
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        );
+      } else {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    },
+    [hapticsEnabled, state.mergeChainCount, state.mergeChainExpiresAt],
+  );
 
   useEffect(() => {
     onDragStateChange?.(isDragging);
@@ -1223,20 +1250,14 @@ export function MergeBoard({
                         const toPart = state.board[toIndex];
                         const merged = mergeParts(fromIndex, toIndex);
                         if (merged && fromPart) {
-                          playMergeSound(fromPart.tier + 1);
+                          playMergeFeedback(fromPart.tier + 1);
                         } else if (!merged) {
                           SoundManager.play("error");
                         }
-                        if (hapticsEnabled) {
-                          if (merged) {
-                            Haptics.notificationAsync(
-                              Haptics.NotificationFeedbackType.Success,
-                            );
-                          } else {
-                            Haptics.notificationAsync(
-                              Haptics.NotificationFeedbackType.Error,
-                            );
-                          }
+                        if (hapticsEnabled && !merged) {
+                          Haptics.notificationAsync(
+                            Haptics.NotificationFeedbackType.Error,
+                          );
                         }
                         if (merged && fromPart && toPart && !reducedMotion) {
                           const mergedFamily =
@@ -1312,20 +1333,12 @@ export function MergeBoard({
             const toPart = state.board[toIndex];
             const merged = mergeParts(fromIndex, toIndex);
             if (merged && fromPart) {
-              playMergeSound(fromPart.tier + 1);
+              playMergeFeedback(fromPart.tier + 1);
             } else if (!merged) {
               SoundManager.play("error");
             }
-            if (hapticsEnabled) {
-              if (merged) {
-                Haptics.notificationAsync(
-                  Haptics.NotificationFeedbackType.Success,
-                );
-              } else {
-                Haptics.notificationAsync(
-                  Haptics.NotificationFeedbackType.Error,
-                );
-              }
+            if (hapticsEnabled && !merged) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             }
             if (merged && fromPart && toPart && !reducedMotion) {
               const mergedFamily =
@@ -1368,7 +1381,7 @@ export function MergeBoard({
       movePart,
       hapticsEnabled,
       reducedMotion,
-      playMergeSound,
+      playMergeFeedback,
       recycleLayout,
       backpackSlotRects,
       gridLayout,
@@ -1491,6 +1504,7 @@ export function MergeBoard({
                 dragOffsetX={dragOffsetX}
                 dragOffsetY={dragOffsetY}
                 compatibilityGuideActive={compatibilityGuideActive}
+                enhancedPartCues={enhancedPartCues}
               />
             </View>
           ) : (
@@ -1980,6 +1994,7 @@ export function MergeBoard({
                           dragOffsetX={dragOffsetX}
                           dragOffsetY={dragOffsetY}
                           compatibilityGuideActive={compatibilityGuideActive}
+                          enhancedPartCues={enhancedPartCues}
                         />
                       </View>
                     ) : (
@@ -2212,6 +2227,7 @@ export function MergeBoard({
             lightPhase={dragPreviewPhase}
             dragPreview
             compatibilityGuideActive={compatibilityGuideActive}
+            enhancedPartCues={enhancedPartCues}
           />
         </Animated.View>
       ) : null}

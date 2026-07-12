@@ -23,6 +23,7 @@ import {
   SupplierScoutRoute,
   WarrantyStampMode,
   Mission,
+  DailyGoalAction,
   CouncilCampaignStatus,
   CouncilCampaignProgress,
   ProjectDefinition,
@@ -37,6 +38,14 @@ import {
   UPGRADE_DEFINITIONS,
   RD_DEFINITIONS,
 } from "@/types/game";
+import type { SaveEnvelopeV2 } from "@/types/persistence";
+import {
+  advanceDailyGoal,
+  DAILY_GOAL_TEMPLATES,
+  ensureDailyGoal,
+  markDailyGoalClaimed,
+} from "@/lib/dailyGoals";
+import { calculateOfflineCash } from "@/lib/offlineProgress";
 import { MISSION_TEMPLATES, MissionTemplate } from "@/constants/missions";
 import {
   STORY_BEATS,
@@ -53,7 +62,10 @@ import {
   REPUTATION_TIER_THRESHOLDS,
 } from "@/constants/reputation";
 import { getLockoutLabRequestTarget } from "@/constants/lockout";
-import { PlaytestPresetId } from "@/constants/playtestPresets";
+import {
+  isPlaytestPresetId,
+  PlaytestPresetId,
+} from "@/constants/playtestPresets";
 import {
   ORDER_LIBRARY,
   ARCHETYPES,
@@ -78,6 +90,10 @@ import {
   getProjectOfferRefreshCost,
 } from "@/lib/projects";
 import { getCouncilPerkEffects, getCouncilHearingPenalty } from "@/lib/council";
+import {
+  buildCouncilHearingClearTelemetry,
+  buildCouncilHearingTriggerTelemetry,
+} from "@/lib/councilTelemetry";
 import {
   applyRushDeadlineMultiplier,
   getActiveSiteRule,
@@ -108,6 +124,19 @@ import {
   resolvePhase3OnboardingVariant,
   resolvePhase3OnboardingVariantSource,
 } from "@/lib/phase3OnboardingVariant";
+import {
+  buildNormalBaseline,
+  clearPlaytestData,
+  clearPlaytestSession,
+  type PersistedPlaytestSession,
+  gameStorage,
+  readPlaytestSession,
+  readValidatedSavePair,
+  type SaveDestination,
+  writeAndValidateSavePair,
+  writePlaytestSession,
+} from "@/lib/gamePersistence";
+import { resolveReleaseChannel } from "@/lib/releaseChannel";
 import {
   canStartLegacyCycle,
   createInitialLegacyState,
@@ -216,6 +245,13 @@ type GameAction =
       doctrineIds: LegacyDoctrineId[];
     }
   | { type: "SET_LEGACY_TITLE"; titleId?: string }
+  | { type: "ENSURE_DAILY_GOAL"; now: number }
+  | { type: "CLAIM_DAILY_GOAL"; now: number }
+  | {
+      type: "APPLY_OFFLINE_CASH";
+      cashAward: number;
+      creditedMinutes: number;
+    }
   | { type: "RESET_GAME" }
   | { type: "RESET_TUTORIAL" }
   | { type: "TUTORIAL_NUDGE" }
@@ -234,9 +270,14 @@ type GameAction =
   | { type: "SPAWN_ORDER" }
   | { type: "RESOLVE_LOCKOUT"; choice: "baron" | "freedom" }
   | { type: "PLAYTEST_APPLY_PRESET"; presetId: PlaytestPresetId }
+  | { type: "PLAYTEST_LOAD_STATE"; state: GameState }
   | { type: "PLAYTEST_SKIP_PHASE2" }
   | { type: "PLAYTEST_SKIP_PHASE3" }
-  | { type: "LOAD_STATE"; state: GameState };
+  | {
+      type: "LOAD_STATE";
+      state: GameState;
+      allowLegacyCouncilRecovery?: boolean;
+    };
 
 type SupplierTapMode = "tap" | "overdraw";
 
@@ -954,9 +995,11 @@ function buildInitialCouncilState(): GameState["council"] {
 function canUnlockCouncil(state: GameState) {
   if (state.gamePhase < 2) return false;
   const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
-  const capstoneComplete =
-    capstoneId && state.projectsCompleted.includes(capstoneId);
-  if (capstoneComplete) return true;
+  return !!capstoneId && state.projectsCompleted.includes(capstoneId);
+}
+
+function canLegacyRecoverCouncil(state: GameState) {
+  if (state.gamePhase < 2) return false;
   return (
     state.projectsCompleted.length >=
       tuning.council.unlockMinProjectsCompleted &&
@@ -1282,16 +1325,36 @@ function generateProjectOffers(state: GameState, count = 3): ProjectOffer[] {
   const eligible = PROJECT_DEFINITIONS.filter((project) =>
     canOfferProject(project, state),
   );
+  const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
+  const capstone = capstoneId
+    ? PROJECT_DEFINITION_BY_ID.get(capstoneId)
+    : undefined;
+  const shouldPinCapstone =
+    count > 0 &&
+    !state.council.unlocked &&
+    !!capstone &&
+    canOfferProject(capstone, state) &&
+    !state.projectsCompleted.includes(capstone.id) &&
+    state.activeProject?.projectId !== capstone.id;
   // Completed contracts are not re-offered while new ones remain, so rewards
   // can't be farmed by re-running the same project. Once every eligible
   // contract is complete, repeats become available as a late-game income loop.
   const fresh = eligible.filter(
     (project) => !state.projectsCompleted.includes(project.id),
   );
-  const candidates = fresh.length > 0 ? fresh : eligible;
-  if (candidates.length === 0) return [];
+  const candidates = (fresh.length > 0 ? fresh : eligible).filter(
+    (project) => !shouldPinCapstone || project.id !== capstoneId,
+  );
+  if (candidates.length === 0 && !shouldPinCapstone) return [];
   const offers: ProjectOffer[] = [];
   const available = [...candidates];
+  if (shouldPinCapstone && capstone) {
+    offers.push({
+      projectId: capstone.id,
+      seed: Math.floor(Math.random() * 1000000),
+      generatedAt: now,
+    });
+  }
   while (offers.length < count && available.length > 0) {
     const weighted = available.map((project) => ({
       ...project,
@@ -1331,6 +1394,44 @@ function updateProjectRevealQueue(
     nextQueue.push(offer.projectId);
   });
   return nextQueue;
+}
+
+function ensureCapstonePinnedInCurrentOffers(state: GameState): GameState {
+  const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
+  const capstone = capstoneId
+    ? PROJECT_DEFINITION_BY_ID.get(capstoneId)
+    : undefined;
+  if (
+    !state.projectsUnlocked ||
+    state.council.unlocked ||
+    !capstone ||
+    !canOfferProject(capstone, state) ||
+    state.projectsCompleted.includes(capstone.id) ||
+    state.activeProject?.projectId === capstone.id ||
+    state.projectOffers.some((offer) => offer.projectId === capstone.id)
+  ) {
+    return state;
+  }
+
+  const offerLimit = Math.max(1, state.projectOffers.length || 3);
+  const capstoneOffer: ProjectOffer = {
+    projectId: capstone.id,
+    seed: Math.floor(Math.random() * 1000000),
+    generatedAt: Date.now(),
+  };
+  const projectOffers = [
+    capstoneOffer,
+    ...state.projectOffers.filter((offer) => offer.projectId !== capstone.id),
+  ].slice(0, offerLimit);
+  return {
+    ...state,
+    projectOffers,
+    projectRevealQueue: updateProjectRevealQueue(
+      state.projectRevealQueue,
+      state.projectRevealSeen,
+      projectOffers,
+    ),
+  };
 }
 
 function applyOrderRewardTuning(rewards: Order["rewards"]): Order["rewards"] {
@@ -1382,9 +1483,7 @@ const PERSISTED_STORY_LOG_LIMIT = 120;
 const PERSISTED_STORY_QUEUE_LIMIT = 8;
 const MAX_PART_TIER: PartTier = 16;
 const MAX_WASTE_TIER: PartTier = 3;
-const SAVE_VERSION = 1;
-const STORAGE_KEY = "lighting_tycoon_state_v1";
-const STORAGE_BACKUP_KEY = "lighting_tycoon_state_v1_backup";
+const SAVE_VERSION = 2;
 const TUTORIAL_GOAL_TEMPLATE_ID = "tutorial_first_orders";
 const STORY_QUEUE_PERSIST_CATEGORIES = new Set([
   "system",
@@ -1450,6 +1549,11 @@ function normalizeSettings(
       typeof candidate.soundEnabled === "boolean"
         ? candidate.soundEnabled
         : fallback.soundEnabled,
+    sfxVolume:
+      typeof candidate.sfxVolume === "number" &&
+      Number.isFinite(candidate.sfxVolume)
+        ? Math.max(0, Math.min(1, candidate.sfxVolume))
+        : fallback.sfxVolume,
     hapticsEnabled:
       typeof candidate.hapticsEnabled === "boolean"
         ? candidate.hapticsEnabled
@@ -1458,6 +1562,10 @@ function normalizeSettings(
       typeof candidate.reducedMotion === "boolean"
         ? candidate.reducedMotion
         : fallback.reducedMotion,
+    enhancedPartCues:
+      typeof candidate.enhancedPartCues === "boolean"
+        ? candidate.enhancedPartCues
+        : fallback.enhancedPartCues,
     phase3OnboardingVariantOverride: normalizePhase3OnboardingVariantOverride(
       candidate.phase3OnboardingVariantOverride,
       fallback.phase3OnboardingVariantOverride,
@@ -1657,9 +1765,8 @@ function isPhaseAtLeast(
   return state.gamePhase >= phase;
 }
 
-type SaveEnvelope = {
-  version: number;
-  state: GameState;
+type SaveEnvelope = SaveEnvelopeV2 & {
+  migratedFromLegacy?: boolean;
 };
 
 function filterStoryQueue(queue: string[]): string[] {
@@ -1683,7 +1790,10 @@ function looksLikeGameState(raw: unknown): raw is GameState {
   return Array.isArray(candidate.board) && typeof candidate.cash === "number";
 }
 
-function normalizeSaveEnvelope(raw: unknown): SaveEnvelope | null {
+function normalizeSaveEnvelope(
+  raw: unknown,
+  migrationTime = Date.now(),
+): SaveEnvelope | null {
   if (!raw || typeof raw !== "object") return null;
   const record = raw as { version?: unknown; state?: unknown };
   if (record.state && typeof record.state === "object") {
@@ -1696,10 +1806,28 @@ function normalizeSaveEnvelope(raw: unknown): SaveEnvelope | null {
           : 0;
     const version = Number.isFinite(parsedVersion) ? parsedVersion : 0;
     if (version > SAVE_VERSION) return null;
-    return { version: SAVE_VERSION, state: record.state as GameState };
+    const rawSavedAt = (record as { savedAt?: unknown }).savedAt;
+    const savedAt =
+      version === SAVE_VERSION &&
+      typeof rawSavedAt === "number" &&
+      Number.isFinite(rawSavedAt) &&
+      rawSavedAt > 0
+        ? rawSavedAt
+        : migrationTime;
+    return {
+      version: SAVE_VERSION,
+      savedAt,
+      state: record.state as GameState,
+      migratedFromLegacy: version < SAVE_VERSION,
+    };
   }
   if (looksLikeGameState(raw)) {
-    return { version: SAVE_VERSION, state: raw as GameState };
+    return {
+      version: SAVE_VERSION,
+      savedAt: migrationTime,
+      state: raw as GameState,
+      migratedFromLegacy: true,
+    };
   }
   return null;
 }
@@ -1712,6 +1840,16 @@ function parseSavePayload(payload: string | null): SaveEnvelope | null {
   } catch {
     return null;
   }
+}
+
+function selectPreferredSaveEnvelope(
+  primary: SaveEnvelope,
+  backup: SaveEnvelope,
+): "primary" | "backup" {
+  if (primary.migratedFromLegacy || backup.migratedFromLegacy) {
+    return "primary";
+  }
+  return backup.savedAt > primary.savedAt ? "backup" : "primary";
 }
 
 function buildPersistedState(state: GameState): GameState {
@@ -1733,10 +1871,14 @@ function buildPersistedState(state: GameState): GameState {
   };
 }
 
-function buildSaveEnvelope(state: GameState): SaveEnvelope {
+function buildSaveEnvelope(
+  state: GameState,
+  savedAt = Date.now(),
+): SaveEnvelope {
   const persistableState = buildPersistedState(state);
   return {
     version: SAVE_VERSION,
+    savedAt,
     state: {
       ...persistableState,
       storyLog: persistableState.storyLog.slice(-PERSISTED_STORY_LOG_LIMIT),
@@ -2360,6 +2502,101 @@ type MissionEvent =
   | { type: "craft_freedom_controller" }
   | { type: "use_freedom_controller" };
 
+function dailyGoalActionForFulfillment(
+  action: DailyGoalAction,
+  order: Order,
+  parts: Part[],
+): boolean {
+  if (action === "complete_order") return true;
+  const hasLocked = parts.some((part) => part.family === "locked");
+  if (action === "complete_order_no_locked") return !hasLocked;
+  if (action === "complete_order_with_locked") return hasLocked;
+  if (action === "complete_order_compatible") {
+    return (
+      parts.some((part) => part.compatible) ||
+      order.type === "compatibility_required" ||
+      order.requirements.some((requirement) => requirement.requiresCompatible)
+    );
+  }
+  return false;
+}
+
+function advanceDailyGoalForFulfillment(
+  state: GameState,
+  order: Order,
+  parts: Part[],
+  now = Date.now(),
+): GameState {
+  const goal = state.dailyGoal;
+  if (!goal || !dailyGoalActionForFulfillment(goal.type, order, parts)) {
+    return state;
+  }
+  return {
+    ...state,
+    dailyGoal: advanceDailyGoal(goal, goal.type, now),
+  };
+}
+
+function normalizeLifetimeStats(
+  raw: unknown,
+  fallbackHighestTier = 0,
+): GameState["lifetimeStats"] {
+  const record =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const count = (key: string, max = Number.MAX_SAFE_INTEGER) => {
+    const value = record[key];
+    return typeof value === "number" && Number.isFinite(value)
+      ? Math.min(max, Math.max(0, Math.floor(value)))
+      : 0;
+  };
+  return {
+    totalMerges: count("totalMerges"),
+    totalOrdersCompleted: count("totalOrdersCompleted"),
+    bestMergeChain: count("bestMergeChain"),
+    highestTierCrafted: Math.max(
+      Math.min(MAX_PART_TIER, Math.max(0, Math.floor(fallbackHighestTier))),
+      count("highestTierCrafted", MAX_PART_TIER),
+    ),
+  };
+}
+
+function normalizeDailyGoal(raw: unknown): GameState["dailyGoal"] {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+  const template = DAILY_GOAL_TEMPLATES.find(
+    (candidate) => candidate.id === record.templateId,
+  );
+  if (!template || typeof record.dateKey !== "string") return undefined;
+  const progress =
+    typeof record.progress === "number" && Number.isFinite(record.progress)
+      ? Math.min(template.target, Math.max(0, Math.floor(record.progress)))
+      : 0;
+  const completedAt =
+    progress >= template.target &&
+    typeof record.completedAt === "number" &&
+    Number.isFinite(record.completedAt)
+      ? record.completedAt
+      : undefined;
+  const claimedAt =
+    completedAt !== undefined &&
+    typeof record.claimedAt === "number" &&
+    Number.isFinite(record.claimedAt)
+      ? record.claimedAt
+      : undefined;
+  return {
+    dateKey: record.dateKey,
+    templateId: template.id,
+    type: template.type,
+    label: template.label,
+    description: template.description,
+    target: template.target,
+    progress,
+    reward: { ...template.reward },
+    completedAt,
+    claimedAt,
+  };
+}
+
 function applyMissionProgress(
   state: GameState,
   event: MissionEvent,
@@ -2967,6 +3204,7 @@ const PLAYTEST_STABLE_TRANSITION_PRESETS: ReadonlySet<PlaytestPresetId> =
     "phase2_gate",
     "phase2_contracts_ready",
     "phase2_rep_gate",
+    "phase2_capstone_ready",
     "phase3_council_live",
     "phase3_hearing_recovery",
     "phase3_ratify_ready",
@@ -2978,10 +3216,15 @@ function buildPlaytestSeedState(currentState: GameState): GameState {
   const base = getInitialState();
   return {
     ...base,
-    settings: normalizeSettings(
-      { ...base.settings, ...currentState.settings },
-      base.settings,
-    ),
+    settings: {
+      ...base.settings,
+      soundEnabled: currentState.settings.soundEnabled,
+      sfxVolume: currentState.settings.sfxVolume,
+      hapticsEnabled: currentState.settings.hapticsEnabled,
+      reducedMotion: currentState.settings.reducedMotion,
+      enhancedPartCues: currentState.settings.enhancedPartCues,
+      phase3OnboardingVariantOverride: undefined,
+    },
   };
 }
 
@@ -3110,6 +3353,53 @@ function buildPlaytestPhase2RepGateState(state: GameState): GameState {
     projectRevealQueue: [],
     projectDebuff: undefined,
     projectsCompleted: [],
+  };
+}
+
+function buildPlaytestPhase2CapstoneReadyState(state: GameState): GameState {
+  const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
+  const capstone = capstoneId
+    ? PROJECT_DEFINITION_BY_ID.get(capstoneId)
+    : undefined;
+  if (!capstone) return state;
+  const targetReputation = Math.max(
+    state.reputation,
+    REPUTATION_TIER_THRESHOLDS[capstone.unlock.minRepTier] ?? state.reputation,
+  );
+  const completedProjectIds = PROJECT_DEFINITIONS.filter(
+    (project) => project.id !== capstone.id && project.unlock.phaseMin <= 2,
+  )
+    .slice(0, capstone.unlock.minProjectsCompleted ?? 6)
+    .map((project) => project.id);
+  const projectCompletionLog: Record<string, number> = {};
+  completedProjectIds.forEach((projectId, index) => {
+    projectCompletionLog[projectId] =
+      PLAYTEST_PRESET_GENERATED_AT -
+      (completedProjectIds.length - index) * 1000;
+  });
+  const offer: ProjectOffer = {
+    projectId: capstone.id,
+    seed: PLAYTEST_PRESET_OFFER_SEED_BASE,
+    generatedAt: PLAYTEST_PRESET_GENERATED_AT,
+  };
+  return {
+    ...state,
+    reputation: targetReputation,
+    reputationTier: getReputationTier(targetReputation),
+    currentNeighborhoodId: getNeighborhoodByRep(targetReputation).id,
+    projectsUnlocked: true,
+    projectsCompleted: completedProjectIds,
+    projectCompletionLog,
+    activeProject: undefined,
+    projectOffers: [offer],
+    projectRevealQueue: [capstone.id],
+    projectDebuff: undefined,
+    council: {
+      ...state.council,
+      unlocked: false,
+      activeCampaignId: undefined,
+      activeHearing: undefined,
+    },
   };
 }
 
@@ -3450,6 +3740,10 @@ function applyPlaytestPresetState(
       nextState = phase2GateState;
     } else if (presetId === "phase2_contracts_ready") {
       nextState = buildPlaytestPhase2ContractsReadyState(phase2GateState);
+    } else if (presetId === "phase2_capstone_ready") {
+      nextState = buildPlaytestPhase2CapstoneReadyState(
+        buildPlaytestPhase2ContractsReadyState(phase2GateState),
+      );
     } else {
       nextState = buildPlaytestPhase2RepGateState(
         buildPlaytestPhase2ContractsReadyState(phase2GateState),
@@ -3458,6 +3752,9 @@ function applyPlaytestPresetState(
   }
   if (PLAYTEST_STABLE_TRANSITION_PRESETS.has(presetId)) {
     nextState = stabilizePlaytestPresetState(nextState);
+  }
+  if (presetId === "phase2_capstone_ready") {
+    nextState = buildPlaytestPhase2CapstoneReadyState(nextState);
   }
   if (
     presetId === "phase3_hearing_recovery" ||
@@ -3719,6 +4016,8 @@ function buildLegacyCycleStartState(
       { ...baseState.settings, ...state.settings },
       baseState.settings,
     ),
+    lifetimeStats: { ...state.lifetimeStats },
+    dailyGoal: undefined,
     legacy: seededLegacy,
   };
   const refreshedOffers = generateProjectOffers(nextState, 3);
@@ -4698,8 +4997,10 @@ export function getInitialState(): GameState {
     tier16ShowcasePending: false,
     settings: {
       soundEnabled: true,
+      sfxVolume: 0.8,
       hapticsEnabled: true,
       reducedMotion: false,
+      enhancedPartCues: false,
     },
     undoSnapshot: undefined,
     undoCooldownUntil: 0,
@@ -4726,6 +5027,13 @@ export function getInitialState(): GameState {
     orderSpawnCooldownUntil: 0,
     lastCriticalEventId: 0,
     maxTierCrafted: 1,
+    lifetimeStats: {
+      totalMerges: 0,
+      totalOrdersCompleted: 0,
+      bestMergeChain: 0,
+      highestTierCrafted: 0,
+    },
+    dailyGoal: undefined,
     marketingBoostOrdersRemaining: 0,
     installStreakCurrent: 0,
     installStreakBest: 0,
@@ -4919,7 +5227,7 @@ function findEmptySlots(state: GameState, count: number): number[] {
   return slots;
 }
 
-export function gameReducer(state: GameState, action: GameAction): GameState {
+function gameReducerCore(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "TICK_SUPPLIERS": {
       const now = Date.now();
@@ -6213,6 +6521,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         firstCompatibleDiscoveredAt: nextFirstCompatibleDiscoveredAt,
         compatibilityGuideStep: nextCompatibilityGuideStep,
         maxTierCrafted: nextMaxTierCrafted,
+        lifetimeStats: {
+          totalMerges: state.lifetimeStats.totalMerges + 1,
+          totalOrdersCompleted: state.lifetimeStats.totalOrdersCompleted,
+          bestMergeChain: Math.max(
+            state.lifetimeStats.bestMergeChain,
+            nextChainCount,
+          ),
+          highestTierCrafted: isWasteMerge
+            ? state.lifetimeStats.highestTierCrafted
+            : Math.max(state.lifetimeStats.highestTierCrafted, newTier),
+        },
+        dailyGoal: advanceDailyGoal(state.dailyGoal, "merge_count", now),
         mentorClinicMergesRemaining: clinicActive
           ? Math.max(0, state.mentorClinicMergesRemaining - 1)
           : state.mentorClinicMergesRemaining,
@@ -6236,6 +6556,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           mergeMomentumLevel: state.mergeMomentumLevel,
           mergeMomentumPending: state.mergeMomentumPending,
           mergeMomentumDropFloor: state.mergeMomentumDropFloor,
+          lifetimeStats: { ...state.lifetimeStats },
+          dailyGoal: state.dailyGoal ? { ...state.dailyGoal } : undefined,
         },
         mergeChainCount: nextChainCount,
         mergeChainExpiresAt: nextChainExpiresAt,
@@ -6887,7 +7209,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let councilUnlockHintBeatId: string | null = null;
       let councilUnlockedNow = false;
       let councilHearingTriggeredId: string | null = null;
-      let councilHearingClearedId: string | null = null;
+      let councilHearingTriggeredTelemetry: ReturnType<
+        typeof buildCouncilHearingTriggerTelemetry
+      > | null = null;
+      let councilHearingClearedTelemetry: ReturnType<
+        typeof buildCouncilHearingClearTelemetry
+      > | null = null;
       let councilCampaignCompletedId: string | null = null;
       let councilPilotCompletedId: string | null = null;
       let councilRatifySpawnedId: string | null = null;
@@ -8080,10 +8407,24 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 (value) => value <= 0,
               );
               if (cleared) {
+                const hearingAppliedAt = councilActiveHearing.appliedAt;
+                const pressureBeforeClear = councilLobbyPressure;
                 councilActiveHearing = undefined;
                 hearingClearedThisOrder = true;
                 councilLobbyPressure -= hearingDef.onClear.lobbyPressureDrop;
-                councilHearingClearedId = hearingDef.id;
+                councilHearingClearedTelemetry =
+                  buildCouncilHearingClearTelemetry({
+                    hearingId: hearingDef.id,
+                    method: "play",
+                    campaignId: councilActiveCampaignId,
+                    appliedAt: hearingAppliedAt,
+                    clearedAt: Date.now(),
+                    cashCost: 0,
+                    researchCost: 0,
+                    pressureBefore: pressureBeforeClear,
+                    pressureAfter: councilLobbyPressure,
+                    actionsToResolve: installsSinceHearing,
+                  });
                 if (!nextPhase3Onboarding.hearingResolvedSeen) {
                   nextPhase3Onboarding = {
                     ...nextPhase3Onboarding,
@@ -8128,6 +8469,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               pressureBefore < threshold && councilLobbyPressure >= threshold,
           );
           if (crossed !== undefined && installsSinceHearing >= 1) {
+            const actionsSincePreviousHearing = installsSinceHearing;
             const hearings = Object.values(COUNCIL_HEARING_BY_ID);
             const pick = hearings[Math.floor(Math.random() * hearings.length)];
             if (pick) {
@@ -8141,6 +8483,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 appliedAt: Date.now(),
                 refreshCountAtStart: refreshCount,
               };
+              councilHearingTriggeredTelemetry =
+                buildCouncilHearingTriggerTelemetry({
+                  hearingId: pick.id,
+                  source: "fulfill",
+                  campaignId: councilActiveCampaignId,
+                  pressureBefore,
+                  pressureAfter: councilLobbyPressure,
+                  threshold: crossed,
+                  actionsSincePreviousHearing,
+                });
               installsSinceHearing = 0;
               councilHearingTriggeredId = pick.id;
               if (!nextPhase3Onboarding.hearingEncounteredSeen) {
@@ -8349,6 +8701,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         captureEvent("council_unlock", {
           projectsCompleted: nextProjectsCompleted.length,
           reputationTier: getReputationTier(state.reputation + repReward),
+          council_unlock_path: "capstone",
         });
         captureEvent("phase3_onboarding_started", {
           source: "order_fulfill_transition",
@@ -8386,17 +8739,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             : undefined,
         });
       }
-      if (councilHearingTriggeredId) {
-        captureEvent("council_hearing_trigger", {
-          hearingId: councilHearingTriggeredId,
-          source: "fulfill",
-        });
+      if (councilHearingTriggeredTelemetry) {
+        captureEvent(
+          "council_hearing_trigger",
+          councilHearingTriggeredTelemetry,
+        );
       }
-      if (councilHearingClearedId) {
-        captureEvent("council_hearing_clear", {
-          hearingId: councilHearingClearedId,
-          method: "play",
-        });
+      if (councilHearingClearedTelemetry) {
+        captureEvent("council_hearing_clear", councilHearingClearedTelemetry);
       }
 
       let nextState: GameState = {
@@ -8492,6 +8842,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         orderMetrics: nextOrderMetrics,
         maxOrders: nextMaxOrders,
         maxTierCrafted: nextMaxTierCrafted,
+        lifetimeStats: {
+          ...state.lifetimeStats,
+          totalOrdersCompleted: state.lifetimeStats.totalOrdersCompleted + 1,
+        },
         installStreakCurrent: nextInstallStreakCurrent,
         installStreakBest: nextInstallStreakBest,
         undoSnapshot: undefined,
@@ -8719,6 +9073,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           order,
           parts: partsUsed,
         });
+        nextState = advanceDailyGoalForFulfillment(nextState, order, partsUsed);
       }
       return nextState;
     }
@@ -9766,6 +10121,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         projectId: project.id,
         deposit: depositCost,
         addonCost,
+        isCapstone: project.id === tuning.council.unlockAfterCapstoneProjectId,
+        projectsCompletedCount: state.projectsCompleted.length,
       });
       if (firstContractAccepted && state.gamePhase === 2) {
         captureEvent("phase2_first_contract_accepted", {
@@ -10266,6 +10623,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let activeHearing = state.council.activeHearing;
       let installsSinceHearing = state.council.installsSinceLastHearingCheck;
       let hearingTriggered = false;
+      let hearingThresholdCrossed: number | undefined;
       const perks = getCouncilPerkEffects(state);
       if (!activeHearing) {
         const thresholdShift = perks.lobbyPressureThresholdShift ?? 0;
@@ -10294,6 +10652,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             };
             installsSinceHearing = 0;
             hearingTriggered = true;
+            hearingThresholdCrossed = crossed;
           }
         }
       }
@@ -10391,10 +10750,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         captureEvent("council_draft_complete", { campaignId: campaign.id });
       }
       if (hearingTriggered && activeHearing) {
-        captureEvent("council_hearing_trigger", {
-          hearingId: activeHearing.hearingId,
-          source: "draft",
-        });
+        captureEvent(
+          "council_hearing_trigger",
+          buildCouncilHearingTriggerTelemetry({
+            hearingId: activeHearing.hearingId,
+            source: "draft",
+            campaignId: campaign.id,
+            pressureBefore: state.council.lobbyPressure,
+            pressureAfter: nextLobbyPressure,
+            threshold: hearingThresholdCrossed ?? nextLobbyPressure,
+            actionsSincePreviousHearing:
+              state.council.installsSinceLastHearingCheck + 1,
+          }),
+        );
       }
 
       let nextState: GameState = {
@@ -10535,10 +10903,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           hearingId: hearing.id,
         });
       }
-      captureEvent("council_hearing_clear", {
-        hearingId: hearing.id,
-        method: "pay",
-      });
+      captureEvent(
+        "council_hearing_clear",
+        buildCouncilHearingClearTelemetry({
+          hearingId: hearing.id,
+          method: "pay",
+          campaignId: state.council.activeCampaignId,
+          appliedAt: state.council.activeHearing.appliedAt,
+          clearedAt: Date.now(),
+          cashCost,
+          researchCost,
+          pressureBefore: state.council.lobbyPressure,
+          pressureAfter: nextLobbyPressure,
+          actionsToResolve: state.council.installsSinceLastHearingCheck + 1,
+        }),
+      );
       const firstHearingResolve = !state.phase3Onboarding.hearingResolvedSeen;
       if (firstHearingResolve && state.gamePhase >= 3) {
         captureEvent("phase3_first_hearing_resolved", {
@@ -11753,6 +12132,53 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case "ENSURE_DAILY_GOAL": {
+      const nextGoal = ensureDailyGoal(
+        state.dailyGoal,
+        new Date(action.now),
+        state.firstSessionComplete,
+      );
+      if (nextGoal === state.dailyGoal) return state;
+      return { ...state, dailyGoal: nextGoal };
+    }
+
+    case "CLAIM_DAILY_GOAL": {
+      const claimedGoal = markDailyGoalClaimed(state.dailyGoal, action.now);
+      if (!claimedGoal || claimedGoal === state.dailyGoal) return state;
+      const cashReward = claimedGoal.reward.cash ?? 0;
+      const reputationReward = claimedGoal.reward.reputation ?? 0;
+      const researchReward = claimedGoal.reward.research ?? 0;
+      const reputation = state.reputation + reputationReward;
+      const neighborhood = getNeighborhoodByRep(reputation);
+      return {
+        ...state,
+        dailyGoal: claimedGoal,
+        cash: state.cash + cashReward,
+        reputation,
+        research: state.research + researchReward,
+        reputationTier: getReputationTier(reputation),
+        currentNeighborhoodId: neighborhood.id,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
+    case "APPLY_OFFLINE_CASH": {
+      const cashAward = Math.max(0, Math.floor(action.cashAward));
+      if (!Number.isFinite(cashAward) || cashAward <= 0) return state;
+      captureEvent("cash_earned", {
+        amount: cashAward,
+        source: "offline",
+        creditedMinutes: Math.max(0, Math.floor(action.creditedMinutes)),
+      });
+      return {
+        ...state,
+        cash: state.cash + cashAward,
+        undoSnapshot: undefined,
+        lastCriticalEventId: state.lastCriticalEventId + 1,
+      };
+    }
+
     case "RESET_GAME": {
       const nextState = getInitialState();
       return {
@@ -12127,6 +12553,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         mergeMomentumLevel: state.undoSnapshot.mergeMomentumLevel,
         mergeMomentumPending: state.undoSnapshot.mergeMomentumPending,
         mergeMomentumDropFloor: state.undoSnapshot.mergeMomentumDropFloor,
+        lifetimeStats: state.undoSnapshot.lifetimeStats ?? state.lifetimeStats,
+        dailyGoal:
+          "dailyGoal" in state.undoSnapshot
+            ? state.undoSnapshot.dailyGoal
+            : state.dailyGoal,
         currentNeighborhoodId: nextNeighborhood.id,
         reputationTier: nextRepTier,
         undoSnapshot: undefined,
@@ -12436,6 +12867,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "PLAYTEST_APPLY_PRESET": {
       return applyPlaytestPresetState(state, action.presetId);
+    }
+
+    case "PLAYTEST_LOAD_STATE": {
+      return action.state;
     }
 
     case "PLAYTEST_SKIP_PHASE2": {
@@ -13071,6 +13506,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ),
       };
       nextState = queueStoryBeat(nextState, "council_unlock");
+      captureEvent("council_unlock", {
+        projectsCompleted: nextState.projectsCompleted.length,
+        reputationTier: nextState.reputationTier,
+        council_unlock_path: "playtest",
+      });
       captureEvent("phase3_onboarding_started", {
         source: "playtest_skip_phase3",
       });
@@ -13478,8 +13918,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             }
           : undefined;
       const projectsCompleted = Array.isArray(action.state.projectsCompleted)
-        ? (action.state.projectsCompleted as string[]).filter(
-            (value) => typeof value === "string",
+        ? Array.from(
+            new Set(
+              (action.state.projectsCompleted as unknown[]).filter(
+                (value): value is string =>
+                  typeof value === "string" &&
+                  PROJECT_DEFINITION_BY_ID.has(value),
+              ),
+            ),
           )
         : base.projectsCompleted;
       const projectCompletionLog =
@@ -14182,6 +14628,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastCompatibilityOrderSpawnedAt,
         lastCompatGlossaryOpenAt,
         maxTierCrafted,
+        lifetimeStats: normalizeLifetimeStats(
+          action.state.lifetimeStats,
+          maxTierCrafted,
+        ),
+        dailyGoal: normalizeDailyGoal(action.state.dailyGoal),
         marketingBoostOrdersRemaining,
         ordersHelpNudgeSeen,
         installStreakCurrent,
@@ -14473,7 +14924,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         restoredState = ensureMissions(restoredState);
       }
 
-      if (!restoredState.council.unlocked && canUnlockCouncil(restoredState)) {
+      const legacyCouncilRecovery =
+        action.allowLegacyCouncilRecovery === true &&
+        !restoredState.council.unlocked &&
+        !canUnlockCouncil(restoredState) &&
+        canLegacyRecoverCouncil(restoredState);
+      if (
+        !restoredState.council.unlocked &&
+        (canUnlockCouncil(restoredState) || legacyCouncilRecovery)
+      ) {
         restoredState = {
           ...restoredState,
           gamePhase: 3,
@@ -14484,6 +14943,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           },
         };
         restoredState = queueStoryBeat(restoredState, "council_unlock");
+        captureEvent("council_unlock", {
+          projectsCompleted: restoredState.projectsCompleted.length,
+          reputationTier: restoredState.reputationTier,
+          council_unlock_path: legacyCouncilRecovery
+            ? "legacy_migration"
+            : "capstone",
+        });
         if (restoredState.tutorialComplete) {
           restoredState = ensureMissions(restoredState);
         }
@@ -14513,6 +14979,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
+export function gameReducer(state: GameState, action: GameAction): GameState {
+  return ensureCapstonePinnedInCurrentOffers(gameReducerCore(state, action));
+}
+
 interface GameContextValue {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
@@ -14530,14 +15000,25 @@ interface GameContextValue {
   unlockRDNode: (nodeId: string) => void;
   craftFreedomController: () => void;
   useFreedomController: (partIndex: number) => void;
-  applyPlaytestPreset: (presetId: PlaytestPresetId) => void;
-  skipToPhase2: () => void;
-  skipToPhase3: () => void;
+  playtestSession: PersistedPlaytestSession | null;
+  playtestBusy: boolean;
+  playtestError: string | null;
+  startPlaytestPreset: (
+    presetId: PlaytestPresetId,
+    phase3OnboardingVariantOverride?: GameState["settings"]["phase3OnboardingVariantOverride"],
+  ) => Promise<void>;
+  restartPlaytestPreset: () => Promise<void>;
+  restoreMainSave: () => Promise<void>;
+  skipToPhase2: () => Promise<void>;
+  skipToPhase3: () => Promise<void>;
   startLegacyCycle: (
     kitId: LegacyKitId,
     doctrineIds: LegacyDoctrineId[],
   ) => void;
   setLegacyTitle: (titleId?: string) => void;
+  claimDailyGoal: () => void;
+  offlineCashNotice: { cashAward: number; creditedMinutes: number } | null;
+  dismissOfflineCashNotice: () => void;
   canMerge: (fromIndex: number, toIndex: number) => boolean;
   getFulfillmentIndices: (order: Order) => number[] | null;
   getFulfillmentAnalysis: (order: Order) => OrderFulfillmentAnalysis;
@@ -14548,6 +15029,7 @@ interface GameContextValue {
 const GameContext = createContext<GameContextValue | null>(null);
 const FIRST_OPEN_KEY = "lighting_tycoon_first_open_v1";
 const ACTIVE_SESSION_KEY = "lighting_tycoon_active_session_v1";
+const RELEASE_CHANNEL = resolveReleaseChannel();
 const FINAL_TUTORIAL_STEP = 7;
 const SESSION_HEARTBEAT_MS = 30000;
 const SESSION_RECOVERY_TIMEOUT_MS = 90000;
@@ -14643,12 +15125,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const criticalSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const saveRequestedRef = useRef(false);
-  const saveInFlightRef = useRef(false);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const persistenceWritableRef = useRef(false);
+  const playtestSessionRef = useRef<PersistedPlaytestSession | null>(null);
+  const playtestTransitionRef = useRef(false);
   const lastSaveAtRef = useRef(0);
   const lastCriticalSaveAtRef = useRef(0);
   const lastCriticalEventRef = useRef(state.lastCriticalEventId);
   const [hydrated, setHydrated] = React.useState(false);
+  const [playtestSession, setPlaytestSession] =
+    React.useState<PersistedPlaytestSession | null>(null);
+  const [playtestBusy, setPlaytestBusy] = React.useState(false);
+  const [playtestError, setPlaytestError] = React.useState<string | null>(null);
+  const [offlineCashNotice, setOfflineCashNotice] = React.useState<{
+    cashAward: number;
+    creditedMinutes: number;
+  } | null>(null);
+  const pendingOfflineCashRef = useRef<{
+    cashAward: number;
+    creditedMinutes: number;
+  } | null>(null);
   const telemetryReadyRef = useRef(false);
   const stateRef = useRef(state);
   const playerIdRef = useRef<string | null>(null);
@@ -14708,18 +15204,92 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadState = async () => {
       try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        let envelope = parseSavePayload(stored);
-        if (!envelope) {
-          const backup = await AsyncStorage.getItem(STORAGE_BACKUP_KEY);
-          envelope = parseSavePayload(backup);
+        if (RELEASE_CHANNEL !== "production") {
+          const session = await readPlaytestSession(isPlaytestPresetId);
+          if (session) {
+            const sandbox = await readValidatedSavePair(
+              "playtest",
+              parseSavePayload,
+              gameStorage,
+              selectPreferredSaveEnvelope,
+            );
+            if (sandbox.preferred) {
+              persistenceWritableRef.current = true;
+              playtestSessionRef.current = session;
+              setPlaytestSession(session);
+              dispatch({
+                type: "PLAYTEST_LOAD_STATE",
+                state: sandbox.preferred.state,
+              });
+              return;
+            }
+            await clearPlaytestSession();
+            try {
+              await clearPlaytestData();
+            } catch (cleanupError) {
+              console.warn(
+                "Recovered normal progress but could not clear corrupt playtest data",
+                cleanupError,
+              );
+            }
+          } else {
+            await clearPlaytestSession();
+          }
         }
-        if (!envelope) {
-          setHydrated(true);
+        const normal = await readValidatedSavePair(
+          "normal",
+          parseSavePayload,
+          gameStorage,
+          selectPreferredSaveEnvelope,
+        );
+        if (!normal.preferred) {
+          persistenceWritableRef.current = true;
           return;
         }
-        dispatch({ type: "LOAD_STATE", state: envelope.state });
+        const normalState =
+          RELEASE_CHANNEL === "production"
+            ? {
+                ...normal.preferred.state,
+                settings: {
+                  ...normal.preferred.state.settings,
+                  phase3OnboardingVariantOverride: undefined,
+                },
+              }
+            : normal.preferred.state;
+        dispatch({
+          type: "LOAD_STATE",
+          state: normalState,
+          allowLegacyCouncilRecovery:
+            normal.preferred.migratedFromLegacy === true,
+        });
+        const offlineCash = calculateOfflineCash({
+          savedAt: normal.preferred.savedAt,
+          now: Date.now(),
+          firstSessionComplete: normalState.firstSessionComplete === true,
+          playtestActive: false,
+          reputationTier:
+            typeof normalState.reputationTier === "number"
+              ? normalState.reputationTier
+              : getReputationTier(normalState.reputation ?? 0),
+          currentRunMaxTierCrafted:
+            typeof normalState.maxTierCrafted === "number"
+              ? normalState.maxTierCrafted
+              : 1,
+        });
+        if (offlineCash.reason === "awarded" && offlineCash.cashAward > 0) {
+          pendingOfflineCashRef.current = {
+            cashAward: offlineCash.cashAward,
+            creditedMinutes: offlineCash.creditedMinutes,
+          };
+          dispatch({
+            type: "APPLY_OFFLINE_CASH",
+            cashAward: offlineCash.cashAward,
+            creditedMinutes: offlineCash.creditedMinutes,
+          });
+        }
+        persistenceWritableRef.current = true;
       } catch (error) {
+        persistenceWritableRef.current = false;
         console.warn("Failed to load saved game state", error);
       } finally {
         setHydrated(true);
@@ -14850,6 +15420,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       player_id: playerIdRef.current,
       phase3_onboarding_variant: phase3OnboardingVariant,
       phase3_onboarding_variant_source: phase3OnboardingVariantSource,
+      release_channel: RELEASE_CHANNEL,
+      playtest_preset_id: playtestSessionRef.current?.presetId,
     });
     overdrawSessionMetricsRef.current = { count: 0, totalAddedSeconds: 0 };
     overdrawOutcomePendingRef.current = null;
@@ -15009,6 +15581,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         player_id: playerIdRef.current ?? undefined,
         phase3_onboarding_variant: phase3OnboardingVariant,
         phase3_onboarding_variant_source: phase3OnboardingVariantSource,
+        release_channel: RELEASE_CHANNEL,
+        playtest_preset_id: playtestSessionRef.current?.presetId,
       });
       void clearPersistedActiveSession(sessionId, runId);
     },
@@ -15164,8 +15738,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setTelemetryRuntimeContext({
       phase3_onboarding_variant: phase3OnboardingVariant,
       phase3_onboarding_variant_source: phase3OnboardingVariantSource,
+      release_channel: RELEASE_CHANNEL,
+      playtest_preset_id: playtestSession?.presetId,
     });
-  }, [hydrated, state.settings.phase3OnboardingVariantOverride]);
+  }, [
+    hydrated,
+    playtestSession?.presetId,
+    state.settings.phase3OnboardingVariantOverride,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !telemetryReadyRef.current) return;
@@ -15603,58 +16183,82 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const drainSaveQueue = useCallback(() => {
-    if (saveInFlightRef.current) return;
-    if (!saveRequestedRef.current) return;
-
-    saveRequestedRef.current = false;
-    saveInFlightRef.current = true;
-    const enqueuedAt = Date.now();
-    const snapshot = stateRef.current;
-    const criticalEventIdAtEnqueue = snapshot.lastCriticalEventId;
-    const payload = JSON.stringify(buildSaveEnvelope(snapshot));
-    let savedPrimary = false;
-
-    void (async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_BACKUP_KEY, payload);
-      } catch (error) {
-        console.warn("Failed to save backup game state", error);
-      }
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, payload);
-        savedPrimary = true;
+  const enqueueSave = useCallback(
+    (snapshot: GameState, destination: SaveDestination) => {
+      const payload = JSON.stringify(buildSaveEnvelope(snapshot));
+      const enqueuedAt = Date.now();
+      const criticalEventIdAtEnqueue = snapshot.lastCriticalEventId;
+      const operation = saveChainRef.current.then(async () => {
+        await writeAndValidateSavePair(
+          destination,
+          payload,
+          parseSavePayload,
+          gameStorage,
+          selectPreferredSaveEnvelope,
+        );
         lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
-      } catch (error) {
-        console.warn("Failed to save game state", error);
-      }
-    })().finally(() => {
-      saveInFlightRef.current = false;
-      if (
-        savedPrimary &&
-        criticalSaveTimeoutRef.current &&
-        stateRef.current.lastCriticalEventId <= criticalEventIdAtEnqueue
-      ) {
-        clearTimeout(criticalSaveTimeoutRef.current);
-        criticalSaveTimeoutRef.current = null;
-      }
-      if (saveRequestedRef.current) {
-        drainSaveQueue();
-      }
+        if (
+          criticalSaveTimeoutRef.current &&
+          stateRef.current.lastCriticalEventId <= criticalEventIdAtEnqueue
+        ) {
+          clearTimeout(criticalSaveTimeoutRef.current);
+          criticalSaveTimeoutRef.current = null;
+        }
+      });
+      saveChainRef.current = operation.catch((error) => {
+        console.warn(`Failed to save ${destination} game state`, error);
+      });
+      return operation;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const award = pendingOfflineCashRef.current;
+    if (!hydrated || !award || playtestSessionRef.current) return;
+    pendingOfflineCashRef.current = null;
+    void enqueueSave(state, "normal")
+      .then(() => {
+        setOfflineCashNotice(award);
+      })
+      .catch((error) => {
+        console.warn("Failed to persist offline cash award", error);
+      });
+  }, [enqueueSave, hydrated, state]);
+
+  useEffect(() => {
+    if (!hydrated || playtestSession) return;
+    dispatch({ type: "ENSURE_DAILY_GOAL", now: Date.now() });
+  }, [hydrated, playtestSession, state.firstSessionComplete]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active" || playtestSessionRef.current) return;
+      dispatch({ type: "ENSURE_DAILY_GOAL", now: Date.now() });
     });
+    return () => sub.remove();
   }, []);
 
   const flushSave = useCallback(() => {
-    if (!hydrated) return;
+    if (
+      !hydrated ||
+      !persistenceWritableRef.current ||
+      playtestTransitionRef.current
+    ) {
+      return saveChainRef.current;
+    }
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    const requestedAt = Date.now();
-    lastSaveAtRef.current = Math.max(lastSaveAtRef.current, requestedAt);
-    saveRequestedRef.current = true;
-    drainSaveQueue();
-  }, [drainSaveQueue, hydrated]);
+    const enqueuedAt = Date.now();
+    const snapshot = stateRef.current;
+    lastSaveAtRef.current = Math.max(lastSaveAtRef.current, enqueuedAt);
+    return enqueueSave(
+      snapshot,
+      playtestSessionRef.current ? "playtest" : "normal",
+    );
+  }, [enqueueSave, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -15885,20 +16489,182 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "USE_FREEDOM_CONTROLLER", partIndex });
   }, []);
 
-  const applyPlaytestPreset = useCallback((presetId: PlaytestPresetId) => {
-    dispatch({ type: "PLAYTEST_APPLY_PRESET", presetId });
+  const startPlaytestPreset = useCallback(
+    async (
+      presetId: PlaytestPresetId,
+      phase3OnboardingVariantOverride?: GameState["settings"]["phase3OnboardingVariantOverride"],
+    ) => {
+      if (RELEASE_CHANNEL === "production") {
+        throw new Error("Playtest Lab is unavailable in production builds.");
+      }
+      if (playtestTransitionRef.current) {
+        throw new Error("A Playtest Lab transition is already in progress.");
+      }
+      if (!persistenceWritableRef.current) {
+        throw new Error(
+          "Storage could not be read safely. Restart the app before entering Playtest Lab.",
+        );
+      }
+      playtestTransitionRef.current = true;
+      setPlaytestBusy(true);
+      setPlaytestError(null);
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      if (criticalSaveTimeoutRef.current) {
+        clearTimeout(criticalSaveTimeoutRef.current);
+        criticalSaveTimeoutRef.current = null;
+      }
+      try {
+        const existingSession = playtestSessionRef.current;
+        let baseline = existingSession?.normalBaseline;
+        if (!existingSession) {
+          await saveChainRef.current;
+          await enqueueSave(stateRef.current, "normal");
+          const normal = await readValidatedSavePair(
+            "normal",
+            parseSavePayload,
+            gameStorage,
+            selectPreferredSaveEnvelope,
+          );
+          if (!normal.primary || !normal.backup) {
+            throw new Error(
+              "Could not validate both normal save copies. Your game was not changed.",
+            );
+          }
+          baseline = buildNormalBaseline(normal);
+        }
+        if (!baseline) {
+          throw new Error("Normal save baseline is unavailable.");
+        }
+        let nextState = applyPlaytestPresetState(stateRef.current, presetId);
+        if (existingSession) {
+          nextState = {
+            ...nextState,
+            settings: {
+              ...nextState.settings,
+              phase3OnboardingVariantOverride:
+                stateRef.current.settings.phase3OnboardingVariantOverride,
+            },
+          };
+        }
+        if (phase3OnboardingVariantOverride !== undefined) {
+          nextState = {
+            ...nextState,
+            settings: {
+              ...nextState.settings,
+              phase3OnboardingVariantOverride,
+            },
+          };
+        }
+        const payload = JSON.stringify(buildSaveEnvelope(nextState));
+        await writeAndValidateSavePair(
+          "playtest",
+          payload,
+          parseSavePayload,
+          gameStorage,
+          selectPreferredSaveEnvelope,
+        );
+        const session: PersistedPlaytestSession = {
+          version: 1,
+          presetId,
+          startedAt: existingSession?.startedAt ?? Date.now(),
+          normalBaseline: baseline,
+        };
+        await writePlaytestSession(session);
+        playtestSessionRef.current = session;
+        setPlaytestSession(session);
+        setTelemetryRuntimeContext({
+          release_channel: RELEASE_CHANNEL,
+          playtest_preset_id: presetId,
+        });
+        stateRef.current = nextState;
+        dispatch({ type: "PLAYTEST_LOAD_STATE", state: nextState });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Playtest transition failed.";
+        setPlaytestError(message);
+        throw error;
+      } finally {
+        playtestTransitionRef.current = false;
+        setPlaytestBusy(false);
+      }
+    },
+    [enqueueSave],
+  );
+
+  const restartPlaytestPreset = useCallback(async () => {
+    const presetId = playtestSessionRef.current?.presetId;
+    if (!presetId) throw new Error("No active playtest scenario to restart.");
+    await startPlaytestPreset(presetId);
+  }, [startPlaytestPreset]);
+
+  const restoreMainSave = useCallback(async () => {
+    if (!playtestSessionRef.current) return;
+    if (playtestTransitionRef.current) {
+      throw new Error("A Playtest Lab transition is already in progress.");
+    }
+    playtestTransitionRef.current = true;
+    setPlaytestBusy(true);
+    setPlaytestError(null);
+    try {
+      await saveChainRef.current;
+      const normal = await readValidatedSavePair(
+        "normal",
+        parseSavePayload,
+        gameStorage,
+        selectPreferredSaveEnvelope,
+      );
+      if (!normal.preferred) {
+        throw new Error(
+          "Normal progress could not be validated. The playtest session remains active.",
+        );
+      }
+      await clearPlaytestSession();
+      playtestSessionRef.current = null;
+      setPlaytestSession(null);
+      setTelemetryRuntimeContext({
+        release_channel: RELEASE_CHANNEL,
+        playtest_preset_id: undefined,
+      });
+      stateRef.current = normal.preferred.state;
+      dispatch({
+        type: "LOAD_STATE",
+        state: normal.preferred.state,
+        allowLegacyCouncilRecovery:
+          normal.preferred.migratedFromLegacy === true,
+      });
+      try {
+        await clearPlaytestData();
+      } catch (cleanupError) {
+        console.warn(
+          "Restored normal progress but could not clear playtest data",
+          cleanupError,
+        );
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Restore failed.";
+      setPlaytestError(message);
+      throw error;
+    } finally {
+      playtestTransitionRef.current = false;
+      setPlaytestBusy(false);
+    }
   }, []);
 
-  const skipToPhase2 = useCallback(() => {
-    dispatch({ type: "PLAYTEST_APPLY_PRESET", presetId: "phase2_gate" });
-  }, []);
+  const skipToPhase2 = useCallback(
+    () => startPlaytestPreset("phase2_gate"),
+    [startPlaytestPreset],
+  );
 
-  const skipToPhase3 = useCallback(() => {
-    dispatch({
-      type: "PLAYTEST_APPLY_PRESET",
-      presetId: "phase3_council_live",
-    });
-  }, []);
+  const skipToPhase3 = useCallback(
+    () => startPlaytestPreset("phase3_council_live"),
+    [startPlaytestPreset],
+  );
 
   const startLegacyCycle = useCallback(
     (kitId: LegacyKitId, doctrineIds: LegacyDoctrineId[]) => {
@@ -15909,6 +16675,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const setLegacyTitle = useCallback((titleId?: string) => {
     dispatch({ type: "SET_LEGACY_TITLE", titleId });
+  }, []);
+
+  const claimDailyGoal = useCallback(() => {
+    if (playtestSessionRef.current) return;
+    dispatch({ type: "CLAIM_DAILY_GOAL", now: Date.now() });
+  }, []);
+
+  const dismissOfflineCashNotice = useCallback(() => {
+    setOfflineCashNotice(null);
   }, []);
 
   const undoLastMove = useCallback(() => {
@@ -15971,11 +16746,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         unlockRDNode,
         craftFreedomController,
         useFreedomController,
-        applyPlaytestPreset,
+        playtestSession,
+        playtestBusy,
+        playtestError,
+        startPlaytestPreset,
+        restartPlaytestPreset,
+        restoreMainSave,
         skipToPhase2,
         skipToPhase3,
         startLegacyCycle,
         setLegacyTitle,
+        claimDailyGoal,
+        offlineCashNotice,
+        dismissOfflineCashNotice,
         canMerge,
         getFulfillmentIndices,
         getFulfillmentAnalysis,
@@ -16000,4 +16783,6 @@ export const __TEST_ONLY__ = {
   gameReducer,
   getInitialState,
   buildLegacyCycleStartState,
+  normalizeSaveEnvelope,
+  buildSaveEnvelope,
 };

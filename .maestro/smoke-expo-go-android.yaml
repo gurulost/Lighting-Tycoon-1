@@ -1,0 +1,109 @@
+appId: host.exp.exponent
+---
+- openLink: exp://10.0.2.2:8081
+- tapOn:
+    text: "Skip Tutorial"
+    optional: true
+- tapOn:
+    text: "Tap again to skip"
+    optional: true
+- tapOn:
+    text: "Start Phase 2 Objective"
+    optional: true
+- tapOn:
+    text: "Close Settings"
+    optional: true
+- tapOn:
+    text: "Close Suppliers"
+    optional: true
+- tapOn:
+    id: "phase2-intro-continue"
+    optional: true
+- tapOn:
+    id: "orders-modal-close"
+    optional: true
+- tapOn:
+    id: "playtest-banner-restore"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "e2e-skip-phase2"
+    timeout: 300000
+- tapOn:
+    text: "Skip to Phase 2 playtest scenario"
+- extendedWaitUntil:
+    visible:
+      id: "phase2-intro-modal"
+    timeout: 30000
+- tapOn:
+    id: "phase2-intro-continue"
+- extendedWaitUntil:
+    visible:
+      id: "orders-modal"
+    timeout: 30000
+- tapOn:
+    id: "orders-modal-close"
+- assertVisible:
+    id: "playtest-session-banner"
+- tapOn:
+    id: "workbench-station"
+- tapOn:
+    id: "supplier-tap-baron"
+- tapOn:
+    text: "Close Suppliers"
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- openLink: exp://10.0.2.2:8081
+- extendedWaitUntil:
+    visible:
+      id: "playtest-session-banner"
+    timeout: 60000
+- tapOn:
+    id: "playtest-banner-restart"
+- extendedWaitUntil:
+    visible:
+      id: "phase2-intro-modal"
+    timeout: 30000
+- tapOn:
+    id: "phase2-intro-continue"
+- extendedWaitUntil:
+    visible:
+      id: "orders-modal"
+    timeout: 30000
+- tapOn:
+    id: "orders-modal-close"
+- assertVisible:
+    id: "playtest-session-banner"
+- tapOn:
+    id: "playtest-banner-restore"
+- extendedWaitUntil:
+    notVisible:
+      id: "playtest-session-banner"
+    timeout: 30000
+- tapOn:
+    text: "Start Phase 2 Objective"
+    optional: true
+- tapOn:
+    id: "orders-modal-close"
+    optional: true
+- tapOn:
+    id: "settings-button"
+- runFlow:
+    when:
+      visible: "Start Phase 2 Objective"
+    commands:
+      - tapOn: "Start Phase 2 Objective"
+      - tapOn:
+          id: "orders-modal-close"
+          optional: true
+      - tapOn:
+          id: "settings-button"
+- assertVisible:
+    text: "Settings"
+- tapOn:
+    text: "Decrease sound effects volume"
+- tapOn:
+    text: "Increase sound effects volume"
+- tapOn:
+    text: "Close Settings"

@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -47,3 +47,6 @@ jobs:
 
       - name: Web E2E tests
         run: npm run test:e2e
+
+      - name: Production surface guard
+        run: npm run test:e2e:production

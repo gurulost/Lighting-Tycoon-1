@@ -1,4 +1,5 @@
 import { PROJECT_DEFINITIONS } from "@/constants/projects";
+import { REPUTATION_TIER_THRESHOLDS } from "@/constants/reputation";
 import { __TEST_ONLY__ } from "@/context/GameContext";
 import type { GameState, Order, Part, PartTier } from "@/types/game";
 
@@ -81,6 +82,148 @@ describe("RESOLVE_LOCKOUT idempotency", () => {
 });
 
 describe("project offers exclude completed contracts", () => {
+  it("pins the Expo capstone through refresh, cancellation, and failure", () => {
+    const capstoneId = "proj_international_expo";
+    const completedIds = PROJECT_DEFINITIONS.slice(0, 6).map(
+      (project) => project.id,
+    );
+    const eligible = buildPostTutorialState({
+      gamePhase: 2,
+      liberationComplete: true,
+      projectsUnlocked: true,
+      reputation: 2500,
+      reputationTier: 9,
+      cash: 1_000_000,
+      projectsCompleted: completedIds,
+      projectOffers: [],
+    });
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const refreshed = gameReducer(eligible, {
+        type: "PROJECT_REFRESH_OFFERS",
+      });
+      expect(refreshed.projectOffers.map((offer) => offer.projectId)).toContain(
+        capstoneId,
+      );
+    }
+
+    const offered = gameReducer(eligible, { type: "PROJECT_GENERATE_OFFERS" });
+    const accepted = gameReducer(offered, {
+      type: "PROJECT_ACCEPT",
+      projectId: capstoneId,
+    });
+    expect(accepted.activeProject?.projectId).toBe(capstoneId);
+
+    const cancelled = gameReducer(accepted, { type: "PROJECT_CANCEL" });
+    expect(cancelled.projectOffers.map((offer) => offer.projectId)).toContain(
+      capstoneId,
+    );
+
+    const acceptedAgain = gameReducer(cancelled, {
+      type: "PROJECT_ACCEPT",
+      projectId: capstoneId,
+    });
+    const failed = gameReducer(acceptedAgain, { type: "PROJECT_STAGE_FAIL" });
+    expect(failed.projectOffers.map((offer) => offer.projectId)).toContain(
+      capstoneId,
+    );
+  });
+
+  it("injects the capstone when an order crosses into tier-9 eligibility", () => {
+    const capstoneId = "proj_international_expo";
+    const completedIds = PROJECT_DEFINITIONS.filter(
+      (project) => project.id !== capstoneId,
+    )
+      .slice(0, 6)
+      .map((project) => project.id);
+    const initial = getInitialState();
+    const board = [...initial.board];
+    board[0] = createPart(0, 1);
+    const ordinaryOffer = PROJECT_DEFINITIONS.find(
+      (project) =>
+        project.id !== capstoneId && !completedIds.includes(project.id),
+    );
+    expect(ordinaryOffer).toBeDefined();
+    const state = buildPostTutorialState({
+      gamePhase: 2,
+      liberationComplete: true,
+      projectsUnlocked: true,
+      reputation: REPUTATION_TIER_THRESHOLDS[9] - 5,
+      reputationTier: 8,
+      projectsCompleted: completedIds,
+      projectOffers: [
+        { projectId: ordinaryOffer!.id, seed: 1, generatedAt: 1 },
+      ],
+      orders: [createBasicOrder("cross-tier-9")],
+      board,
+    });
+
+    const next = gameReducer(state, {
+      type: "FULFILL_ORDER",
+      orderId: "cross-tier-9",
+    });
+
+    expect(next.reputationTier).toBeGreaterThanOrEqual(9);
+    expect(next.projectOffers[0]?.projectId).toBe(capstoneId);
+  });
+
+  it("deduplicates and rejects unknown completed project IDs on load", () => {
+    const initial = getInitialState();
+    const knownId = PROJECT_DEFINITIONS[0].id;
+    const loaded = gameReducer(initial, {
+      type: "LOAD_STATE",
+      state: {
+        ...initial,
+        gamePhase: 2,
+        liberationComplete: true,
+        projectsUnlocked: true,
+        projectsCompleted: [knownId, knownId, "unknown_project"],
+      },
+      allowLegacyCouncilRecovery: true,
+    });
+
+    expect(loaded.projectsCompleted).toEqual([knownId]);
+    expect(loaded.council.unlocked).toBe(false);
+  });
+
+  it("does not pin the Expo capstone before eligibility or after Council unlock", () => {
+    const capstoneId = "proj_international_expo";
+    const completedIds = PROJECT_DEFINITIONS.slice(0, 6).map(
+      (project) => project.id,
+    );
+    const beforeEligibility = buildPostTutorialState({
+      gamePhase: 2,
+      liberationComplete: true,
+      projectsUnlocked: true,
+      reputationTier: 8,
+      cash: 1_000_000,
+      projectsCompleted: completedIds,
+      projectOffers: [],
+    });
+    const before = gameReducer(beforeEligibility, {
+      type: "PROJECT_GENERATE_OFFERS",
+    });
+    expect(before.projectOffers.map((offer) => offer.projectId)).not.toContain(
+      capstoneId,
+    );
+
+    const alreadyUnlocked = buildPostTutorialState({
+      ...beforeEligibility,
+      gamePhase: 3,
+      reputationTier: 9,
+      council: { ...beforeEligibility.council, unlocked: true },
+    });
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0);
+    try {
+      const after = gameReducer(alreadyUnlocked, {
+        type: "PROJECT_GENERATE_OFFERS",
+      });
+      expect(after.projectOffers[0]?.projectId).not.toBe(capstoneId);
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
   it("does not re-offer completed projects while fresh ones remain", () => {
     const completedIds = PROJECT_DEFINITIONS.slice(0, 4).map(
       (project) => project.id,

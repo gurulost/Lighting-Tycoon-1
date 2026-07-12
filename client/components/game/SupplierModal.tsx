@@ -140,6 +140,8 @@ export function SupplierModal({
           title="Suppliers"
           subtitle="Choose a supply source. Charges refill over time."
           onClose={onClose}
+          testID="supplier-modal"
+          closeTestID="supplier-modal-close"
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -308,6 +310,7 @@ export function SupplierModal({
                       <Pressable
                         onPress={() => handleTap(supplierId)}
                         disabled={locked || !tapStatus.ok}
+                        testID={`supplier-tap-${supplierId}`}
                         style={[
                           styles.tapButton,
                           {

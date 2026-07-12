@@ -3,6 +3,7 @@ export type PlaytestPresetId =
   | "phase2_gate"
   | "phase2_contracts_ready"
   | "phase2_rep_gate"
+  | "phase2_capstone_ready"
   | "phase3_council_live"
   | "phase3_hearing_recovery"
   | "phase3_ratify_ready";
@@ -19,6 +20,7 @@ export const PLAYTEST_PRESET_ORDER: PlaytestPresetId[] = [
   "phase2_gate",
   "phase2_contracts_ready",
   "phase2_rep_gate",
+  "phase2_capstone_ready",
   "phase3_council_live",
   "phase3_hearing_recovery",
   "phase3_ratify_ready",
@@ -56,6 +58,13 @@ export const PLAYTEST_PRESET_META: Record<
       "Bootstraps to a post-gate state where Rep Tier is intentionally below contract requirements.",
     phaseLabel: "Phase 2",
   },
+  phase2_capstone_ready: {
+    title: "Phase 2 Capstone Ready",
+    summary: "Start with the International Expo capstone pinned.",
+    detail:
+      "Starts at Rep Tier 9 with six contracts complete, Council locked, and the capstone ready to accept.",
+    phaseLabel: "Phase 2",
+  },
   phase3_council_live: {
     title: "Phase 3 Council Live",
     summary: "Start in Council-unlocked Phase 3.",
@@ -78,3 +87,10 @@ export const PLAYTEST_PRESET_META: Record<
     phaseLabel: "Phase 3",
   },
 };
+
+export function isPlaytestPresetId(value: unknown): value is PlaytestPresetId {
+  return (
+    typeof value === "string" &&
+    PLAYTEST_PRESET_ORDER.includes(value as PlaytestPresetId)
+  );
+}

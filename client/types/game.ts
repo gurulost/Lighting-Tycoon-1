@@ -158,6 +158,35 @@ export interface Mission {
   chainLength?: number;
 }
 
+export type DailyGoalAction = Extract<
+  MissionType,
+  | "merge_count"
+  | "complete_order"
+  | "complete_order_no_locked"
+  | "complete_order_with_locked"
+  | "complete_order_compatible"
+>;
+
+export interface DailyGoalState {
+  dateKey: string;
+  templateId: string;
+  type: DailyGoalAction;
+  label: string;
+  description: string;
+  target: number;
+  progress: number;
+  reward: MissionReward;
+  completedAt?: number;
+  claimedAt?: number;
+}
+
+export interface LifetimeStats {
+  totalMerges: number;
+  totalOrdersCompleted: number;
+  bestMergeChain: number;
+  highestTierCrafted: number;
+}
+
 export interface OrderRequirement {
   tier: PartTier;
   family: OrderFamily;
@@ -535,8 +564,10 @@ export interface GameState {
 
   settings: {
     soundEnabled: boolean;
+    sfxVolume: number;
     hapticsEnabled: boolean;
     reducedMotion: boolean;
+    enhancedPartCues: boolean;
     phase3OnboardingVariantOverride?: Phase3OnboardingVariant;
   };
 
@@ -557,6 +588,8 @@ export interface GameState {
     mergeMomentumLevel: number;
     mergeMomentumPending: { threshold: number } | null;
     mergeMomentumDropFloor?: PartTier;
+    lifetimeStats?: LifetimeStats;
+    dailyGoal?: DailyGoalState;
   };
   undoCooldownUntil: number;
 
@@ -595,6 +628,8 @@ export interface GameState {
   lastCriticalEventId: number;
 
   maxTierCrafted: number;
+  lifetimeStats: LifetimeStats;
+  dailyGoal?: DailyGoalState;
 
   marketingBoostOrdersRemaining: number;
 

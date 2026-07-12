@@ -1,10 +1,13 @@
 # Database
 
-Lighting Tycoon uses PostgreSQL with Drizzle ORM.
+Lighting Tycoon retains PostgreSQL/Drizzle scaffolding, but it is not part of the
+active gameplay persistence path. Progress is stored locally on the device and
+the server's save endpoints return `410 Gone`.
 
 ## Connection
 
-The database is configured via `DATABASE_URL`.
+`DATABASE_URL` is used only when explicitly running dormant database tooling.
+Ordinary server startup does not require it.
 
 ## Schema Overview
 

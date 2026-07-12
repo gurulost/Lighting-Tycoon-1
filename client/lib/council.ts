@@ -249,18 +249,24 @@ export function getCouncilUnlockInfo(
   state: CouncilUnlockState,
 ): CouncilUnlockInfo {
   const tuning = getTuning();
-  const minProjects = Math.max(
-    0,
-    Math.floor(tuning.council.unlockMinProjectsCompleted ?? 0),
-  );
-  const minRepTier = Math.max(
-    0,
-    Math.floor(tuning.council.unlockMinRepTier ?? 0),
-  );
   const capstoneId = tuning.council.unlockAfterCapstoneProjectId;
   const capstone = capstoneId
     ? PROJECT_DEFINITION_BY_ID.get(capstoneId)
     : undefined;
+  const minProjects = Math.max(
+    0,
+    Math.floor(
+      capstone?.unlock.minProjectsCompleted ??
+        tuning.council.unlockMinProjectsCompleted ??
+        0,
+    ),
+  );
+  const minRepTier = Math.max(
+    0,
+    Math.floor(
+      capstone?.unlock.minRepTier ?? tuning.council.unlockMinRepTier ?? 0,
+    ),
+  );
   const capstoneTitle = capstone?.title;
   const capstoneComplete =
     !!capstoneId && state.projectsCompleted.includes(capstoneId);
@@ -272,11 +278,8 @@ export function getCouncilUnlockInfo(
     minRepTier > 0
       ? Math.min(state.reputationTier, minRepTier)
       : state.reputationTier;
-  const hasNumericGoals = minProjects > 0 || minRepTier > 0;
   const lockedCopy = capstoneTitle
-    ? hasNumericGoals
-      ? `Unlock by completing ${capstoneTitle} or reaching the goals below.`
-      : `Unlock by completing ${capstoneTitle}.`
+    ? `Unlock by completing ${capstoneTitle}.`
     : "Unlock by reaching the goals below.";
   const copy = state.council.unlocked
     ? "Standards Council unlocked. Open it from the bottom bar to start a campaign."

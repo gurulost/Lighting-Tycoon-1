@@ -7,10 +7,12 @@ node_modules/
 .expo/
 dist/
 server_dist/
+static-build/
 web-build/
 expo-env.d.ts
 playwright-report/
 test-results/
+output/
 
 # Native
 .kotlin/

@@ -163,7 +163,7 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.phase2Onboarding.offersCoachmarkSeen).toBe(true);
   });
 
-  it("transitions into Phase 3 when Council unlock conditions are met", () => {
+  it("does not unlock Council live after eight ordinary projects", () => {
     const initial = __TEST_ONLY__.getInitialState();
     const board = [...initial.board];
     board[0] = createPart(0, 1);
@@ -182,6 +182,7 @@ describe("phase/tier progression reducer coverage", () => {
       reputationTier: 9,
       currentNeighborhoodId: "liberation",
       projectsCompleted,
+      projectsUnlocked: true,
       orders: [order],
       board,
     };
@@ -194,9 +195,37 @@ describe("phase/tier progression reducer coverage", () => {
       } as any,
     );
 
+    expect(next.council.unlocked).toBe(false);
+    expect(next.gamePhase).toBe(2);
+    expect(next.projectsUnlocked).toBe(true);
+  });
+
+  it("transitions into Phase 3 after the Expo capstone is complete", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const board = [...initial.board];
+    board[0] = createPart(0, 1);
+    const order = createOrder("unlock-council-capstone");
+    const state: GameState = {
+      ...initial,
+      tutorialComplete: true,
+      firstSessionComplete: true,
+      gamePhase: 2,
+      liberationComplete: true,
+      reputation: 2500,
+      reputationTier: 9,
+      projectsUnlocked: true,
+      projectsCompleted: ["proj_international_expo"],
+      orders: [order],
+      board,
+    };
+
+    const next = __TEST_ONLY__.gameReducer(state, {
+      type: "FULFILL_ORDER",
+      orderId: order.id,
+    });
+
     expect(next.council.unlocked).toBe(true);
     expect(next.gamePhase).toBe(3);
-    expect(next.projectsUnlocked).toBe(true);
   });
 
   it("normalizes loaded saves with unlocked Council to Phase 3", () => {
@@ -224,11 +253,13 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.projectsUnlocked).toBe(true);
   });
 
-  it("auto-unlocks Council during load when unlock requirements are already met", () => {
+  it("uses the one-time legacy recovery only for an explicitly migrated save", () => {
     const initial = __TEST_ONLY__.getInitialState();
-    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 8).map(
-      (project) => project.id,
-    );
+    const projectsCompleted = PROJECT_DEFINITIONS.filter(
+      (project) => project.id !== "proj_international_expo",
+    )
+      .slice(0, 8)
+      .map((project) => project.id);
     const loaded: GameState = {
       ...initial,
       gamePhase: 2,
@@ -248,12 +279,44 @@ describe("phase/tier progression reducer coverage", () => {
       {
         type: "LOAD_STATE",
         state: loaded as any,
+        allowLegacyCouncilRecovery: true,
       } as any,
     );
 
     expect(next.council.unlocked).toBe(true);
     expect(next.gamePhase).toBe(3);
     expect(next.projectsUnlocked).toBe(true);
+  });
+
+  it("does not let a current V2-style reload bypass the mandatory capstone", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const projectsCompleted = PROJECT_DEFINITIONS.filter(
+      (project) => project.id !== "proj_international_expo",
+    )
+      .slice(0, 8)
+      .map((project) => project.id);
+    const loaded: GameState = {
+      ...initial,
+      gamePhase: 2,
+      liberationComplete: true,
+      projectsCompleted,
+      reputation: 2500,
+      reputationTier: 9,
+      projectsUnlocked: true,
+      projectOffers: [],
+      council: { ...initial.council, unlocked: false },
+    };
+
+    const next = __TEST_ONLY__.gameReducer(initial, {
+      type: "LOAD_STATE",
+      state: loaded,
+    } as any);
+
+    expect(next.council.unlocked).toBe(false);
+    expect(next.gamePhase).toBe(2);
+    expect(next.projectOffers.map((offer) => offer.projectId)).toContain(
+      "proj_international_expo",
+    );
   });
 
   it("repairs stale Phase 3 saves with disabled Council/project flags", () => {
@@ -480,7 +543,7 @@ describe("phase/tier progression reducer coverage", () => {
         presetId: "phase3_council_live",
       } as any,
     );
-    expect(jumped.settings.phase3OnboardingVariantOverride).toBe("control");
+    expect(jumped.settings.phase3OnboardingVariantOverride).toBeUndefined();
 
     const reset = __TEST_ONLY__.gameReducer(
       jumped as any,
@@ -488,7 +551,7 @@ describe("phase/tier progression reducer coverage", () => {
         type: "RESET_GAME",
       } as any,
     );
-    expect(reset.settings.phase3OnboardingVariantOverride).toBe("control");
+    expect(reset.settings.phase3OnboardingVariantOverride).toBeUndefined();
 
     const cleared = __TEST_ONLY__.gameReducer(
       reset as any,
@@ -591,6 +654,25 @@ describe("phase/tier progression reducer coverage", () => {
     expect(next.projectOffers.length).toBe(0);
     expect(next.reputationTier).toBeLessThan(4);
     expect(next.orderMetrics).toEqual(initial.orderMetrics);
+  });
+
+  it("bootstraps a Council-locked Phase 2 capstone-ready preset", () => {
+    const initial = __TEST_ONLY__.getInitialState();
+    const next = __TEST_ONLY__.gameReducer(
+      initial as any,
+      {
+        type: "PLAYTEST_APPLY_PRESET",
+        presetId: "phase2_capstone_ready",
+      } as any,
+    );
+
+    expect(next.gamePhase).toBe(2);
+    expect(next.reputationTier).toBeGreaterThanOrEqual(9);
+    expect(next.projectsCompleted).toHaveLength(6);
+    expect(next.projectsCompleted).not.toContain("proj_international_expo");
+    expect(next.projectOffers[0]?.projectId).toBe("proj_international_expo");
+    expect(next.council.unlocked).toBe(false);
+    expect(next.activeProject).toBeUndefined();
   });
 
   it("reapplies deterministic phase presets even from late-game state", () => {
@@ -793,6 +875,65 @@ describe("phase/tier progression reducer coverage", () => {
         ),
       );
       expect(phase3Tier16Max).toBeGreaterThanOrEqual(16);
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
+  it("caps Open Workshop level 8 drops and tier-16 celebration to the active phase", () => {
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.999);
+    const initial = __TEST_ONLY__.getInitialState();
+    try {
+      const phase2State: GameState = {
+        ...initial,
+        tutorialComplete: true,
+        firstSessionComplete: true,
+        gamePhase: 2,
+        liberationComplete: true,
+        maxTierCrafted: 12,
+        suppliers: {
+          ...initial.suppliers,
+          open: {
+            level: 8,
+            chargesRemaining: 1,
+            cooldownEndsAt: 0,
+            overdrawCount: 0,
+          },
+        },
+      };
+      const phase2Next = __TEST_ONLY__.gameReducer(phase2State, {
+        type: "TAP_SUPPLIER",
+        supplierId: "open",
+      });
+      const phase2Tiers = [...phase2Next.board, ...phase2Next.backpack]
+        .filter((part): part is Part => !!part && part.family !== "waste")
+        .map((part) => part.tier);
+      expect(Math.max(...phase2Tiers)).toBe(13);
+      expect(phase2Next.maxTierCrafted).toBe(13);
+      expect(phase2Next.tier16ShowcaseSeen).toBe(false);
+      expect(phase2Next.tier16ShowcasePending).toBe(false);
+      expect(
+        phase2Next.orders.some((candidate) =>
+          candidate.modifierIds?.includes("tier16_showcase"),
+        ),
+      ).toBe(false);
+
+      const phase3State: GameState = {
+        ...phase2State,
+        gamePhase: 3,
+        council: { ...phase2State.council, unlocked: true },
+      };
+      const phase3Next = __TEST_ONLY__.gameReducer(phase3State, {
+        type: "TAP_SUPPLIER",
+        supplierId: "open",
+      });
+      expect(phase3Next.maxTierCrafted).toBe(16);
+      expect(phase3Next.tier16ShowcaseSeen).toBe(true);
+      expect(
+        phase3Next.orders.some((candidate) =>
+          candidate.modifierIds?.includes("tier16_showcase"),
+        ),
+      ).toBe(true);
     } finally {
       randomSpy.mockRestore();
     }

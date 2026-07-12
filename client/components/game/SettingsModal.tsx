@@ -7,6 +7,7 @@ import {
   Switch,
   Alert,
   TextInput,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -15,53 +16,16 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
 import { ModalShell } from "./ModalShell";
-import { PlaytestPresetModal } from "./PlaytestPresetModal";
 import { BorderRadius, GameColors, Spacing } from "@/constants/theme";
-import {
-  PlaytestPresetId,
-  PLAYTEST_PRESET_META,
-} from "@/constants/playtestPresets";
 import { useGame } from "@/context/GameContext";
-import type { Phase3OnboardingVariant } from "@/types/game";
-import {
-  getPhase3OnboardingVariantLabel,
-  resolvePhase3OnboardingBuildVariant,
-} from "@/lib/phase3OnboardingVariant";
-
-type Phase3OnboardingVariantOption = "build_default" | Phase3OnboardingVariant;
-
-const PHASE3_ONBOARDING_VARIANT_OPTIONS: {
-  id: Phase3OnboardingVariantOption;
-  label: string;
-  description: string;
-}[] = [
-  {
-    id: "build_default",
-    label: "Build Default",
-    description: "Use the mode configured in app env.",
-  },
-  {
-    id: "control",
-    label: "Control",
-    description: "Story/banner only with no guided handoff.",
-  },
-  {
-    id: "phase3_handoff_only",
-    label: "Handoff Only",
-    description: "Phase 3 intro plus Council-open handoff only.",
-  },
-  {
-    id: "phase3_full_adaptive",
-    label: "Full Adaptive",
-    description: "Complete adaptive guidance and rescue hints.",
-  },
-];
 
 interface SettingsModalProps {
   onClose: () => void;
   onOpenGlossary?: () => void;
   debugOverlayEnabled?: boolean;
   onToggleDebugOverlay?: (value: boolean) => void;
+  playtestEnabled?: boolean;
+  onOpenPlaytestLab?: () => void;
 }
 
 interface SettingRowProps {
@@ -104,37 +68,94 @@ function SettingRow({
   );
 }
 
+function VolumeSettingRow({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const percent = Math.round(value * 100);
+  const changeBy = (delta: number) => {
+    onChange(Math.max(0, Math.min(1, Math.round((value + delta) * 10) / 10)));
+  };
+  return (
+    <View
+      style={styles.settingRow}
+      testID={Platform.OS === "web" ? "settings-sfx-volume" : undefined}
+      accessible={false}
+    >
+      <LinearGradient
+        colors={[
+          `${GameColors.ui.primary}30`,
+          `${GameColors.ui.primary}10`,
+          `${GameColors.ui.primary}30`,
+        ]}
+        style={styles.settingIcon}
+      >
+        <Feather name="sliders" size={20} color={GameColors.ui.primary} />
+      </LinearGradient>
+      <View style={styles.settingContent}>
+        <ThemedText style={styles.settingLabel}>SFX Volume</ThemedText>
+        <ThemedText style={styles.settingDescription}>
+          Master gameplay sound level
+        </ThemedText>
+      </View>
+      <View style={styles.volumeControls}>
+        <Pressable
+          style={[
+            styles.volumeButton,
+            value <= 0 && styles.volumeButtonDisabled,
+          ]}
+          onPress={() => changeBy(-0.1)}
+          disabled={value <= 0}
+          accessibilityRole="button"
+          accessibilityLabel="Decrease sound effects volume"
+          testID="settings-sfx-volume-down"
+        >
+          <Feather name="minus" size={15} color={GameColors.text.primary} />
+        </Pressable>
+        <ThemedText
+          style={styles.volumeValue}
+          accessibilityLabel={`Sound effects volume ${percent} percent`}
+        >
+          {percent}%
+        </ThemedText>
+        <Pressable
+          style={[
+            styles.volumeButton,
+            value >= 1 && styles.volumeButtonDisabled,
+          ]}
+          onPress={() => changeBy(0.1)}
+          disabled={value >= 1}
+          accessibilityRole="button"
+          accessibilityLabel="Increase sound effects volume"
+          testID="settings-sfx-volume-up"
+        >
+          <Feather name="plus" size={15} color={GameColors.text.primary} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export function SettingsModal({
   onClose,
   onOpenGlossary,
   debugOverlayEnabled,
   onToggleDebugOverlay,
+  playtestEnabled = false,
+  onOpenPlaytestLab,
 }: SettingsModalProps) {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, applyPlaytestPreset } = useGame();
-  const e2eEnabled = process.env.EXPO_PUBLIC_E2E === "1";
+  const { state, dispatch } = useGame();
   const {
     soundEnabled,
+    sfxVolume,
     hapticsEnabled,
     reducedMotion,
-    phase3OnboardingVariantOverride,
+    enhancedPartCues,
   } = state.settings;
-  const phase3OnboardingBuildVariant = resolvePhase3OnboardingBuildVariant();
-  const effectivePhase3OnboardingVariant =
-    phase3OnboardingVariantOverride ?? phase3OnboardingBuildVariant;
-  const phase3ModeSummary = phase3OnboardingVariantOverride
-    ? `${getPhase3OnboardingVariantLabel(effectivePhase3OnboardingVariant)} override active`
-    : `${getPhase3OnboardingVariantLabel(effectivePhase3OnboardingVariant)} via build default`;
-  const selectedPhase3VariantOption = PHASE3_ONBOARDING_VARIANT_OPTIONS.find(
-    (option) =>
-      option.id ===
-      (phase3OnboardingVariantOverride === undefined
-        ? "build_default"
-        : phase3OnboardingVariantOverride),
-  );
-  const canSkipPhase2 = state.gamePhase < 2 && !state.liberationComplete;
-  const canSkipPhase3 = state.gamePhase < 3 || !state.council.unlocked;
-  const [playtestPresetVisible, setPlaytestPresetVisible] = useState(false);
   const [resetChallengeVisible, setResetChallengeVisible] = useState(false);
   const [resetAnswer, setResetAnswer] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -202,90 +223,8 @@ export function SettingsModal({
     onClose();
   };
 
-  const runPlaytestPreset = (presetId: PlaytestPresetId) => {
-    applyPlaytestPreset(presetId);
-    setPlaytestPresetVisible(false);
-    onClose();
-  };
-
-  const handlePlaytestPresetSelect = (presetId: PlaytestPresetId) => {
-    if (e2eEnabled) {
-      runPlaytestPreset(presetId);
-      return;
-    }
-    const preset = PLAYTEST_PRESET_META[presetId];
-    Alert.alert(
-      `Playtest: ${preset.title}`,
-      `${preset.summary}\n\n${preset.detail}`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Apply Preset",
-          style: "destructive",
-          onPress: () => runPlaytestPreset(presetId),
-        },
-      ],
-    );
-  };
-
-  const handleSkipPhase2 = () => {
-    if (!canSkipPhase2) return;
-    if (e2eEnabled) {
-      runPlaytestPreset("phase2_gate");
-      return;
-    }
-    Alert.alert(
-      "Playtest: Skip to Phase 2",
-      "This applies a Phase 2 playtest bootstrap so you can validate projects and late-game flows from a fresh save.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Skip Now",
-          style: "destructive",
-          onPress: () => {
-            runPlaytestPreset("phase2_gate");
-          },
-        },
-      ],
-    );
-  };
-
-  const handleSkipPhase3 = () => {
-    if (!canSkipPhase3) return;
-    if (e2eEnabled) {
-      runPlaytestPreset("phase3_council_live");
-      return;
-    }
-    Alert.alert(
-      "Playtest: Skip to Phase 3",
-      "This bootstraps a Council-unlocked Phase 3 state so you can validate tier-16 progression and campaigns quickly.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Skip Now",
-          style: "destructive",
-          onPress: () => {
-            runPlaytestPreset("phase3_council_live");
-          },
-        },
-      ],
-    );
-  };
-
-  const handlePhase3VariantSelect = (
-    variant: Phase3OnboardingVariantOption,
-  ) => {
-    dispatch({
-      type: "UPDATE_SETTINGS",
-      settings: {
-        phase3OnboardingVariantOverride:
-          variant === "build_default" ? undefined : variant,
-      },
-    });
-  };
-
   return (
-    <Pressable
+    <View
       style={[
         styles.overlay,
         {
@@ -293,13 +232,15 @@ export function SettingsModal({
           paddingBottom: Math.max(Spacing.xl, insets.bottom + Spacing.md),
         },
       ]}
-      onPress={resetChallengeVisible ? closeResetChallenge : onClose}
-      testID="settings-modal"
+      testID={Platform.OS === "web" ? "settings-modal" : undefined}
+      accessible={false}
     >
       <Pressable
-        style={styles.modalContainer}
-        onPress={(e) => e.stopPropagation()}
-      >
+        style={StyleSheet.absoluteFillObject}
+        onPress={resetChallengeVisible ? closeResetChallenge : onClose}
+        accessible={false}
+      />
+      <View style={styles.modalContainer}>
         <ModalShell
           title="Settings"
           subtitle="Tune your workshop experience"
@@ -329,6 +270,16 @@ export function SettingsModal({
                 color={GameColors.ui.primary}
               />
 
+              <VolumeSettingRow
+                value={sfxVolume}
+                onChange={(value) =>
+                  dispatch({
+                    type: "UPDATE_SETTINGS",
+                    settings: { sfxVolume: value },
+                  })
+                }
+              />
+
               <SettingRow
                 icon="smartphone"
                 label="Haptic Feedback"
@@ -355,6 +306,20 @@ export function SettingsModal({
                   })
                 }
                 color={GameColors.currency.cash}
+              />
+
+              <SettingRow
+                icon="eye"
+                label="Enhanced Part Cues"
+                description="Add non-color shapes, borders, and stronger O/L/W/C labels"
+                value={enhancedPartCues}
+                onValueChange={(value) =>
+                  dispatch({
+                    type: "UPDATE_SETTINGS",
+                    settings: { enhancedPartCues: value },
+                  })
+                }
+                color={GameColors.ui.success}
               />
 
               {__DEV__ && onToggleDebugOverlay ? (
@@ -435,155 +400,39 @@ export function SettingsModal({
                 </View>
               </Pressable>
 
-              <Pressable
-                style={styles.actionRow}
-                onPress={() => setPlaytestPresetVisible(true)}
-                testID="settings-playtest-presets"
-              >
-                <LinearGradient
-                  colors={[
-                    `${GameColors.ui.primary}30`,
-                    `${GameColors.ui.primary}10`,
-                  ]}
-                  style={styles.settingIcon}
+              {playtestEnabled && onOpenPlaytestLab ? (
+                <Pressable
+                  style={styles.actionRow}
+                  onPress={() => {
+                    onClose();
+                    onOpenPlaytestLab();
+                  }}
+                  accessibilityRole="button"
+                  testID="settings-open-playtest-lab"
                 >
-                  <Feather name="map" size={20} color={GameColors.ui.primary} />
-                </LinearGradient>
-                <View style={styles.settingContent}>
-                  <ThemedText style={styles.settingLabel}>
-                    Playtest: Jump Presets
-                  </ThemedText>
-                  <ThemedText style={styles.settingDescription}>
-                    Transition rehearsal + targeted Phase 2/3 scenario
-                    bootstraps
-                  </ThemedText>
-                </View>
-              </Pressable>
-
-              <View
-                style={styles.phase3ModeCard}
-                testID="settings-phase3-onboarding-mode"
-              >
-                <View style={styles.phase3ModeHeader}>
-                  <View style={styles.phase3ModeTitleRow}>
+                  <LinearGradient
+                    colors={[
+                      `${GameColors.ui.success}30`,
+                      `${GameColors.ui.primary}10`,
+                    ]}
+                    style={styles.settingIcon}
+                  >
                     <Feather
-                      name="sliders"
-                      size={14}
-                      color={GameColors.currency.research}
+                      name="activity"
+                      size={20}
+                      color={GameColors.ui.success}
                     />
-                    <ThemedText style={styles.phase3ModeTitle}>
-                      Playtest: Phase 3 Onboarding
+                  </LinearGradient>
+                  <View style={styles.settingContent}>
+                    <ThemedText style={styles.settingLabel}>
+                      Playtest Lab
+                    </ThemedText>
+                    <ThemedText style={styles.settingDescription}>
+                      Protected Phase 2 and Phase 3 test scenarios
                     </ThemedText>
                   </View>
-                  <ThemedText
-                    style={styles.phase3ModeSummary}
-                    testID="settings-phase3-variant-current"
-                  >
-                    {phase3ModeSummary}
-                  </ThemedText>
-                </View>
-                <View style={styles.phase3ModeOptionList}>
-                  {PHASE3_ONBOARDING_VARIANT_OPTIONS.map((option) => {
-                    const selected =
-                      option.id === "build_default"
-                        ? phase3OnboardingVariantOverride === undefined
-                        : phase3OnboardingVariantOverride === option.id;
-                    return (
-                      <Pressable
-                        key={option.id}
-                        style={[
-                          styles.phase3ModeOption,
-                          selected && styles.phase3ModeOptionSelected,
-                        ]}
-                        onPress={() => handlePhase3VariantSelect(option.id)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        testID={`settings-phase3-variant-${option.id}`}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.phase3ModeOptionLabel,
-                            selected && styles.phase3ModeOptionLabelSelected,
-                          ]}
-                        >
-                          {option.label}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {selectedPhase3VariantOption ? (
-                  <ThemedText style={styles.phase3ModeOptionDescription}>
-                    {selectedPhase3VariantOption.description}
-                  </ThemedText>
-                ) : null}
-              </View>
-
-              <Pressable
-                style={[
-                  styles.actionRow,
-                  !canSkipPhase2 && styles.actionRowDisabled,
-                ]}
-                onPress={canSkipPhase2 ? handleSkipPhase2 : undefined}
-                testID="settings-skip-phase2"
-              >
-                <LinearGradient
-                  colors={[
-                    `${GameColors.currency.research}30`,
-                    `${GameColors.currency.research}10`,
-                  ]}
-                  style={styles.settingIcon}
-                >
-                  <Feather
-                    name="skip-forward"
-                    size={20}
-                    color={GameColors.currency.research}
-                  />
-                </LinearGradient>
-                <View style={styles.settingContent}>
-                  <ThemedText style={styles.settingLabel}>
-                    Playtest: Skip to Phase 2
-                  </ThemedText>
-                  <ThemedText style={styles.settingDescription}>
-                    {canSkipPhase2
-                      ? "Bootstrap a fresh save into a Phase 2-ready state"
-                      : "Already in Phase 2 or later"}
-                  </ThemedText>
-                </View>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.actionRow,
-                  !canSkipPhase3 && styles.actionRowDisabled,
-                ]}
-                onPress={canSkipPhase3 ? handleSkipPhase3 : undefined}
-                testID="settings-skip-phase3"
-              >
-                <LinearGradient
-                  colors={[
-                    `${GameColors.ui.success}30`,
-                    `${GameColors.ui.success}10`,
-                  ]}
-                  style={styles.settingIcon}
-                >
-                  <Feather
-                    name="fast-forward"
-                    size={20}
-                    color={GameColors.ui.success}
-                  />
-                </LinearGradient>
-                <View style={styles.settingContent}>
-                  <ThemedText style={styles.settingLabel}>
-                    Playtest: Skip to Phase 3
-                  </ThemedText>
-                  <ThemedText style={styles.settingDescription}>
-                    {canSkipPhase3
-                      ? "Bootstrap into a Council-unlocked Phase 3 state"
-                      : "Already in Phase 3"}
-                  </ThemedText>
-                </View>
-              </Pressable>
+                </Pressable>
+              ) : null}
 
               <Pressable
                 style={styles.actionRow}
@@ -624,7 +473,7 @@ export function SettingsModal({
             </View>
           </ScrollView>
         </ModalShell>
-      </Pressable>
+      </View>
 
       {resetChallengeVisible ? (
         <Pressable style={styles.resetOverlay} onPress={closeResetChallenge}>
@@ -686,13 +535,7 @@ export function SettingsModal({
           </Pressable>
         </Pressable>
       ) : null}
-
-      <PlaytestPresetModal
-        visible={playtestPresetVisible}
-        onClose={() => setPlaytestPresetVisible(false)}
-        onSelect={handlePlaytestPresetSelect}
-      />
-    </Pressable>
+    </View>
   );
 }
 
@@ -731,9 +574,6 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingVertical: Spacing.sm,
   },
-  actionRowDisabled: {
-    opacity: 0.45,
-  },
   settingIcon: {
     width: 44,
     height: 44,
@@ -756,63 +596,30 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     marginTop: 2,
   },
-  phase3ModeCard: {
-    borderWidth: 1,
-    borderColor: "#2A2A4A",
-    borderRadius: BorderRadius.lg,
-    backgroundColor: "rgba(20, 24, 44, 0.72)",
-    padding: Spacing.md,
-    gap: Spacing.sm,
-  },
-  phase3ModeHeader: {
-    gap: 2,
-  },
-  phase3ModeTitleRow: {
+  volumeControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
+    gap: 6,
   },
-  phase3ModeTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
-  phase3ModeSummary: {
-    fontSize: 12,
-    color: GameColors.text.secondary,
-  },
-  phase3ModeOptionList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.xs,
-  },
-  phase3ModeOption: {
-    width: "48%",
+  volumeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#2A2A4A",
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    backgroundColor: "rgba(26, 26, 46, 0.72)",
-    minHeight: 34,
+    borderColor: "#3A4764",
+    backgroundColor: "#1A2036",
+    alignItems: "center",
     justifyContent: "center",
   },
-  phase3ModeOptionSelected: {
-    borderColor: GameColors.currency.research,
-    backgroundColor: "rgba(155, 92, 255, 0.14)",
+  volumeButtonDisabled: {
+    opacity: 0.35,
   },
-  phase3ModeOptionLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: GameColors.text.primary,
-  },
-  phase3ModeOptionLabelSelected: {
-    color: GameColors.currency.research,
-  },
-  phase3ModeOptionDescription: {
+  volumeValue: {
+    minWidth: 40,
+    textAlign: "center",
     fontSize: 11,
-    color: GameColors.text.secondary,
-    marginTop: 2,
+    fontWeight: "800",
+    color: GameColors.text.primary,
   },
   footer: {
     paddingHorizontal: Spacing.lg,

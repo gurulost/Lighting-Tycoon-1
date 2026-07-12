@@ -626,7 +626,7 @@ export function buildPhasePlaybookSnapshot({
       nowTitle: "All available contracts are complete",
       nowDetail: "Check the board for refreshes and new contract rotations.",
       nextTitle:
-        "Keep raising reputation for harder contracts and Council unlock.",
+        "Qualify for and complete the Expo capstone to unlock Council.",
       blocker: undefined,
       progressLabel,
       primaryAction: "open_projects_offers",

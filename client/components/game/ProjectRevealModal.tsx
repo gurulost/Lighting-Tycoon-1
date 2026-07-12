@@ -82,7 +82,13 @@ export function ProjectRevealModal({
               New Empire Contract
             </ThemedText>
           </View>
-          <Pressable style={styles.closeButton} onPress={onDismiss}>
+          <Pressable
+            style={styles.closeButton}
+            onPress={onDismiss}
+            testID="project-reveal-modal-close"
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss project offer"
+          >
             <Feather name="x" size={18} color={GameColors.text.primary} />
           </Pressable>
         </View>

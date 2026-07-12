@@ -10,6 +10,7 @@ module.exports = defineConfig([
     ignores: [
       "dist/**",
       "server_dist/**",
+      "static-build/**",
       "test-results/**",
       "playwright-report/**",
     ],

@@ -585,6 +585,7 @@ export function ProjectBoardModal({
       icon="flag"
       iconColor={GameColors.ui.primary}
       onClose={onClose}
+      closeTestID="project-board-modal-close"
       testID="project-board-modal"
     >
       <ScrollView

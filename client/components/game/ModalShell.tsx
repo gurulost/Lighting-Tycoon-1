@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable, ViewStyle } from "react-native";
+import { View, StyleSheet, Pressable, ViewStyle, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -65,7 +65,8 @@ export function ModalShell({
     <LinearGradient
       colors={ModalTokens.gradient}
       style={containerStyle}
-      testID={testID}
+      testID={Platform.OS === "web" ? testID : undefined}
+      accessible={false}
     >
       {showHeader ? (
         <View style={[styles.header, isCard && styles.headerCard]}>
@@ -94,6 +95,9 @@ export function ModalShell({
                 hitSlop={8}
                 pressRetentionOffset={12}
                 testID={closeTestID}
+                accessibilityRole="button"
+                accessibilityLabel={`Close ${title}`}
+                accessibilityState={{ disabled: closeDisabled }}
                 style={[
                   styles.closeButton,
                   closeDisabled && styles.closeButtonDisabled,

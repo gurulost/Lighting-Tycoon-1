@@ -12,9 +12,13 @@ import { useTheme } from "@/hooks/useTheme";
 import { BorderRadius, GameColors, Spacing } from "@/constants/theme";
 import { LEGACY_DOCTRINES } from "@/constants/legacy";
 import { getDoctrineSlotCap, getLegacyBadgeTitle } from "@/lib/legacy";
+import {
+  DailyGoalCard,
+  PlayerProfileSummaryCard,
+} from "@/components/game/PlayerContinuityCards";
 
 export default function ProfileScreen() {
-  const { state, setLegacyTitle } = useGame();
+  const { state, setLegacyTitle, claimDailyGoal } = useGame();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
@@ -38,6 +42,9 @@ export default function ProfileScreen() {
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
+      <PlayerProfileSummaryCard stats={state.lifetimeStats} />
+      <DailyGoalCard goal={state.dailyGoal} onClaim={claimDailyGoal} />
+
       <View style={styles.card}>
         <ThemedText style={styles.cardTitle}>Legacy Standards</ThemedText>
         <ThemedText style={styles.cardText}>

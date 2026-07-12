@@ -30,14 +30,16 @@ async function applyPlaytestPreset(page: Page, presetId: string) {
   await expect(settingsModal).toBeVisible({ timeout: 10_000 });
 
   await page
-    .getByTestId("settings-playtest-presets")
+    .getByTestId("settings-open-playtest-lab")
     .click({ timeout: 10_000 });
-  const presetModal = page.getByTestId("playtest-preset-modal");
+  const presetModal = page.getByTestId("playtest-lab-modal");
   await expect(presetModal).toBeVisible({ timeout: 10_000 });
 
   await page
     .getByTestId(`playtest-preset-${presetId}`)
     .click({ timeout: 10_000 });
+  await page.getByTestId("playtest-lab-apply").click({ timeout: 10_000 });
+  await expect(presetModal).toBeHidden({ timeout: 10_000 });
   await expect(settingsModal).toBeHidden({ timeout: 10_000 });
 }
 
@@ -50,14 +52,14 @@ async function setPhase3OnboardingVariant(
     .click({ timeout: 10_000, force: true });
   const settingsModal = page.getByTestId("settings-modal");
   await expect(settingsModal).toBeVisible({ timeout: 10_000 });
-  const modeCard = page.getByTestId("settings-phase3-onboarding-mode");
-  await modeCard.scrollIntoViewIfNeeded();
-  await expect(modeCard).toBeVisible({ timeout: 10_000 });
-  const variantButton = page.getByTestId(`settings-phase3-variant-${variant}`);
+  await page.getByTestId("settings-open-playtest-lab").click();
+  const lab = page.getByTestId("playtest-lab-modal");
+  await expect(lab).toBeVisible({ timeout: 10_000 });
+  const variantButton = page.getByTestId(`playtest-variant-${variant}`);
   await variantButton.scrollIntoViewIfNeeded();
   await variantButton.click({ timeout: 10_000 });
-  await page.getByTestId("settings-modal-close").click({ timeout: 10_000 });
-  await expect(settingsModal).toBeHidden({ timeout: 10_000 });
+  await page.getByTestId("playtest-lab-close").click({ timeout: 10_000 });
+  await expect(lab).toBeHidden({ timeout: 10_000 });
 }
 
 test("Phase 3 handoff highlights campaign activation and first Set Active action", async ({
@@ -245,7 +247,7 @@ test("Phase 3 control variant skips the Phase 3 intro takeover", async ({
 }) => {
   await bootstrapInteractiveState(page);
   await setPhase3OnboardingVariant(page, "control");
-  await page.getByTestId("e2e-skip-phase3").click({ force: true });
+  await applyPlaytestPreset(page, "phase3_council_live");
 
   await expect(page.getByTestId("phase3-intro-modal")).toBeHidden({
     timeout: 4_000,
