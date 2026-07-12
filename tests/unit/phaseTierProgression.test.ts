@@ -167,7 +167,7 @@ describe("phase/tier progression reducer coverage", () => {
     const initial = __TEST_ONLY__.getInitialState();
     const board = [...initial.board];
     board[0] = createPart(0, 1);
-    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 6).map(
+    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 8).map(
       (project) => project.id,
     );
     const order = createOrder("unlock-council");
@@ -226,7 +226,7 @@ describe("phase/tier progression reducer coverage", () => {
 
   it("auto-unlocks Council during load when unlock requirements are already met", () => {
     const initial = __TEST_ONLY__.getInitialState();
-    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 6).map(
+    const projectsCompleted = PROJECT_DEFINITIONS.slice(0, 8).map(
       (project) => project.id,
     );
     const loaded: GameState = {

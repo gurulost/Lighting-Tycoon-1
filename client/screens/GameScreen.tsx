@@ -60,6 +60,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { countFreeSlots, getBoardPressureBand } from "@/lib/boardPressure";
 import { getCouncilUnlockInfo } from "@/lib/council";
+import { analyzeOrderAgainstBoard } from "@/lib/orders";
 import {
   resolvePhaseObjective,
   type PhaseObjectiveState,
@@ -558,9 +559,34 @@ export default function GameScreen() {
   }, [state.storyLog, state.storyLastViewedAt]);
   const tutorialSkipped =
     state.tutorialComplete && state.tutorialMetrics.skipped;
+  // The guide's coercive UI (force-open Orders, disable close, clear part
+  // selection) only engages while a qualifying order is actually fulfillable
+  // from the current board. Otherwise a player without the exact required
+  // part would be soft-locked inside the Orders modal — persisted across
+  // relaunch, since compatibilityGuideStep is saved.
+  const compatGuideTargetFulfillable = useMemo(() => {
+    if (
+      state.compatibilityGuideStep !== 2 &&
+      state.compatibilityGuideStep !== 3
+    ) {
+      return false;
+    }
+    return state.orders.some((order) => {
+      const qualifies =
+        order.type === "compatibility_required" ||
+        order.requirements.some((req) => req.requiresCompatible) ||
+        (order.type === "locked_required" && !order.noSubstitutions);
+      if (!qualifies) return false;
+      return (
+        analyzeOrderAgainstBoard(order, state.board).fulfillmentIndices !== null
+      );
+    });
+  }, [state.compatibilityGuideStep, state.orders, state.board]);
   const compatibilityGuideOrdersLock =
     state.tutorialComplete &&
-    (state.compatibilityGuideStep === 2 || state.compatibilityGuideStep === 3);
+    (state.compatibilityGuideStep === 2 ||
+      state.compatibilityGuideStep === 3) &&
+    compatGuideTargetFulfillable;
   const overlayDebugTop = useMemo(() => {
     if (overlayQueue.length === 0) return null;
     return overlayQueue.reduce((best, entry) => {
@@ -1495,6 +1521,7 @@ export default function GameScreen() {
       phase2IntroVisible ||
       phase2ContractsBriefVisible ||
       phase3IntroVisible ||
+      phase3RatifyReadyVisible ||
       showLockoutModal ||
       selectedPartOpen ||
       Boolean(projectDossierId) ||
@@ -1509,6 +1536,7 @@ export default function GameScreen() {
     state.council.activeHearing,
     state.phase3Onboarding.hearingResolvedSeen,
     phase3HearingIntroVisible,
+    phase3RatifyReadyVisible,
     activeModal,
     phase2IntroVisible,
     phase2ContractsBriefVisible,
@@ -2225,22 +2253,15 @@ export default function GameScreen() {
       setActiveModal(null);
       return;
     }
-    if (
-      (state.compatibilityGuideStep === 2 ||
-        state.compatibilityGuideStep === 3) &&
-      activeModal !== "orders"
-    ) {
+    if (compatibilityGuideOrdersLock && activeModal !== "orders") {
       setActiveModal("orders");
     }
-    if (
-      (state.compatibilityGuideStep === 2 ||
-        state.compatibilityGuideStep === 3) &&
-      selectedPartIndex !== null
-    ) {
+    if (compatibilityGuideOrdersLock && selectedPartIndex !== null) {
       setSelectedPartIndex(null);
     }
   }, [
     activeModal,
+    compatibilityGuideOrdersLock,
     selectedPartIndex,
     state.compatibilityGuideStep,
     state.tutorialComplete,
@@ -3288,7 +3309,10 @@ export default function GameScreen() {
       </Modal>
 
       <MergeMomentumModal
-        visible={Boolean(state.mergeMomentumPending)}
+        // Defer behind phase intro takeovers: mergeMomentumPending is
+        // persisted, so a reload at a phase boundary can otherwise stack this
+        // full-screen overlay on top of the intro modal.
+        visible={Boolean(state.mergeMomentumPending) && !overlaySuppressed}
         threshold={state.mergeMomentumPending?.threshold ?? 0}
         onChoose={(choice) => claimMergeMomentum(choice)}
       />

@@ -85,7 +85,7 @@ Mentor framing: You didn't just win contracts - you changed minds. Now you can c
 
 Tina intent: We're not just building installs anymore; we're writing the rulebook. Every campaign we pass makes the open way the default, and the lobby has to keep up.
 
-- Unlocks after the Phase 2 capstone (or fallback: 6 projects + rep tier gate).
+- Unlocks after the Phase 2 capstone (or fallback: 8 projects + rep tier gate; the fallback sits above the capstone's own offer gate of 6 projects so the capstone finale is reachable).
 - One active Council campaign at a time; you can switch without losing progress.
 - Campaigns are three steps:
   - Draft: invest cash + research (partial investment allowed).
@@ -139,10 +139,12 @@ Tina intent: We're not just building installs anymore; we're writing the ruleboo
 - Baron Warranty Stamp: spend cash to soften wrong-family penalties or boost Baron contract payouts.
 
 ## Lockout Event
+- Only occurs during game Phase 1 (the dependency/liberation arc); dependency is frozen at 0 after liberation, so lockouts cannot fire in game Phases 2-3.
 - Triggers when Dependency drops below the crackdown threshold (~20)
-- Phase 1: audit alert
-- Phase 2: choose Baron compliance (locked) or Lab route (research)
-- Phase 3: resolve with Freedom Controller or compliance order
+- Escalates through three lockout stages (`lockoutPhase`):
+  - Stage 1: audit alert
+  - Stage 2: choose Baron compliance (locked) or Lab route (research)
+  - Stage 3: resolve with Freedom Controller (liberation, advances to game Phase 2) or compliance order
 - Dependency will not drop below the crackdown threshold while the audit is active
 - Lab request target scales with Baron Pressure at lockout start
 

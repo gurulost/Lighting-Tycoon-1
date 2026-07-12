@@ -82,10 +82,10 @@ Preferred communication style: Simple, everyday language.
   - `DependencyMeter`: Dynamic color transitions, warning pulses, and Bulb Baron portrait at high dependency
   - `OrderCard`: Gradient backgrounds, requirement chips, pulsing glow when fulfillable
   - `OrdersModal`: Premium header styling with stats row
-  - `SettingsModal`: Toggle switches for sound, haptics, and notifications
+  - `SettingsModal`: Toggle switches for sound, haptics, and reduced motion
 
 ### Tutorial System
-- **TutorialOverlay component**: 6-step onboarding guide for new players
+- **TutorialOverlay component**: 8-step onboarding guide for new players (see docs/tutorial.md for the step list)
 - Steps cover: Welcome, Merge Board, Part Families, Customer Orders, Dependency Meter, Getting Started
 - Skip option and progress dots for navigation
 

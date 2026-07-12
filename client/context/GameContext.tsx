@@ -1279,9 +1279,16 @@ function canOfferProject(project: ProjectDefinition, state: GameState) {
 
 function generateProjectOffers(state: GameState, count = 3): ProjectOffer[] {
   const now = Date.now();
-  const candidates = PROJECT_DEFINITIONS.filter((project) =>
+  const eligible = PROJECT_DEFINITIONS.filter((project) =>
     canOfferProject(project, state),
   );
+  // Completed contracts are not re-offered while new ones remain, so rewards
+  // can't be farmed by re-running the same project. Once every eligible
+  // contract is complete, repeats become available as a late-game income loop.
+  const fresh = eligible.filter(
+    (project) => !state.projectsCompleted.includes(project.id),
+  );
+  const candidates = fresh.length > 0 ? fresh : eligible;
   if (candidates.length === 0) return [];
   const offers: ProjectOffer[] = [];
   const available = [...candidates];
@@ -4019,7 +4026,20 @@ function createPhase2GoalOrder(state: GameState): Order {
 }
 
 function createCompatibilityGuideOrder(state: GameState): Order {
-  const targetTier = Math.max(3, Math.min(4, state.maxTierCrafted));
+  // The requirement is exact-tier, so target a tier the player can actually
+  // deliver: prefer a compatible open part already on the board and only fall
+  // back to the tier 3-4 band when none exists. A mismatched target would
+  // strand the guide behind the locked Orders modal.
+  const boardCompatibleTiers = state.board
+    .filter(
+      (part): part is Part =>
+        !!part && part.family === "open" && part.compatible === true,
+    )
+    .map((part) => part.tier);
+  const fallbackTier = Math.max(3, Math.min(4, state.maxTierCrafted));
+  const targetTier = boardCompatibleTiers.length
+    ? Math.min(...boardCompatibleTiers)
+    : fallbackTier;
   return withTunedRewards({
     id: generateId(),
     title: "Compatibility Walkthrough",
@@ -5119,6 +5139,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return { ...item, tier: nextTier };
         });
       }
+
+      // Drops must respect the phase tier cap just like merges (see MERGE_PARTS);
+      // Open Workshop L7/L8 tables can otherwise roll above the Phase 2 cap.
+      const supplierTierCap = getMaxPartTierForState(state);
+      rollResult.baseItems = rollResult.baseItems.map((item) =>
+        item.family === "waste" || item.tier <= supplierTierCap
+          ? item
+          : { ...item, tier: supplierTierCap as PartTier },
+      );
 
       let nextBoard = [...state.board];
       let nextBackpack = [...state.backpack];
@@ -7685,10 +7714,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         typeof nextActiveProject.stageDeadlineRemaining === "number"
       ) {
         const remaining = nextActiveProject.stageDeadlineRemaining - 1;
-        projectStageFailed = remaining <= 0;
+        // Fail only once the allowance is exceeded: an authored deadline of N
+        // permits exactly N side-installs ("0 left" = next one fails), instead
+        // of failing on the install the UI still shows as "1 left".
+        projectStageFailed = remaining < 0;
         nextActiveProject = {
           ...nextActiveProject,
-          stageDeadlineRemaining: remaining,
+          stageDeadlineRemaining: Math.max(0, remaining),
         };
       }
 
@@ -12059,8 +12091,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const snapshotReputation = state.undoSnapshot.reputation;
       const nextNeighborhood = getNeighborhoodByRep(snapshotReputation);
       const nextRepTier = getReputationTier(snapshotReputation);
+      // If the undone move is what triggered the lockout, restoring
+      // lockoutActive=false must also remove the lockout order beginLockout
+      // inserted, or it lingers as a permanently protected orphan.
+      const undoingLockoutTrigger =
+        state.lockoutActive && !state.undoSnapshot.lockoutActive;
       return {
         ...state,
+        orders: undoingLockoutTrigger
+          ? state.orders.filter((order) => !order.isLockout)
+          : state.orders,
+        lockoutOrderId: undoingLockoutTrigger
+          ? undefined
+          : state.lockoutOrderId,
+        lockoutLabOrdersRemaining: undoingLockoutTrigger
+          ? 0
+          : state.lockoutLabOrdersRemaining,
+        lockoutLabOrdersTarget: undoingLockoutTrigger
+          ? 0
+          : state.lockoutLabOrdersTarget,
+        lockoutChoice: undoingLockoutTrigger ? undefined : state.lockoutChoice,
         board: [...state.undoSnapshot.board],
         backpack: [...state.undoSnapshot.backpack],
         cash: state.undoSnapshot.cash,
@@ -12301,6 +12351,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "RESOLVE_LOCKOUT": {
+      // Guard against double-dispatch (e.g. fast double-tap on the modal button):
+      // resolving an inactive lockout must be a no-op, otherwise the freedom
+      // branch re-runs liberation on an already-Phase-2 state.
+      if (!state.lockoutActive) return state;
       captureEvent("lockout_resolve", {
         choice: action.choice,
       });
@@ -13327,19 +13381,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? (action.state.storySeen as Record<string, boolean>)
           : {};
       const phase2GoalSeen = !!storySeenMap["phase2_goal"];
-      const phase2GoalPendingRaw =
-        typeof action.state.phase2GoalPending === "boolean"
-          ? action.state.phase2GoalPending
-          : gamePhase === 2 && !phase2GoalSeen && !hasPhase2GoalOrder;
-      const phase2GoalPending =
-        phase2GoalPendingRaw &&
-        gamePhase === 2 &&
-        !hasPhase2GoalOrder &&
-        !phase2GoalSeen;
       const projectsUnlockedRaw =
         typeof action.state.projectsUnlocked === "boolean"
           ? action.state.projectsUnlocked
           : undefined;
+      const phase2GoalPendingRaw =
+        typeof action.state.phase2GoalPending === "boolean"
+          ? action.state.phase2GoalPending
+          : gamePhase === 2 && !phase2GoalSeen && !hasPhase2GoalOrder;
+      // A Phase 2 save with projects still locked but no goal order on the
+      // board would strand forever (the SPAWN_ORDER retry only fires while
+      // phase2GoalPending is set), so re-arm pending in that state even when
+      // the goal story beat was already seen.
+      const phase2GoalStranded =
+        gamePhase === 2 && !hasPhase2GoalOrder && projectsUnlockedRaw === false;
+      const phase2GoalPending =
+        (phase2GoalPendingRaw &&
+          gamePhase === 2 &&
+          !hasPhase2GoalOrder &&
+          !phase2GoalSeen) ||
+        phase2GoalStranded;
       const projectsUnlocked =
         gamePhase >= 3
           ? true
@@ -14213,6 +14274,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           lockoutLabOrdersRemaining: 0,
           lockoutLabOrdersTarget: 0,
           lockoutChoice: undefined,
+          // Lockout cannot exist post-liberation; a stale lockout order would
+          // occupy a slot forever since isLockout orders are always protected.
+          orders: restoredState.orders.filter((order) => !order.isLockout),
         };
       } else if (restoredState.lockoutActive) {
         let orders = Array.isArray(restoredState.orders)
