@@ -3657,7 +3657,12 @@ export default function GameScreen() {
               accessibilityRole="button"
               accessibilityLabel="Skip to Phase 2 playtest scenario"
             >
-              <ThemedText style={styles.e2eButtonText}>E2E P2</ThemedText>
+              <ThemedText
+                style={styles.e2eButtonText}
+                maxFontSizeMultiplier={1}
+              >
+                E2E P2
+              </ThemedText>
             </Pressable>
             <Pressable
               style={styles.e2eButton}
@@ -3666,7 +3671,12 @@ export default function GameScreen() {
               accessibilityRole="button"
               accessibilityLabel="Skip to Phase 3 playtest scenario"
             >
-              <ThemedText style={styles.e2eButtonText}>E2E P3</ThemedText>
+              <ThemedText
+                style={styles.e2eButtonText}
+                maxFontSizeMultiplier={1}
+              >
+                E2E P3
+              </ThemedText>
             </Pressable>
           </View>
         ) : null}
@@ -3691,6 +3701,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   e2eButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: "#2A5A87",

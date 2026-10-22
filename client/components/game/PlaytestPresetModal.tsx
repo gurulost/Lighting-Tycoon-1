@@ -64,7 +64,7 @@ export function PlaytestLabModal({
   onVariantChange,
 }: PlaytestLabModalProps) {
   const insets = useSafeAreaInsets();
-  const { stacked } = useAccessibleLayout();
+  const { stacked, largeText } = useAccessibleLayout();
   const reducedMotion = useReducedMotion();
   const [selected, setSelected] = React.useState<PlaytestPresetId | null>(null);
 
@@ -117,7 +117,9 @@ export function PlaytestLabModal({
             style={styles.header}
           >
             <View style={styles.headerCopy}>
-              <ThemedText style={styles.eyebrow}>QA CONTROL DECK</ThemedText>
+              {!largeText ? (
+                <ThemedText style={styles.eyebrow}>QA CONTROL DECK</ThemedText>
+              ) : null}
               <ThemedText
                 style={styles.title}
                 accessibilityRole="header"
@@ -125,9 +127,11 @@ export function PlaytestLabModal({
               >
                 Playtest Lab
               </ThemedText>
-              <ThemedText style={styles.subtitle} maxFontSizeMultiplier={2}>
-                Load a protected, deterministic workshop scenario.
-              </ThemedText>
+              {!largeText ? (
+                <ThemedText style={styles.subtitle} maxFontSizeMultiplier={2}>
+                  Load a protected, deterministic workshop scenario.
+                </ThemedText>
+              ) : null}
             </View>
             <Pressable
               style={styles.closeButton}
@@ -274,7 +278,7 @@ export function PlaytestLabModal({
               testID="playtest-lab-apply"
             >
               {busy ? <ActivityIndicator color="#081018" size="small" /> : null}
-              <ThemedText style={styles.applyText}>
+              <ThemedText style={styles.applyText} maxFontSizeMultiplier={2}>
                 {busy ? "Loading Scenario" : "Load Selected Scenario"}
               </ThemedText>
             </Pressable>
@@ -452,6 +456,8 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     minHeight: 46,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -460,5 +466,11 @@ const styles = StyleSheet.create({
     backgroundColor: GameColors.ui.success,
   },
   applyDisabled: { opacity: 0.42 },
-  applyText: { fontSize: 13, fontWeight: "900", color: "#081018" },
+  applyText: {
+    flexShrink: 1,
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#081018",
+  },
 });
