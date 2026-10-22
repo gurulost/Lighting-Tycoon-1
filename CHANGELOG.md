@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this project follows semantic versio
 ## [Unreleased]
 
 - Kept the Playtest Lab scenario list scrollable at maximum accessibility text size and bounded internal E2E labels so they cannot grow across Settings.
+- Exposed nested Council reminder, part-detail and Baron-offer controls to native accessibility, enlarged reminder actions, and reclaimed decorative tutorial space at large text sizes.
 - Added adaptive Settings and tutorial layouts for accessibility text sizes, labeled switches, modal screen-reader isolation and presentation-aware focus, and live system Reduce Motion support.
 - Made board, supplier and project layouts respond to iPad resizing; preserved all iPad orientations and reachable Playtest Lab actions.
 - Disabled default diagnostic PII enrichment, log ingestion and continuous replay; made masked error replay opt-in and removed unused microphone permissions.

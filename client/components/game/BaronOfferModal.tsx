@@ -214,10 +214,17 @@ export function BaronOfferModal({ onAccept, onDecline }: BaronOfferModalProps) {
   const declineAction = splitParenChips("Decline (Open-Standard stash)");
 
   return (
-    <Pressable style={styles.overlay} onPress={handleDecline}>
+    <Pressable
+      accessible={false}
+      style={styles.overlay}
+      onPress={handleDecline}
+      testID="baron-offer-backdrop"
+    >
       <Pressable
+        accessible={false}
         style={styles.container}
         onPress={(event) => event.stopPropagation()}
+        testID="baron-offer-content"
       >
         <ModalShell
           variant="card"

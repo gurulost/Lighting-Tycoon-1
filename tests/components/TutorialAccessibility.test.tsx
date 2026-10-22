@@ -42,6 +42,7 @@ it("retains instructions and a scroll path at AX5 even in a tiny available regio
     ),
   ).toBeTruthy();
   expect(screen.UNSAFE_getByType(ScrollView)).toBeTruthy();
+  expect(screen.getAllByText("Step 1 of 8")).toHaveLength(1);
   fireEvent.press(screen.getByRole("button", { name: "Skip tutorial" }));
   fireEvent.press(
     screen.getByRole("button", { name: "Confirm skip tutorial" }),

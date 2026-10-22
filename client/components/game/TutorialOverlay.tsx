@@ -455,20 +455,22 @@ export function TutorialOverlay({
                 nanoMode ? styles.cardGradientNano : null,
               ]}
             >
-              <LinearGradient
-                colors={[`${currentStep.color}40`, `${currentStep.color}15`]}
-                style={[
-                  styles.iconContainer,
-                  compactMode ? styles.iconContainerCompact : null,
-                  nanoMode ? styles.iconContainerNano : null,
-                ]}
-              >
-                <Feather
-                  name={currentStep.icon}
-                  size={nanoMode ? 22 : compactMode ? 30 : 40}
-                  color={currentStep.color}
-                />
-              </LinearGradient>
+              {!largeText ? (
+                <LinearGradient
+                  colors={[`${currentStep.color}40`, `${currentStep.color}15`]}
+                  style={[
+                    styles.iconContainer,
+                    compactMode ? styles.iconContainerCompact : null,
+                    nanoMode ? styles.iconContainerNano : null,
+                  ]}
+                >
+                  <Feather
+                    name={currentStep.icon}
+                    size={nanoMode ? 22 : compactMode ? 30 : 40}
+                    color={currentStep.color}
+                  />
+                </LinearGradient>
+              ) : null}
 
               <ThemedText
                 accessibilityRole="header"
@@ -571,7 +573,7 @@ export function TutorialOverlay({
         </Animated.View>
       </View>
 
-      {!microMode ? (
+      {!microMode && !largeText ? (
         <View style={[styles.stepIndicator, { pointerEvents: "none" }]}>
           <ThemedText style={styles.stepText}>
             Step {state.tutorialStep + 1} of {TUTORIAL_STEPS.length}

@@ -1,0 +1,49 @@
+# Run only on a dedicated test simulator. Set its content size externally;
+# repeat at medium, XXXL, AX3 and AX5. This flow clears that app's test data.
+appId: com.lightingtycoon.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "tutorial-skip"
+    timeout: 120000
+- takeScreenshot: output/native-accessibility-tutorial-start
+- tapOn:
+    id: "tutorial-skip"
+- tapOn:
+    id: "tutorial-skip"
+- tapOn:
+    id: "settings-button"
+- assertVisible: "Close Settings"
+- assertVisible: "Sound Effects"
+- scrollUntilVisible:
+    element: "Decrease sound effects volume"
+    direction: DOWN
+    timeout: 60000
+- tapOn: "Decrease sound effects volume"
+- tapOn: "Increase sound effects volume"
+- scrollUntilVisible:
+    element:
+      id: "settings-open-playtest-lab"
+    direction: DOWN
+    timeout: 120000
+- takeScreenshot: output/native-accessibility-settings-controls
+- tapOn:
+    id: "settings-open-playtest-lab"
+- assertVisible: "Close Playtest Lab"
+- scrollUntilVisible:
+    element:
+      id: "playtest-preset-phase3_ratify_ready"
+    direction: DOWN
+    timeout: 120000
+- tapOn:
+    id: "playtest-preset-phase3_ratify_ready"
+- assertVisible:
+    id: "playtest-lab-apply"
+- takeScreenshot: output/native-accessibility-lab-final-scenario
+- tapOn: "Close Playtest Lab"
+- tapOn:
+    id: "settings-button"
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"

@@ -32,6 +32,15 @@ Lab, scroll to the last scenario, and verify the sticky action and close control
 At AX3/AX5, verify tutorial instructions can scroll and Skip remains tappable.
 Cancel out of restart confirmation; do not erase a normal save to test layout.
 
+For a repeatable native navigation check, use `.maestro/accessibility.yaml` with
+`MAESTRO_STANDALONE=1 MAESTRO_DEVICE_ID=<UDID> MAESTRO_FLOW=.maestro/accessibility.yaml npm run test:maestro`.
+It deliberately clears the app's data, so use a dedicated test simulator only.
+The flow checks Settings hit-testing, volume controls, scrolling to the final Lab
+scenario, selecting it, sticky action reachability, dismissal and reopening.
+Run the ordinary smoke flow separately to exercise scenario load/restart/restore.
+Retain screenshots per text size and review them; element visibility alone cannot
+establish that large text is visually legible or that VoiceOver reads it in order.
+
 Use iPad mini and 13-inch iPad in portrait, landscape, half-width and narrow windows.
 Resize with the tutorial, Suppliers, Project Reveal, Settings and Lab open. Check
 board hit-testing after resize, safe-area padding, and reachable dismissal.

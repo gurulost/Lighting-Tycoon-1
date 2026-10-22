@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -19,6 +19,7 @@ export function Phase3RatifyReadyModal({
 
   return (
     <Pressable
+      accessible={false}
       style={[
         styles.backdrop,
         {
@@ -29,9 +30,25 @@ export function Phase3RatifyReadyModal({
       onPress={onDismiss}
       testID="phase3-ratify-ready-backdrop"
     >
-      <View style={styles.backdropScrim} />
-      <Pressable onPress={(event) => event.stopPropagation()}>
-        <View style={styles.card} testID="phase3-ratify-ready-modal">
+      <View
+        style={styles.backdropScrim}
+        pointerEvents="none"
+        aria-hidden
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
+      <Pressable
+        accessible={false}
+        style={styles.container}
+        onPress={(event) => event.stopPropagation()}
+        testID="phase3-ratify-ready-content"
+      >
+        <View
+          style={styles.card}
+          accessibilityViewIsModal
+          onAccessibilityEscape={onDismiss}
+          testID="phase3-ratify-ready-modal"
+        >
           <View style={styles.header}>
             <View style={styles.titleWrap}>
               <Feather
@@ -39,7 +56,11 @@ export function Phase3RatifyReadyModal({
                 size={14}
                 color={GameColors.currency.research}
               />
-              <ThemedText style={styles.kicker}>
+              <ThemedText
+                style={styles.kicker}
+                accessibilityRole="header"
+                maxFontSizeMultiplier={2}
+              >
                 Council Showcase Ready
               </ThemedText>
             </View>
@@ -56,10 +77,12 @@ export function Phase3RatifyReadyModal({
               <Feather name="x" size={13} color={GameColors.text.secondary} />
             </Pressable>
           </View>
-          <ThemedText style={styles.body}>
-            Ratify can finish now. Open Orders and complete the Council showcase
-            to lock this standard.
-          </ThemedText>
+          <ScrollView style={styles.bodyScroll}>
+            <ThemedText style={styles.body}>
+              Ratify can finish now. Open Orders and complete the Council
+              showcase to lock this standard.
+            </ThemedText>
+          </ScrollView>
           <Pressable
             style={styles.openOrdersButton}
             onPress={(event) => {
@@ -71,7 +94,9 @@ export function Phase3RatifyReadyModal({
             testID="phase3-ratify-ready-open-orders"
           >
             <Feather name="inbox" size={14} color={GameColors.ui.primary} />
-            <ThemedText style={styles.openOrdersText}>Open Orders</ThemedText>
+            <ThemedText style={styles.openOrdersText} maxFontSizeMultiplier={2}>
+              Open Orders
+            </ThemedText>
           </Pressable>
         </View>
       </Pressable>
@@ -90,9 +115,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(6, 9, 19, 0.84)",
   },
+  container: {
+    width: "100%",
+    maxWidth: 420,
+    maxHeight: "100%",
+    flexShrink: 1,
+  },
   card: {
     width: "100%",
     maxWidth: 420,
+    maxHeight: "100%",
+    flexShrink: 1,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: "#324262",
@@ -107,6 +140,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   header: {
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -119,6 +153,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
+    flex: 1,
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.35,
@@ -126,9 +161,9 @@ const styles = StyleSheet.create({
     color: GameColors.currency.research,
   },
   dismissButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#36445E",
     alignItems: "center",
@@ -140,7 +175,10 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: GameColors.text.secondary,
   },
+  bodyScroll: { flexGrow: 0, flexShrink: 1 },
   openOrdersButton: {
+    flexShrink: 0,
+    minHeight: 44,
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
@@ -153,6 +191,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   openOrdersText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: "700",
     color: GameColors.ui.primary,

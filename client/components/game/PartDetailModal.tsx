@@ -65,10 +65,17 @@ export function PartDetailModal({
   };
 
   return (
-    <Pressable style={styles.overlay} onPress={onClose}>
+    <Pressable
+      accessible={false}
+      style={styles.overlay}
+      onPress={onClose}
+      testID="part-detail-backdrop"
+    >
       <Pressable
+        accessible={false}
         style={styles.container}
         onPress={(event) => event.stopPropagation()}
+        testID="part-detail-content"
       >
         <ModalShell
           variant="card"
@@ -117,6 +124,10 @@ export function PartDetailModal({
             {isLocked ? (
               <Pressable
                 onPress={handleUseFreedom}
+                accessibilityRole="button"
+                accessibilityLabel="Use Freedom Controller"
+                accessibilityState={{ disabled: !canUseFreedomController }}
+                disabled={!canUseFreedomController}
                 style={[
                   styles.freedomButton,
                   {
@@ -190,6 +201,7 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
   },
   freedomButton: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

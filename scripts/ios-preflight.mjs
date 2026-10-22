@@ -75,13 +75,24 @@ export function commandTimeout(args) {
     : 30_000;
 }
 
-function execute(command, args) {
-  const result = spawnSync(command, args, {
+export function execute(command, args, spawn = spawnSync) {
+  const spawnOptions = {
     encoding: "utf8",
     timeout: commandTimeout(args),
     maxBuffer: 8 * 1024 * 1024,
     env: { ...process.env, COCOAPODS_DISABLE_STATS: "true" },
-  });
+  };
+  let result = spawn(command, args, spawnOptions);
+  // Cold hosted runners can time out while CoreSimulator starts its service.
+  // Retry that read-only discovery once, never failed commands or bad output.
+  if (
+    args[0] === "simctl" &&
+    args[1] === "list" &&
+    result.error?.code === "ETIMEDOUT"
+  ) {
+    console.warn("CoreSimulator discovery timed out; retrying once.");
+    result = spawn(command, args, spawnOptions);
+  }
   if (result.error || result.status !== 0) {
     throw new Error(
       `${command} ${args.join(" ")}: ${result.error?.message ?? ((result.stderr || result.stdout).trim() || `exit ${result.status}`)}`,

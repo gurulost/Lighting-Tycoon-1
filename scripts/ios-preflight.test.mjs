@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   commandTimeout,
+  execute,
   parseOptions,
   runPreflight,
   selectSimulator,
@@ -18,6 +19,46 @@ test("allows bounded cold simulator discovery without extending ordinary command
     90_000,
   );
   assert.equal(commandTimeout(["-version"]), 30_000);
+});
+
+test("retries only a timed-out CoreSimulator read once", () => {
+  const timeout = Object.assign(new Error("timeout"), { code: "ETIMEDOUT" });
+  let calls = 0;
+  const spawn = () => {
+    calls += 1;
+    return calls === 1 ? { error: timeout } : { status: 0, stdout: "{}" };
+  };
+  assert.equal(execute("xcrun", ["simctl", "list", "runtimes"], spawn), "{}");
+  assert.equal(calls, 2);
+  calls = 0;
+  assert.throws(() => execute("pod", ["--version"], spawn), /timeout/);
+  assert.equal(calls, 1);
+  calls = 0;
+  assert.throws(
+    () => execute("xcrun", ["simctl", "boot", "SIM-1"], spawn),
+    /timeout/,
+  );
+  assert.equal(calls, 1);
+  calls = 0;
+  assert.throws(
+    () =>
+      execute("xcrun", ["simctl", "list", "runtimes"], () => {
+        calls += 1;
+        return { status: 1, stderr: "runtime unavailable" };
+      }),
+    /runtime unavailable/,
+  );
+  assert.equal(calls, 1);
+  calls = 0;
+  assert.throws(
+    () =>
+      execute("xcrun", ["simctl", "list", "runtimes"], () => {
+        calls += 1;
+        return { error: timeout };
+      }),
+    /timeout/,
+  );
+  assert.equal(calls, 2);
 });
 
 const runtime = {
