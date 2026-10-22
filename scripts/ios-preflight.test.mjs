@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  commandTimeout,
   parseOptions,
   runPreflight,
   selectSimulator,
 } from "./ios-preflight.mjs";
+
+test("allows bounded cold simulator discovery without extending ordinary commands", () => {
+  assert.equal(
+    commandTimeout(["simctl", "list", "runtimes", "--json"]),
+    90_000,
+  );
+  assert.equal(commandTimeout(["simctl", "list", "devices", "--json"]), 90_000);
+  assert.equal(
+    commandTimeout(["-workspace", "/repo", "-showdestinations"]),
+    90_000,
+  );
+  assert.equal(commandTimeout(["-version"]), 30_000);
+});
 
 const runtime = {
   identifier: "com.apple.CoreSimulator.SimRuntime.iOS-26-2",

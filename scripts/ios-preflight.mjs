@@ -67,10 +67,18 @@ export function selectSimulator(runtimes, devices, requestedId) {
     : available[0];
 }
 
+export function commandTimeout(args) {
+  // CoreSimulator discovery may initialize its service on a cold CI runner.
+  // Keep it bounded, but allow the same budget as Xcode destination discovery.
+  return args[0] === "simctl" || args.includes("-showdestinations")
+    ? 90_000
+    : 30_000;
+}
+
 function execute(command, args) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
-    timeout: args.includes("-showdestinations") ? 90_000 : 30_000,
+    timeout: commandTimeout(args),
     maxBuffer: 8 * 1024 * 1024,
     env: { ...process.env, COCOAPODS_DISABLE_STATS: "true" },
   });

@@ -139,3 +139,5 @@ The July audit sections below are historical; the October implementation section
   - Evidence: `output/ios-ci-39821510681/phone/lab-ax5-before-fix.png`; three new component regressions pass. Native verification of the correction is in progress.
 - [x] R-101 [status:accepted_risk] File Provider evicted a tracked source file during validation and blocked reads. Continued from an independent temporary clone of the exact pushed revision; no user files were moved, deleted or overwritten. Runtime artifacts and dependencies are not source changes.
   - Rationale: Preserve the canonical workspace and unrelated `.claude/` content while avoiding repeated placeholder I/O stalls.
+- [x] P-105 [status:verified] The correction's production CI runner timed out on cold `simctl list runtimes` at 30 seconds, before compilation. Simulator discovery now has a bounded 90-second budget like destination discovery; ordinary commands retain 30 seconds. Preserve the toolchain JSON even on failure. No retries, missing-runtime bypass or eligibility weakening added.
+  - Evidence: completed job 119992196130 in native run 39826824106; direct timeout-policy regression test added.

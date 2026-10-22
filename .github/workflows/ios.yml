@@ -71,7 +71,11 @@ jobs:
       - name: Initialize selected Xcode components
         run: sudo env DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -runFirstLaunch
       - name: Verify toolchain and runtime
-        run: node scripts/ios-preflight.mjs --skip-project --expect-xcode 26.2 --expect-sdk 26.2 --runtime-version 26.2
+        run: |
+          status=0
+          node scripts/ios-preflight.mjs --skip-project --expect-xcode 26.2 --expect-sdk 26.2 --runtime-version 26.2 --json > ios-toolchain-preflight.json || status=$?
+          cat ios-toolchain-preflight.json
+          exit "$status"
       - name: Test native preflight and generated configuration guards
         run: node --test scripts/ios-preflight.test.mjs scripts/verify-ios-config.test.mjs
       - name: Generate native project from Expo configuration
@@ -105,6 +109,7 @@ jobs:
         with:
           name: ios-simulator-${{ matrix.release-channel }}
           path: |
+            ios-toolchain-preflight.json
             ios-preflight.json
             ios-build.log
             output/ios-build.xcresult
