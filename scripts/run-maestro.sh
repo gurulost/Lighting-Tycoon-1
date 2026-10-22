@@ -20,16 +20,18 @@ if [ -z "${JAVA_HOME:-}" ]; then
 fi
 
 PORT="${EXPO_DEV_SERVER_PORT:-8081}"
-if command -v lsof >/dev/null 2>&1; then
+if [ "${MAESTRO_STANDALONE:-0}" = "1" ]; then
+  echo "Testing an installed standalone app; Metro is not required."
+elif command -v lsof >/dev/null 2>&1; then
   if ! lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "Metro dev server not detected on port $PORT." >&2
-    echo "Start it with: npx expo start --dev-client --port $PORT" >&2
+    echo "Start it with: npx expo start --localhost --port $PORT" >&2
     exit 1
   fi
 elif command -v nc >/dev/null 2>&1; then
   if ! nc -z localhost "$PORT" >/dev/null 2>&1; then
     echo "Metro dev server not detected on port $PORT." >&2
-    echo "Start it with: npx expo start --dev-client --port $PORT" >&2
+    echo "Start it with: npx expo start --localhost --port $PORT" >&2
     exit 1
   fi
 fi

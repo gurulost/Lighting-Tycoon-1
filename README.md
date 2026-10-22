@@ -44,6 +44,8 @@ Use `.env.example` and `docs/configuration.md` as references for required enviro
 - `docs/api.md` - API reference
 - `docs/database.md` - database schema and migrations
 - `docs/deployment.md` - build and deployment steps
+- `docs/ios-release.md` - native iOS preflight, TestFlight and App Store workflow
+- `PRIVACY.md` - implemented data handling and store-policy publication requirements
 - `docs/testing.md` - testing guidance
 - `docs/operations.md` - production runbook notes
 - `docs/game_systems.md` - core loop and mechanics

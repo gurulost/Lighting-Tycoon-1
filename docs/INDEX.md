@@ -18,6 +18,9 @@
 - `database.md` - database schema and migrations
 - `testing.md` - testing guidance
 - `deployment.md` - build and deployment steps
+- `ios-release.md` - native preflight, TestFlight, signing and store release runbook
+- `ios-accessibility.md` - Dynamic Type, native modal focus, motion and profiling checks
+- `privacy.md` - analytics/diagnostics inventory and publication verification
 - `operations.md` - production runbook notes
 - `adr/README.md` - architecture decision records
 - `../.env.example` - environment variable template (export in shell)
@@ -32,6 +35,7 @@
 ## QA & Production
 
 - `qa.md` - QA harness
+- `ios-implementation-qa.md` - current iOS improvement verification and native release blocker
 - `release_checklist.md` - production release checklist
 - `phase-1-2-3-tier-16-production-checklist.md` - source-of-truth rollout checklist for explicit phases and tier cap expansion to 16
 - `telemetry.md` - analytics runbook and event catalog

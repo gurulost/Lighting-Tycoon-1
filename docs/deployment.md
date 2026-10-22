@@ -41,19 +41,20 @@ See `docs/configuration.md` for required variables.
 - Internal tester builds use `EXPO_PUBLIC_RELEASE_CHANNEL=playtest`; Lab scenarios save into an isolated sandbox.
 - Browser automation uses `EXPO_PUBLIC_RELEASE_CHANNEL=e2e`.
 - `npm run web:build:production` and `npm run web:build:playtest` build explicit web bundles without deploying them.
-- `eas.json` defines explicit `production`, internal `playtest`, and internal development-client `e2e` profiles; implementation does not trigger a cloud build.
+- `eas.json` defines App Store `production`/`testflight`, internal `playtest`, and internal standalone `e2e` profiles. Production profiles automatically increment remotely managed build numbers. Implementation does not trigger a cloud build.
 
 ## Release Checklist
 
 Follow the release checklist in `docs/release_checklist.md`.
 
-## Mobile Store Builds (Not Yet Documented)
+## iOS Native Builds and Store Releases
 
-This repo does not currently document iOS/Android store release steps. Recommended next steps:
+Follow [ios-release.md](ios-release.md) for local native preflight, the unsigned
+macOS Simulator compile gate, EAS version initialization, signing ownership,
+TestFlight submission, symbolication, store preparation, and rollback.
 
-- Choose a build path (Expo EAS Build vs. bare workflow).
-- Document provisioning, signing, and store submission steps.
-- Record versioning rules for `app.json` and release artifacts.
+The GitHub iOS workflow compiles the production app but never uploads or submits
+it. Android store-specific release instructions remain to be documented.
 
 ## Rollback (Recommended)
 

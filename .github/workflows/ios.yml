@@ -1,0 +1,113 @@
+name: iOS Simulator build
+
+on:
+  pull_request:
+    paths:
+      - "client/**"
+      - "shared/**"
+      - "assets/**"
+      - "app.json"
+      - "app.config.*"
+      - "package*.json"
+      - "babel.config.*"
+      - "metro.config.*"
+      - "tsconfig.json"
+      - "scripts/ios-*"
+      - "scripts/verify-ios-*"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "shared/**"
+      - "assets/**"
+      - "app.json"
+      - "app.config.*"
+      - "package*.json"
+      - "babel.config.*"
+      - "metro.config.*"
+      - "tsconfig.json"
+      - "scripts/ios-*"
+      - "scripts/verify-ios-*"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        release-channel: [production, e2e]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_PUBLIC_RELEASE_CHANNEL: ${{ matrix.release-channel }}
+      EXPO_PUBLIC_DOMAIN: localhost:5000
+      IOS_COCOAPODS_VERSION: 1.16.2
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      COCOAPODS_DISABLE_STATS: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install pinned CocoaPods
+        run: gem install cocoapods --version "$IOS_COCOAPODS_VERSION" --no-document
+      - name: Initialize selected Xcode components
+        run: sudo env DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -runFirstLaunch
+      - name: Verify toolchain and runtime
+        run: node scripts/ios-preflight.mjs --skip-project --expect-xcode 26.2 --expect-sdk 26.2 --runtime-version 26.2
+      - name: Test native preflight and generated configuration guards
+        run: node --test scripts/ios-preflight.test.mjs scripts/verify-ios-config.test.mjs
+      - name: Generate native project from Expo configuration
+        run: npx expo prebuild --platform ios --no-install
+      - name: Install native dependencies
+        working-directory: ios
+        run: pod _1.16.2_ install
+      - name: Verify generated permissions, orientations, and privacy declaration
+        run: node scripts/verify-ios-config.mjs
+      - name: Verify project destination
+        run: node scripts/ios-preflight.mjs --expect-xcode 26.2 --expect-sdk 26.2 --runtime-version 26.2 --json > ios-preflight.json
+      - name: Compile ARM64 Simulator app and JavaScript bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace ios/LightingTycoon.xcworkspace \
+            -scheme LightingTycoon \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath output/ios-derived-data \
+            -resultBundlePath output/ios-build.xcresult \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO build | tee ios-build.log
+      - name: Package unsigned Simulator app for native smoke testing
+        run: ditto -c -k --sequesterRsrc --keepParent output/ios-derived-data/Build/Products/Release-iphonesimulator/LightingTycoon.app output/LightingTycoon-simulator.zip
+      - name: Preserve native build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-${{ matrix.release-channel }}
+          path: |
+            ios-preflight.json
+            ios-build.log
+            output/ios-build.xcresult
+            output/LightingTycoon-simulator.zip
+          if-no-files-found: warn
+          retention-days: 14

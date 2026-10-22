@@ -39,7 +39,7 @@ Maestro (native smoke flow):
 npm run test:maestro
 ```
 
-Maestro requires a native build or dev client installed on the device/simulator.
+Maestro requires a native build installed on the device/simulator.
 On macOS, run with Java 17 and a booted simulator:
 
 ```bash
@@ -52,7 +52,7 @@ npm run test:maestro
 `npm run test:maestro` will try to locate Java 17 automatically; set `JAVA_HOME`
 manually if your install lives elsewhere.
 
-The dev-client flow now covers launch, an audio-producing supplier action,
+The native flow covers launch, an audio-producing supplier action,
 Playtest Lab entry, background/foreground resume, scenario restart, main-save
 restore, and SFX volume controls. Select an explicit target when more than one
 device is available:
@@ -63,16 +63,20 @@ MAESTRO_DEVICE_ID=<simulator-or-emulator-id> npm run test:maestro
 
 ## Maestro on iOS (Runbook)
 
-1. Install/build the iOS dev client once:
+Run `node scripts/ios-preflight.mjs --skip-project` before generating the native
+project, and `node scripts/ios-preflight.mjs` after prebuild/CocoaPods installation.
+See [ios-release.md](ios-release.md) for exact toolchain and recovery guidance.
+
+1. Install/build a local Debug app once:
 
 ```bash
 EXPO_PUBLIC_RELEASE_CHANNEL=e2e npm run ios
 ```
 
-2. Start Metro for the dev client:
+2. Start Metro for the Debug app (the repository does not install `expo-dev-client`):
 
 ```bash
-EXPO_PUBLIC_RELEASE_CHANNEL=e2e npx expo start --dev-client --port 8081
+EXPO_PUBLIC_RELEASE_CHANNEL=e2e npx expo start --localhost --port 8081
 ```
 
 3. Boot a simulator (or open the Simulator app):
@@ -91,9 +95,9 @@ If the app is missing from the simulator, re-run
 `EXPO_PUBLIC_RELEASE_CHANNEL=e2e npm run ios`. Maestro currently runs against
 iOS simulators (not physical devices).
 
-When the installed Xcode SDK does not match an available simulator runtime, the
-same native behavior can be checked in Expo Go without downloading another
-multi-gigabyte runtime:
+When a native build is unavailable, Expo Go can provide limited JavaScript/UI
+smoke coverage. It does not validate generated permissions, native SDK
+integration, standalone launch/audio, or release qualification:
 
 ```bash
 EXPO_PUBLIC_RELEASE_CHANNEL=e2e npx expo start --localhost --clear --port 8081
@@ -101,18 +105,28 @@ MAESTRO_FLOW=.maestro/smoke-expo-go.yaml \
   MAESTRO_DEVICE_ID=<ios-simulator-udid> npm run test:maestro
 ```
 
-For Android, install/boot an emulator, build an E2E-channel dev client, and run
+For Android, install/boot an emulator, build an E2E-channel Debug app, and run
 the default `.maestro/smoke.yaml` with its emulator ID. Expo Go is also a
-supported fallback when a dev-client build is unavailable:
+limited JavaScript/UI fallback when a native build is unavailable, with the same
+evidence limits described above:
 
 ```bash
 EXPO_PUBLIC_RELEASE_CHANNEL=e2e npm run android
-EXPO_PUBLIC_RELEASE_CHANNEL=e2e npx expo start --dev-client --port 8081
+EXPO_PUBLIC_RELEASE_CHANNEL=e2e npx expo start --localhost --port 8081
 MAESTRO_DEVICE_ID=<android-emulator-id> npm run test:maestro
 ```
 
-EAS can produce the corresponding internal development clients without changing
-the source configuration: `eas build --profile e2e --platform all`.
+EAS `e2e` produces standalone internal Release apps with embedded JavaScript,
+not development clients: `eas build --profile e2e --platform all`.
+For an already installed standalone E2E app, bypass the Metro prerequisite:
+
+```bash
+MAESTRO_STANDALONE=1 MAESTRO_DEVICE_ID=<simulator-or-emulator-id> npm run test:maestro
+```
+
+For a local standalone iOS build, use `EXPO_PUBLIC_RELEASE_CHANNEL=e2e
+npx expo run:ios --configuration Release --no-bundler`. Debug apps and the Expo
+Go fallbacks described here still require Metro.
 
 ```bash
 EXPO_PUBLIC_RELEASE_CHANNEL=e2e npx expo start --localhost --clear --port 8081
@@ -145,6 +159,19 @@ a substitute for the emulator interaction flow.
 - Green automation proves the tested mechanics and release boundaries; it is not evidence that players find the balance enjoyable.
 
 ## CI
+
+`.github/workflows/ios.yml` also generates the Expo native project on macOS with
+Xcode 26.2, checks a real eligible Simulator destination, and compiles separate
+Release production/E2E ARM64 Simulator apps with signing/store upload disabled.
+Download its logs and `.xcresult` artifact when diagnosing native compile errors.
+Successful jobs also include a Simulator app ZIP for local launch/smoke checks;
+these are unsigned Simulator binaries, not installable physical-device releases.
+This compile gate does not replace a standalone native launch/audio/persistence
+smoke flow. Test preflight's failure handling with:
+
+```bash
+node --test scripts/ios-preflight.test.mjs
+```
 
 PRs are gated with:
 

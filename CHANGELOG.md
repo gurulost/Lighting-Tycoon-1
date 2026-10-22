@@ -8,6 +8,12 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+- Added adaptive Settings and tutorial layouts for accessibility text sizes, labeled switches, modal screen-reader isolation and presentation-aware focus, and live system Reduce Motion support.
+- Made board, supplier and project layouts respond to iPad resizing; preserved all iPad orientations and reachable Playtest Lab actions.
+- Disabled default diagnostic PII enrichment, log ingestion and continuous replay; made masked error replay opt-in and removed unused microphone permissions.
+- Added native toolchain preflight, a pinned macOS iOS compilation workflow, generated configuration checks, and documented TestFlight/versioning/privacy release steps.
+- Scheduled optional image warmup serially after initial interactions, with background pause and unmount cancellation.
+
 - Initial documentation suite added.
 - Optimized runtime image assets by converting merge particles to WebP, adding a lightweight header icon asset, and enforcing asset-format/size checks in CI.
 - Improved long-session responsiveness by coalescing autosave writes, throttling critical save flushes, and reducing redundant order-card compute/rerenders.
