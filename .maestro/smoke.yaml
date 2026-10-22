@@ -25,10 +25,26 @@ appId: com.lightingtycoon.app
     timeout: 30000
 - tapOn:
     id: "orders-modal-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "orders-modal"
+    timeout: 30000
+# React state hides the native modal before its physical dismissal finishes.
+- waitForAnimationToEnd:
+    timeout: 2000
 - assertVisible:
     id: "playtest-session-banner"
 - tapOn:
     id: "workbench-station"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Close Suppliers"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "supplier-tap-baron"
+    direction: DOWN
+    timeout: 120000
 - tapOn:
     id: "supplier-tap-baron"
 - tapOn:
@@ -59,6 +75,12 @@ appId: com.lightingtycoon.app
     timeout: 30000
 - tapOn:
     id: "orders-modal-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "orders-modal"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 2000
 - assertVisible:
     id: "playtest-session-banner"
 - tapOn:

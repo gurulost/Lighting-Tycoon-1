@@ -1,11 +1,5 @@
 import React, { useMemo, useEffect, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  useWindowDimensions,
-} from "react-native";
+import { View, StyleSheet, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -14,6 +8,7 @@ import { ModalShell } from "./ModalShell";
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 import { getEffectiveSupplierConfig } from "@/constants/suppliers";
 import type { SupplierId } from "@/types/game";
 import {
@@ -64,7 +59,7 @@ export function SupplierModal({
 }: SupplierModalProps) {
   const { state, tapSupplier, getSupplierTapStatus, dispatch } = useGame();
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight, stacked } = useAccessibleLayout();
   const [now, setNow] = useState(() => Date.now());
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;
@@ -133,7 +128,13 @@ export function SupplierModal({
         },
       ]}
     >
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      <Pressable
+        style={StyleSheet.absoluteFillObject}
+        onPress={onClose}
+        accessible={false}
+        aria-hidden
+        accessibilityElementsHidden
+      />
       <View style={[styles.container, { maxHeight }]}>
         <ModalShell
           variant="card"
@@ -260,7 +261,9 @@ export function SupplierModal({
                     colors={["#1F1F2E", "#26263A", "#1F1F2E"]}
                     style={[styles.card, { borderColor: meta.accent + "40" }]}
                   >
-                    <View style={styles.cardHeader}>
+                    <View
+                      style={[styles.cardHeader, stacked && styles.stackedRow]}
+                    >
                       <View
                         style={[
                           styles.iconWrap,
@@ -273,7 +276,13 @@ export function SupplierModal({
                           color={meta.accent}
                         />
                       </View>
-                      <View style={styles.cardTitleWrap}>
+                      <View
+                        style={[
+                          styles.cardTitleWrap,
+                          stacked && styles.stackedCopy,
+                        ]}
+                        testID={`supplier-copy-${supplierId}`}
+                      >
                         <ThemedText style={styles.cardTitle}>
                           {meta.name}
                         </ThemedText>
@@ -303,7 +312,10 @@ export function SupplierModal({
                       </View>
                     </View>
 
-                    <View style={styles.cardFooter}>
+                    <View
+                      style={[styles.cardFooter, stacked && styles.stackedRow]}
+                      testID={`supplier-footer-${supplierId}`}
+                    >
                       <ThemedText style={styles.chargeText}>
                         Charges: {chargesDisplay}
                       </ThemedText>
@@ -311,6 +323,11 @@ export function SupplierModal({
                         onPress={() => handleTap(supplierId)}
                         disabled={locked || !tapStatus.ok}
                         testID={`supplier-tap-${supplierId}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${buttonLabel} ${meta.name} supplier`}
+                        accessibilityState={{
+                          disabled: locked || !tapStatus.ok,
+                        }}
                         style={[
                           styles.tapButton,
                           {
@@ -360,6 +377,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   resourcePill: {
+    maxWidth: "100%",
+    flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
@@ -369,6 +388,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   resourceText: {
+    flexShrink: 1,
     color: GameColors.text.secondary,
     fontSize: 12,
   },
@@ -393,6 +413,7 @@ const styles = StyleSheet.create({
   cardTitleWrap: {
     flex: 1,
   },
+  stackedCopy: { flex: 0, flexShrink: 0 },
   cardTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -434,11 +455,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  stackedRow: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: Spacing.sm,
+  },
   chargeText: {
     fontSize: 12,
     color: GameColors.text.secondary,
   },
   tapButton: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: BorderRadius.full,

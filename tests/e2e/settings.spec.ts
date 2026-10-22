@@ -47,6 +47,35 @@ test.describe("Settings Modal", () => {
     viewport: { width: 390, height: 844 },
   });
 
+  test("supplier actions remain named, reachable and operable on narrow layouts", async ({
+    page,
+  }) => {
+    await bootstrapInteractiveState(page);
+    for (const viewport of [
+      { width: 320, height: 700 },
+      { width: 768, height: 1024 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.getByTestId("workbench-station").click();
+      const close = page.getByRole("button", {
+        name: "Close Suppliers",
+        exact: true,
+      });
+      await expect(close).toBeInViewport();
+      const supply = page.getByRole("button", {
+        name: "Tap Baron Supply Depot supplier",
+        exact: true,
+      });
+      await supply.scrollIntoViewIfNeeded();
+      await expect(supply).toBeInViewport();
+      await supply.click();
+      await close.click();
+      await expect(close).toBeHidden();
+    }
+    // A successful supply action can enqueue a legitimate Discovery story.
+    // Do not click through that handoff to an unrelated Settings interaction.
+  });
+
   test("phase 2 intro handoff does not steal focus back from settings", async ({
     page,
   }) => {
