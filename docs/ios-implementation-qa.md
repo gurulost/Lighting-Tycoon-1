@@ -11,10 +11,11 @@
 
 Implemented the approved accessibility, privacy, responsive-layout, warmup and
 release-tooling packets. Browser/component/static checks and focused standalone
-native checks support the tested behavior. The pinned CI lane provides the native
-compile path while local Xcode destination registration remains broken. Final
-integrated native confirmation is tracked in the implementation ledger; this is
-not an App Store-ready or human-playtest-proven release.
+native checks support the tested behavior. Both clean production/E2E native builds
+and source CI pass on the final application revision `d12e30d`. The pinned CI lane
+provides the native compile path while local Xcode destination registration
+remains broken. This passes the implemented automated/internal scope, not App
+Store readiness, whole-game accessibility certification or human gameplay acceptance.
 
 The user explicitly deferred the public privacy URL and private contact. No
 EAS build, deployment, store submission, credential rotation or policy publication
@@ -68,6 +69,10 @@ energy or leak improvement is claimed without a symbolicated standalone trace.
 ETTrace needs a separately instrumented app and UUID-matched symbols; no such
 profile is asserted here. A bounded app-only memory capture produced no usable
 graph, and only the stalled capture process was stopped.
+The dedicated iPhone's actual system Reduce Motion switch was enabled in Settings:
+the app displayed its system-motion explanation while its saved switch remained
+off (native value `0`). The original system setting, large text size and Shutdown
+state were restored; the iPad was likewise restored to large/portrait/Shutdown.
 
 Privacy defaults disable continuous replay, default PII, Sentry logs and
 screen/touch autocapture. E2E disables diagnostics/analytics. Error replay is a
@@ -94,6 +99,20 @@ passed on `cbfbe8c`. Focused native UI checks then used that CI-built binary wit
 explicitly hashed embedded-JavaScript candidates. The ledger distinguishes these
 runtime checks from subsequent clean native compilation; a JS rebundle is not
 reported as an independent native compile.
+The final Supplier candidate (`d12e30d`) passes the complete AX5 native smoke with
+Hermes bundle SHA-256 `29cd3db00cd39bacea843975536f6ec98f95a21f01e1b4940cfdedbf71096107`.
+The final clean [native CI run 39832828568](https://github.com/gurulost/Lighting-Tycoon-1/actions/runs/39832828568)
+and [source CI run 39832828346](https://github.com/gurulost/Lighting-Tycoon-1/actions/runs/39832828346)
+both pass on exact application revision `d12e30d9196d6c246cf1a5d46fc475dc66746f05`.
+These clean builds are distinct from the explicitly hashed runtime rebundle above.
+Downloaded, unmodified artifacts from that final native run also pass a device-data-
+preserving E2E → production → E2E install sequence: create the Phase 2 sandbox,
+open normal progress without tester controls in production, resume the preserved
+sandbox in E2E, then Restore Main. No uninstall or data clearing occurs between
+those channel replacements. The initial Maestro launch stalled in its automatic
+permission grant before app launch; explicit app launch plus no-launch flows
+avoid that harness issue. A standalone `PLAYTEST` selector was corrected to the
+banner's actual grouped accessibility identity; screenshots confirm visible text.
 
 Generated captures and native diagnostics are ignored local artifacts, not
 committed binaries. Rerun their named commands on another checkout.
@@ -108,4 +127,4 @@ dense AX5 HUD/navigation typography, physical-device VoiceOver order, and
 quantitative performance/memory qualification remain explicit follow-ups.
 No music or SwiftUI rewrite was added.
 
-final result: blocked
+final result: passed
