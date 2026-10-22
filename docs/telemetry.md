@@ -26,6 +26,7 @@ PostHog is the analytics source of truth for gameplay telemetry and live tuning.
 Notes:
 
 - Telemetry is currently enabled for mobile builds (`posthog-react-native`); web is intentionally disabled.
+- E2E builds disable PostHog and Sentry. Screen/touch autocapture is off; gameplay is emitted through the catalog. See [privacy.md](privacy.md) for the Sentry/PostHog inventory and replay defaults.
 - Feature flag payloads (for tuning) are reloaded at app startup and on identify.
 
 ## Instrumentation Workflow

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -11,30 +11,36 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { PostHogProvider } from "posthog-react-native";
 import { getTelemetryConfigStatus, posthog } from "@/lib/telemetry";
+import { getObservabilityPolicy } from "@/lib/observability";
 
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GameProvider } from "@/context/GameContext";
 import { GameColors } from "@/constants/theme";
 
-Sentry.init({
-  dsn: "https://b65f0568679134d6d8705b2e5527b376@o4510308447354880.ingest.us.sentry.io/4510809845727232",
+const observability = getObservabilityPolicy(
+  {
+    releaseChannel: process.env.EXPO_PUBLIC_RELEASE_CHANNEL,
+    sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    errorReplay: process.env.EXPO_PUBLIC_SENTRY_ERROR_REPLAY,
+  },
+  { isDevelopment: __DEV__, platform: Platform.OS },
+);
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
-});
+if (observability.enabled) {
+  Sentry.init({
+    dsn: observability.dsn,
+    environment: observability.environment,
+    sendDefaultPii: observability.sendDefaultPii,
+    enableLogs: observability.enableLogs,
+    replaysSessionSampleRate: observability.replaysSessionSampleRate,
+    replaysOnErrorSampleRate: observability.replaysOnErrorSampleRate,
+    integrations: observability.errorReplayEnabled
+      ? [Sentry.mobileReplayIntegration(observability.replayMasking)]
+      : [],
+    initialScope: { tags: { release_channel: observability.environment } },
+  });
+}
 
 function App() {
   useEffect(() => {
@@ -52,9 +58,11 @@ function App() {
   const content = (
     <ErrorBoundary
       onError={(error, componentStack) => {
-        Sentry.captureException(error, {
-          extra: { componentStack },
-        });
+        if (observability.enabled) {
+          Sentry.captureException(error, {
+            extra: { componentStack },
+          });
+        }
       }}
     >
       <QueryClientProvider client={queryClient}>
@@ -83,14 +91,14 @@ function App() {
       client={posthog}
       // PostHog's hook-based screen autocapture is incompatible with React
       // Navigation 7. Gameplay navigation is tracked explicitly instead.
-      autocapture={{ captureScreens: false }}
+      autocapture={{ captureScreens: false, captureTouches: false }}
     >
       {content}
     </PostHogProvider>
   );
 }
 
-export default Sentry.wrap(App);
+export default observability.enabled ? Sentry.wrap(App) : App;
 
 const styles = StyleSheet.create({
   root: {

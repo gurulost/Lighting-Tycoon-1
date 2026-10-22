@@ -12,6 +12,8 @@ This document lists environment variables used by the client and server.
 - `REPLIT_DOMAINS` (server) - comma-separated list of allowed origins
 - `EXPO_PUBLIC_POSTHOG_KEY` (client) - PostHog project API key for telemetry
 - `EXPO_PUBLIC_POSTHOG_HOST` (client) - PostHog host (defaults to US cloud)
+- `EXPO_PUBLIC_SENTRY_DSN` (client) - optional public error-ingestion DSN override; omitted values use the existing app project. Never put a private Sentry token in a public variable.
+- `EXPO_PUBLIC_SENTRY_ERROR_REPLAY` (client) - only exact `true` enables masked error replay in production native builds. Replay is off by default, on the web, in playtest, and in E2E.
 - `POSTHOG_PERSONAL_API_KEY` (tooling) - PostHog private API key for querying usage data
 - `POSTHOG_PROJECT_ID` (tooling) - PostHog project id for query scope
 - `POSTHOG_API_HOST` (tooling) - PostHog API host for queries (defaults to US cloud)
@@ -19,6 +21,7 @@ This document lists environment variables used by the client and server.
 ## Notes
 
 - Game progress is stored locally; all `/api/game` methods return `410 Gone`.
+- E2E builds disable analytics and error reporting. Other release builds disable automatic screen/touch collection, default PII, continuous replay, and Sentry logs; see [privacy inventory](privacy.md) before changing those defaults.
 - `EXPO_PUBLIC_DOMAIN`, when used, should be host + port only (no protocol).
 - When using Replit, the `expo:dev` script sets `EXPO_PUBLIC_DOMAIN` automatically.
 - `.env.example` is a template only; keep real values in `.env.local` (gitignored).

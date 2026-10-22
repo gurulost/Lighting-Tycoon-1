@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Application from "expo-application";
 import PostHog from "posthog-react-native";
 import type { JsonType, PostHogEventProperties } from "@posthog/core";
+import { resolveReleaseChannel } from "@/lib/releaseChannel";
 import {
   TELEMETRY_EVENT_CATALOG,
   TELEMETRY_EVENT_NAME_SET,
@@ -18,6 +19,7 @@ const apiKey = process.env.EXPO_PUBLIC_POSTHOG_KEY?.trim();
 const host =
   process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() || "https://us.i.posthog.com";
 const buildSha = process.env.EXPO_PUBLIC_BUILD_SHA?.trim() || undefined;
+const releaseChannel = resolveReleaseChannel();
 
 export const TELEMETRY_SCHEMA_VERSION = "2026-02-05.1";
 
@@ -37,7 +39,7 @@ type TelemetryRuntimeContext = {
 let telemetryRuntimeContext: TelemetryRuntimeContext = {};
 
 export const posthog =
-  apiKey && !isWeb
+  apiKey && !isWeb && releaseChannel !== "e2e"
     ? new PostHog(apiKey, {
         host,
         captureAppLifecycleEvents: true,
@@ -56,6 +58,7 @@ export function getTelemetryConfigStatus() {
     apiKeyPresent: !!apiKey,
     host,
     platform: Platform.OS,
+    releaseChannel,
   };
 }
 
@@ -77,6 +80,7 @@ function withTelemetryDefaults(
   properties?: TelemetryProperties,
 ): TelemetryProperties {
   const source = properties ? { ...properties } : {};
+  source.release_channel = releaseChannel;
   if (source.schema_version === undefined) {
     source.schema_version = TELEMETRY_SCHEMA_VERSION;
   }
