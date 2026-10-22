@@ -5,11 +5,13 @@ import Animated, {
   useSharedValue,
   withSpring,
   WithSpringConfig,
+  cancelAnimation,
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { BorderRadius, Spacing } from "@/constants/theme";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface ButtonProps {
   onPress?: () => void;
@@ -35,22 +37,27 @@ export function Button({
   disabled = false,
 }: ButtonProps) {
   const { theme } = useTheme();
+  const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
+  React.useEffect(() => {
+    if (reducedMotion || disabled) {
+      cancelAnimation(scale);
+      scale.value = 1;
+    }
+  }, [reducedMotion, disabled, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const handlePressIn = () => {
-    if (!disabled) {
+    if (!disabled && !reducedMotion) {
       scale.value = withSpring(0.98, springConfig);
     }
   };
 
   const handlePressOut = () => {
-    if (!disabled) {
-      scale.value = withSpring(1, springConfig);
-    }
+    scale.value = disabled || reducedMotion ? 1 : withSpring(1, springConfig);
   };
 
   return (
@@ -59,6 +66,8 @@ export function Button({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
       style={[
         styles.button,
         {
@@ -81,7 +90,9 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    height: Spacing.buttonHeight,
+    minHeight: Spacing.buttonHeight,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.full,
     alignItems: "center",
     justifyContent: "center",

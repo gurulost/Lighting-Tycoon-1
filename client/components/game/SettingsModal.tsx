@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,6 +19,10 @@ import { Button } from "@/components/Button";
 import { ModalShell } from "./ModalShell";
 import { BorderRadius, GameColors, Spacing } from "@/constants/theme";
 import { useGame } from "@/context/GameContext";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
+import { useSystemReducedMotion } from "@/hooks/useReducedMotion";
+import * as Application from "expo-application";
+import Constants from "expo-constants";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -45,19 +50,29 @@ function SettingRow({
   onValueChange,
   color,
 }: SettingRowProps) {
+  const { stacked } = useAccessibleLayout();
   return (
-    <View style={styles.settingRow}>
+    <View
+      style={[styles.settingRow, stacked && styles.stackedRow]}
+      testID={`settings-row-${label.toLowerCase().replace(/\s+/g, "-")}`}
+    >
       <LinearGradient
         colors={[`${color}30`, `${color}10`, `${color}30`]}
         style={styles.settingIcon}
+        aria-hidden
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
       >
         <Feather name={icon} size={20} color={color} />
       </LinearGradient>
-      <View style={styles.settingContent}>
+      <View style={[styles.settingContent, stacked && styles.stackedContent]}>
         <ThemedText style={styles.settingLabel}>{label}</ThemedText>
         <ThemedText style={styles.settingDescription}>{description}</ThemedText>
       </View>
       <Switch
+        accessibilityLabel={label}
+        accessibilityHint={description}
+        accessibilityState={{ checked: value }}
         value={value}
         onValueChange={onValueChange}
         trackColor={{ false: "#2A2A4A", true: `${color}60` }}
@@ -75,13 +90,14 @@ function VolumeSettingRow({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const { stacked } = useAccessibleLayout();
   const percent = Math.round(value * 100);
   const changeBy = (delta: number) => {
     onChange(Math.max(0, Math.min(1, Math.round((value + delta) * 10) / 10)));
   };
   return (
     <View
-      style={styles.settingRow}
+      style={[styles.settingRow, stacked && styles.stackedRow]}
       testID={Platform.OS === "web" ? "settings-sfx-volume" : undefined}
       accessible={false}
     >
@@ -92,10 +108,13 @@ function VolumeSettingRow({
           `${GameColors.ui.primary}30`,
         ]}
         style={styles.settingIcon}
+        aria-hidden
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
       >
         <Feather name="sliders" size={20} color={GameColors.ui.primary} />
       </LinearGradient>
-      <View style={styles.settingContent}>
+      <View style={[styles.settingContent, stacked && styles.stackedContent]}>
         <ThemedText style={styles.settingLabel}>SFX Volume</ThemedText>
         <ThemedText style={styles.settingDescription}>
           Master gameplay sound level
@@ -109,6 +128,7 @@ function VolumeSettingRow({
           ]}
           onPress={() => changeBy(-0.1)}
           disabled={value <= 0}
+          accessibilityState={{ disabled: value <= 0 }}
           accessibilityRole="button"
           accessibilityLabel="Decrease sound effects volume"
           testID="settings-sfx-volume-down"
@@ -128,6 +148,7 @@ function VolumeSettingRow({
           ]}
           onPress={() => changeBy(0.1)}
           disabled={value >= 1}
+          accessibilityState={{ disabled: value >= 1 }}
           accessibilityRole="button"
           accessibilityLabel="Increase sound effects volume"
           testID="settings-sfx-volume-up"
@@ -148,6 +169,8 @@ export function SettingsModal({
   onOpenPlaytestLab,
 }: SettingsModalProps) {
   const insets = useSafeAreaInsets();
+  const { stacked } = useAccessibleLayout();
+  const systemReducedMotion = useSystemReducedMotion();
   const { state, dispatch } = useGame();
   const {
     soundEnabled,
@@ -240,7 +263,14 @@ export function SettingsModal({
         onPress={resetChallengeVisible ? closeResetChallenge : onClose}
         accessible={false}
       />
-      <View style={styles.modalContainer}>
+      <View
+        style={styles.modalContainer}
+        aria-hidden={resetChallengeVisible}
+        accessibilityElementsHidden={resetChallengeVisible}
+        importantForAccessibility={
+          resetChallengeVisible ? "no-hide-descendants" : "auto"
+        }
+      >
         <ModalShell
           title="Settings"
           subtitle="Tune your workshop experience"
@@ -297,7 +327,11 @@ export function SettingsModal({
               <SettingRow
                 icon="activity"
                 label="Reduced Motion"
-                description="Tone down animations and effects"
+                description={
+                  systemReducedMotion
+                    ? "System Reduce Motion is on. Animations stay reduced."
+                    : "Tone down animations and effects"
+                }
                 value={reducedMotion}
                 onValueChange={(value) =>
                   dispatch({
@@ -335,6 +369,8 @@ export function SettingsModal({
 
               <Pressable
                 style={styles.actionRow}
+                accessibilityRole="button"
+                accessibilityLabel="Replay Tutorial"
                 onPress={() =>
                   Alert.alert(
                     "Replay Tutorial",
@@ -376,7 +412,13 @@ export function SettingsModal({
                 </View>
               </Pressable>
 
-              <Pressable style={styles.actionRow} onPress={handleResetGame}>
+              <Pressable
+                style={styles.actionRow}
+                onPress={handleResetGame}
+                accessibilityRole="button"
+                accessibilityLabel="Restart Game"
+                accessibilityHint="Requires confirmation before erasing progress"
+              >
                 <LinearGradient
                   colors={[
                     `${GameColors.ui.danger}30`,
@@ -408,6 +450,7 @@ export function SettingsModal({
                     onOpenPlaytestLab();
                   }}
                   accessibilityRole="button"
+                  accessibilityLabel="Playtest Lab"
                   testID="settings-open-playtest-lab"
                 >
                   <LinearGradient
@@ -436,6 +479,8 @@ export function SettingsModal({
 
               <Pressable
                 style={styles.actionRow}
+                accessibilityRole="button"
+                accessibilityLabel="Glossary"
                 onPress={() => {
                   onOpenGlossary?.();
                   onClose();
@@ -468,7 +513,15 @@ export function SettingsModal({
                 <ThemedText style={styles.versionLabel}>
                   Lighting Tycoon
                 </ThemedText>
-                <ThemedText style={styles.versionNumber}>v1.0.0</ThemedText>
+                <ThemedText style={styles.versionNumber}>
+                  v
+                  {Application.nativeApplicationVersion ??
+                    Constants.expoConfig?.version ??
+                    "1.0.0"}
+                  {Application.nativeBuildVersion
+                    ? ` (${Application.nativeBuildVersion})`
+                    : ""}
+                </ThemedText>
               </View>
             </View>
           </ScrollView>
@@ -476,11 +529,17 @@ export function SettingsModal({
       </View>
 
       {resetChallengeVisible ? (
-        <Pressable style={styles.resetOverlay} onPress={closeResetChallenge}>
+        <KeyboardAvoidingView
+          style={styles.resetOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          accessibilityViewIsModal
+        >
           <Pressable
-            style={styles.resetContainer}
-            onPress={(e) => e.stopPropagation()}
-          >
+            style={StyleSheet.absoluteFillObject}
+            onPress={closeResetChallenge}
+            accessible={false}
+          />
+          <View style={styles.resetContainer}>
             <ModalShell
               title="Final Confirmation"
               subtitle="Solve the check to restart"
@@ -489,12 +548,17 @@ export function SettingsModal({
               onClose={closeResetChallenge}
               variant="card"
             >
-              <View style={styles.resetContent}>
+              <ScrollView
+                contentContainerStyle={styles.resetContent}
+                keyboardShouldPersistTaps="handled"
+                style={styles.scrollBody}
+              >
                 <ThemedText style={styles.resetPrompt}>
                   To confirm, answer: {resetChallenge.a} + {resetChallenge.b} =
                   ?
                 </ThemedText>
                 <TextInput
+                  accessibilityLabel="Confirmation answer"
                   value={resetAnswer}
                   onChangeText={(value) => {
                     const cleaned = value.replace(/[^0-9]/g, "");
@@ -513,10 +577,17 @@ export function SettingsModal({
                     {resetError}
                   </ThemedText>
                 ) : null}
-                <View style={styles.resetButtonRow}>
+                <View
+                  style={[
+                    styles.resetButtonRow,
+                    stacked && styles.resetButtonStack,
+                  ]}
+                >
                   <Pressable
                     style={styles.resetCancelButton}
                     onPress={closeResetChallenge}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel restart"
                   >
                     <ThemedText style={styles.resetCancelText}>
                       Cancel
@@ -530,10 +601,10 @@ export function SettingsModal({
                     Restart Game
                   </Button>
                 </View>
-              </View>
+              </ScrollView>
             </ModalShell>
-          </Pressable>
-        </Pressable>
+          </View>
+        </KeyboardAvoidingView>
       ) : null}
     </View>
   );
@@ -553,7 +624,7 @@ const styles = StyleSheet.create({
     maxHeight: "100%",
   },
   scrollBody: {
-    maxHeight: "100%",
+    flexShrink: 1,
   },
   scrollContent: {
     paddingBottom: Spacing.sm,
@@ -567,6 +638,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  stackedRow: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+  },
+  stackedContent: {
+    flexGrow: 0,
+    flexBasis: "auto",
+    alignSelf: "stretch",
   },
   actionRow: {
     flexDirection: "row",
@@ -584,7 +664,9 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
   },
   settingContent: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
   },
   settingLabel: {
     fontSize: 15,
@@ -602,8 +684,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   volumeButton: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 17,
     borderWidth: 1,
     borderColor: "#3A4764",
@@ -652,6 +734,7 @@ const styles = StyleSheet.create({
   resetContainer: {
     width: "100%",
     maxWidth: 380,
+    maxHeight: "100%",
   },
   resetContent: {
     gap: Spacing.md,
@@ -661,7 +744,7 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
   },
   resetInput: {
-    height: Spacing.inputHeight,
+    minHeight: Spacing.inputHeight,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: "#2A2A4A",
@@ -679,9 +762,10 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     alignItems: "center",
   },
+  resetButtonStack: { flexDirection: "column", alignItems: "stretch" },
   resetCancelButton: {
     flex: 1,
-    height: Spacing.buttonHeight,
+    minHeight: Spacing.buttonHeight,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     borderColor: "#2A2A4A",
@@ -695,6 +779,10 @@ const styles = StyleSheet.create({
   },
   resetConfirmButton: {
     flex: 1,
+    height: "auto",
+    minHeight: Spacing.buttonHeight,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     backgroundColor: GameColors.ui.danger,
   },
 });

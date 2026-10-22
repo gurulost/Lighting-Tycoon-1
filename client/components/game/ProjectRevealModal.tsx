@@ -4,7 +4,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,6 +30,7 @@ export function ProjectRevealModal({
   onOpenBoard,
 }: ProjectRevealModalProps) {
   const insets = useSafeAreaInsets();
+  const screen = useWindowDimensions();
   const project = projectId
     ? PROJECT_DEFINITION_BY_ID.get(projectId)
     : undefined;
@@ -59,7 +60,6 @@ export function ProjectRevealModal({
   const secondaryAction = { label: "Maybe later", onPress: onDismiss };
   const showDossierLink = Boolean(onOpenBoard);
 
-  const screen = Dimensions.get("window");
   const maxCardHeight = Math.min(screen.height * 0.92, 780);
 
   return (

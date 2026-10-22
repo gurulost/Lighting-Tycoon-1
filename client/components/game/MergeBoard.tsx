@@ -8,7 +8,7 @@ import React, {
 import {
   View,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   Pressable,
   StyleProp,
   ViewStyle,
@@ -38,6 +38,7 @@ import type { SfxId } from "@/audio/sounds";
 import { getMergeFeedback } from "@/lib/gameplayFeedback";
 import { withRepeat } from "@/lib/reanimated";
 import { useSharedPhase } from "@/hooks/useSharedPhase";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   TrimLightStrip,
   TRIM_LIGHT_ANIMATION_DURATIONS,
@@ -235,7 +236,7 @@ export function MergeBoard({
   const { state, mergeParts, movePart, canMerge, dispatch } = useGame();
   const workbenchRef = useRef<View>(null);
   const hapticsEnabled = state.settings.hapticsEnabled;
-  const reducedMotion = state.settings.reducedMotion;
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragSource, setDragSource] = useState<{
     source: "board" | "backpack";
@@ -345,7 +346,7 @@ export function MergeBoard({
     onDragStateChange?.(isDragging);
   }, [isDragging, onDragStateChange]);
 
-  const screenWidth = Dimensions.get("window").width;
+  const { width: screenWidth } = useWindowDimensions();
   const boardPadding = Spacing.lg * 2;
   const totalGapWidth = (GRID_COLS - 1) * Spacing.tileGap;
   const baseTileSize = Math.floor(

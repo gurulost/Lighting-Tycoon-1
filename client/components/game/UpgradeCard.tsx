@@ -6,6 +6,7 @@ import Animated, {
   withSpring,
   withDelay,
   withSequence,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -13,6 +14,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { Upgrade, UPGRADE_DEFINITIONS } from "@/types/game";
 import { useGame } from "@/context/GameContext";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { getTuning } from "@/lib/tuning";
@@ -48,8 +50,15 @@ const UPGRADE_NAME_BY_ID = UPGRADE_DEFINITIONS.reduce<Record<string, string>>(
 
 export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
   const { state } = useGame();
+  const reducedMotion = useReducedMotion();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const scale = useSharedValue(1);
+  React.useEffect(() => {
+    if (reducedMotion) {
+      cancelAnimation(scale);
+      scale.value = 1;
+    }
+  }, [reducedMotion, scale]);
   const tuning = getTuning();
 
   const currentLevel = state.upgrades[upgrade.id] || 0;
@@ -91,10 +100,11 @@ export function UpgradeCard({ upgrade, onPurchase }: UpgradeCardProps) {
     if (dependencyUpgradeObsolete) return;
     if (canPurchase) {
       handlePurchase();
-      scale.value = withSequence(
-        withSpring(0.95, { damping: 15 }),
-        withDelay(100, withSpring(1, { damping: 15 })),
-      );
+      if (!reducedMotion)
+        scale.value = withSequence(
+          withSpring(0.95, { damping: 15 }),
+          withDelay(100, withSpring(1, { damping: 15 })),
+        );
     } else {
       SoundManager.play("error");
       if (hapticsEnabled) {

@@ -1,5 +1,11 @@
 import React from "react";
-import { View, StyleSheet, Pressable, Dimensions } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
@@ -18,8 +24,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { useGame } from "@/context/GameContext";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DIM_COLOR = "rgba(10, 10, 20, 0.45)";
 
 type HighlightTarget =
@@ -132,15 +138,26 @@ export function TutorialOverlay({
   safeBottom = 120,
 }: TutorialOverlayProps) {
   const insets = useSafeAreaInsets();
+  const {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    fontScale,
+  } = useWindowDimensions();
+  const largeText = fontScale >= 1.5;
   const { state, dispatch } = useGame();
-  const reducedMotion = state.settings.reducedMotion;
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const [confirmSkip, setConfirmSkip] = React.useState(false);
+  const [skipHeight, setSkipHeight] = React.useState(44);
   const pulse = useSharedValue(0);
   const currentStep = TUTORIAL_STEPS[state.tutorialStep];
   const shouldRender = !state.tutorialComplete && Boolean(currentStep);
 
   const isLastStep = state.tutorialStep === TUTORIAL_STEPS.length - 1;
-  const cardPointerEvents = isLastStep ? "box-none" : "none";
+  const cardPointerEvents = largeText
+    ? "auto"
+    : isLastStep
+      ? "box-none"
+      : "none";
 
   const handleSkip = () => {
     if (!confirmSkip) {
@@ -276,7 +293,7 @@ export function TutorialOverlay({
       })()
     : [{ top: 0, left: 0, right: 0, bottom: 0 }];
 
-  const topSafe = insets.top + Spacing.md;
+  const topSafe = insets.top + Spacing.md + skipHeight + Spacing.sm;
   const bottomSafe = insets.bottom + safeBottom + Spacing.md;
   const availableAbove = holeRect
     ? Math.max(0, holeRect.y - topSafe - Spacing.md)
@@ -298,7 +315,10 @@ export function TutorialOverlay({
     availableSpace > 0 ? availableSpace < 220 : SCREEN_HEIGHT < 640;
   const nanoMode =
     availableSpace > 0 ? availableSpace < 150 : SCREEN_HEIGHT < 600;
-  const clampHeight = availableSpace > 0 ? availableSpace : undefined;
+  const clampHeight = Math.max(
+    96,
+    availableSpace > 0 ? availableSpace : SCREEN_HEIGHT - topSafe - bottomSafe,
+  );
   const cardPositionStyle = placeCardAtTop
     ? { top: topSafe }
     : { bottom: bottomSafe };
@@ -344,6 +364,7 @@ export function TutorialOverlay({
       </View>
 
       <Pressable
+        onLayout={(event) => setSkipHeight(event.nativeEvent.layout.height)}
         style={[
           styles.skipButton,
           { top: insets.top + Spacing.md, left: insets.left + Spacing.lg },
@@ -352,13 +373,19 @@ export function TutorialOverlay({
         onLongPress={handleSkipImmediate}
         delayLongPress={450}
         testID="tutorial-skip"
-        accessibilityLabel="tutorial-skip"
+        accessibilityRole="button"
+        accessibilityLabel={
+          confirmSkip ? "Confirm skip tutorial" : "Skip tutorial"
+        }
+        accessibilityHint="Activate twice to skip the guided steps"
       >
-        <ThemedText style={styles.skipText}>
+        <ThemedText style={styles.skipText} maxFontSizeMultiplier={2}>
           {confirmSkip ? "Tap again to skip" : "Skip Tutorial"}
         </ThemedText>
         {!confirmSkip ? (
-          <ThemedText style={styles.skipHint}>Tap twice or hold</ThemedText>
+          <ThemedText style={styles.skipHint} maxFontSizeMultiplier={1.5}>
+            Tap twice or hold
+          </ThemedText>
         ) : null}
       </Pressable>
 
@@ -416,118 +443,131 @@ export function TutorialOverlay({
             { pointerEvents: cardPointerEvents },
           ]}
         >
-          <LinearGradient
-            colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-            style={[
-              styles.cardGradient,
-              compactMode ? styles.cardGradientCompact : null,
-              nanoMode ? styles.cardGradientNano : null,
-            ]}
+          <ScrollView
+            style={styles.cardScroll}
+            showsVerticalScrollIndicator={largeText}
           >
             <LinearGradient
-              colors={[`${currentStep.color}40`, `${currentStep.color}15`]}
+              colors={["#1A1A2E", "#252542", "#1A1A2E"]}
               style={[
-                styles.iconContainer,
-                compactMode ? styles.iconContainerCompact : null,
-                nanoMode ? styles.iconContainerNano : null,
+                styles.cardGradient,
+                compactMode ? styles.cardGradientCompact : null,
+                nanoMode ? styles.cardGradientNano : null,
               ]}
             >
-              <Feather
-                name={currentStep.icon}
-                size={nanoMode ? 22 : compactMode ? 30 : 40}
-                color={currentStep.color}
-              />
-            </LinearGradient>
-
-            <ThemedText
-              style={[
-                styles.title,
-                compactMode ? styles.titleCompact : null,
-                nanoMode ? styles.titleNano : null,
-              ]}
-            >
-              {currentStep.title}
-            </ThemedText>
-            {!nanoMode ? (
-              <ThemedText
+              <LinearGradient
+                colors={[`${currentStep.color}40`, `${currentStep.color}15`]}
                 style={[
-                  styles.description,
-                  compactMode ? styles.descriptionCompact : null,
+                  styles.iconContainer,
+                  compactMode ? styles.iconContainerCompact : null,
+                  nanoMode ? styles.iconContainerNano : null,
                 ]}
-                numberOfLines={compactMode ? 3 : undefined}
-                adjustsFontSizeToFit={compactMode}
-                minimumFontScale={0.85}
               >
-                {currentStep.description}
-              </ThemedText>
-            ) : null}
-            {state.tutorialHint && !microMode ? (
-              <ThemedText
-                style={[
-                  styles.hintText,
-                  compactMode ? styles.hintTextCompact : null,
-                ]}
-                numberOfLines={compactMode ? 1 : undefined}
-              >
-                {state.tutorialHint}
-              </ThemedText>
-            ) : null}
-
-            {!compactMode && !microMode ? (
-              <View style={styles.progressContainer}>
-                {TUTORIAL_STEPS.map((step, index) => (
-                  <View
-                    key={step.id}
-                    style={[
-                      styles.progressDot,
-                      {
-                        backgroundColor:
-                          index === state.tutorialStep
-                            ? currentStep.color
-                            : index < state.tutorialStep
-                              ? `${currentStep.color}60`
-                              : "#2A2A4A",
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
-            ) : null}
-
-            {isLastStep ? (
-              <Pressable
-                onPress={() => dispatch({ type: "COMPLETE_TUTORIAL" })}
-                style={styles.nextButtonContainer}
-              >
-                <LinearGradient
-                  colors={[
-                    currentStep.color,
-                    `${currentStep.color}CC`,
-                    currentStep.color,
-                  ]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.nextButton}
-                >
-                  <ThemedText style={styles.nextButtonText}>
-                    Start Playing!
-                  </ThemedText>
-                  <Feather name="play" size={20} color="#0F0F1F" />
-                </LinearGradient>
-              </Pressable>
-            ) : !compactMode && !microMode ? (
-              <View style={styles.waitingContainer}>
                 <Feather
-                  name="chevron-down"
-                  size={18}
-                  color={GameColors.text.secondary}
+                  name={currentStep.icon}
+                  size={nanoMode ? 22 : compactMode ? 30 : 40}
+                  color={currentStep.color}
                 />
-                <ThemedText style={styles.waitingText}>
-                  Complete the step to continue
+              </LinearGradient>
+
+              <ThemedText
+                accessibilityRole="header"
+                maxFontSizeMultiplier={2}
+                style={[
+                  styles.title,
+                  compactMode ? styles.titleCompact : null,
+                  nanoMode ? styles.titleNano : null,
+                ]}
+              >
+                {currentStep.title}
+              </ThemedText>
+              {largeText ? (
+                <ThemedText style={styles.stepText} maxFontSizeMultiplier={2}>
+                  Step {state.tutorialStep + 1} of {TUTORIAL_STEPS.length}
                 </ThemedText>
-              </View>
-            ) : null}
-          </LinearGradient>
+              ) : null}
+              {!nanoMode || largeText ? (
+                <ThemedText
+                  style={[
+                    styles.description,
+                    compactMode ? styles.descriptionCompact : null,
+                  ]}
+                  numberOfLines={!largeText && compactMode ? 3 : undefined}
+                  adjustsFontSizeToFit={!largeText && compactMode}
+                  minimumFontScale={0.85}
+                >
+                  {currentStep.description}
+                </ThemedText>
+              ) : null}
+              {state.tutorialHint && (!microMode || largeText) ? (
+                <ThemedText
+                  style={[
+                    styles.hintText,
+                    compactMode ? styles.hintTextCompact : null,
+                  ]}
+                  numberOfLines={!largeText && compactMode ? 1 : undefined}
+                >
+                  {state.tutorialHint}
+                </ThemedText>
+              ) : null}
+
+              {!compactMode && !microMode ? (
+                <View style={styles.progressContainer}>
+                  {TUTORIAL_STEPS.map((step, index) => (
+                    <View
+                      key={step.id}
+                      style={[
+                        styles.progressDot,
+                        {
+                          backgroundColor:
+                            index === state.tutorialStep
+                              ? currentStep.color
+                              : index < state.tutorialStep
+                                ? `${currentStep.color}60`
+                                : "#2A2A4A",
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              ) : null}
+
+              {isLastStep ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => dispatch({ type: "COMPLETE_TUTORIAL" })}
+                  style={styles.nextButtonContainer}
+                >
+                  <LinearGradient
+                    colors={[
+                      currentStep.color,
+                      `${currentStep.color}CC`,
+                      currentStep.color,
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.nextButton}
+                  >
+                    <ThemedText style={styles.nextButtonText}>
+                      Start Playing!
+                    </ThemedText>
+                    <Feather name="play" size={20} color="#0F0F1F" />
+                  </LinearGradient>
+                </Pressable>
+              ) : !compactMode && !microMode ? (
+                <View style={styles.waitingContainer}>
+                  <Feather
+                    name="chevron-down"
+                    size={18}
+                    color={GameColors.text.secondary}
+                  />
+                  <ThemedText style={styles.waitingText}>
+                    Complete the step to continue
+                  </ThemedText>
+                </View>
+              ) : null}
+            </LinearGradient>
+          </ScrollView>
         </Animated.View>
       </View>
 
@@ -559,6 +599,8 @@ const styles = StyleSheet.create({
     backgroundColor: DIM_COLOR,
   },
   skipButton: {
+    zIndex: 2,
+    maxWidth: "80%",
     position: "absolute",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
@@ -603,6 +645,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
   },
+  cardScroll: { flexShrink: 1 },
   cardCompact: {
     maxWidth: 320,
   },

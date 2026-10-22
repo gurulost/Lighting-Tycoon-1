@@ -1,7 +1,6 @@
 import React from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { AccessibleModal as Modal } from "./AccessibleModal";
 import {
   PLAYTEST_PRESET_META,
   PLAYTEST_PRESET_ORDER,
@@ -62,6 +64,8 @@ export function PlaytestLabModal({
   onVariantChange,
 }: PlaytestLabModalProps) {
   const insets = useSafeAreaInsets();
+  const { stacked } = useAccessibleLayout();
+  const reducedMotion = useReducedMotion();
   const [selected, setSelected] = React.useState<PlaytestPresetId | null>(null);
 
   React.useEffect(() => {
@@ -84,7 +88,7 @@ export function PlaytestLabModal({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={reducedMotion ? "none" : "fade"}
       onRequestClose={busy ? undefined : onClose}
     >
       <View
@@ -100,17 +104,28 @@ export function PlaytestLabModal({
         <Pressable
           style={StyleSheet.absoluteFillObject}
           onPress={busy ? undefined : onClose}
+          aria-hidden
           accessibilityElementsHidden
         />
-        <View style={styles.sheet}>
+        <View
+          style={styles.sheet}
+          accessibilityViewIsModal
+          onAccessibilityEscape={busy ? undefined : onClose}
+        >
           <LinearGradient
             colors={["#14182C", "#202846", "#14182C"]}
             style={styles.header}
           >
             <View style={styles.headerCopy}>
               <ThemedText style={styles.eyebrow}>QA CONTROL DECK</ThemedText>
-              <ThemedText style={styles.title}>Playtest Lab</ThemedText>
-              <ThemedText style={styles.subtitle}>
+              <ThemedText
+                style={styles.title}
+                accessibilityRole="header"
+                maxFontSizeMultiplier={2}
+              >
+                Playtest Lab
+              </ThemedText>
+              <ThemedText style={styles.subtitle} maxFontSizeMultiplier={2}>
                 Load a protected, deterministic workshop scenario.
               </ThemedText>
             </View>
@@ -149,6 +164,7 @@ export function PlaytestLabModal({
                       onPress={() => onVariantChange(variant.id)}
                       disabled={busy}
                       accessibilityRole="button"
+                      accessibilityLabel={`${variant.label} onboarding`}
                       accessibilityState={{ selected: active, disabled: busy }}
                       testID={`playtest-variant-${variant.id ?? "build_default"}`}
                     >
@@ -178,11 +194,18 @@ export function PlaytestLabModal({
                   onPress={() => setSelected(presetId)}
                   disabled={busy}
                   accessibilityRole="button"
+                  accessibilityLabel={`${preset.title}. ${preset.phaseLabel}. ${preset.summary}`}
+                  accessibilityHint={`First action: ${FIRST_ACTION[presetId]}`}
                   accessibilityState={{ selected: isSelected, disabled: busy }}
                   testID={`playtest-preset-${presetId}`}
                 >
                   <View style={styles.optionCopy}>
-                    <View style={styles.optionTitleRow}>
+                    <View
+                      style={[
+                        styles.optionTitleRow,
+                        stacked && styles.stackedTitle,
+                      ]}
+                    >
                       <ThemedText style={styles.optionTitle}>
                         {preset.title}
                       </ThemedText>
@@ -236,7 +259,7 @@ export function PlaytestLabModal({
           </ScrollView>
 
           <View style={styles.footer}>
-            <ThemedText style={styles.footerNote}>
+            <ThemedText style={styles.footerNote} maxFontSizeMultiplier={2}>
               Main progress stays sealed while this scenario is active.
             </ThemedText>
             <Pressable
@@ -369,6 +392,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.sm,
   },
+  stackedTitle: { flexDirection: "column", alignItems: "flex-start" },
   optionTitle: {
     flex: 1,
     fontSize: 14,

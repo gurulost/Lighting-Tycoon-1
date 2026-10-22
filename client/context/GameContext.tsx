@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { AppState } from "react-native";
+import { MotionPreferencesProvider } from "@/hooks/useReducedMotion";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   GameState,
@@ -16766,7 +16767,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         canUndo,
       }}
     >
-      {children}
+      <MotionPreferencesProvider userPreference={state.settings.reducedMotion}>
+        {children}
+      </MotionPreferencesProvider>
     </GameContext.Provider>
   );
 }

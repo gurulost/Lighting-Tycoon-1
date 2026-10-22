@@ -1,10 +1,21 @@
-import React from "react";
-import { View, StyleSheet, Pressable, ViewStyle, Platform } from "react-native";
+import React, { useEffect, useRef } from "react";
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Text,
+  View,
+  StyleSheet,
+  Pressable,
+  ViewStyle,
+  Platform,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
+import { useModalPresented } from "./AccessibleModal";
 import {
   GameColors,
   Spacing,
@@ -47,6 +58,17 @@ export function ModalShell({
   children,
 }: ModalShellProps) {
   const insets = useSafeAreaInsets();
+  const { largeText } = useAccessibleLayout();
+  const headingRef = useRef<Text>(null);
+  const presented = useModalPresented();
+  useEffect(() => {
+    if (!presented || Platform.OS === "web") return;
+    const frame = requestAnimationFrame(() => {
+      const node = findNodeHandle(headingRef.current);
+      if (node) AccessibilityInfo.setAccessibilityFocus(node);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [presented]);
   const isCard = variant === "card";
 
   const showHeader = Boolean(
@@ -67,23 +89,37 @@ export function ModalShell({
       style={containerStyle}
       testID={Platform.OS === "web" ? testID : undefined}
       accessible={false}
+      accessibilityViewIsModal
+      onAccessibilityEscape={closeDisabled ? undefined : onClose}
     >
       {showHeader ? (
         <View style={[styles.header, isCard && styles.headerCard]}>
           <View style={styles.headerLeft}>
             {leading ? (
               leading
-            ) : icon ? (
+            ) : icon && !largeText ? (
               <View
                 style={[styles.iconBadge, { borderColor: ModalTokens.border }]}
+                aria-hidden
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
               >
                 <Feather name={icon} size={20} color={iconColor} />
               </View>
             ) : null}
             <View style={styles.headerText}>
-              <ThemedText style={styles.title}>{title}</ThemedText>
+              <Text
+                ref={headingRef}
+                style={styles.title}
+                accessibilityRole="header"
+                maxFontSizeMultiplier={2}
+              >
+                {title}
+              </Text>
               {subtitle ? (
-                <ThemedText style={styles.subtitle}>{subtitle}</ThemedText>
+                <ThemedText style={styles.subtitle} maxFontSizeMultiplier={2}>
+                  {subtitle}
+                </ThemedText>
               ) : null}
             </View>
           </View>
@@ -130,6 +166,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardContainer: {
+    flexShrink: 1,
+    maxHeight: "100%",
     borderWidth: 1,
     borderColor: ModalTokens.border,
     padding: Spacing.xl,
@@ -139,7 +177,7 @@ const styles = StyleSheet.create({
   header: {
     minHeight: ModalTokens.headerHeight,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
@@ -197,8 +235,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minHeight: 0,
   },
   contentCard: {
     flexShrink: 1,
+    minHeight: 0,
   },
 });

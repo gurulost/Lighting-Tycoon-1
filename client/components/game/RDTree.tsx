@@ -16,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { RD_DEFINITIONS, RDNode } from "@/types/game";
 import { useGame } from "@/context/GameContext";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
 import { withRepeat } from "@/lib/reanimated";
@@ -46,7 +47,7 @@ function RDNodeCard({
 }) {
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
-  const reducedMotion = state.settings.reducedMotion;
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const scale = useSharedValue(1);
   const glow = useSharedValue(0);
 
@@ -54,6 +55,8 @@ function RDNodeCard({
     if (reducedMotion) {
       cancelAnimation(glow);
       glow.value = 0;
+      cancelAnimation(scale);
+      scale.value = 1;
       return;
     }
     if (node.id === "freedom_build" && isUnlocked) {
@@ -73,7 +76,7 @@ function RDNodeCard({
       cancelAnimation(glow);
       glow.value = 0;
     };
-  }, [isUnlocked, node.id, reducedMotion, glow]);
+  }, [isUnlocked, node.id, reducedMotion, glow, scale]);
 
   const handleUnlock = React.useCallback(() => {
     if (hapticsEnabled) {
@@ -85,10 +88,11 @@ function RDNodeCard({
   const handlePress = () => {
     if (canUnlock && !isUnlocked) {
       handleUnlock();
-      scale.value = withSequence(
-        withSpring(0.95, { damping: 15 }),
-        withDelay(100, withSpring(1, { damping: 15 })),
-      );
+      if (!reducedMotion)
+        scale.value = withSequence(
+          withSpring(0.95, { damping: 15 }),
+          withDelay(100, withSpring(1, { damping: 15 })),
+        );
     }
   };
 

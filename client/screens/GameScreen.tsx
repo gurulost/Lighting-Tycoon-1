@@ -8,7 +8,9 @@ import React, {
 import {
   View,
   StyleSheet,
-  Modal,
+  AccessibilityInfo,
+  findNodeHandle,
+  Platform,
   Pressable,
   AppState,
   InteractionManager,
@@ -81,6 +83,12 @@ import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { STORY_BEATS } from "@/constants/story";
 import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import SoundManager from "@/audio/SoundManager";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import {
+  AccessibleModal as Modal,
+  ModalReturnFocusProvider,
+} from "@/components/game/AccessibleModal";
+import { createAssetWarmup } from "@/lib/assetWarmup";
 import { OverlayItem, OVERLAY_PRIORITY } from "@/types/overlay";
 import type { Phase3OnboardingVariant } from "@/types/game";
 import type { PlaytestPresetId } from "@/constants/playtestPresets";
@@ -353,6 +361,7 @@ export default function GameScreen() {
     dismissOfflineCashNotice,
     hydrated,
   } = useGame();
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const releaseChannel = resolveReleaseChannel();
   const playtestEnabled = hasPlaytestCapability(releaseChannel);
   const e2eEnabled = hasE2EShortcuts(releaseChannel);
@@ -2345,9 +2354,21 @@ export default function GameScreen() {
       partPremiumOpen,
       partPremiumLocked,
     ];
-    Promise.all(
-      sources.map((source) => Image.loadAsync(source).catch(() => null)),
+    const warmup = createAssetWarmup(sources, (source) =>
+      Image.loadAsync(source),
     );
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (AppState.currentState === "active") warmup.resume();
+    });
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") warmup.resume();
+      else warmup.pause();
+    });
+    return () => {
+      task.cancel();
+      subscription.remove();
+      warmup.dispose();
+    };
   }, []);
 
   useEffect(() => {
@@ -2671,7 +2692,7 @@ export default function GameScreen() {
       state.reputationTier > reputationTierRef.current &&
       state.tutorialComplete
     ) {
-      if (!state.settings.reducedMotion) {
+      if (!reducedMotion) {
         enqueueOverlay({
           id: `milestone:${Date.now()}`,
           type: "milestone",
@@ -2683,7 +2704,7 @@ export default function GameScreen() {
   }, [
     state.reputationTier,
     state.tutorialComplete,
-    state.settings.reducedMotion,
+    reducedMotion,
     enqueueOverlay,
   ]);
 
@@ -2733,857 +2754,935 @@ export default function GameScreen() {
     [dispatch, playtestSession],
   );
 
-  return (
-    <LinearGradient
-      colors={["#0A0A14", "#0F0F1F", "#0A0A14"]}
-      style={[styles.container, { paddingTop: insets.top }]}
-      onLayout={(event) => {
-        const layout = event?.nativeEvent?.layout;
-        if (!layout) return;
-        const { height } = layout;
-        setScreenHeight((prev) => (prev === height ? prev : height));
-      }}
-    >
-      {__DEV__ ? (
-        <DebugOverlay
-          visible={debugOverlayVisible}
-          onClose={() => setDebugOverlayVisible(false)}
-          activeModal={activeModal}
-          selectedPartIndex={selectedPartIndex}
-          isDragging={isDragging}
-          showLockoutModal={showLockoutModal}
-          overlayQueueLength={overlayQueue.length}
-          overlayTop={overlayDebugTop}
-        />
-      ) : null}
+  const baronOfferVisible =
+    !phase2IntroVisible &&
+    !phase2ContractsBriefVisible &&
+    !phase3IntroVisible &&
+    !phase3HearingIntroVisible &&
+    !phase3RatifyReadyVisible &&
+    state.baronOfferAvailable &&
+    baronOfferGate &&
+    !showLockoutModal &&
+    activeModal === null &&
+    !selectedPartOpen;
+  const hasBlockingModal = Boolean(
+    activeModal ||
+      playtestLabVisible ||
+      projectDossierId ||
+      phase2IntroVisible ||
+      phase2ContractsBriefVisible ||
+      phase3IntroVisible ||
+      phase3HearingIntroVisible ||
+      phase3RatifyReadyVisible ||
+      selectedPartOpen ||
+      showProjectReveal ||
+      showLockoutModal ||
+      baronOfferVisible ||
+      (state.mergeMomentumPending && !overlaySuppressed),
+  );
+  const gameAccessibilityRef = useRef<View>(null);
+  const blockingModalRef = useRef(hasBlockingModal);
+  blockingModalRef.current = hasBlockingModal;
+  const restoreGameFocus = useCallback(() => {
+    if (blockingModalRef.current || Platform.OS === "web") return;
+    const node = findNodeHandle(gameAccessibilityRef.current);
+    if (node) AccessibilityInfo.setAccessibilityFocus(node);
+  }, []);
 
-      <View
-        style={styles.topStack}
+  return (
+    <ModalReturnFocusProvider value={restoreGameFocus}>
+      <LinearGradient
+        colors={["#0A0A14", "#0F0F1F", "#0A0A14"]}
+        style={styles.container}
         onLayout={(event) => {
           const layout = event?.nativeEvent?.layout;
           if (!layout) return;
-          setTopStackLayout((prev) =>
-            prev && layoutRectEqual(prev, layout) ? prev : layout,
-          );
+          const { height } = layout;
+          setScreenHeight((prev) => (prev === height ? prev : height));
         }}
       >
-        {playtestSession ? (
-          <PlaytestSessionBanner
-            presetId={playtestSession.presetId}
-            busy={playtestBusy}
-            onChange={openPlaytestLab}
-            onRestart={() => void handlePlaytestRestart()}
-            onRestore={() => void handlePlaytestRestore()}
-          />
-        ) : null}
         <View
-          style={topBarStyle}
-          onLayout={(event) => {
-            const layout = event?.nativeEvent?.layout;
-            if (!layout) return;
-            setTopBarLayout((prev) =>
-              prev && layoutRectEqual(prev, layout) ? prev : layout,
-            );
-          }}
+          style={[styles.gameContent, { paddingTop: insets.top }]}
+          aria-hidden={hasBlockingModal}
+          accessibilityElementsHidden={hasBlockingModal}
+          importantForAccessibility={
+            hasBlockingModal ? "no-hide-descendants" : "auto"
+          }
         >
-          <View style={styles.currencyWrap} onLayout={setTarget("currency")}>
-            <CurrencyDisplay
-              cash={state.cash}
-              reputation={state.reputation}
-              research={state.research}
-              density={currencyDensity}
-              onCashPress={
-                !state.tutorialComplete && state.tutorialStep < 4
-                  ? undefined
-                  : () => openModalFromUser("upgrades")
-              }
-              onCashLongPress={() =>
-                showToast("Cash buys upgrades and expansions.", 2400)
-              }
-              onReputationLongPress={() =>
-                showToast(
-                  "Reputation unlocks neighborhoods and better orders.",
-                  2600,
-                )
-              }
-              onResearchLongPress={() =>
-                showToast(
-                  "Research unlocks R&D and the Freedom Controller.",
-                  2600,
-                )
-              }
-              reducedMotion={state.settings.reducedMotion}
+          {__DEV__ ? (
+            <DebugOverlay
+              visible={debugOverlayVisible}
+              onClose={() => setDebugOverlayVisible(false)}
+              activeModal={activeModal}
+              selectedPartIndex={selectedPartIndex}
+              isDragging={isDragging}
+              showLockoutModal={showLockoutModal}
+              overlayQueueLength={overlayQueue.length}
+              overlayTop={overlayDebugTop}
             />
-          </View>
+          ) : null}
+
           <View
-            style={[styles.topActions, { gap: topActionsGap }]}
+            style={styles.topStack}
             onLayout={(event) => {
               const layout = event?.nativeEvent?.layout;
               if (!layout) return;
-              setTopActionsLayout((prev) =>
+              setTopStackLayout((prev) =>
                 prev && layoutRectEqual(prev, layout) ? prev : layout,
               );
             }}
           >
-            <Pressable
-              style={[
-                topActionButtonStyle,
-                unreadStoryCount > 0 && styles.topActionBadgeHost,
-              ]}
-              onPress={openStoryLog}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Story log"
-            >
-              <LinearGradient
-                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={[styles.settingsGradient, topActionGradientSizeStyle]}
-              >
-                <Feather
-                  name="book-open"
-                  size={topActionIconSize}
-                  color={GameColors.text.secondary}
-                />
-              </LinearGradient>
-              {unreadStoryCount > 0 ? (
-                <View style={styles.storyBadgeWrap} pointerEvents="none">
-                  <LinearGradient
-                    colors={["#00D9FF", "#4DFF88"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.storyBadge}
-                  >
-                    <ThemedText style={styles.storyBadgeText}>
-                      {unreadStoryCount > 9 ? "9+" : unreadStoryCount}
-                    </ThemedText>
-                  </LinearGradient>
-                </View>
-              ) : null}
-            </Pressable>
-            <View
-              onLayout={setTarget("glossary")}
-              style={[
-                styles.helpButtonWrap,
-                showTutorialGlossaryBeacon && styles.helpButtonWrapBeacon,
-                showTutorialGlossaryBeacon && styles.topActionBadgeHost,
-                { borderRadius: topActionRadius },
-              ]}
-            >
-              <Pressable
-                style={topActionButtonStyle}
-                onPress={() => openGlossary()}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Help and glossary"
-              >
-                <LinearGradient
-                  colors={["#062A35", "#0C5B72", "#062A35"]}
-                  style={[
-                    styles.settingsGradient,
-                    styles.helpGradient,
-                    showTutorialGlossaryBeacon && styles.helpGradientBeacon,
-                    topActionGradientSizeStyle,
-                  ]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Feather
-                    name="help-circle"
-                    size={helpIconSize}
-                    color={GameColors.ui.primary}
-                  />
-                </LinearGradient>
-              </Pressable>
-              {showTutorialGlossaryBeacon ? (
-                <View style={styles.helpGuideBadgeWrap} pointerEvents="none">
-                  <LinearGradient
-                    colors={["#00D9FF", "#4DFF88"]}
-                    style={styles.helpGuideBadge}
-                  >
-                    <Feather name="help-circle" size={9} color="#0A0A14" />
-                  </LinearGradient>
-                </View>
-              ) : null}
-            </View>
-            <Pressable
-              style={topActionButtonStyle}
-              onPress={() => openModalFromUser("settings")}
-              testID="settings-button"
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Settings"
-            >
-              <LinearGradient
-                colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                style={[styles.settingsGradient, topActionGradientSizeStyle]}
-              >
-                <Feather
-                  name="settings"
-                  size={topActionIconSize}
-                  color={GameColors.text.secondary}
-                />
-              </LinearGradient>
-            </Pressable>
-            {showHudToggle ? (
-              <Pressable
-                style={topActionButtonStyle}
-                onPress={() => setHudCollapsed((prev) => !prev)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  topCondensed ? "Expand HUD" : "Collapse HUD"
-                }
-              >
-                <LinearGradient
-                  colors={["#1F1F2E", "#252542", "#1F1F2E"]}
-                  style={[styles.settingsGradient, topActionGradientSizeStyle]}
-                >
-                  <Feather
-                    name={topCondensed ? "chevrons-down" : "chevrons-up"}
-                    size={topActionIconSize}
-                    color={GameColors.text.secondary}
-                  />
-                </LinearGradient>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-
-        <View
-          style={[
-            styles.statusRow,
-            topStackSideMarginStyle,
-            topCondensed && styles.statusRowCompact,
-          ]}
-        >
-          <View style={styles.statusItem}>
-            <View ref={dependencyTargetRef} onLayout={measureDependencyTarget}>
-              <DependencyMeter
-                value={state.dependency}
-                baronPressure={state.baronPressure}
-                compact
-                reducedMotion={state.settings.reducedMotion}
-                lockoutActive={state.lockoutActive}
-                onInfoPress={() =>
-                  openGlossary({
-                    sectionId: "dependency",
-                    source: "dependency_meter",
-                  })
-                }
+            {playtestSession && !showLockoutModal ? (
+              <PlaytestSessionBanner
+                presetId={playtestSession.presetId}
+                busy={playtestBusy}
+                onChange={openPlaytestLab}
+                onRestart={() => void handlePlaytestRestart()}
+                onRestore={() => void handlePlaytestRestore()}
               />
+            ) : null}
+            <View
+              style={topBarStyle}
+              onLayout={(event) => {
+                const layout = event?.nativeEvent?.layout;
+                if (!layout) return;
+                setTopBarLayout((prev) =>
+                  prev && layoutRectEqual(prev, layout) ? prev : layout,
+                );
+              }}
+            >
+              <View
+                style={styles.currencyWrap}
+                onLayout={setTarget("currency")}
+              >
+                <CurrencyDisplay
+                  cash={state.cash}
+                  reputation={state.reputation}
+                  research={state.research}
+                  density={currencyDensity}
+                  onCashPress={
+                    !state.tutorialComplete && state.tutorialStep < 4
+                      ? undefined
+                      : () => openModalFromUser("upgrades")
+                  }
+                  onCashLongPress={() =>
+                    showToast("Cash buys upgrades and expansions.", 2400)
+                  }
+                  onReputationLongPress={() =>
+                    showToast(
+                      "Reputation unlocks neighborhoods and better orders.",
+                      2600,
+                    )
+                  }
+                  onResearchLongPress={() =>
+                    showToast(
+                      "Research unlocks R&D and the Freedom Controller.",
+                      2600,
+                    )
+                  }
+                  reducedMotion={reducedMotion}
+                />
+              </View>
+              <View
+                style={[styles.topActions, { gap: topActionsGap }]}
+                onLayout={(event) => {
+                  const layout = event?.nativeEvent?.layout;
+                  if (!layout) return;
+                  setTopActionsLayout((prev) =>
+                    prev && layoutRectEqual(prev, layout) ? prev : layout,
+                  );
+                }}
+              >
+                <Pressable
+                  style={[
+                    topActionButtonStyle,
+                    unreadStoryCount > 0 && styles.topActionBadgeHost,
+                  ]}
+                  onPress={openStoryLog}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Story log"
+                >
+                  <LinearGradient
+                    colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                    style={[
+                      styles.settingsGradient,
+                      topActionGradientSizeStyle,
+                    ]}
+                  >
+                    <Feather
+                      name="book-open"
+                      size={topActionIconSize}
+                      color={GameColors.text.secondary}
+                    />
+                  </LinearGradient>
+                  {unreadStoryCount > 0 ? (
+                    <View style={styles.storyBadgeWrap} pointerEvents="none">
+                      <LinearGradient
+                        colors={["#00D9FF", "#4DFF88"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.storyBadge}
+                      >
+                        <ThemedText style={styles.storyBadgeText}>
+                          {unreadStoryCount > 9 ? "9+" : unreadStoryCount}
+                        </ThemedText>
+                      </LinearGradient>
+                    </View>
+                  ) : null}
+                </Pressable>
+                <View
+                  onLayout={setTarget("glossary")}
+                  style={[
+                    styles.helpButtonWrap,
+                    showTutorialGlossaryBeacon && styles.helpButtonWrapBeacon,
+                    showTutorialGlossaryBeacon && styles.topActionBadgeHost,
+                    { borderRadius: topActionRadius },
+                  ]}
+                >
+                  <Pressable
+                    style={topActionButtonStyle}
+                    onPress={() => openGlossary()}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="Help and glossary"
+                  >
+                    <LinearGradient
+                      colors={["#062A35", "#0C5B72", "#062A35"]}
+                      style={[
+                        styles.settingsGradient,
+                        styles.helpGradient,
+                        showTutorialGlossaryBeacon && styles.helpGradientBeacon,
+                        topActionGradientSizeStyle,
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Feather
+                        name="help-circle"
+                        size={helpIconSize}
+                        color={GameColors.ui.primary}
+                      />
+                    </LinearGradient>
+                  </Pressable>
+                  {showTutorialGlossaryBeacon ? (
+                    <View
+                      style={styles.helpGuideBadgeWrap}
+                      pointerEvents="none"
+                    >
+                      <LinearGradient
+                        colors={["#00D9FF", "#4DFF88"]}
+                        style={styles.helpGuideBadge}
+                      >
+                        <Feather name="help-circle" size={9} color="#0A0A14" />
+                      </LinearGradient>
+                    </View>
+                  ) : null}
+                </View>
+                <Pressable
+                  ref={gameAccessibilityRef}
+                  style={topActionButtonStyle}
+                  onPress={() => openModalFromUser("settings")}
+                  testID="settings-button"
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Settings"
+                >
+                  <LinearGradient
+                    colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                    style={[
+                      styles.settingsGradient,
+                      topActionGradientSizeStyle,
+                    ]}
+                  >
+                    <Feather
+                      name="settings"
+                      size={topActionIconSize}
+                      color={GameColors.text.secondary}
+                    />
+                  </LinearGradient>
+                </Pressable>
+                {showHudToggle ? (
+                  <Pressable
+                    style={topActionButtonStyle}
+                    onPress={() => setHudCollapsed((prev) => !prev)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      topCondensed ? "Expand HUD" : "Collapse HUD"
+                    }
+                  >
+                    <LinearGradient
+                      colors={["#1F1F2E", "#252542", "#1F1F2E"]}
+                      style={[
+                        styles.settingsGradient,
+                        topActionGradientSizeStyle,
+                      ]}
+                    >
+                      <Feather
+                        name={topCondensed ? "chevrons-down" : "chevrons-up"}
+                        size={topActionIconSize}
+                        color={GameColors.text.secondary}
+                      />
+                    </LinearGradient>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
+
+            <View
+              style={[
+                styles.statusRow,
+                topStackSideMarginStyle,
+                topCondensed && styles.statusRowCompact,
+              ]}
+            >
+              <View style={styles.statusItem}>
+                <View
+                  ref={dependencyTargetRef}
+                  onLayout={measureDependencyTarget}
+                >
+                  <DependencyMeter
+                    value={state.dependency}
+                    baronPressure={state.baronPressure}
+                    compact
+                    reducedMotion={reducedMotion}
+                    lockoutActive={state.lockoutActive}
+                    onInfoPress={() =>
+                      openGlossary({
+                        sectionId: "dependency",
+                        source: "dependency_meter",
+                      })
+                    }
+                  />
+                </View>
+              </View>
+              <View style={styles.statusItem}>
+                <NeighborhoodBadge
+                  reputation={state.reputation}
+                  currentNeighborhoodId={state.currentNeighborhoodId}
+                  compact
+                />
+              </View>
+            </View>
+
+            <MergeChainIndicator
+              count={state.mergeChainCount}
+              expiresAt={state.mergeChainExpiresAt}
+              windowMs={mergeChainWindowMs}
+              reducedMotion={reducedMotion}
+            />
+
+            {state.lockoutActive ? (
+              <View
+                style={[
+                  styles.lockoutHintRow,
+                  topStackSideMarginStyle,
+                  topCondensed && styles.lockoutHintRowCompact,
+                ]}
+              >
+                <Feather
+                  name="alert-circle"
+                  size={12}
+                  color={GameColors.ui.danger}
+                />
+                <View style={styles.lockoutHintTextWrap}>
+                  <ThemedText style={styles.lockoutHintText}>
+                    Audit in progress - Dependency can&apos;t drop below 20.
+                  </ThemedText>
+                  <ThemedText style={styles.lockoutHintSubtext}>
+                    {lockoutProgressLabel}
+                  </ThemedText>
+                </View>
+              </View>
+            ) : null}
+
+            {state.gamePhase >= 2 && phaseObjective ? (
+              <SplitObjectiveRow
+                missions={state.missions}
+                missionsLocked={!state.tutorialComplete}
+                objective={phaseObjective}
+                playbook={phase2Playbook}
+                playbookHint={phasePlaybookHint}
+                onPressGoals={() => openModalFromUser("missions")}
+                onLockedGoalsPress={() =>
+                  showToast("Finish the tutorial to unlock goals.", 2200)
+                }
+                onPressObjective={handlePhaseObjectivePress}
+                onPressPlaybookHelp={handlePhasePlaybookHelp}
+                compact={topCondensed}
+                stacked={isSplitObjectiveStacked}
+                style={topStackSideMarginStyle}
+              />
+            ) : (
+              <MissionStrip
+                missions={state.missions}
+                locked={!state.tutorialComplete}
+                onPress={() => openModalFromUser("missions")}
+                onLockedPress={() =>
+                  showToast("Finish the tutorial to unlock goals.", 2200)
+                }
+                compact={topCondensed}
+                collapsed={topCondensed}
+                style={topStackSideMarginStyle}
+              />
+            )}
           </View>
-          <View style={styles.statusItem}>
-            <NeighborhoodBadge
-              reputation={state.reputation}
-              currentNeighborhoodId={state.currentNeighborhoodId}
-              compact
+
+          <View
+            ref={boardContainerRef}
+            style={styles.boardContainer}
+            onLayout={(event) => {
+              measureBoardContainer();
+              setTarget("board")(event);
+            }}
+          >
+            <MergeBoard
+              enhancedPartCues={state.settings.enhancedPartCues}
+              layoutVersion={storyLayoutTick}
+              boardContainerLayout={boardContainerLayout}
+              maxHeight={boardContainerLayout?.height}
+              suppliersOpen={activeModal === "suppliers"}
+              onWorkbenchPress={() => {
+                openModalFromUser("suppliers");
+              }}
+              onOrderInboxPress={() => {
+                if (!state.tutorialComplete && state.tutorialStep < 3) {
+                  showToast("Finish Step 3 to unlock Orders.", 2200);
+                  return;
+                }
+                openModalFromUser("orders");
+              }}
+              onRDBenchPress={() => {
+                if (state.upgrades["rd_unlock"] < 1) {
+                  showToast("Unlock R&D via upgrades to access the lab.", 2200);
+                  return;
+                }
+                openModalFromUser("rd");
+              }}
+              onStationLongPress={(station) => {
+                if (station === "workbench") {
+                  showToast(
+                    "Suppliers: tap to access your supply panel.",
+                    2600,
+                  );
+                } else if (station === "orders") {
+                  showToast(
+                    "Orders: fulfill installs for cash, reputation, and research.",
+                    2600,
+                  );
+                } else {
+                  showToast(
+                    "R&D: spend research to unlock Freedom Controller tech.",
+                    2600,
+                  );
+                }
+              }}
+              onUtilityLongPress={(utility) => {
+                if (utility === "backpack") {
+                  showToast(
+                    "Backpack: temporary storage. Drag items in and out.",
+                    2400,
+                  );
+                } else {
+                  showToast("Recycle: delete a part for a small refund.", 2400);
+                }
+              }}
+              onDragStateChange={setIsDragging}
+              onPartLongPress={(index) => setSelectedPartIndex(index)}
+              onStationLayout={handleStationLayout}
+              onUndo={undoLastMove}
+              canUndo={canUndoNow}
+              tutorialFocus={
+                !state.tutorialComplete && state.tutorialStep === 0
+                  ? "workbench"
+                  : !state.tutorialComplete && state.tutorialStep === 3
+                    ? "orders"
+                    : null
+              }
+              compatibilityGuideActive={state.compatibilityGuideStep === 1}
             />
           </View>
+
+          <LinearGradient
+            colors={["#1A1A2E", "#252542", "#1A1A2E"]}
+            style={[
+              styles.bottomBar,
+              isCompactLayout && styles.bottomBarCompact,
+              {
+                paddingBottom:
+                  insets.bottom + (isCompactLayout ? Spacing.sm : Spacing.md),
+              },
+            ]}
+            onLayout={(event) => {
+              const layout = event?.nativeEvent?.layout;
+              if (!layout) return;
+              setBottomBarLayout((prev) =>
+                prev && layoutRectEqual(prev, layout) ? prev : layout,
+              );
+            }}
+          >
+            <BottomButton
+              icon="inbox"
+              label="Orders"
+              color={GameColors.currency.reputation}
+              onPress={() => openModalFromUser("orders")}
+              onDisabledPress={() =>
+                showToast("Finish the tutorial to unlock Orders.", 2200)
+              }
+              badge={fulfillableOrderCount}
+              paused={orderSpawnPaused}
+              disabled={!state.tutorialComplete && state.tutorialStep < 3}
+              onLayout={setTarget("orders")}
+              compact={isCompactLayout}
+              reducedMotion={reducedMotion}
+            />
+
+            {showProjectsButton ? (
+              <BottomButton
+                icon={state.projectsUnlocked ? "flag" : "lock"}
+                label="Projects"
+                color={GameColors.ui.primary}
+                onPress={() => openProjectBoard()}
+                badge={projectBadge}
+                indicator={projectIndicator}
+                compact={isCompactLayout}
+                reducedMotion={reducedMotion}
+              />
+            ) : null}
+
+            {showCouncilButton ? (
+              <BottomButton
+                icon="award"
+                label="Council"
+                color={GameColors.currency.research}
+                onPress={() => openModalFromUser("council")}
+                onDisabledPress={() => showToast(councilTooltipMessage, 3200)}
+                disabled={!state.council.unlocked}
+                badge={councilBadge}
+                compact={isCompactLayout}
+                reducedMotion={reducedMotion}
+              />
+            ) : null}
+
+            <BottomButton
+              icon="shopping-cart"
+              label="Shop"
+              color={GameColors.currency.cash}
+              onPress={() => openModalFromUser("upgrades")}
+              onDisabledPress={() =>
+                showToast("Finish the tutorial to unlock the Shop.", 2200)
+              }
+              disabled={!state.tutorialComplete && state.tutorialStep < 4}
+              onLayout={setTarget("upgrades")}
+              compact={isCompactLayout}
+              reducedMotion={reducedMotion}
+            />
+
+            <BottomButton
+              icon="cpu"
+              label="R&D"
+              color={GameColors.currency.research}
+              onPress={() => openModalFromUser("rd")}
+              onDisabledPress={() =>
+                showToast("Unlock R&D via upgrades to access the lab.", 2200)
+              }
+              disabled={
+                !state.tutorialComplete || state.upgrades["rd_unlock"] < 1
+              }
+              compact={isCompactLayout}
+              reducedMotion={reducedMotion}
+            />
+
+            {state.freedomControllerCount > 0 ? (
+              <View style={styles.freedomIndicator}>
+                <Image
+                  source={freedomControllerImage}
+                  style={styles.freedomIcon}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                />
+                <ThemedText style={styles.freedomCount}>
+                  {state.freedomControllerCount}
+                </ThemedText>
+              </View>
+            ) : null}
+          </LinearGradient>
+
+          <OverlayManager
+            queue={overlaySuppressed ? [] : overlayQueue}
+            onDismiss={dismissOverlay}
+            topOffset={(topStackLayout?.height ?? 0) + Spacing.xs}
+            storyTopOffset={
+              insets.top + (topBarLayout?.height ?? 0) + Spacing.xs
+            }
+            bottomInset={insets.bottom}
+            reducedMotion={reducedMotion}
+            onStoryPress={handleStoryPress}
+            onStoryDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
+            onUnlockBannerPress={
+              phase3HandoffEnabled ? requestCouncilOpen : undefined
+            }
+            onTelemetry={handleOverlayTelemetry}
+          />
         </View>
 
-        <MergeChainIndicator
-          count={state.mergeChainCount}
-          expiresAt={state.mergeChainExpiresAt}
-          windowMs={mergeChainWindowMs}
-          reducedMotion={state.settings.reducedMotion}
+        {playtestEnabled ? (
+          <PlaytestLabModal
+            visible={playtestLabVisible}
+            busy={playtestBusy}
+            error={playtestError}
+            activePresetId={playtestSession?.presetId}
+            phase3Variant={
+              playtestSession
+                ? state.settings.phase3OnboardingVariantOverride
+                : pendingPhase3Variant
+            }
+            onClose={() => setPlaytestLabVisible(false)}
+            onSelect={handlePlaytestPresetSelect}
+            onVariantChange={handlePlaytestVariantChange}
+          />
+        ) : null}
+
+        <Modal
+          visible={phase2IntroVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={handlePhase2IntroContinue}
+        >
+          <Phase2IntroModal
+            mode="phase_intro"
+            testID="phase2-intro-modal"
+            continueTestID="phase2-intro-continue"
+            objective={phaseObjective}
+            onContinue={handlePhase2IntroContinue}
+          />
+        </Modal>
+
+        <Modal
+          visible={phase2ContractsBriefVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={handlePhase2ContractsBriefContinue}
+        >
+          <Phase2IntroModal
+            mode="contracts_unlock"
+            testID="phase2-contracts-brief-modal"
+            continueTestID="phase2-contracts-brief-continue"
+            objective={phaseObjective}
+            onContinue={handlePhase2ContractsBriefContinue}
+          />
+        </Modal>
+
+        <Modal
+          visible={phase3IntroVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={handlePhase3IntroContinue}
+        >
+          <Phase3IntroModal
+            objective={phaseObjective}
+            onContinue={handlePhase3IntroContinue}
+          />
+        </Modal>
+
+        <Modal
+          visible={phase3HearingIntroVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={handlePhase3HearingIntroDismiss}
+        >
+          <Phase3HearingIntroModal
+            onClearByPlay={handlePhase3HearingClearByPlay}
+            onLobbyBack={handlePhase3HearingLobbyBack}
+            onDismiss={handlePhase3HearingIntroDismiss}
+          />
+        </Modal>
+
+        <Modal
+          visible={phase3RatifyReadyVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={handlePhase3RatifyReadyDismiss}
+        >
+          <Phase3RatifyReadyModal
+            onOpenOrders={handlePhase3RatifyReadyOpenOrders}
+            onDismiss={handlePhase3RatifyReadyDismiss}
+          />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "orders"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => {
+            if (compatibilityGuideOrdersLock) {
+              return;
+            }
+            if (state.tutorialComplete || state.tutorialStep !== 3) {
+              closeModal();
+            }
+          }}
+        >
+          <OrdersModal
+            onClose={closeModal}
+            closeDisabled={
+              (!state.tutorialComplete && state.tutorialStep === 3) ||
+              compatibilityGuideOrdersLock
+            }
+            onOpenProjects={() => openProjectBoard()}
+            onOpenCouncil={requestCouncilOpen}
+          />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "projects"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <ProjectBoardModal
+            onClose={closeModal}
+            onOpenDossier={openProjectDossier}
+            onOpenCouncil={requestCouncilOpen}
+            focusProjectId={projectBoardFocusId}
+            initialTab={projectBoardInitialTab}
+            openId={projectBoardOpenId}
+          />
+        </Modal>
+
+        <Modal
+          visible={Boolean(projectDossierId)}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setProjectDossierId(null)}
+        >
+          {projectDossierId ? (
+            <ProjectDossierModal
+              projectId={projectDossierId}
+              onClose={() => setProjectDossierId(null)}
+              onOpenBoard={openProjectBoardForProject}
+            />
+          ) : null}
+        </Modal>
+
+        <Modal
+          visible={activeModal === "council"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <CouncilModal
+            onClose={closeModal}
+            onOpenOrders={() => openModalFromUser("orders")}
+            entryHint={councilEntryHint}
+            onOpenLegacyCycle={() => openModalFromUser("legacy")}
+          />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "legacy"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <LegacyCycleModal onClose={closeModal} />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "suppliers"}
+          animationType="fade"
+          transparent
+          onRequestClose={closeModal}
+        >
+          <SupplierModal
+            visible={activeModal === "suppliers"}
+            onClose={closeModal}
+            onToast={showToast}
+          />
+        </Modal>
+
+        <MergeMomentumModal
+          // Defer behind phase intro takeovers: mergeMomentumPending is
+          // persisted, so a reload at a phase boundary can otherwise stack this
+          // full-screen overlay on top of the intro modal.
+          visible={Boolean(state.mergeMomentumPending) && !overlaySuppressed}
+          threshold={state.mergeMomentumPending?.threshold ?? 0}
+          onChoose={(choice) => claimMergeMomentum(choice)}
         />
 
-        {state.lockoutActive ? (
-          <View
-            style={[
-              styles.lockoutHintRow,
-              topStackSideMarginStyle,
-              topCondensed && styles.lockoutHintRowCompact,
-            ]}
-          >
-            <Feather
-              name="alert-circle"
-              size={12}
-              color={GameColors.ui.danger}
+        <Modal
+          visible={activeModal === "upgrades"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => {
+            if (state.tutorialComplete || state.tutorialStep !== 4) {
+              closeModal();
+            }
+          }}
+        >
+          <UpgradesModal
+            onClose={closeModal}
+            closeDisabled={!state.tutorialComplete && state.tutorialStep === 4}
+            tutorialOnlyUpgradeId={
+              !state.tutorialComplete && state.tutorialStep === 4
+                ? "space_1"
+                : undefined
+            }
+          />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "rd"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <RDModal onClose={closeModal} />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "settings"}
+          animationType="fade"
+          transparent
+          onRequestClose={closeModal}
+        >
+          <SettingsModal
+            onClose={closeModal}
+            onOpenGlossary={() => openGlossary()}
+            debugOverlayEnabled={debugOverlayVisible}
+            onToggleDebugOverlay={setDebugOverlayVisible}
+            playtestEnabled={playtestEnabled}
+            onOpenPlaytestLab={openPlaytestLab}
+          />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "story"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <StoryLogModal onClose={closeModal} />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "glossary"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <GlossaryModal
+            onClose={closeModal}
+            initialSectionId={glossaryInitialSectionId}
+            openToken={glossaryOpenToken}
+          />
+        </Modal>
+
+        <Modal
+          visible={activeModal === "missions"}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeModal}
+        >
+          <MissionDetailModal onClose={closeModal} />
+        </Modal>
+
+        <Modal visible={baronOfferVisible} animationType="fade" transparent>
+          <BaronOfferModal
+            onAccept={() => dispatch({ type: "ACCEPT_BARON_OFFER" })}
+            onDecline={() => dispatch({ type: "DECLINE_BARON_OFFER" })}
+          />
+        </Modal>
+
+        <Modal
+          visible={showProjectReveal}
+          animationType="fade"
+          transparent
+          onRequestClose={dismissProjectReveal}
+        >
+          <ProjectRevealModal
+            projectId={pendingProjectRevealId}
+            onDismiss={dismissProjectReveal}
+            onOpenDossier={handleRevealDossier}
+            onOpenBoard={handleRevealBoard}
+          />
+        </Modal>
+
+        <Modal visible={selectedPartOpen} animationType="fade" transparent>
+          {selectedPart ? (
+            <PartDetailModal
+              part={selectedPart}
+              onClose={() => setSelectedPartIndex(null)}
+              onUseFreedomController={() =>
+                dispatch({
+                  type: "USE_FREEDOM_CONTROLLER",
+                  partIndex: selectedPartIndex!,
+                })
+              }
+              canUseFreedomController={state.freedomControllerCount > 0}
             />
-            <View style={styles.lockoutHintTextWrap}>
-              <ThemedText style={styles.lockoutHintText}>
-                Audit in progress - Dependency can&apos;t drop below 20.
-              </ThemedText>
-              <ThemedText style={styles.lockoutHintSubtext}>
-                {lockoutProgressLabel}
-              </ThemedText>
-            </View>
+          ) : null}
+        </Modal>
+
+        {showLockoutModal ? <LockoutModal onClose={() => {}} /> : null}
+        {showLockoutModal &&
+        playtestSession &&
+        !playtestLabVisible &&
+        activeModal === null ? (
+          <View style={[styles.lockoutPlaytestControls, { top: insets.top }]}>
+            <PlaytestSessionBanner
+              presetId={playtestSession.presetId}
+              busy={playtestBusy}
+              onChange={openPlaytestLab}
+              onRestart={() => void handlePlaytestRestart()}
+              onRestore={() => void handlePlaytestRestore()}
+            />
           </View>
         ) : null}
 
-        {state.gamePhase >= 2 && phaseObjective ? (
-          <SplitObjectiveRow
-            missions={state.missions}
-            missionsLocked={!state.tutorialComplete}
-            objective={phaseObjective}
-            playbook={phase2Playbook}
-            playbookHint={phasePlaybookHint}
-            onPressGoals={() => openModalFromUser("missions")}
-            onLockedGoalsPress={() =>
-              showToast("Finish the tutorial to unlock goals.", 2200)
-            }
-            onPressObjective={handlePhaseObjectivePress}
-            onPressPlaybookHelp={handlePhasePlaybookHelp}
-            compact={topCondensed}
-            stacked={isSplitObjectiveStacked}
-            style={topStackSideMarginStyle}
-          />
-        ) : (
-          <MissionStrip
-            missions={state.missions}
-            locked={!state.tutorialComplete}
-            onPress={() => openModalFromUser("missions")}
-            onLockedPress={() =>
-              showToast("Finish the tutorial to unlock goals.", 2200)
-            }
-            compact={topCondensed}
-            collapsed={topCondensed}
-            style={topStackSideMarginStyle}
-          />
-        )}
-      </View>
-
-      <View
-        ref={boardContainerRef}
-        style={styles.boardContainer}
-        onLayout={(event) => {
-          measureBoardContainer();
-          setTarget("board")(event);
-        }}
-      >
-        <MergeBoard
-          enhancedPartCues={state.settings.enhancedPartCues}
-          layoutVersion={storyLayoutTick}
-          boardContainerLayout={boardContainerLayout}
-          maxHeight={boardContainerLayout?.height}
-          suppliersOpen={activeModal === "suppliers"}
-          onWorkbenchPress={() => {
-            openModalFromUser("suppliers");
-          }}
-          onOrderInboxPress={() => {
-            if (!state.tutorialComplete && state.tutorialStep < 3) {
-              showToast("Finish Step 3 to unlock Orders.", 2200);
-              return;
-            }
-            openModalFromUser("orders");
-          }}
-          onRDBenchPress={() => {
-            if (state.upgrades["rd_unlock"] < 1) {
-              showToast("Unlock R&D via upgrades to access the lab.", 2200);
-              return;
-            }
-            openModalFromUser("rd");
-          }}
-          onStationLongPress={(station) => {
-            if (station === "workbench") {
-              showToast("Suppliers: tap to access your supply panel.", 2600);
-            } else if (station === "orders") {
-              showToast(
-                "Orders: fulfill installs for cash, reputation, and research.",
-                2600,
-              );
-            } else {
-              showToast(
-                "R&D: spend research to unlock Freedom Controller tech.",
-                2600,
-              );
-            }
-          }}
-          onUtilityLongPress={(utility) => {
-            if (utility === "backpack") {
-              showToast(
-                "Backpack: temporary storage. Drag items in and out.",
-                2400,
-              );
-            } else {
-              showToast("Recycle: delete a part for a small refund.", 2400);
-            }
-          }}
-          onDragStateChange={setIsDragging}
-          onPartLongPress={(index) => setSelectedPartIndex(index)}
-          onStationLayout={handleStationLayout}
-          onUndo={undoLastMove}
-          canUndo={canUndoNow}
-          tutorialFocus={
-            !state.tutorialComplete && state.tutorialStep === 0
-              ? "workbench"
-              : !state.tutorialComplete && state.tutorialStep === 3
-                ? "orders"
-                : null
-          }
-          compatibilityGuideActive={state.compatibilityGuideStep === 1}
-        />
-      </View>
-
-      <LinearGradient
-        colors={["#1A1A2E", "#252542", "#1A1A2E"]}
-        style={[
-          styles.bottomBar,
-          isCompactLayout && styles.bottomBarCompact,
-          {
-            paddingBottom:
-              insets.bottom + (isCompactLayout ? Spacing.sm : Spacing.md),
-          },
-        ]}
-        onLayout={(event) => {
-          const layout = event?.nativeEvent?.layout;
-          if (!layout) return;
-          setBottomBarLayout((prev) =>
-            prev && layoutRectEqual(prev, layout) ? prev : layout,
-          );
-        }}
-      >
-        <BottomButton
-          icon="inbox"
-          label="Orders"
-          color={GameColors.currency.reputation}
-          onPress={() => openModalFromUser("orders")}
-          onDisabledPress={() =>
-            showToast("Finish the tutorial to unlock Orders.", 2200)
-          }
-          badge={fulfillableOrderCount}
-          paused={orderSpawnPaused}
-          disabled={!state.tutorialComplete && state.tutorialStep < 3}
-          onLayout={setTarget("orders")}
-          compact={isCompactLayout}
-          reducedMotion={state.settings.reducedMotion}
-        />
-
-        {showProjectsButton ? (
-          <BottomButton
-            icon={state.projectsUnlocked ? "flag" : "lock"}
-            label="Projects"
-            color={GameColors.ui.primary}
-            onPress={() => openProjectBoard()}
-            badge={projectBadge}
-            indicator={projectIndicator}
-            compact={isCompactLayout}
-            reducedMotion={state.settings.reducedMotion}
+        {!state.tutorialComplete && !hasBlockingModal ? (
+          <TutorialOverlay
+            targets={tutorialTargets}
+            safeBottom={bottomBarLayout?.height}
           />
         ) : null}
 
-        {showCouncilButton ? (
-          <BottomButton
-            icon="award"
-            label="Council"
-            color={GameColors.currency.research}
-            onPress={() => openModalFromUser("council")}
-            onDisabledPress={() => showToast(councilTooltipMessage, 3200)}
-            disabled={!state.council.unlocked}
-            badge={councilBadge}
-            compact={isCompactLayout}
-            reducedMotion={state.settings.reducedMotion}
-          />
-        ) : null}
-
-        <BottomButton
-          icon="shopping-cart"
-          label="Shop"
-          color={GameColors.currency.cash}
-          onPress={() => openModalFromUser("upgrades")}
-          onDisabledPress={() =>
-            showToast("Finish the tutorial to unlock the Shop.", 2200)
-          }
-          disabled={!state.tutorialComplete && state.tutorialStep < 4}
-          onLayout={setTarget("upgrades")}
-          compact={isCompactLayout}
-          reducedMotion={state.settings.reducedMotion}
-        />
-
-        <BottomButton
-          icon="cpu"
-          label="R&D"
-          color={GameColors.currency.research}
-          onPress={() => openModalFromUser("rd")}
-          onDisabledPress={() =>
-            showToast("Unlock R&D via upgrades to access the lab.", 2200)
-          }
-          disabled={!state.tutorialComplete || state.upgrades["rd_unlock"] < 1}
-          compact={isCompactLayout}
-          reducedMotion={state.settings.reducedMotion}
-        />
-
-        {state.freedomControllerCount > 0 ? (
-          <View style={styles.freedomIndicator}>
-            <Image
-              source={freedomControllerImage}
-              style={styles.freedomIcon}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-            />
-            <ThemedText style={styles.freedomCount}>
-              {state.freedomControllerCount}
-            </ThemedText>
+        {e2eEnabled && !playtestSession && !hasBlockingModal ? (
+          <View style={[styles.e2eControls, { top: insets.top + Spacing.sm }]}>
+            <Pressable
+              style={styles.e2eButton}
+              onPress={skipToPhase2}
+              testID="e2e-skip-phase2"
+              accessibilityRole="button"
+              accessibilityLabel="Skip to Phase 2 playtest scenario"
+            >
+              <ThemedText style={styles.e2eButtonText}>E2E P2</ThemedText>
+            </Pressable>
+            <Pressable
+              style={styles.e2eButton}
+              onPress={skipToPhase3}
+              testID="e2e-skip-phase3"
+              accessibilityRole="button"
+              accessibilityLabel="Skip to Phase 3 playtest scenario"
+            >
+              <ThemedText style={styles.e2eButtonText}>E2E P3</ThemedText>
+            </Pressable>
           </View>
         ) : null}
       </LinearGradient>
-
-      <OverlayManager
-        queue={overlaySuppressed ? [] : overlayQueue}
-        onDismiss={dismissOverlay}
-        topOffset={(topStackLayout?.height ?? 0) + Spacing.xs}
-        storyTopOffset={insets.top + (topBarLayout?.height ?? 0) + Spacing.xs}
-        bottomInset={insets.bottom}
-        reducedMotion={state.settings.reducedMotion}
-        onStoryPress={handleStoryPress}
-        onStoryDismiss={() => dispatch({ type: "DISMISS_STORY_BEAT" })}
-        onUnlockBannerPress={
-          phase3HandoffEnabled ? requestCouncilOpen : undefined
-        }
-        onTelemetry={handleOverlayTelemetry}
-      />
-
-      {playtestEnabled ? (
-        <PlaytestLabModal
-          visible={playtestLabVisible}
-          busy={playtestBusy}
-          error={playtestError}
-          activePresetId={playtestSession?.presetId}
-          phase3Variant={
-            playtestSession
-              ? state.settings.phase3OnboardingVariantOverride
-              : pendingPhase3Variant
-          }
-          onClose={() => setPlaytestLabVisible(false)}
-          onSelect={handlePlaytestPresetSelect}
-          onVariantChange={handlePlaytestVariantChange}
-        />
-      ) : null}
-
-      <Modal
-        visible={phase2IntroVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={handlePhase2IntroContinue}
-      >
-        <Phase2IntroModal
-          mode="phase_intro"
-          testID="phase2-intro-modal"
-          continueTestID="phase2-intro-continue"
-          objective={phaseObjective}
-          onContinue={handlePhase2IntroContinue}
-        />
-      </Modal>
-
-      <Modal
-        visible={phase2ContractsBriefVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={handlePhase2ContractsBriefContinue}
-      >
-        <Phase2IntroModal
-          mode="contracts_unlock"
-          testID="phase2-contracts-brief-modal"
-          continueTestID="phase2-contracts-brief-continue"
-          objective={phaseObjective}
-          onContinue={handlePhase2ContractsBriefContinue}
-        />
-      </Modal>
-
-      <Modal
-        visible={phase3IntroVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={handlePhase3IntroContinue}
-      >
-        <Phase3IntroModal
-          objective={phaseObjective}
-          onContinue={handlePhase3IntroContinue}
-        />
-      </Modal>
-
-      <Modal
-        visible={phase3HearingIntroVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={handlePhase3HearingIntroDismiss}
-      >
-        <Phase3HearingIntroModal
-          onClearByPlay={handlePhase3HearingClearByPlay}
-          onLobbyBack={handlePhase3HearingLobbyBack}
-          onDismiss={handlePhase3HearingIntroDismiss}
-        />
-      </Modal>
-
-      <Modal
-        visible={phase3RatifyReadyVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={handlePhase3RatifyReadyDismiss}
-      >
-        <Phase3RatifyReadyModal
-          onOpenOrders={handlePhase3RatifyReadyOpenOrders}
-          onDismiss={handlePhase3RatifyReadyDismiss}
-        />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "orders"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => {
-          if (compatibilityGuideOrdersLock) {
-            return;
-          }
-          if (state.tutorialComplete || state.tutorialStep !== 3) {
-            closeModal();
-          }
-        }}
-      >
-        <OrdersModal
-          onClose={closeModal}
-          closeDisabled={
-            (!state.tutorialComplete && state.tutorialStep === 3) ||
-            compatibilityGuideOrdersLock
-          }
-          onOpenProjects={() => openProjectBoard()}
-          onOpenCouncil={requestCouncilOpen}
-        />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "projects"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <ProjectBoardModal
-          onClose={closeModal}
-          onOpenDossier={openProjectDossier}
-          onOpenCouncil={requestCouncilOpen}
-          focusProjectId={projectBoardFocusId}
-          initialTab={projectBoardInitialTab}
-          openId={projectBoardOpenId}
-        />
-      </Modal>
-
-      <Modal
-        visible={Boolean(projectDossierId)}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setProjectDossierId(null)}
-      >
-        {projectDossierId ? (
-          <ProjectDossierModal
-            projectId={projectDossierId}
-            onClose={() => setProjectDossierId(null)}
-            onOpenBoard={openProjectBoardForProject}
-          />
-        ) : null}
-      </Modal>
-
-      <Modal
-        visible={activeModal === "council"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <CouncilModal
-          onClose={closeModal}
-          onOpenOrders={() => openModalFromUser("orders")}
-          entryHint={councilEntryHint}
-          onOpenLegacyCycle={() => openModalFromUser("legacy")}
-        />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "legacy"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <LegacyCycleModal onClose={closeModal} />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "suppliers"}
-        animationType="fade"
-        transparent
-        onRequestClose={closeModal}
-      >
-        <SupplierModal
-          visible={activeModal === "suppliers"}
-          onClose={closeModal}
-          onToast={showToast}
-        />
-      </Modal>
-
-      <MergeMomentumModal
-        // Defer behind phase intro takeovers: mergeMomentumPending is
-        // persisted, so a reload at a phase boundary can otherwise stack this
-        // full-screen overlay on top of the intro modal.
-        visible={Boolean(state.mergeMomentumPending) && !overlaySuppressed}
-        threshold={state.mergeMomentumPending?.threshold ?? 0}
-        onChoose={(choice) => claimMergeMomentum(choice)}
-      />
-
-      <Modal
-        visible={activeModal === "upgrades"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => {
-          if (state.tutorialComplete || state.tutorialStep !== 4) {
-            closeModal();
-          }
-        }}
-      >
-        <UpgradesModal
-          onClose={closeModal}
-          closeDisabled={!state.tutorialComplete && state.tutorialStep === 4}
-          tutorialOnlyUpgradeId={
-            !state.tutorialComplete && state.tutorialStep === 4
-              ? "space_1"
-              : undefined
-          }
-        />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "rd"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <RDModal onClose={closeModal} />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "settings"}
-        animationType="fade"
-        transparent
-        onRequestClose={closeModal}
-      >
-        <SettingsModal
-          onClose={closeModal}
-          onOpenGlossary={() => openGlossary()}
-          debugOverlayEnabled={debugOverlayVisible}
-          onToggleDebugOverlay={setDebugOverlayVisible}
-          playtestEnabled={playtestEnabled}
-          onOpenPlaytestLab={openPlaytestLab}
-        />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "story"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <StoryLogModal onClose={closeModal} />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "glossary"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <GlossaryModal
-          onClose={closeModal}
-          initialSectionId={glossaryInitialSectionId}
-          openToken={glossaryOpenToken}
-        />
-      </Modal>
-
-      <Modal
-        visible={activeModal === "missions"}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closeModal}
-      >
-        <MissionDetailModal onClose={closeModal} />
-      </Modal>
-
-      <Modal
-        visible={
-          !phase2IntroVisible &&
-          !phase2ContractsBriefVisible &&
-          !phase3IntroVisible &&
-          !phase3HearingIntroVisible &&
-          !phase3RatifyReadyVisible &&
-          state.baronOfferAvailable &&
-          baronOfferGate &&
-          !showLockoutModal &&
-          activeModal === null &&
-          !selectedPartOpen
-        }
-        animationType="fade"
-        transparent
-      >
-        <BaronOfferModal
-          onAccept={() => dispatch({ type: "ACCEPT_BARON_OFFER" })}
-          onDecline={() => dispatch({ type: "DECLINE_BARON_OFFER" })}
-        />
-      </Modal>
-
-      <Modal
-        visible={showProjectReveal}
-        animationType="fade"
-        transparent
-        onRequestClose={dismissProjectReveal}
-      >
-        <ProjectRevealModal
-          projectId={pendingProjectRevealId}
-          onDismiss={dismissProjectReveal}
-          onOpenDossier={handleRevealDossier}
-          onOpenBoard={handleRevealBoard}
-        />
-      </Modal>
-
-      <Modal visible={selectedPartOpen} animationType="fade" transparent>
-        {selectedPart ? (
-          <PartDetailModal
-            part={selectedPart}
-            onClose={() => setSelectedPartIndex(null)}
-            onUseFreedomController={() =>
-              dispatch({
-                type: "USE_FREEDOM_CONTROLLER",
-                partIndex: selectedPartIndex!,
-              })
-            }
-            canUseFreedomController={state.freedomControllerCount > 0}
-          />
-        ) : null}
-      </Modal>
-
-      {showLockoutModal ? <LockoutModal onClose={() => {}} /> : null}
-
-      {!state.tutorialComplete ? (
-        <TutorialOverlay
-          targets={tutorialTargets}
-          safeBottom={bottomBarLayout?.height}
-        />
-      ) : null}
-
-      {e2eEnabled && !playtestSession ? (
-        <View style={[styles.e2eControls, { top: insets.top + Spacing.sm }]}>
-          <Pressable
-            style={styles.e2eButton}
-            onPress={skipToPhase2}
-            testID="e2e-skip-phase2"
-            accessibilityRole="button"
-            accessibilityLabel="Skip to Phase 2 playtest scenario"
-          >
-            <ThemedText style={styles.e2eButtonText}>E2E P2</ThemedText>
-          </Pressable>
-          <Pressable
-            style={styles.e2eButton}
-            onPress={skipToPhase3}
-            testID="e2e-skip-phase3"
-            accessibilityRole="button"
-            accessibilityLabel="Skip to Phase 3 playtest scenario"
-          >
-            <ThemedText style={styles.e2eButtonText}>E2E P3</ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
-    </LinearGradient>
+    </ModalReturnFocusProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  lockoutPlaytestControls: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 3000,
+  },
+  gameContent: { flex: 1 },
   e2eControls: {
     position: "absolute",
     right: 8,

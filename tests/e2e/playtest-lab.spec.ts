@@ -152,3 +152,19 @@ test("every deterministic scenario can be applied and restarted", async ({
     timeout: 15_000,
   });
 });
+
+test("pre-transition lockout keeps sandbox restore reachable", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByTestId("e2e-skip-phase2").click();
+  await dismissBlockingHandoff(page);
+  await page.getByTestId("playtest-banner-change").click();
+  await page.getByTestId("playtest-preset-pre_phase2_transition").click();
+  await page.getByTestId("playtest-lab-apply").click();
+  await expect(
+    page.getByText("Compliance Audit", { exact: true }),
+  ).toBeVisible();
+  await page.getByTestId("playtest-banner-restore").click();
+  await expect(page.getByTestId("playtest-session-banner")).toHaveCount(0);
+});

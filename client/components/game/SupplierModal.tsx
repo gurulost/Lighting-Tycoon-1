@@ -4,7 +4,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -64,7 +64,7 @@ export function SupplierModal({
 }: SupplierModalProps) {
   const { state, tapSupplier, getSupplierTapStatus, dispatch } = useGame();
   const insets = useSafeAreaInsets();
-  const screenHeight = Dimensions.get("window").height;
+  const { height: screenHeight } = useWindowDimensions();
   const [now, setNow] = useState(() => Date.now());
   const baronEarlyRelief =
     state.suppliers.open.level <= 0 && state.suppliers.salvage.level <= 0;

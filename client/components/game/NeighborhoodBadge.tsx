@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { NEIGHBORHOODS } from "@/constants/neighborhoods";
 import {
@@ -22,6 +23,7 @@ export function NeighborhoodBadge({
   currentNeighborhoodId,
   compact = false,
 }: NeighborhoodBadgeProps) {
+  const { largeText } = useAccessibleLayout();
   const currentIndex = Math.max(
     0,
     NEIGHBORHOODS.findIndex((n) => n.id === currentNeighborhoodId),
@@ -53,6 +55,8 @@ export function NeighborhoodBadge({
     <LinearGradient
       colors={["#1A1A2E", "#23233D", "#1A1A2E"]}
       style={[styles.container, compact && styles.containerCompact]}
+      accessible
+      accessibilityLabel={`${current.name}. Neighborhood ${currentIndex + 1} of ${NEIGHBORHOODS.length}. ${next ? `${reputation} of ${nextRep} reputation to unlock ${next.name}` : "All neighborhoods unlocked"}`}
     >
       <View
         style={[
@@ -76,16 +80,16 @@ export function NeighborhoodBadge({
         </View>
         <ThemedText
           style={[styles.title, compact && styles.titleCompact]}
-          numberOfLines={1}
+          numberOfLines={largeText ? undefined : 1}
           adjustsFontSizeToFit={!compact}
           minimumFontScale={compact ? 1 : 0.85}
-          maxFontSizeMultiplier={1}
+          maxFontSizeMultiplier={2}
           ellipsizeMode="tail"
         >
           {titleText}
         </ThemedText>
         {!compact ? (
-          <ThemedText style={styles.tierLabel} maxFontSizeMultiplier={1}>
+          <ThemedText style={styles.tierLabel} maxFontSizeMultiplier={2}>
             Tier {currentIndex + 1}/{NEIGHBORHOODS.length}
           </ThemedText>
         ) : null}
@@ -106,10 +110,10 @@ export function NeighborhoodBadge({
         </View>
         <ThemedText
           style={[styles.progressText, compact && styles.progressTextCompact]}
-          numberOfLines={1}
+          numberOfLines={largeText ? undefined : 1}
           adjustsFontSizeToFit={!compact}
           minimumFontScale={compact ? 1 : 0.9}
-          maxFontSizeMultiplier={1}
+          maxFontSizeMultiplier={2}
           ellipsizeMode="tail"
         >
           {next ? `${reputation}/${nextRep} Rep` : "All unlocked"}

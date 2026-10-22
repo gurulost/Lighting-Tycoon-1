@@ -4,6 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/ThemedText";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 import {
   PLAYTEST_PRESET_META,
   type PlaytestPresetId,
@@ -25,16 +26,20 @@ export function PlaytestSessionBanner({
   onRestart,
   onRestore,
 }: Props) {
+  const { stacked } = useAccessibleLayout();
   return (
     <LinearGradient
       colors={["#10243A", "#162E42", "#10243A"]}
-      style={styles.banner}
+      style={[styles.banner, stacked && styles.stackedBanner]}
       testID="playtest-session-banner"
     >
       <View style={styles.identity}>
         <Feather name="activity" size={13} color={GameColors.ui.success} />
         <ThemedText style={styles.label}>PLAYTEST</ThemedText>
-        <ThemedText style={styles.scenario} numberOfLines={1}>
+        <ThemedText
+          style={styles.scenario}
+          numberOfLines={stacked ? undefined : 1}
+        >
           {PLAYTEST_PRESET_META[presetId].title}
         </ThemedText>
       </View>
@@ -120,6 +125,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
+  stackedBanner: { flexDirection: "column", alignItems: "stretch" },
   label: {
     fontSize: 9,
     fontWeight: "900",
@@ -133,7 +139,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: GameColors.text.primary,
   },
-  actions: { flexDirection: "row", alignItems: "center", gap: 5 },
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 5,
+  },
   action: {
     minHeight: 44,
     minWidth: 44,

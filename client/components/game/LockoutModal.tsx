@@ -15,6 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ModalShell } from "./ModalShell";
 import { TinaChip } from "./TinaChip";
 import { useGame } from "@/context/GameContext";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { getLockoutLabRequestsBase } from "@/constants/lockout";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import SoundManager from "@/audio/SoundManager";
@@ -27,7 +28,7 @@ interface LockoutModalProps {
 export function LockoutModal({ onClose }: LockoutModalProps) {
   const { state, dispatch } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
-  const reducedMotion = state.settings.reducedMotion;
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const pulseScale = useSharedValue(1);
 
   React.useEffect(() => {

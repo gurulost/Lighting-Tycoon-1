@@ -137,4 +137,82 @@ test.describe("Settings Modal", () => {
       .click({ timeout: 10_000 });
     await expect(lab).toBeVisible();
   });
+
+  test("Settings accessibility and Lab controls survive live tablet and split-view resizing", async ({
+    page,
+  }, testInfo) => {
+    await bootstrapInteractiveState(page);
+    await page.getByTestId("settings-button").click();
+    await expect(
+      page.getByRole("switch", { name: "Sound Effects", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Settings", exact: true }),
+    ).toHaveCount(0);
+    for (const viewport of [
+      { width: 1024, height: 1366 },
+      { width: 1366, height: 1024 },
+      { width: 320, height: 700 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const close = page.getByRole("button", {
+        name: "Close Settings",
+        exact: true,
+      });
+      await expect(close).toBeInViewport();
+      const toggle = page.getByRole("switch", {
+        name: "Enhanced Part Cues",
+        exact: true,
+      });
+      await toggle.scrollIntoViewIfNeeded();
+      await expect(toggle).toBeInViewport();
+      await toggle.click();
+      await toggle.click();
+    }
+    await page.getByTestId("settings-open-playtest-lab").click();
+    for (const viewport of [
+      { width: 1366, height: 1024 },
+      { width: 507, height: 900 },
+      { width: 320, height: 700 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect(
+        page.getByRole("button", { name: "Close Playtest Lab" }),
+      ).toBeInViewport();
+      const lastScenario = page.getByTestId(
+        "playtest-preset-phase3_ratify_ready",
+      );
+      await lastScenario.scrollIntoViewIfNeeded();
+      await lastScenario.click();
+      await expect(page.getByTestId("playtest-lab-apply")).toBeInViewport();
+      await page.screenshot({
+        path: testInfo.outputPath(
+          `lab-${viewport.width}x${viewport.height}.png`,
+        ),
+      });
+    }
+    await page.getByRole("button", { name: "Close Playtest Lab" }).click();
+    // Wait for the native-web modal's exit transition and focus trap to unmount
+    // before targeting the workshop behind it.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Settings", exact: true }),
+    ).toBeVisible();
+    const settingsButton = page.getByRole("button", {
+      name: "Settings",
+      exact: true,
+    });
+    await settingsButton.focus();
+    await expect(settingsButton).toBeFocused();
+    await page.keyboard.press("Enter");
+    const settings = page.getByTestId("settings-modal");
+    await expect(settings).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.getByRole("button", { name: "Close Settings" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(settings.locator(":focus")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(settings).toBeHidden();
+    await expect(settingsButton).toBeFocused();
+  });
 });

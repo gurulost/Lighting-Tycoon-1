@@ -20,6 +20,7 @@ import { ModalShell } from "./ModalShell";
 import { OnboardingCallout } from "./OnboardingCallout";
 import { SiteRuleBanner } from "./SiteRuleBanner";
 import { useGame } from "@/context/GameContext";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import {
   Order,
@@ -277,6 +278,7 @@ export function OrdersModal({
 }: OrdersModalProps) {
   const insets = useSafeAreaInsets();
   const { state, fulfillOrder, dispatch } = useGame();
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const isTutorialOrdersStep =
     !state.tutorialComplete && state.tutorialStep === 3;
   const tuning = getTuning();
@@ -519,9 +521,9 @@ export function OrdersModal({
   const orderTrimPhase = useSharedPhase({
     active: ordersSummary.readyCount > 0,
     duration: TRIM_LIGHT_ANIMATION_DURATIONS.twinkle,
-    reducedMotion: state.settings.reducedMotion,
+    reducedMotion,
   });
-  const emptyEnterAnim = state.settings.reducedMotion
+  const emptyEnterAnim = reducedMotion
     ? FadeIn.duration(150)
     : FadeIn.duration(300);
 
@@ -572,7 +574,7 @@ export function OrdersModal({
 
   const triggerInstallMoment = React.useCallback(
     (order: Order) => {
-      if (state.settings.reducedMotion) return;
+      if (reducedMotion) return;
 
       // Select pattern based on order type
       const pattern: TrimLightPattern =
@@ -601,7 +603,7 @@ export function OrdersModal({
         animationMode,
       });
     },
-    [state.settings.reducedMotion],
+    [reducedMotion],
   );
 
   const handleInstallMomentComplete = React.useCallback((key: number) => {
@@ -725,7 +727,7 @@ export function OrdersModal({
     >
       <InstallMomentCelebration
         moment={installMoment}
-        reducedMotion={state.settings.reducedMotion}
+        reducedMotion={reducedMotion}
         onComplete={handleInstallMomentComplete}
       />
       <ScrollView
@@ -1073,7 +1075,7 @@ export function OrdersModal({
                     compatibilityGuideStep === 3 && isGuideTrackedOrder
                   }
                   hapticsEnabled={state.settings.hapticsEnabled}
-                  reducedMotion={state.settings.reducedMotion}
+                  reducedMotion={reducedMotion}
                 />
               );
             })

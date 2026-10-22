@@ -30,6 +30,7 @@ import {
 } from "@/types/game";
 import { PartItem } from "./PartItem";
 import { useGame } from "@/context/GameContext";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { resolvePhaseObjective } from "@/lib/objectives";
 import { buildPhasePlaybookSnapshot } from "@/lib/phase2Playbook";
 
@@ -954,7 +955,7 @@ export function GlossaryModal({
   openToken = 0,
 }: GlossaryModalProps) {
   const { state } = useGame();
-  const reducedMotion = state.settings.reducedMotion;
+  const reducedMotion = useReducedMotion(state.settings.reducedMotion);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const isCompactHeight = windowHeight < 720;
