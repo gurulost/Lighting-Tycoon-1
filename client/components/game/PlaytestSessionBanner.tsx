@@ -33,12 +33,20 @@ export function PlaytestSessionBanner({
       style={[styles.banner, stacked && styles.stackedBanner]}
       testID="playtest-session-banner"
     >
-      <View style={styles.identity}>
+      <View
+        style={[styles.identity, stacked && styles.stackedIdentity]}
+        accessible
+        accessibilityLabel={`PLAYTEST · ${PLAYTEST_PRESET_META[presetId].title}`}
+        testID="playtest-banner-identity"
+      >
         <Feather name="activity" size={13} color={GameColors.ui.success} />
-        <ThemedText style={styles.label}>PLAYTEST</ThemedText>
+        <ThemedText style={styles.label} maxFontSizeMultiplier={2}>
+          PLAYTEST
+        </ThemedText>
         <ThemedText
           style={styles.scenario}
           numberOfLines={stacked ? undefined : 1}
+          maxFontSizeMultiplier={2}
         >
           {PLAYTEST_PRESET_META[presetId].title}
         </ThemedText>
@@ -97,6 +105,7 @@ function BannerAction({
     >
       <ThemedText
         style={[styles.actionText, primary && styles.actionPrimaryText]}
+        maxFontSizeMultiplier={2}
       >
         {label}
       </ThemedText>
@@ -126,8 +135,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   stackedBanner: { flexDirection: "column", alignItems: "stretch" },
+  stackedIdentity: { flex: 0, flexShrink: 0 },
   label: {
     fontSize: 9,
+    lineHeight: 12,
     fontWeight: "900",
     letterSpacing: 1,
     color: GameColors.ui.success,
@@ -136,6 +147,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexShrink: 1,
     fontSize: 11,
+    lineHeight: 16,
     fontWeight: "700",
     color: GameColors.text.primary,
   },
@@ -161,6 +173,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 9,
+    lineHeight: 12,
     fontWeight: "800",
     color: GameColors.text.secondary,
   },

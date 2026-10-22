@@ -11,7 +11,8 @@ The shared native modal wrapper declares an isolated accessibility container.
 Gameplay is hidden from accessibility while a takeover is present. Headers take
 focus after the native presentation callback; dismissal restores focus to the
 workshop Settings control after the native dismissal callback. Nested restart
-confirmation hides ordinary Settings, supports Escape, scrolling, and the keyboard.
+confirmation hides ordinary Settings and supports native accessibility escape,
+scrolling, and keyboard-safe input. Browser checks cover keyboard Escape separately.
 Verify with VoiceOver before advertising full screen-reader support: an automation
 hierarchy alone does not prove spoken order or focus behavior on a physical device.
 

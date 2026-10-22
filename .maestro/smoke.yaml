@@ -12,6 +12,11 @@ appId: com.lightingtycoon.app
     visible:
       id: "phase2-intro-modal"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "phase2-intro-continue"
+    direction: DOWN
+    timeout: 120000
 - tapOn:
     id: "phase2-intro-continue"
 - extendedWaitUntil:
@@ -41,6 +46,11 @@ appId: com.lightingtycoon.app
     visible:
       id: "phase2-intro-modal"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "phase2-intro-continue"
+    direction: DOWN
+    timeout: 120000
 - tapOn:
     id: "phase2-intro-continue"
 - extendedWaitUntil:
@@ -60,6 +70,10 @@ appId: com.lightingtycoon.app
 - tapOn:
     id: "settings-button"
 - assertVisible: "Settings"
+- scrollUntilVisible:
+    element: "Decrease sound effects volume"
+    direction: DOWN
+    timeout: 60000
 - tapOn: "Decrease sound effects volume"
 - tapOn: "Increase sound effects volume"
 - tapOn: "Close Settings"
