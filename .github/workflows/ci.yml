@@ -5,9 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       EXPO_NO_TELEMETRY: "1"
       EXPO_PUBLIC_DOMAIN: "localhost:5000"
@@ -43,7 +48,7 @@ jobs:
         run: npm test
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
 
       - name: Web E2E tests
         run: npm run test:e2e
