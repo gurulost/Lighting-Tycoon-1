@@ -50,7 +50,19 @@ jobs:
       - name: Deployment verifier tests
         run: node --test scripts/verify-deployment.test.mjs
 
+      - name: Prefer the official HTTPS Ubuntu package mirror
+        run: |
+          # Azure's image-default mirror can stall browser font/library downloads.
+          # Keep the same Ubuntu repositories and signature verification.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i \
+              -e 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+              -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+              /etc/apt/apt-mirrors.txt
+          fi
+
       - name: Install Playwright browsers
+        timeout-minutes: 7
         run: npx playwright install --with-deps chromium
 
       - name: Web E2E tests

@@ -142,6 +142,13 @@ a substitute for the emulator interaction flow.
 
 - **Unit**: pure game logic (reducers, generators, tuning helpers).
 - **Integration**: `/api/healthz` and legacy `/healthz` return 200 without a database; hosted health is no-store and every `/api/game` method returns 410. Run `node --test scripts/verify-deployment.test.mjs` for verifier fixtures and `node scripts/verify-deployment.mjs https://lightingtycoon.replit.app` against the published app.
+
+CI prefers Ubuntu's official HTTPS archive over the hosted runner's Azure mirror
+for Playwright system dependencies after repeated stalled font/library downloads.
+This changes only the transport mirror in the ephemeral runner; the Ubuntu
+repositories, package selections and signature verification remain unchanged.
+Browser installation is bounded to seven minutes and fails the job on timeout;
+browser tests are never silently skipped.
 - **UI**: component tests for core interactions (merge, orders, onboarding).
 - **End-to-end**: critical player journeys, Playtest Lab resume/restore, and production tester-surface absence.
 
