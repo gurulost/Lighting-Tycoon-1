@@ -82,7 +82,8 @@ test(
         clearTimeout(timer);
         child.off("error", finish);
         child.off("exit", earlyExit);
-        error ? reject(error) : resolve();
+        if (error) reject(error);
+        else resolve();
       };
       const earlyExit = (code) =>
         finish(new Error(`Server exited before readiness (${code})`));
