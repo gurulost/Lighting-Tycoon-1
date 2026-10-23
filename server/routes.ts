@@ -20,10 +20,14 @@ export const disabledGameSaveHandler: RequestHandler = (_req, res) => {
 };
 
 export const healthHandler: RequestHandler = (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   return res.status(200).json({ status: "ok" });
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Keep the original route, but use the API path for hosted probes: the
+  // current Replit edge intercepts bare /healthz before it reaches Express.
+  app.get("/api/healthz", healthHandler);
   app.get("/healthz", healthHandler);
   app.all(GAME_SAVE_DISABLED_PATH, disabledGameSaveHandler);
 

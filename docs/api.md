@@ -6,10 +6,16 @@ until an authenticated, versioned save contract is implemented.
 
 ## Health
 
-### `GET /healthz`
+### `GET /api/healthz` (hosted monitoring)
 
 - **Response 200**: `{ "status": "ok" }`
+- **Cache-Control**: `no-store`
 - Does not require `DATABASE_URL` or test database connectivity.
+- `HEAD` returns the same status/headers with no body.
+- `/healthz` remains a compatible application route. On the current Replit
+  deployment, the bare path is intercepted upstream with a Google 404 while
+  `/healthz/` reaches Express. Use the explicit API path for external probes;
+  do not rely on redirect or trailing-slash normalization.
 
 ## Disabled cloud-save contract
 

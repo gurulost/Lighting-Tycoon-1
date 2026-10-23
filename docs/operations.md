@@ -20,8 +20,24 @@ This document captures operational notes for running the server in production.
 
 ## Health Checks
 
-Use `GET /healthz` for process liveness. It returns `200 { "status": "ok" }`
-without requiring database connectivity.
+Use `GET /api/healthz` for hosted process liveness. It returns
+`200 { "status": "ok" }` with `Cache-Control: no-store`, without requiring
+database connectivity. `HEAD` returns the same status/headers without a body.
+
+`/healthz` remains supported by the application, but the current Replit edge
+returns its own 404 for that bare path before Express. `/healthz/` works, but
+external monitoring should use `/api/healthz` rather than a slash workaround.
+
+Verify the public deployment after publishing:
+
+```bash
+node scripts/verify-deployment.mjs https://lightingtycoon.replit.app
+```
+
+The check requires real 200 JSON liveness and all disabled cloud-save methods
+to return 410. Redirects, cacheable health responses, HTML login/error pages,
+network timeouts and accidentally enabled save routes fail the check. It never
+creates or updates game progress.
 
 ## Progress Storage
 
@@ -37,4 +53,4 @@ the server does not contain an authoritative copy to back up or restore.
 ## Incident Response
 
 - Check server logs for API errors and validation issues.
-- Verify `/healthz` and static asset responses.
+- Verify `/api/healthz`, platform manifests and their referenced static assets.

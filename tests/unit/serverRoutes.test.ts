@@ -11,6 +11,7 @@ import {
 
 function responseMock() {
   const response = {
+    setHeader: jest.fn(),
     status: jest.fn(),
     json: jest.fn(),
   };
@@ -36,6 +37,10 @@ describe("server route contracts", () => {
     healthHandler({} as never, response as unknown as Response, jest.fn());
     expect(response.status).toHaveBeenCalledWith(200);
     expect(response.json).toHaveBeenCalledWith({ status: "ok" });
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
   });
 
   it.each(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])(
@@ -85,6 +90,7 @@ describe("server route contracts", () => {
       all: jest.fn(),
     } as unknown as Express;
     await registerRoutes(app);
+    expect(app.get).toHaveBeenCalledWith("/api/healthz", healthHandler);
     expect(app.get).toHaveBeenCalledWith("/healthz", healthHandler);
     expect(app.all).toHaveBeenCalledWith(
       GAME_SAVE_DISABLED_PATH,

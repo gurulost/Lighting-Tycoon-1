@@ -1,5 +1,8 @@
 # Changelog
 
+- Added a no-store `/api/healthz` hosted liveness endpoint while preserving `/healthz`, plus a strict deployment verifier covering health and every disabled cloud-save method. External Replit monitoring no longer depends on a trailing-slash workaround.
+- Removed unnecessary socket port-sharing so the optional server starts on macOS as well as Linux; real-server verification runs without database configuration.
+
 All notable engineering changes to this repository will be documented in this file.
 
 For game design and content changes, see `docs/changelog.md`.

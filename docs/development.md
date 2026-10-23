@@ -89,5 +89,5 @@ npm run with:env -- npm run telemetry:doctor
 ## Troubleshooting
 
 - `EXPO_PUBLIC_DOMAIN is not set`: ensure you have exported the variable.
-- Server liveness: verify `GET /healthz` returns `{ "status": "ok" }`.
+- Server liveness: verify `GET /api/healthz` returns `{ "status": "ok" }` with no-store caching. `/healthz` remains a local-compatible route; hosted probes use the API path.
 - `/api/game` returning `410`: expected; cloud saves are disabled.

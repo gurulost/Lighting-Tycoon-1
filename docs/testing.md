@@ -141,7 +141,7 @@ a substitute for the emulator interaction flow.
 ## Recommended Test Strategy (Target State)
 
 - **Unit**: pure game logic (reducers, generators, tuning helpers).
-- **Integration**: `/healthz` returns 200 and every `/api/game` method returns 410 without a database.
+- **Integration**: `/api/healthz` and legacy `/healthz` return 200 without a database; hosted health is no-store and every `/api/game` method returns 410. Run `node --test scripts/verify-deployment.test.mjs` for verifier fixtures and `node scripts/verify-deployment.mjs https://lightingtycoon.replit.app` against the published app.
 - **UI**: component tests for core interactions (merge, orders, onboarding).
 - **End-to-end**: critical player journeys, Playtest Lab resume/restore, and production tester-surface absence.
 

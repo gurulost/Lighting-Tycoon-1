@@ -47,6 +47,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Deployment verifier tests
+        run: node --test scripts/verify-deployment.test.mjs
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
