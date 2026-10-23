@@ -8,6 +8,10 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+- Reflowed the gameplay currency toolbar, status/goals cards, navigation and backpack utilities for narrow windows and large text, with independent overflow regions and explicit spoken values/actions.
+- Added keyboard part activation and a gated Part Details Move to Backpack action using existing storage/Undo rules, so short-screen play does not require an offscreen drag.
+- Bounded compact part/cooldown badges while preserving full accessible identity, and corrected HUD expansion and web stacked-flex sizing.
+
 - Kept the Playtest Lab scenario list scrollable at maximum accessibility text size and bounded internal E2E labels so they cannot grow across Settings.
 - Preserved the persistent PLAYTEST scenario identity in stacked banners while keeping recovery controls compact and reachable.
 - Stacked Supplier descriptions and charge/action rows on narrow or large-text layouts so supply controls remain onscreen, named and operable.

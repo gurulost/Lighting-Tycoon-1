@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginHorizontal: 0,
     marginTop: 0,
-    height: 68,
+    minHeight: 68,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: BorderRadius.sm,

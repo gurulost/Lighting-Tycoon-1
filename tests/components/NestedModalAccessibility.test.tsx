@@ -60,6 +60,33 @@ it("keeps part detail controls individually accessible and preserves conversion 
   expect(onClose).toHaveBeenCalledTimes(2);
 });
 
+it("offers a named non-drag backpack action and respects storage gating", () => {
+  const store = jest.fn();
+  const close = jest.fn();
+  const props = {
+    part: { id: "open-part", tier: 4 as const, family: "open" as const },
+    onClose: close,
+    onUseFreedomController: jest.fn(),
+    canUseFreedomController: false,
+    onStoreInBackpack: store,
+  };
+  const screen = render(
+    <PartDetailModal {...props} canStoreInBackpack={false} />,
+  );
+  fireEvent.press(
+    screen.getByRole("button", { name: "Move to Backpack", disabled: true }),
+    { stopPropagation: jest.fn() },
+  );
+  expect(store).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  screen.rerender(<PartDetailModal {...props} canStoreInBackpack />);
+  const action = screen.getByRole("button", { name: "Move to Backpack" });
+  expect(StyleSheet.flatten(action.props.style).minHeight).toBe(44);
+  fireEvent.press(action);
+  expect(store).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
 it("keeps Baron accept and decline individually accessible without altering decisions", () => {
   const onAccept = jest.fn();
   const onDecline = jest.fn();

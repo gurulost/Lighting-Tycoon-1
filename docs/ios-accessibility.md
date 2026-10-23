@@ -22,6 +22,33 @@ never changes the save. The initial query is conservative and cannot overwrite a
 newer change event. Animated modal transitions and shared controls follow the same
 effective preference. System motion changes and listener cleanup have focused tests.
 
+## Gameplay HUD and board
+
+The currency toolbar reflows above its icon actions on narrow screens and at
+large text sizes. Currency exposes exact spoken amounts; ordinary taps open
+the same explanations previously available only by long press. Status and goals
+have intrinsic card heights, and at large text sizes their full objective copy
+wraps rather than being clipped into fixed-height rows. A labeled, bounded HUD
+scroll area keeps this detail available without pushing navigation offscreen.
+The HUD toggle actually hides/shows these optional details. At large text sizes
+in windows shorter than 600pt it starts collapsed to preserve board space; an
+explicit choice lasts for the screen session and is not saved as a preference.
+
+The merge board has its own overflow scroll area. Scrolling is suspended during
+a part drag; measured board/station coordinates are refreshed after scrolling.
+Navigation stays outside that area and scrolls horizontally when later-phase
+actions do not fit. Labels scale up to 200%; buttons retain full spoken names,
+counts, gating state and at least 44pt targets. Small part/status badges have
+bounded typography; full tier/family/compatibility details remain in accessible
+part names and the scalable Part Details dialog.
+
+Backpack/Undo/Recycle wrap on phones or at large text sizes. Open Part Details
+with a long press, screen-reader activation, or keyboard Enter/Space, then choose
+Move to Backpack to use the first free slot. It respects the same unlock/full
+checks and Undo as dragging. A stored part's ordinary activation returns it to the
+first free board slot. This avoids requiring an offscreen drag on short displays.
+Part Details has a bounded scrollable body and a fixed reachable close control.
+
 ## Device checks
 
 Use the standalone E2E build and a dedicated simulator. Record its original content

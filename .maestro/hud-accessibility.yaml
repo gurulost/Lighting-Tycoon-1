@@ -1,0 +1,43 @@
+# Dedicated test app only. Launch externally and enter Phase 2 first.
+# No launchApp here: avoid Maestro's unrelated default permission grants.
+# Set Dynamic Type externally; exercise at default, XXXL, AX3 and AX5.
+appId: com.lightingtycoon.app
+---
+- assertVisible:
+    id: "currency-cash"
+- assertVisible:
+    id: "settings-button"
+- repeat:
+    times: 8
+    commands:
+      - swipe:
+          from:
+            id: "hud-details-scroll"
+          direction: UP
+          duration: 400
+- assertVisible:
+    id: "phase-objective-cta"
+- takeScreenshot: output/hud-review/native-objective-details
+- tapOn:
+    id: "phase-objective-cta"
+- assertVisible:
+    id: "orders-modal-close"
+- tapOn:
+    id: "orders-modal-close"
+- waitForAnimationToEnd:
+    timeout: 2000
+- repeat:
+    times: 6
+    commands:
+      - swipe:
+          from:
+            id: "workshop-board-scroll"
+          direction: UP
+          duration: 400
+- assertVisible: "Undo last move"
+- assertVisible: "Recycle help.*"
+- takeScreenshot: output/hud-review/native-backpack-utilities
+- tapOn:
+    id: "settings-button"
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"

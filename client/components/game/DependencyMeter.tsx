@@ -17,6 +17,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { withRepeat } from "@/lib/reanimated";
 import { getTuning } from "@/lib/tuning";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 import {
   TrimLightStrip,
   TrimLightPattern,
@@ -50,6 +51,7 @@ export function DependencyMeter({
   lockoutActive = false,
   onInfoPress,
 }: DependencyMeterProps) {
+  const { largeText } = useAccessibleLayout();
   const tuning = getTuning();
   const pressureCap = Math.max(
     1,
@@ -282,7 +284,13 @@ export function DependencyMeter({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <View style={[styles.header, compact && styles.headerCompact]}>
+        <View
+          style={[
+            styles.header,
+            compact && styles.headerCompact,
+            largeText && styles.headerStacked,
+          ]}
+        >
           <View style={styles.labelContainer}>
             <View
               style={[
@@ -303,7 +311,8 @@ export function DependencyMeter({
             </View>
             <ThemedText
               style={[styles.label, compact && styles.labelCompact]}
-              numberOfLines={1}
+              numberOfLines={largeText ? undefined : 1}
+              maxFontSizeMultiplier={2}
               ellipsizeMode="tail"
             >
               {compact ? getStatusText() : "Dependency"}
@@ -312,7 +321,7 @@ export function DependencyMeter({
               <Pressable
                 onPress={onInfoPress}
                 accessibilityRole="button"
-                accessibilityLabel={`Explain dependency and Baron pressure. Current dependency band: ${getStatusText()}, ${Math.round(value)} percent`}
+                accessibilityLabel={`Explain dependency and Baron pressure. Current dependency band: ${getStatusText()}, ${Math.round(value)} percent. Baron pressure ${pressurePercent} percent`}
                 accessibilityHint="Opens the dependency bands, thresholds, and effects guide"
                 hitSlop={10}
                 testID="dependency-info-button"
@@ -334,6 +343,7 @@ export function DependencyMeter({
             style={[
               styles.statusContainer,
               compact && styles.statusContainerCompact,
+              largeText && styles.statusContainerStacked,
             ]}
           >
             {!compact ? (
@@ -348,6 +358,7 @@ export function DependencyMeter({
               </ThemedText>
             ) : null}
             <ThemedText
+              maxFontSizeMultiplier={2}
               style={[
                 styles.percentage,
                 compact && styles.percentageCompact,
@@ -357,6 +368,7 @@ export function DependencyMeter({
               {Math.round(value)}%
             </ThemedText>
             <ThemedText
+              maxFontSizeMultiplier={2}
               style={[
                 styles.valueDivider,
                 compact && styles.valueDividerCompact,
@@ -371,6 +383,7 @@ export function DependencyMeter({
                 color={pressureColor}
               />
               <ThemedText
+                maxFontSizeMultiplier={2}
                 style={[
                   styles.percentage,
                   compact && styles.percentageCompact,
@@ -525,7 +538,7 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginHorizontal: 0,
     marginVertical: 0,
-    height: 68,
+    minHeight: 68,
     borderRadius: BorderRadius.sm,
   },
   innerContainer: {
@@ -544,6 +557,12 @@ const styles = StyleSheet.create({
   },
   headerCompact: {
     marginBottom: 2,
+  },
+  headerStacked: { alignItems: "flex-start", gap: Spacing.xs },
+  statusContainerStacked: {
+    marginLeft: 0,
+    width: "100%",
+    justifyContent: "flex-start",
   },
   labelContainer: {
     flexDirection: "row",
@@ -572,9 +591,9 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   infoButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0, 217, 255, 0.09)",
@@ -582,9 +601,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0, 217, 255, 0.44)",
   },
   infoButtonCompact: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   infoButtonPressed: {
     backgroundColor: "rgba(0, 217, 255, 0.22)",

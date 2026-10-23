@@ -110,8 +110,10 @@ export function MergeChainIndicator({
             size={12}
             color={viewModel.atThreshold ? "#FFD76A" : GameColors.ui.primary}
           />
-          <ThemedText style={styles.count}>CHAIN ×{count}</ThemedText>
-          <ThemedText style={styles.next}>
+          <ThemedText style={styles.count} maxFontSizeMultiplier={2}>
+            CHAIN ×{count}
+          </ThemedText>
+          <ThemedText style={styles.next} maxFontSizeMultiplier={2}>
             {viewModel.nextThreshold
               ? `Next pulse ×${viewModel.nextThreshold}`
               : "Maximum momentum"}
@@ -155,6 +157,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flexWrap: "wrap",
   },
   count: {
     color: GameColors.text.primary,

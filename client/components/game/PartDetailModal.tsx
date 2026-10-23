@@ -1,5 +1,12 @@
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -15,6 +22,8 @@ interface PartDetailModalProps {
   onClose: () => void;
   onUseFreedomController: () => void;
   canUseFreedomController: boolean;
+  onStoreInBackpack?: () => void;
+  canStoreInBackpack?: boolean;
 }
 
 export function PartDetailModal({
@@ -22,7 +31,11 @@ export function PartDetailModal({
   onClose,
   onUseFreedomController,
   canUseFreedomController,
+  onStoreInBackpack,
+  canStoreInBackpack = false,
 }: PartDetailModalProps) {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { state } = useGame();
   const hapticsEnabled = state.settings.hapticsEnabled;
   const isLocked = part.family === "locked";
@@ -67,13 +80,27 @@ export function PartDetailModal({
   return (
     <Pressable
       accessible={false}
-      style={styles.overlay}
+      style={[
+        styles.overlay,
+        {
+          paddingTop: insets.top + Spacing.lg,
+          paddingBottom: insets.bottom + Spacing.lg,
+        },
+      ]}
       onPress={onClose}
       testID="part-detail-backdrop"
     >
       <Pressable
         accessible={false}
-        style={styles.container}
+        style={[
+          styles.container,
+          {
+            maxHeight: Math.max(
+              160,
+              height - insets.top - insets.bottom - Spacing.lg * 2,
+            ),
+          },
+        ]}
         onPress={(event) => event.stopPropagation()}
         testID="part-detail-content"
       >
@@ -92,7 +119,10 @@ export function PartDetailModal({
           leading={leading}
           onClose={onClose}
         >
-          <View style={styles.content}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            style={styles.scroll}
+          >
             <View style={styles.detailRow}>
               <Feather
                 name="layers"
@@ -103,6 +133,38 @@ export function PartDetailModal({
                 Tier {part.tier}
               </ThemedText>
             </View>
+
+            {onStoreInBackpack ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Move to Backpack"
+                accessibilityHint={
+                  canStoreInBackpack
+                    ? "Stores this part in the first free backpack slot. Undo remains available."
+                    : "Requires an unlocked backpack with a free slot."
+                }
+                accessibilityState={{ disabled: !canStoreInBackpack }}
+                disabled={!canStoreInBackpack}
+                onPress={() => {
+                  if (!canStoreInBackpack) return;
+                  onStoreInBackpack();
+                  onClose();
+                }}
+                style={[
+                  styles.storageButton,
+                  !canStoreInBackpack && { opacity: 0.5 },
+                ]}
+              >
+                <Feather
+                  name="archive"
+                  size={18}
+                  color={GameColors.ui.primary}
+                />
+                <ThemedText style={styles.storageText}>
+                  Move to Backpack
+                </ThemedText>
+              </Pressable>
+            ) : null}
 
             <View style={styles.detailRow}>
               <Feather
@@ -161,7 +223,7 @@ export function PartDetailModal({
                 </ThemedText>
               </Pressable>
             ) : null}
-          </View>
+          </ScrollView>
         </ModalShell>
       </Pressable>
     </Pressable>
@@ -190,6 +252,24 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  scroll: { flexShrink: 1 },
+  storageButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: GameColors.ui.primary,
+  },
+  storageText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: GameColors.text.primary,
+    flex: 1,
   },
   detailRow: {
     flexDirection: "row",
@@ -198,6 +278,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 14,
+    flex: 1,
     color: GameColors.text.secondary,
   },
   freedomButton: {
@@ -213,5 +294,6 @@ const styles = StyleSheet.create({
   freedomText: {
     fontSize: 14,
     fontWeight: "700",
+    flexShrink: 1,
   },
 });

@@ -49,7 +49,12 @@ export function CooldownBadge({
   const letterSpacing = digitCount <= 2 ? 1.2 : digitCount === 3 ? 0.6 : 0.2;
 
   return (
-    <View style={styles.container} pointerEvents="none">
+    <View
+      style={styles.container}
+      pointerEvents="none"
+      accessible
+      accessibilityLabel={`Supplier cooldown, ${safeSeconds} seconds remaining${deltaSeconds ? `, reduced by ${deltaSeconds} seconds` : ""}`}
+    >
       <LinearGradient
         colors={["#0A0A16", "#141428", "#0A0A16"]}
         style={[
@@ -64,6 +69,7 @@ export function CooldownBadge({
         ]}
       >
         <ThemedText
+          maxFontSizeMultiplier={1}
           style={[
             styles.timerText,
             {
@@ -88,6 +94,7 @@ export function CooldownBadge({
             ]}
           >
             <ThemedText
+              maxFontSizeMultiplier={1.25}
               style={[
                 styles.deltaText,
                 { color: urgencyColor, fontSize: deltaFontSize },

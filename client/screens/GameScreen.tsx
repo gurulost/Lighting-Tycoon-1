@@ -12,6 +12,7 @@ import {
   findNodeHandle,
   Platform,
   Pressable,
+  ScrollView,
   AppState,
   InteractionManager,
   useWindowDimensions,
@@ -30,6 +31,7 @@ import Animated, {
 
 import { MergeBoard } from "@/components/game/MergeBoard";
 import { CurrencyDisplay } from "@/components/game/CurrencyDisplay";
+import { getGameplayHudLayout } from "@/lib/gameplayLayout";
 import { DependencyMeter } from "@/components/game/DependencyMeter";
 import { NeighborhoodBadge } from "@/components/game/NeighborhoodBadge";
 import { OrdersModal } from "@/components/game/OrdersModal";
@@ -296,6 +298,9 @@ function BottomButton({
     <Pressable
       style={[styles.bottomButton, disabled && styles.bottomButtonDisabled]}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}${badge ? `, ${badge} ready` : ""}${indicator ? ", new activity" : ""}${paused ? ", spawning paused" : ""}`}
+      testID={`nav-${label.toLowerCase().replace(/[^a-z]/g, "")}`}
       accessibilityState={{ disabled: !!disabled }}
       onLayout={onLayout}
     >
@@ -317,7 +322,9 @@ function BottomButton({
         </LinearGradient>
         {badge && badge > 0 ? (
           <View style={styles.badge}>
-            <ThemedText style={styles.badgeText}>{badge}</ThemedText>
+            <ThemedText style={styles.badgeText} maxFontSizeMultiplier={1.5}>
+              {badge}
+            </ThemedText>
           </View>
         ) : null}
         {!badge && indicator ? <View style={styles.indicatorDot} /> : null}
@@ -328,6 +335,7 @@ function BottomButton({
         ) : null}
       </Animated.View>
       <ThemedText
+        maxFontSizeMultiplier={2}
         style={[
           styles.buttonLabel,
           compact && styles.buttonLabelCompact,
@@ -342,7 +350,11 @@ function BottomButton({
 
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const {
+    width: windowWidth,
+    height: windowHeight,
+    fontScale,
+  } = useWindowDimensions();
   const {
     state,
     dispatch,
@@ -422,7 +434,9 @@ export default function GameScreen() {
   const [undoTick, setUndoTick] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [debugOverlayVisible, setDebugOverlayVisible] = useState(false);
-  const [hudCollapsed, setHudCollapsed] = useState(false);
+  const [hudCollapsedOverride, setHudCollapsed] = useState<boolean | null>(
+    null,
+  );
   const [showTutorialGlossaryBeacon, setShowTutorialGlossaryBeacon] =
     useState(false);
   const [phase2RescueHint, setPhase2RescueHint] =
@@ -444,6 +458,8 @@ export default function GameScreen() {
   const [bottomBarLayout, setBottomBarLayout] = useState<LayoutRect | null>(
     null,
   );
+  const [navigationOffset, setNavigationOffset] = useState(0);
+  const [boardViewportHeight, setBoardViewportHeight] = useState(0);
   const [topStackLayout, setTopStackLayout] = useState<LayoutRect | null>(null);
   const [topActionsLayout, setTopActionsLayout] = useState<LayoutRect | null>(
     null,
@@ -642,9 +658,13 @@ export default function GameScreen() {
     return count;
   }, [state.orders, getFulfillmentIndices]);
   const isCompactLayout = screenHeight > 0 && screenHeight < 740;
-  const isCompactScreen = screenHeight > 0 && screenHeight < 800;
-  const topCondensed = hudCollapsed || isCompactScreen;
   const safeWidth = Math.max(0, windowWidth - insets.left - insets.right);
+  const hudLayout = getGameplayHudLayout(safeWidth, windowHeight, fontScale);
+  const largeText = hudLayout.largeText;
+  const hudCollapsed = hudCollapsedOverride ?? hudLayout.collapseByDefault;
+  const topCondensed = hudCollapsed;
+  const reflowHud = hudLayout.stackToolbar;
+  const scrollHud = largeText || isCompactLayout || safeWidth < 360;
   const phaseObjective = useMemo(
     () =>
       resolvePhaseObjective({
@@ -712,7 +732,8 @@ export default function GameScreen() {
   const isNarrowTopBar = safeWidth > 0 && safeWidth < 520;
   const isTightTopBar = safeWidth > 0 && safeWidth < 450;
   const isUltraNarrowTopBar = safeWidth > 0 && safeWidth < 350;
-  const isSplitObjectiveStacked = safeWidth > 0 && safeWidth < 320;
+  const isSplitObjectiveStacked =
+    largeText || (safeWidth > 0 && safeWidth < 360);
   const phase2GoalOrderId = useMemo(
     () =>
       state.orders.find((order) => order.modifierIds?.includes("phase2_goal"))
@@ -731,7 +752,7 @@ export default function GameScreen() {
     : isNarrowTopBar
       ? "compact"
       : "regular";
-  const showHudToggle = !isCompactScreen && safeWidth >= 390;
+  const showHudToggle = true;
   const topActionRadius = topActionSize / 2;
   const topActionButtonStyle = [
     styles.settingsButton,
@@ -744,6 +765,7 @@ export default function GameScreen() {
   };
   const topBarStyle = [
     styles.topBar,
+    reflowHud && styles.topBarStacked,
     {
       gap: topBarGap,
       paddingLeft: topBarPaddingX + insets.left,
@@ -1197,12 +1219,14 @@ export default function GameScreen() {
     }
     if (relativeTargets.orders) {
       nextTargets.orders = applyOffset(relativeTargets.orders, bottomBarLayout);
+      nextTargets.orders.x -= navigationOffset;
     }
     if (relativeTargets.upgrades) {
       nextTargets.upgrades = applyOffset(
         relativeTargets.upgrades,
         bottomBarLayout,
       );
+      nextTargets.upgrades.x -= navigationOffset;
     }
 
     const next = { ...nextTargets, ...absoluteTargets };
@@ -1214,6 +1238,7 @@ export default function GameScreen() {
     topBarLayout,
     topActionsLayout,
     bottomBarLayout,
+    navigationOffset,
     absoluteTargets,
   ]);
   const enqueueOverlay = useCallback(
@@ -2190,12 +2215,6 @@ export default function GameScreen() {
   }, []);
 
   useEffect(() => {
-    if (state.tutorialComplete) {
-      setHudCollapsed(true);
-    }
-  }, [state.tutorialComplete]);
-
-  useEffect(() => {
     const wasSkipped = previousTutorialSkippedRef.current;
     previousTutorialSkippedRef.current = tutorialSkipped;
 
@@ -2852,7 +2871,10 @@ export default function GameScreen() {
               }}
             >
               <View
-                style={styles.currencyWrap}
+                style={[
+                  styles.currencyWrap,
+                  reflowHud && styles.currencyWrapStacked,
+                ]}
                 onLayout={setTarget("currency")}
               >
                 <CurrencyDisplay
@@ -2884,7 +2906,11 @@ export default function GameScreen() {
                 />
               </View>
               <View
-                style={[styles.topActions, { gap: topActionsGap }]}
+                style={[
+                  styles.topActions,
+                  reflowHud && styles.topActionsStacked,
+                  { gap: topActionsGap },
+                ]}
                 onLayout={(event) => {
                   const layout = event?.nativeEvent?.layout;
                   if (!layout) return;
@@ -2924,7 +2950,10 @@ export default function GameScreen() {
                         end={{ x: 1, y: 1 }}
                         style={styles.storyBadge}
                       >
-                        <ThemedText style={styles.storyBadgeText}>
+                        <ThemedText
+                          style={styles.storyBadgeText}
+                          maxFontSizeMultiplier={1.5}
+                        >
                           {unreadStoryCount > 9 ? "9+" : unreadStoryCount}
                         </ThemedText>
                       </LinearGradient>
@@ -3005,12 +3034,13 @@ export default function GameScreen() {
                 {showHudToggle ? (
                   <Pressable
                     style={topActionButtonStyle}
-                    onPress={() => setHudCollapsed((prev) => !prev)}
+                    onPress={() => setHudCollapsed(!hudCollapsed)}
                     hitSlop={10}
                     accessibilityRole="button"
                     accessibilityLabel={
                       topCondensed ? "Expand HUD" : "Collapse HUD"
                     }
+                    accessibilityState={{ expanded: !hudCollapsed }}
                   >
                     <LinearGradient
                       colors={["#1F1F2E", "#252542", "#1F1F2E"]}
@@ -3030,178 +3060,239 @@ export default function GameScreen() {
               </View>
             </View>
 
-            <View
-              style={[
-                styles.statusRow,
-                topStackSideMarginStyle,
-                topCondensed && styles.statusRowCompact,
-              ]}
-            >
-              <View style={styles.statusItem}>
-                <View
-                  ref={dependencyTargetRef}
-                  onLayout={measureDependencyTarget}
+            {!hudCollapsed && (
+              <>
+                {scrollHud ? (
+                  <ThemedText
+                    style={[styles.hudScrollHint, topStackSideMarginStyle]}
+                    maxFontSizeMultiplier={2}
+                  >
+                    Status & goals · scroll for details
+                  </ThemedText>
+                ) : null}
+                <ScrollView
+                  testID="hud-details-scroll"
+                  style={[
+                    styles.hudDetails,
+                    scrollHud && {
+                      maxHeight: hudLayout.detailsMaxHeight,
+                    },
+                  ]}
+                  contentContainerStyle={styles.hudDetailsContent}
+                  scrollEnabled={scrollHud}
+                  onScroll={measureDependencyTarget}
+                  scrollEventThrottle={100}
+                  keyboardShouldPersistTaps="handled"
+                  accessibilityLabel="Workshop status and goals"
                 >
-                  <DependencyMeter
-                    value={state.dependency}
-                    baronPressure={state.baronPressure}
-                    compact
+                  <View
+                    style={[
+                      styles.statusRow,
+                      largeText && styles.statusRowStacked,
+                      topStackSideMarginStyle,
+                      topCondensed && styles.statusRowCompact,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.statusItem,
+                        largeText && styles.statusItemStacked,
+                      ]}
+                    >
+                      <View
+                        ref={dependencyTargetRef}
+                        onLayout={measureDependencyTarget}
+                      >
+                        <DependencyMeter
+                          value={state.dependency}
+                          baronPressure={state.baronPressure}
+                          compact
+                          reducedMotion={reducedMotion}
+                          lockoutActive={state.lockoutActive}
+                          onInfoPress={() =>
+                            openGlossary({
+                              sectionId: "dependency",
+                              source: "dependency_meter",
+                            })
+                          }
+                        />
+                      </View>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusItem,
+                        largeText && styles.statusItemStacked,
+                      ]}
+                    >
+                      <NeighborhoodBadge
+                        reputation={state.reputation}
+                        currentNeighborhoodId={state.currentNeighborhoodId}
+                        compact
+                      />
+                    </View>
+                  </View>
+
+                  <MergeChainIndicator
+                    count={state.mergeChainCount}
+                    expiresAt={state.mergeChainExpiresAt}
+                    windowMs={mergeChainWindowMs}
                     reducedMotion={reducedMotion}
-                    lockoutActive={state.lockoutActive}
-                    onInfoPress={() =>
-                      openGlossary({
-                        sectionId: "dependency",
-                        source: "dependency_meter",
-                      })
-                    }
                   />
-                </View>
-              </View>
-              <View style={styles.statusItem}>
-                <NeighborhoodBadge
-                  reputation={state.reputation}
-                  currentNeighborhoodId={state.currentNeighborhoodId}
-                  compact
-                />
-              </View>
-            </View>
 
-            <MergeChainIndicator
-              count={state.mergeChainCount}
-              expiresAt={state.mergeChainExpiresAt}
-              windowMs={mergeChainWindowMs}
-              reducedMotion={reducedMotion}
-            />
+                  {state.lockoutActive ? (
+                    <View
+                      style={[
+                        styles.lockoutHintRow,
+                        topStackSideMarginStyle,
+                        topCondensed && styles.lockoutHintRowCompact,
+                      ]}
+                    >
+                      <Feather
+                        name="alert-circle"
+                        size={12}
+                        color={GameColors.ui.danger}
+                      />
+                      <View style={styles.lockoutHintTextWrap}>
+                        <ThemedText style={styles.lockoutHintText}>
+                          Audit in progress - Dependency can&apos;t drop below
+                          20.
+                        </ThemedText>
+                        <ThemedText style={styles.lockoutHintSubtext}>
+                          {lockoutProgressLabel}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  ) : null}
 
-            {state.lockoutActive ? (
-              <View
-                style={[
-                  styles.lockoutHintRow,
-                  topStackSideMarginStyle,
-                  topCondensed && styles.lockoutHintRowCompact,
-                ]}
-              >
-                <Feather
-                  name="alert-circle"
-                  size={12}
-                  color={GameColors.ui.danger}
-                />
-                <View style={styles.lockoutHintTextWrap}>
-                  <ThemedText style={styles.lockoutHintText}>
-                    Audit in progress - Dependency can&apos;t drop below 20.
-                  </ThemedText>
-                  <ThemedText style={styles.lockoutHintSubtext}>
-                    {lockoutProgressLabel}
-                  </ThemedText>
-                </View>
-              </View>
-            ) : null}
-
-            {state.gamePhase >= 2 && phaseObjective ? (
-              <SplitObjectiveRow
-                missions={state.missions}
-                missionsLocked={!state.tutorialComplete}
-                objective={phaseObjective}
-                playbook={phase2Playbook}
-                playbookHint={phasePlaybookHint}
-                onPressGoals={() => openModalFromUser("missions")}
-                onLockedGoalsPress={() =>
-                  showToast("Finish the tutorial to unlock goals.", 2200)
-                }
-                onPressObjective={handlePhaseObjectivePress}
-                onPressPlaybookHelp={handlePhasePlaybookHelp}
-                compact={topCondensed}
-                stacked={isSplitObjectiveStacked}
-                style={topStackSideMarginStyle}
-              />
-            ) : (
-              <MissionStrip
-                missions={state.missions}
-                locked={!state.tutorialComplete}
-                onPress={() => openModalFromUser("missions")}
-                onLockedPress={() =>
-                  showToast("Finish the tutorial to unlock goals.", 2200)
-                }
-                compact={topCondensed}
-                collapsed={topCondensed}
-                style={topStackSideMarginStyle}
-              />
+                  {state.gamePhase >= 2 && phaseObjective ? (
+                    <SplitObjectiveRow
+                      missions={state.missions}
+                      missionsLocked={!state.tutorialComplete}
+                      objective={phaseObjective}
+                      playbook={phase2Playbook}
+                      playbookHint={phasePlaybookHint}
+                      onPressGoals={() => openModalFromUser("missions")}
+                      onLockedGoalsPress={() =>
+                        showToast("Finish the tutorial to unlock goals.", 2200)
+                      }
+                      onPressObjective={handlePhaseObjectivePress}
+                      onPressPlaybookHelp={handlePhasePlaybookHelp}
+                      compact={topCondensed}
+                      stacked={isSplitObjectiveStacked}
+                      style={topStackSideMarginStyle}
+                    />
+                  ) : (
+                    <MissionStrip
+                      missions={state.missions}
+                      locked={!state.tutorialComplete}
+                      onPress={() => openModalFromUser("missions")}
+                      onLockedPress={() =>
+                        showToast("Finish the tutorial to unlock goals.", 2200)
+                      }
+                      compact={topCondensed}
+                      collapsed={topCondensed}
+                      style={topStackSideMarginStyle}
+                    />
+                  )}
+                </ScrollView>
+              </>
             )}
           </View>
 
           <View
-            ref={boardContainerRef}
             style={styles.boardContainer}
             onLayout={(event) => {
-              measureBoardContainer();
+              setBoardViewportHeight(event.nativeEvent.layout.height);
               setTarget("board")(event);
             }}
           >
-            <MergeBoard
-              enhancedPartCues={state.settings.enhancedPartCues}
-              layoutVersion={storyLayoutTick}
-              boardContainerLayout={boardContainerLayout}
-              maxHeight={boardContainerLayout?.height}
-              suppliersOpen={activeModal === "suppliers"}
-              onWorkbenchPress={() => {
-                openModalFromUser("suppliers");
+            <ScrollView
+              testID="workshop-board-scroll"
+              style={styles.boardScroll}
+              contentContainerStyle={styles.boardScrollContent}
+              scrollEnabled={!isDragging}
+              onScroll={() => {
+                measureBoardContainer();
+                setStoryLayoutTick((previous) => previous + 1);
               }}
-              onOrderInboxPress={() => {
-                if (!state.tutorialComplete && state.tutorialStep < 3) {
-                  showToast("Finish Step 3 to unlock Orders.", 2200);
-                  return;
-                }
-                openModalFromUser("orders");
-              }}
-              onRDBenchPress={() => {
-                if (state.upgrades["rd_unlock"] < 1) {
-                  showToast("Unlock R&D via upgrades to access the lab.", 2200);
-                  return;
-                }
-                openModalFromUser("rd");
-              }}
-              onStationLongPress={(station) => {
-                if (station === "workbench") {
-                  showToast(
-                    "Suppliers: tap to access your supply panel.",
-                    2600,
-                  );
-                } else if (station === "orders") {
-                  showToast(
-                    "Orders: fulfill installs for cash, reputation, and research.",
-                    2600,
-                  );
-                } else {
-                  showToast(
-                    "R&D: spend research to unlock Freedom Controller tech.",
-                    2600,
-                  );
-                }
-              }}
-              onUtilityLongPress={(utility) => {
-                if (utility === "backpack") {
-                  showToast(
-                    "Backpack: temporary storage. Drag items in and out.",
-                    2400,
-                  );
-                } else {
-                  showToast("Recycle: delete a part for a small refund.", 2400);
-                }
-              }}
-              onDragStateChange={setIsDragging}
-              onPartLongPress={(index) => setSelectedPartIndex(index)}
-              onStationLayout={handleStationLayout}
-              onUndo={undoLastMove}
-              canUndo={canUndoNow}
-              tutorialFocus={
-                !state.tutorialComplete && state.tutorialStep === 0
-                  ? "workbench"
-                  : !state.tutorialComplete && state.tutorialStep === 3
-                    ? "orders"
-                    : null
-              }
-              compatibilityGuideActive={state.compatibilityGuideStep === 1}
-            />
+              scrollEventThrottle={100}
+              keyboardShouldPersistTaps="handled"
+              accessibilityLabel="Merge board and backpack"
+            >
+              <View ref={boardContainerRef} onLayout={measureBoardContainer}>
+                <MergeBoard
+                  enhancedPartCues={state.settings.enhancedPartCues}
+                  layoutVersion={storyLayoutTick}
+                  boardContainerLayout={boardContainerLayout}
+                  maxHeight={boardViewportHeight}
+                  suppliersOpen={activeModal === "suppliers"}
+                  onWorkbenchPress={() => {
+                    openModalFromUser("suppliers");
+                  }}
+                  onOrderInboxPress={() => {
+                    if (!state.tutorialComplete && state.tutorialStep < 3) {
+                      showToast("Finish Step 3 to unlock Orders.", 2200);
+                      return;
+                    }
+                    openModalFromUser("orders");
+                  }}
+                  onRDBenchPress={() => {
+                    if (state.upgrades["rd_unlock"] < 1) {
+                      showToast(
+                        "Unlock R&D via upgrades to access the lab.",
+                        2200,
+                      );
+                      return;
+                    }
+                    openModalFromUser("rd");
+                  }}
+                  onStationLongPress={(station) => {
+                    if (station === "workbench") {
+                      showToast(
+                        "Suppliers: tap to access your supply panel.",
+                        2600,
+                      );
+                    } else if (station === "orders") {
+                      showToast(
+                        "Orders: fulfill installs for cash, reputation, and research.",
+                        2600,
+                      );
+                    } else {
+                      showToast(
+                        "R&D: spend research to unlock Freedom Controller tech.",
+                        2600,
+                      );
+                    }
+                  }}
+                  onUtilityLongPress={(utility) => {
+                    if (utility === "backpack") {
+                      showToast(
+                        "Backpack: temporary storage. Drag items in and out.",
+                        2400,
+                      );
+                    } else {
+                      showToast(
+                        "Recycle: delete a part for a small refund.",
+                        2400,
+                      );
+                    }
+                  }}
+                  onDragStateChange={setIsDragging}
+                  onPartLongPress={(index) => setSelectedPartIndex(index)}
+                  onStationLayout={handleStationLayout}
+                  onUndo={undoLastMove}
+                  canUndo={canUndoNow}
+                  tutorialFocus={
+                    !state.tutorialComplete && state.tutorialStep === 0
+                      ? "workbench"
+                      : !state.tutorialComplete && state.tutorialStep === 3
+                        ? "orders"
+                        : null
+                  }
+                  compatibilityGuideActive={state.compatibilityGuideStep === 1}
+                />
+              </View>
+            </ScrollView>
           </View>
 
           <LinearGradient
@@ -3222,91 +3313,111 @@ export default function GameScreen() {
               );
             }}
           >
-            <BottomButton
-              icon="inbox"
-              label="Orders"
-              color={GameColors.currency.reputation}
-              onPress={() => openModalFromUser("orders")}
-              onDisabledPress={() =>
-                showToast("Finish the tutorial to unlock Orders.", 2200)
+            <ScrollView
+              horizontal
+              testID="workshop-navigation"
+              style={styles.navigationScroll}
+              contentContainerStyle={styles.navigationContent}
+              onScroll={(event) =>
+                setNavigationOffset(event.nativeEvent.contentOffset.x)
               }
-              badge={fulfillableOrderCount}
-              paused={orderSpawnPaused}
-              disabled={!state.tutorialComplete && state.tutorialStep < 3}
-              onLayout={setTarget("orders")}
-              compact={isCompactLayout}
-              reducedMotion={reducedMotion}
-            />
-
-            {showProjectsButton ? (
+              scrollEventThrottle={100}
+              keyboardShouldPersistTaps="handled"
+              accessibilityLabel="Workshop navigation"
+            >
               <BottomButton
-                icon={state.projectsUnlocked ? "flag" : "lock"}
-                label="Projects"
-                color={GameColors.ui.primary}
-                onPress={() => openProjectBoard()}
-                badge={projectBadge}
-                indicator={projectIndicator}
+                icon="inbox"
+                label="Orders"
+                color={GameColors.currency.reputation}
+                onPress={() => openModalFromUser("orders")}
+                onDisabledPress={() =>
+                  showToast("Finish the tutorial to unlock Orders.", 2200)
+                }
+                badge={fulfillableOrderCount}
+                paused={orderSpawnPaused}
+                disabled={!state.tutorialComplete && state.tutorialStep < 3}
+                onLayout={setTarget("orders")}
                 compact={isCompactLayout}
                 reducedMotion={reducedMotion}
               />
-            ) : null}
 
-            {showCouncilButton ? (
-              <BottomButton
-                icon="award"
-                label="Council"
-                color={GameColors.currency.research}
-                onPress={() => openModalFromUser("council")}
-                onDisabledPress={() => showToast(councilTooltipMessage, 3200)}
-                disabled={!state.council.unlocked}
-                badge={councilBadge}
-                compact={isCompactLayout}
-                reducedMotion={reducedMotion}
-              />
-            ) : null}
-
-            <BottomButton
-              icon="shopping-cart"
-              label="Shop"
-              color={GameColors.currency.cash}
-              onPress={() => openModalFromUser("upgrades")}
-              onDisabledPress={() =>
-                showToast("Finish the tutorial to unlock the Shop.", 2200)
-              }
-              disabled={!state.tutorialComplete && state.tutorialStep < 4}
-              onLayout={setTarget("upgrades")}
-              compact={isCompactLayout}
-              reducedMotion={reducedMotion}
-            />
-
-            <BottomButton
-              icon="cpu"
-              label="R&D"
-              color={GameColors.currency.research}
-              onPress={() => openModalFromUser("rd")}
-              onDisabledPress={() =>
-                showToast("Unlock R&D via upgrades to access the lab.", 2200)
-              }
-              disabled={
-                !state.tutorialComplete || state.upgrades["rd_unlock"] < 1
-              }
-              compact={isCompactLayout}
-              reducedMotion={reducedMotion}
-            />
-
-            {state.freedomControllerCount > 0 ? (
-              <View style={styles.freedomIndicator}>
-                <Image
-                  source={freedomControllerImage}
-                  style={styles.freedomIcon}
-                  contentFit="contain"
-                  cachePolicy="memory-disk"
+              {showProjectsButton ? (
+                <BottomButton
+                  icon={state.projectsUnlocked ? "flag" : "lock"}
+                  label="Projects"
+                  color={GameColors.ui.primary}
+                  onPress={() => openProjectBoard()}
+                  badge={projectBadge}
+                  indicator={projectIndicator}
+                  compact={isCompactLayout}
+                  reducedMotion={reducedMotion}
                 />
-                <ThemedText style={styles.freedomCount}>
-                  {state.freedomControllerCount}
-                </ThemedText>
-              </View>
-            ) : null}
+              ) : null}
+
+              {showCouncilButton ? (
+                <BottomButton
+                  icon="award"
+                  label="Council"
+                  color={GameColors.currency.research}
+                  onPress={() => openModalFromUser("council")}
+                  onDisabledPress={() => showToast(councilTooltipMessage, 3200)}
+                  disabled={!state.council.unlocked}
+                  badge={councilBadge}
+                  compact={isCompactLayout}
+                  reducedMotion={reducedMotion}
+                />
+              ) : null}
+
+              <BottomButton
+                icon="shopping-cart"
+                label="Shop"
+                color={GameColors.currency.cash}
+                onPress={() => openModalFromUser("upgrades")}
+                onDisabledPress={() =>
+                  showToast("Finish the tutorial to unlock the Shop.", 2200)
+                }
+                disabled={!state.tutorialComplete && state.tutorialStep < 4}
+                onLayout={setTarget("upgrades")}
+                compact={isCompactLayout}
+                reducedMotion={reducedMotion}
+              />
+
+              <BottomButton
+                icon="cpu"
+                label="R&D"
+                color={GameColors.currency.research}
+                onPress={() => openModalFromUser("rd")}
+                onDisabledPress={() =>
+                  showToast("Unlock R&D via upgrades to access the lab.", 2200)
+                }
+                disabled={
+                  !state.tutorialComplete || state.upgrades["rd_unlock"] < 1
+                }
+                compact={isCompactLayout}
+                reducedMotion={reducedMotion}
+              />
+
+              {state.freedomControllerCount > 0 ? (
+                <View
+                  style={styles.freedomIndicator}
+                  accessible
+                  accessibilityLabel={`${state.freedomControllerCount} Freedom Controllers available`}
+                >
+                  <Image
+                    source={freedomControllerImage}
+                    style={styles.freedomIcon}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                  />
+                  <ThemedText
+                    style={styles.freedomCount}
+                    maxFontSizeMultiplier={2}
+                  >
+                    {state.freedomControllerCount}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </ScrollView>
           </LinearGradient>
 
           <OverlayManager
@@ -3621,6 +3732,27 @@ export default function GameScreen() {
                 })
               }
               canUseFreedomController={state.freedomControllerCount > 0}
+              canStoreInBackpack={
+                state.backpackUnlocked &&
+                state.backpack.some((part) => part === null)
+              }
+              onStoreInBackpack={() => {
+                const backpackIndex = state.backpack.findIndex(
+                  (part) => part === null,
+                );
+                if (
+                  !state.backpackUnlocked ||
+                  backpackIndex < 0 ||
+                  selectedPartIndex === null
+                )
+                  return;
+                dispatch({
+                  type: "STORE_IN_BACKPACK",
+                  fromIndex: selectedPartIndex,
+                  backpackIndex,
+                });
+                SoundManager.play("backpack");
+              }}
             />
           ) : null}
         </Modal>
@@ -3726,6 +3858,30 @@ const styles = StyleSheet.create({
     position: "relative",
     zIndex: 5,
   },
+  hudDetails: { flexGrow: 0, flexShrink: 0 },
+  hudScrollHint: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: GameColors.text.secondary,
+    paddingBottom: 2,
+  },
+  hudDetailsContent: { paddingBottom: Spacing.xs },
+  topBarStacked: { flexDirection: "column", alignItems: "stretch" },
+  currencyWrapStacked: { flex: 0, flexBasis: "auto", width: "100%" },
+  topActionsStacked: { justifyContent: "flex-end", width: "100%" },
+  statusRowStacked: { flexDirection: "column" },
+  statusItemStacked: { flex: 0, flexBasis: "auto", width: "100%" },
+  boardScroll: { flex: 1 },
+  boardScrollContent: { flexGrow: 1 },
+  navigationScroll: { flexGrow: 0, flexShrink: 1 },
+  navigationContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "space-evenly",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.sm,
+  },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -3757,7 +3913,8 @@ const styles = StyleSheet.create({
   },
   storyBadge: {
     minWidth: 18,
-    height: 18,
+    minHeight: 22,
+    paddingVertical: 2,
     paddingHorizontal: 5,
     borderRadius: 9,
     justifyContent: "center",
@@ -3866,9 +4023,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingHorizontal: 0,
+    paddingTop: 0,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     borderWidth: 1,
@@ -3876,12 +4032,14 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A4A",
   },
   bottomBarCompact: {
-    paddingTop: Spacing.sm,
-    gap: Spacing.lg,
+    paddingTop: 0,
   },
   bottomButton: {
     alignItems: "center",
     gap: Spacing.xs,
+    minWidth: 72,
+    minHeight: 44,
+    paddingHorizontal: Spacing.xs,
   },
   bottomButtonDisabled: {
     opacity: 0.5,
@@ -3909,6 +4067,7 @@ const styles = StyleSheet.create({
   buttonLabel: {
     fontSize: 12,
     fontWeight: "600",
+    textAlign: "center",
   },
   buttonLabelCompact: {
     fontSize: 11,
@@ -3918,7 +4077,8 @@ const styles = StyleSheet.create({
     top: -8,
     right: -8,
     minWidth: 20,
-    height: 20,
+    minHeight: 24,
+    paddingVertical: 2,
     borderRadius: 10,
     backgroundColor: GameColors.ui.danger,
     justifyContent: "center",

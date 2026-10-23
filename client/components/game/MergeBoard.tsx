@@ -132,6 +132,7 @@ function AnimatedStation({
   tileSize,
   accentColor,
   testID,
+  accessibilityLabel,
   containerStyle,
   containerRef,
   onLayout,
@@ -145,6 +146,7 @@ function AnimatedStation({
   tileSize: number;
   accentColor: string;
   testID?: string;
+  accessibilityLabel: string;
   containerStyle?: StyleProp<ViewStyle>;
   containerRef?: React.Ref<View>;
   onLayout?: (event: any) => void;
@@ -193,6 +195,8 @@ function AnimatedStation({
       onLongPress={onLongPress}
       delayLongPress={350}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={containerStyle}
       onLayout={onLayout}
     >
@@ -346,7 +350,8 @@ export function MergeBoard({
     onDragStateChange?.(isDragging);
   }, [isDragging, onDragStateChange]);
 
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, fontScale } = useWindowDimensions();
+  const stackedUtilities = fontScale >= 1.5 || screenWidth < 520;
   const boardPadding = Spacing.lg * 2;
   const totalGapWidth = (GRID_COLS - 1) * Spacing.tileGap;
   const baseTileSize = Math.floor(
@@ -397,7 +402,7 @@ export function MergeBoard({
   let tileSize = baseTileSize;
   let minBackpackSlotSize = defaultMinBackpackSlotSize;
   let minRecycleSize = defaultMinRecycleSize;
-  if (typeof maxHeight === "number" && maxHeight > 0) {
+  if (!stackedUtilities && typeof maxHeight === "number" && maxHeight > 0) {
     let estimatedHeight = estimateBoardHeight(
       tileSize,
       minBackpackSlotSize,
@@ -1453,6 +1458,7 @@ export function MergeBoard({
     return (
       <Animated.View
         key={index}
+        testID={`board-tile-${index}`}
         entering={tileEnter}
         style={[
           styles.tile,
@@ -1519,6 +1525,7 @@ export function MergeBoard({
                 >
                   <ThemedText
                     style={[styles.ghostText, { color: orderHighlightColor }]}
+                    maxFontSizeMultiplier={1.25}
                   >
                     {GHOST_LABELS[ghostTier]}
                   </ThemedText>
@@ -1556,6 +1563,7 @@ export function MergeBoard({
             isActive
             forcePulse={tutorialFocus === "workbench"}
             testID="workbench-station"
+            accessibilityLabel="Open Suppliers workbench"
             containerRef={workbenchRef}
             onLayout={measureWorkbench}
             onPress={() => {
@@ -1616,6 +1624,7 @@ export function MergeBoard({
             isActive={state.orders.length > 0}
             forcePulse={tutorialFocus === "orders"}
             testID="orders-station"
+            accessibilityLabel={`Open Orders inbox, ${state.orders.length} orders`}
             onPress={onOrderInboxPress}
             onLongPress={() => onStationLongPress?.("orders")}
             reducedMotion={reducedMotion}
@@ -1635,7 +1644,10 @@ export function MergeBoard({
               />
               {state.orders.length > 0 ? (
                 <View style={styles.badge}>
-                  <ThemedText style={styles.badgeText}>
+                  <ThemedText
+                    style={styles.badgeText}
+                    maxFontSizeMultiplier={1.25}
+                  >
                     {state.orders.length}
                   </ThemedText>
                 </View>
@@ -1654,6 +1666,7 @@ export function MergeBoard({
           style={[styles.stationSlot, { width: tileSize, height: tileSize }]}
         >
           <AnimatedStation
+            accessibilityLabel="Open R&D bench"
             isActive={rdUnlocked && state.research > 0}
             forcePulse={tutorialFocus === "rd"}
             onPress={rdUnlocked ? onRDBenchPress : () => {}}
@@ -1872,11 +1885,27 @@ export function MergeBoard({
           </View>
         ) : null}
       </LinearGradient>
-      <View style={[styles.utilityRow, { width: gridWidth }]}>
-        <View style={styles.backpackSection}>
+      <View
+        style={[
+          styles.utilityRow,
+          stackedUtilities && styles.utilityRowStacked,
+          { width: gridWidth },
+        ]}
+        testID="board-utilities"
+      >
+        <View
+          style={[
+            styles.backpackSection,
+            stackedUtilities && styles.backpackSectionStacked,
+          ]}
+        >
           <Pressable
+            onPress={() => onUtilityLongPress?.("backpack")}
             onLongPress={() => onUtilityLongPress?.("backpack")}
             delayLongPress={350}
+            accessibilityRole="button"
+            accessibilityLabel={`Backpack. ${state.backpack.filter(Boolean).length} of ${state.backpackSlots} slots used. ${state.backpackUnlocked ? "Tap a stored part to return it to the first free board slot. Dragging is also supported." : "Unlock after upgrade."}`}
+            style={styles.utilityInfoButton}
           >
             <View style={styles.backpackHeader}>
               <Feather
@@ -1889,6 +1918,7 @@ export function MergeBoard({
                 }
               />
               <ThemedText
+                maxFontSizeMultiplier={2}
                 style={[
                   styles.backpackTitle,
                   {
@@ -1907,7 +1937,10 @@ export function MergeBoard({
                     size={10}
                     color={GameColors.text.secondary}
                   />
-                  <ThemedText style={styles.backpackLockedText}>
+                  <ThemedText
+                    style={styles.backpackLockedText}
+                    maxFontSizeMultiplier={2}
+                  >
                     Unlock after upgrade
                   </ThemedText>
                 </View>
@@ -2041,6 +2074,11 @@ export function MergeBoard({
             <Pressable
               style={[styles.undoButton, !canUndo && styles.undoButtonDisabled]}
               onPress={canUndo ? onUndo : undefined}
+              disabled={!canUndo}
+              accessibilityRole="button"
+              accessibilityLabel="Undo last move"
+              accessibilityState={{ disabled: !canUndo }}
+              testID="board-undo"
             >
               <Feather
                 name="rotate-ccw"
@@ -2050,6 +2088,7 @@ export function MergeBoard({
                 }
               />
               <ThemedText
+                maxFontSizeMultiplier={2}
                 style={[
                   styles.undoText,
                   {
@@ -2066,10 +2105,16 @@ export function MergeBoard({
         ) : null}
         <View style={styles.recycleSection}>
           <Pressable
+            onPress={() => onUtilityLongPress?.("recycle")}
             onLongPress={() => onUtilityLongPress?.("recycle")}
             delayLongPress={350}
+            accessibilityRole="button"
+            accessibilityLabel="Recycle help. Drag a part here to recycle it for a small refund."
+            style={styles.utilityInfoButton}
           >
-            <ThemedText style={styles.recycleLabel}>Recycle</ThemedText>
+            <ThemedText style={styles.recycleLabel} maxFontSizeMultiplier={2}>
+              Recycle
+            </ThemedText>
           </Pressable>
           <Animated.View
             ref={recycleRef}
@@ -2120,7 +2165,12 @@ export function MergeBoard({
                         size={10}
                         color={GameColors.currency.cash}
                       />
-                      <ThemedText style={styles.recycleHintPlus}>+</ThemedText>
+                      <ThemedText
+                        style={styles.recycleHintPlus}
+                        maxFontSizeMultiplier={1.25}
+                      >
+                        +
+                      </ThemedText>
                       <Feather
                         name="zap"
                         size={10}
@@ -2424,12 +2474,17 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     overflow: "visible",
   },
+  utilityRowStacked: { flexWrap: "wrap", alignItems: "flex-start" },
+  backpackSectionStacked: { flex: 0, flexBasis: "auto", width: "100%" },
+  utilityInfoButton: { minHeight: 44, justifyContent: "center" },
   undoSection: {
     justifyContent: "center",
     alignItems: "center",
     flexShrink: 0,
   },
   undoButton: {
+    minWidth: 44,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
@@ -2458,6 +2513,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.xs,
     marginBottom: Spacing.xs,
+    flexWrap: "wrap",
   },
   backpackTitle: {
     fontSize: 13,

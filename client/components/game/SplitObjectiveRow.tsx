@@ -9,6 +9,7 @@ import { MissionStrip } from "./MissionStrip";
 import { ThemedText } from "@/components/ThemedText";
 import { PhaseObjectiveState } from "@/lib/objectives";
 import { BorderRadius, GameColors, Spacing } from "@/constants/theme";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 
 interface SplitObjectiveRowProps {
   missions: Mission[];
@@ -122,6 +123,8 @@ export function SplitObjectiveRow({
   stacked = false,
   style,
 }: SplitObjectiveRowProps) {
+  const { largeText } = useAccessibleLayout();
+  stacked = stacked || largeText;
   const theme = OBJECTIVE_THEME[objective.kind];
   const titleLines = stacked ? 2 : 1;
   const subtitleLines = stacked ? 2 : 1;
@@ -183,6 +186,9 @@ export function SplitObjectiveRow({
             style={styles.objectiveTapArea}
             onPress={onPressObjective}
             accessibilityRole="button"
+            accessibilityLabel={`${objective.statusLabel}. ${objectiveTitle}. ${objectiveSubtitle}. ${objectiveDetail ?? ""}. ${playbook?.progressLabel ?? ""}`}
+            accessibilityHint={objectiveCta}
+            testID="phase-objective-action"
           >
             <View style={styles.objectiveHeader} pointerEvents="none">
               <View style={styles.objectiveKickerRow}>
@@ -197,13 +203,19 @@ export function SplitObjectiveRow({
                 >
                   <Feather name={theme.icon} size={13} color={theme.accent} />
                 </View>
-                <ThemedText style={styles.objectiveKicker} numberOfLines={1}>
+                <ThemedText
+                  style={styles.objectiveKicker}
+                  maxFontSizeMultiplier={2}
+                >
                   {objective.statusLabel}
                 </ThemedText>
               </View>
               <View style={styles.objectiveHeaderRight}>
                 {playbook?.progressLabel ? (
-                  <ThemedText style={styles.objectiveProgress}>
+                  <ThemedText
+                    style={styles.objectiveProgress}
+                    maxFontSizeMultiplier={2}
+                  >
                     {playbook.progressLabel}
                   </ThemedText>
                 ) : null}
@@ -218,13 +230,13 @@ export function SplitObjectiveRow({
             <View style={styles.objectiveBody} pointerEvents="none">
               <ThemedText
                 style={styles.objectiveTitle}
-                numberOfLines={titleLines}
+                numberOfLines={largeText ? undefined : titleLines}
               >
                 {objectiveTitle}
               </ThemedText>
               <ThemedText
                 style={styles.objectiveSubtitle}
-                numberOfLines={subtitleLines}
+                numberOfLines={largeText ? undefined : subtitleLines}
               >
                 {objectiveSubtitle}
               </ThemedText>
@@ -234,7 +246,7 @@ export function SplitObjectiveRow({
                     styles.objectiveDetail,
                     { color: objectiveDetailColor },
                   ]}
-                  numberOfLines={detailLines}
+                  numberOfLines={largeText ? undefined : detailLines}
                 >
                   {objectiveDetail}
                 </ThemedText>
@@ -248,20 +260,34 @@ export function SplitObjectiveRow({
                 style={styles.objectiveHelp}
                 onPress={onPressPlaybookHelp}
                 testID="phase-playbook-help"
+                accessibilityRole="button"
+                accessibilityLabel="Open phase progression guide"
               >
                 <Feather
                   name="help-circle"
                   size={11}
                   color={GameColors.text.secondary}
                 />
-                <ThemedText style={styles.objectiveHelpText}>Guide</ThemedText>
+                <ThemedText
+                  style={styles.objectiveHelpText}
+                  maxFontSizeMultiplier={2}
+                >
+                  Guide
+                </ThemedText>
               </Pressable>
             ) : (
               <View />
             )}
-            <Pressable onPress={onPressObjective} accessibilityRole="button">
+            <Pressable
+              style={styles.objectiveCtaButton}
+              testID="phase-objective-cta"
+              onPress={onPressObjective}
+              accessibilityRole="button"
+              accessibilityLabel={objectiveCta}
+            >
               <ThemedText
                 style={[styles.objectiveCta, { color: theme.accent }]}
+                maxFontSizeMultiplier={2}
               >
                 {objectiveCta}
               </ThemedText>
@@ -291,6 +317,7 @@ const styles = StyleSheet.create({
   },
   cellStacked: {
     flex: 0,
+    flexBasis: "auto",
     width: "100%",
   },
   missionStripInSplit: {
@@ -300,7 +327,7 @@ const styles = StyleSheet.create({
   objectiveCard: {
     borderRadius: BorderRadius.lg,
     borderWidth: 1.5,
-    height: 106,
+    minHeight: 106,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.xs,
@@ -314,22 +341,27 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   objectiveCardCompact: {
-    height: 96,
+    minHeight: 96,
     paddingVertical: 6,
   },
   objectiveTapArea: {
-    flex: 1,
+    minHeight: 44,
+    gap: Spacing.xs,
   },
   objectiveHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
   },
   objectiveHeaderRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginLeft: Spacing.xs,
+    flexShrink: 1,
+    flexWrap: "wrap",
   },
   objectiveKickerRow: {
     flexDirection: "row",
@@ -337,6 +369,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     flex: 1,
     minWidth: 0,
+    flexBasis: 100,
   },
   objectiveIconWrap: {
     width: 22,
@@ -352,6 +385,7 @@ const styles = StyleSheet.create({
     color: GameColors.text.secondary,
     textTransform: "uppercase",
     letterSpacing: 0.4,
+    flexShrink: 1,
   },
   objectiveProgress: {
     fontSize: 9,
@@ -360,7 +394,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   objectiveBody: {
-    flex: 1,
     justifyContent: "center",
     gap: 3,
     minWidth: 0,
@@ -387,11 +420,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 2,
     zIndex: 2,
+    flexWrap: "wrap",
+    gap: Spacing.xs,
   },
   objectiveHelp: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    minHeight: 44,
+    paddingHorizontal: 4,
   },
   objectiveHelpText: {
     fontSize: 10,
@@ -401,5 +438,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.2,
+  },
+  objectiveCtaButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    flexShrink: 1,
+    paddingHorizontal: 4,
   },
 });

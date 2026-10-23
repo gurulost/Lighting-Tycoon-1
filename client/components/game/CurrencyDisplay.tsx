@@ -12,6 +12,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 
 interface CurrencyDisplayProps {
   cash: number;
@@ -62,6 +63,7 @@ function formatNumber(num: number): string {
 }
 
 interface CurrencyItemProps {
+  label: string;
   icon: keyof typeof Feather.glyphMap;
   value: number;
   color: string;
@@ -123,6 +125,7 @@ const DENSITY_TOKENS: Record<
 };
 
 function CurrencyItem({
+  label,
   icon,
   value,
   color,
@@ -131,6 +134,7 @@ function CurrencyItem({
   reducedMotion = false,
   tokens,
 }: CurrencyItemProps) {
+  const { largeText } = useAccessibleLayout();
   const scale = useSharedValue(1);
   const prevValue = useSharedValue(value);
   const glowOpacity = useSharedValue(0);
@@ -164,9 +168,30 @@ function CurrencyItem({
   }));
 
   return (
-    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={300}>
+    <Pressable
+      style={styles.currencyTarget}
+      onPress={onPress ?? onLongPress}
+      onLongPress={onLongPress}
+      delayLongPress={300}
+      accessible
+      accessibilityRole={onPress || onLongPress ? "button" : "text"}
+      accessibilityLabel={`${label}, ${Number.isFinite(value) ? value : 0}`}
+      accessibilityHint={
+        onPress
+          ? "Opens upgrades"
+          : onLongPress
+            ? `Explains ${label.toLowerCase()}`
+            : undefined
+      }
+      testID={`currency-${label.toLowerCase()}`}
+    >
       <Animated.View
-        style={[styles.currencyItem, { gap: tokens.itemGap }, animatedStyle]}
+        style={[
+          styles.currencyItem,
+          largeText && styles.currencyItemStacked,
+          { gap: tokens.itemGap },
+          animatedStyle,
+        ]}
       >
         <Animated.View
           style={[styles.glowEffect, { backgroundColor: color }, glowStyle]}
@@ -187,11 +212,13 @@ function CurrencyItem({
           <Feather name={icon} size={tokens.iconSize} color={color} />
         </LinearGradient>
         <ThemedText
+          maxFontSizeMultiplier={2}
           style={[
             styles.value,
             {
               color,
               fontSize: tokens.valueFontSize,
+              lineHeight: Math.ceil(tokens.valueFontSize * 1.35),
               minWidth: tokens.valueMinWidth,
             },
           ]}
@@ -222,7 +249,7 @@ export function CurrencyDisplay({
       style={[
         styles.container,
         {
-          height: tokens.height,
+          minHeight: tokens.height,
           paddingHorizontal: tokens.paddingHorizontal,
           gap: tokens.containerGap,
           borderRadius: tokens.height / 2,
@@ -232,6 +259,7 @@ export function CurrencyDisplay({
       end={{ x: 1, y: 1 }}
     >
       <CurrencyItem
+        label="Cash"
         icon="dollar-sign"
         value={cash}
         color={GameColors.currency.cash}
@@ -244,6 +272,7 @@ export function CurrencyDisplay({
       <View style={[styles.divider, { height: tokens.dividerHeight }]} />
 
       <CurrencyItem
+        label="Reputation"
         icon="star"
         value={reputation}
         color={GameColors.currency.reputation}
@@ -255,6 +284,7 @@ export function CurrencyDisplay({
       <View style={[styles.divider, { height: tokens.dividerHeight }]} />
 
       <CurrencyItem
+        label="Research"
         icon="zap"
         value={research}
         color={GameColors.currency.research}
@@ -267,6 +297,13 @@ export function CurrencyDisplay({
 }
 
 const styles = StyleSheet.create({
+  currencyTarget: {
+    minWidth: 44,
+    minHeight: 44,
+    flex: 1,
+    justifyContent: "center",
+  },
+  currencyItemStacked: { flexDirection: "column", paddingVertical: Spacing.xs },
   container: {
     flexDirection: "row",
     alignItems: "center",

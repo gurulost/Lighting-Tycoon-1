@@ -9,6 +9,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { AvatarImage } from "./AvatarImage";
 import { GameColors, Spacing, BorderRadius } from "@/constants/theme";
 import { getMissionGiverMeta } from "@/lib/missions";
+import { useAccessibleLayout } from "@/hooks/useAccessibleLayout";
 
 interface MissionStripProps {
   missions: Mission[];
@@ -29,6 +30,7 @@ export function MissionStrip({
   collapsed = false,
   style,
 }: MissionStripProps) {
+  const { largeText } = useAccessibleLayout();
   const maxVisible = compact || collapsed ? 1 : 2;
   const activeMissions = missions.slice(0, maxVisible);
   const visibleCount = Math.min(missions.length, maxVisible);
@@ -44,7 +46,17 @@ export function MissionStrip({
   };
 
   return (
-    <Pressable onPress={handlePress} disabled={!canPress && !locked}>
+    <Pressable
+      onPress={handlePress}
+      disabled={!canPress && !locked}
+      accessibilityRole="button"
+      accessibilityLabel={
+        locked
+          ? "Goals locked. Finish the tutorial to unlock goals."
+          : `Goals. ${missions.length} active. ${activeMissions.map((mission) => `${mission.label}, ${mission.progress} of ${mission.target}`).join(". ")}`
+      }
+      testID="goals-button"
+    >
       <LinearGradient
         colors={["#1A1A2E", "#252542", "#1A1A2E"]}
         style={[
@@ -65,9 +77,11 @@ export function MissionStrip({
                 }
               />
             </View>
-            <ThemedText style={styles.headerTitle}>Goals</ThemedText>
+            <ThemedText style={styles.headerTitle} maxFontSizeMultiplier={2}>
+              Goals
+            </ThemedText>
           </View>
-          <ThemedText style={styles.headerMeta}>
+          <ThemedText style={styles.headerMeta} maxFontSizeMultiplier={2}>
             {locked
               ? "Locked"
               : collapsed
@@ -84,7 +98,10 @@ export function MissionStrip({
           <ThemedText style={styles.lockedText}>Goals syncing...</ThemedText>
         ) : collapsed ? (
           <View style={styles.summaryRow}>
-            <ThemedText style={styles.summaryLabel} numberOfLines={1}>
+            <ThemedText
+              style={styles.summaryLabel}
+              numberOfLines={largeText ? undefined : 1}
+            >
               {activeMissions[0].label}
             </ThemedText>
             <ThemedText style={styles.summaryProgress}>
@@ -123,7 +140,10 @@ export function MissionStrip({
                   )}
                   <View style={styles.missionContent}>
                     <View style={styles.missionTopRow}>
-                      <ThemedText style={styles.missionLabel} numberOfLines={1}>
+                      <ThemedText
+                        style={styles.missionLabel}
+                        numberOfLines={largeText ? undefined : 1}
+                      >
                         {mission.label}
                       </ThemedText>
                       <ThemedText style={styles.missionProgress}>
@@ -172,6 +192,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
   },
   headerLeft: {
     flexDirection: "row",
@@ -209,6 +231,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: Spacing.sm,
+    flexWrap: "wrap",
   },
   summaryLabel: {
     fontSize: 12,

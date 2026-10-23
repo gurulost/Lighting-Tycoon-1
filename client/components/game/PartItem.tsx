@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ImageSourcePropType } from "react-native";
+import { View, StyleSheet, ImageSourcePropType, Platform } from "react-native";
 import Animated, {
   type SharedValue,
   useAnimatedStyle,
@@ -397,6 +397,7 @@ export function PartItem({
       ? "unlock"
       : "lock";
   const familyLabel = isWaste ? "W" : isOpen ? "O" : "L";
+  const compactCues = size < 40;
   const accessibilityActivation = onTap ?? onLongPress;
 
   const content = (
@@ -404,6 +405,19 @@ export function PartItem({
       accessible={!dragPreview}
       accessibilityRole={accessibilityActivation ? "button" : "image"}
       accessibilityLabel={getPartAccessibilityLabel(part)}
+      {...(Platform.OS === "web" &&
+      !disabled &&
+      !dragPreview &&
+      accessibilityActivation
+        ? {
+            tabIndex: 0,
+            onKeyDown: (event: React.KeyboardEvent) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              if (!event.repeat) accessibilityActivation();
+            },
+          }
+        : {})}
       accessibilityHint={
         disabled
           ? undefined
@@ -479,7 +493,9 @@ export function PartItem({
           />
         ) : (
           <View style={styles.wasteBadge}>
-            <ThemedText style={styles.wasteText}>{wasteLabel}</ThemedText>
+            <ThemedText style={styles.wasteText} maxFontSizeMultiplier={1.25}>
+              {wasteLabel}
+            </ThemedText>
           </View>
         )}
         {showPremiumLights ? (
@@ -527,10 +543,13 @@ export function PartItem({
           { backgroundColor: GameColors.tiers[part.tier] },
         ]}
       >
-        <ThemedText style={styles.tierText}>{part.tier}</ThemedText>
+        <ThemedText style={styles.tierText} maxFontSizeMultiplier={1.25}>
+          {part.tier}
+        </ThemedText>
       </View>
 
       <View
+        testID="part-family-cue"
         style={[
           styles.familyIndicator,
           enhancedPartCues && styles.familyIndicatorEnhanced,
@@ -540,6 +559,7 @@ export function PartItem({
               : isOpen
                 ? styles.familyIndicatorOpenEnhanced
                 : styles.familyIndicatorLockedEnhanced),
+          compactCues && styles.compactCue,
           part.family === "locked"
             ? { backgroundColor: GameColors.locked.accent + "80" }
             : part.family === "waste"
@@ -547,7 +567,7 @@ export function PartItem({
               : styles.familyIndicatorOpen,
         ]}
       >
-        {enhancedPartCues ? (
+        {enhancedPartCues && !compactCues ? (
           <Feather
             name={familyIcon}
             size={8}
@@ -561,6 +581,7 @@ export function PartItem({
           />
         ) : null}
         <ThemedText
+          maxFontSizeMultiplier={compactCues ? 1 : 1.25}
           style={[
             styles.familyText,
             part.family === "locked"
@@ -576,18 +597,25 @@ export function PartItem({
 
       {part.compatible && !isWaste ? (
         <Animated.View
+          testID="part-compatibility-cue"
           style={[
             styles.compatibleIndicator,
             enhancedPartCues && styles.compatibleIndicatorEnhanced,
+            compactCues && styles.compactCue,
             { backgroundColor: GameColors.ui.success },
             compatibilityGuideActive ? styles.compatibleIndicatorGuide : null,
             compatibleGuideStyle,
           ]}
         >
-          {enhancedPartCues ? (
+          {enhancedPartCues && !compactCues ? (
             <Feather name="check" size={8} color="#0F0F1F" />
           ) : null}
-          <ThemedText style={styles.compatibleText}>C</ThemedText>
+          <ThemedText
+            style={styles.compatibleText}
+            maxFontSizeMultiplier={compactCues ? 1 : 1.25}
+          >
+            C
+          </ThemedText>
         </Animated.View>
       ) : null}
 
@@ -811,9 +839,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -6,
     right: -6,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
@@ -905,6 +933,7 @@ const styles = StyleSheet.create({
     borderColor: "#C8FFE3",
     shadowColor: GameColors.ui.success,
   },
+  compactCue: { width: 14, height: 16, gap: 0 },
   compatibleText: {
     fontSize: 9,
     fontWeight: "700",
