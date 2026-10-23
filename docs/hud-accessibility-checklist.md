@@ -6,11 +6,17 @@ Repair gameplay HUD, objectives, navigation and utilities without changing econo
 saves or production dependencies. Publish the existing Replit app; no duplicate
 app, account changes or native store submission.
 
+Follow-up authorized 2026-10-23: recover iPad verification and test-device cleanup,
+resolve the deployed health-check limitation, safely sync the original checkout,
+and commit/push/redeploy any necessary fixes. Preserve unrelated local work.
+
 ## Audit Queue
 
 - [x] Q-001 [status:verified] Repaired gameplay HUD, objectives, navigation and backpack/utility layout at large text sizes. Added a non-drag backpack affordance using existing reducer/Undo rules; no economy/save schema changes.
-- [ ] Q-002 [status:blocked] Web layouts, keyboard/touch actions, responsive resizing and final iPhone AX5 flow pass. Final iPad native smoke stalled before the first assertion; screenshot and device-specific shutdown services also stalled. Do not count this environment failure as a tablet pass.
+- [x] Q-002 [status:verified] Web layouts, keyboard/touch actions, resizing and final iPhone AX5 flow pass. Follow-up iPad AX5 flow passes all 27 recorded commands on the clean CI app; landscape Settings interaction, portrait restoration, relaunch and Restore Main are independently verified. Earlier stalled/failed harness runs are retained, not counted as passes.
 - [x] Q-003 [status:verified] App implementation committed/pushed to origin/main as `a340298`, published to the existing lightingtycoon.replit.app deployment. Provider logs identify the exact SHA; public iOS/Android bundles contain the new HUD actions. No duplicate app, account change or native store build/submission.
+- [x] Q-004 [status:verified] Original checkout Git metadata hydrated and safe fast-forward to `2a39db3` completed, with no tracked local edits and unrelated `.claude/launch.json` preserved.
+- [x] Q-005 [status:verified] Final iPad verification completed using clean CI app `a340298`; both dedicated devices restored to large text size and Shutdown. Production monitoring now uses no-store `/api/healthz`; its 16 live contract checks pass. No shared simulator reset, data erasure or provider resource/security change.
 
 ## Findings Log
 
@@ -35,6 +41,9 @@ app, account changes or native store submission.
 - [x] P-003 [status:verified] Responsive navigation and utility layout with explicit roles/names, disabled states and non-overlapping labels. Part Details has bounded scroll content, keyboard activation and gated Move to Backpack; existing return/Undo behavior is exercised end-to-end.
   - Addresses: F-002, F-003, F-006, F-007.
   - Evidence: Part Details gating tests and browser persisted-state drag/storage/return/Undo regression.
+- [x] P-004 [status:verified] Added provider-safe no-store `/api/healthz`, retained `/healthz`, removed unsupported/unnecessary port-sharing, and added a strict deployment verifier plus actual-server startup regression coverage.
+  - Addresses: F-008, F-009, R-002.
+  - Evidence: 16 verifier tests, 251 Jest tests, real local production startup without DATABASE_URL, exact-source CI `39934549036`, and 16 public deployment checks pass.
 
 ## Validation Log
 
@@ -42,16 +51,18 @@ app, account changes or native store submission.
   - Evidence: 2026-10-23 UTC, passed local source/config checks and exact-source CI run `39896885683`.
 - [x] V-002 [status:verified] Final integrated browser suite: 26 passed, 2 channel-specific skips; dedicated final production guard: 1 passed. Final focused HUD/phase-transition matrix: 8 passed. Reviewed Phase 2/3 screenshots at 320x568, 390x844, 768x1024, 1024x768 and 844x390; board drag after scroll, keyboard storage/return and Undo pass.
   - Evidence: 2026-10-23 UTC, passed final browser tests and screenshot review; artifacts in `output/hud-review/`.
-- [ ] V-003 [status:blocked] Final iPhone AX5 native flow passes; iPad native follow-through is blocked by an unresponsive simulator service, not counted as passed. Exact final runtime Hermes SHA-256 `65b03604f5eb217841733c9c377c843dbe19db41183e5d3f3397d2f30c8c6cf3` is installed in the earlier CI native base `d12e30d`. Rebundling is not a new native compile. Separately, exact-source clean production/E2E native CI run `39896885533` passed; those binaries are not claimed as new runtime tests.
-  - Evidence: 2026-10-23 UTC, passed final iPhone `.maestro/hud-accessibility.yaml` and clean CI builds; iPad automation/screenshot services timed out before first assertion.
-- [x] V-004 [status:verified] Production server/iOS/Android bundle build passes (local build ID `1792727447111-278`, 160 assets). Existing Replit deployment `7e7d4fb0-e588-4e38-ba03-1260ddd82df7` is Live from exact app revision `a34029804b0bba97b4f62bd89c6166813617b5a0`. Served build `1792727875214-190` contains new HUD markers in both platform bundles. All seven cloud-save methods return 410; `/healthz/` returns 200. Exact `/healthz` is intercepted upstream with Google's 404; see R-002.
-  - Evidence: 2026-10-23 UTC, passed build, public manifests/bundle marker/hash checks and seven cloud-save methods; Replit publication screenshot saved.
+- [x] V-003 [status:verified] Final iPhone AX5 flow passes on its recorded rebundle (`65b03604...`). Follow-up iPad tests use the clean CI E2E binary from source `a340298`, Hermes SHA-256 `5cf24d8b55493cde475c376782a91f2d8ed2e68c2a9d9867867c85aef33007a9`. No client/native dependency changes occurred in the health-fix packet.
+  - Evidence: 2026-10-23 UTC, passed iPad intro/HUD flow (27 completed commands), landscape native Settings open/close, portrait restoration (4 completed commands), relaunch/Settings/Restore Main (10 completed commands). Clean production/E2E native CI `39896885533` passed; screenshots and command records are in `output/hud-review/ipad-ci-ax5/`.
+- [x] V-004 [status:verified] Replit deployment `7e7d4fb0-e588-4e38-ba03-1260ddd82df7`, provider build `2635478f-ce1a-4692-931c-eccd2f85bf2f`, is Live from health-fix source `e61455cc9306eacdbac004b8fbe2ef7de87f5cb6`. Served iOS/Android build `1792749480373-191` contains the HUD markers; health GET/HEAD and 14 disabled-save checks pass.
+  - Evidence: 2026-10-23 UTC, passed strict live verifier (16 checks), public manifest/bundle hash checks and provider exact-SHA inspection. `/api/healthz` returns 200 JSON with no-store; bare legacy `/healthz` remains an upstream limitation, documented below.
+- [x] V-005 [status:verified] Follow-up source checks and safe checkout synchronization pass.
+  - Evidence: 2026-10-23 UTC, passed 50 Jest suites / 251 tests, 16 deployment-verifier tests including actual server startup without DATABASE_URL, types/lint/format/assets/telemetry, production server build and exact-source CI `39934549036`. Original checkout fast-forwarded without changing unrelated `.claude/launch.json`.
 
 ## Residual Risks
 
 - [x] R-001 [status:verified] Connected Replit tools use @mithorizon7, but the authorized browser session resolves the user's account to @DavidDixon7. Existing Lighting Tycoon (1) is connected to gurulost/Lighting-Tycoon-1, with the existing public lightingtycoon.replit.app deployment. Use that existing app; no duplicate or account/credential change.
-- [ ] R-002 [status:blocked] Public exact `/healthz` receives Google's upstream 404 without Express response headers; `/healthz/` receives the app's 200 JSON. The exact source route passes locally. This is an observed hosting-path limitation, not proof of its undocumented cause. No new domain, proxy, hosting type, cost or security changes were attempted to work around it.
-- [ ] R-003 [status:blocked] Device-specific preference restoration/shutdown commands for dedicated iPhone `36F061F0-742A-4F91-9FF0-F3E788922A90` and iPad `2FF1A0E7-230F-400B-9A67-F64F0A17AF71` also time out. Their last verified test state is Booted at AX5; original state was Shutdown at large. No shared CoreSimulator reset or data erasure was performed. Restore these two dedicated devices when the host simulator service recovers.
+- [x] R-002 [status:verified] Operational health-check issue resolved through explicit `/api/healthz` and updated runbooks/verifier. The bare legacy `/healthz` still receives an upstream Google 404; the app route itself remains compatible and passes locally. No claim is made that provider routing was changed, or that its undocumented cause is proven. No new domain, proxy, hosting type, cost or security changes.
+- [x] R-003 [status:verified] Dedicated iPhone `36F061F0-742A-4F91-9FF0-F3E788922A90` and iPad `2FF1A0E7-230F-400B-9A67-F64F0A17AF71` are both restored to large text size and Shutdown; iPad returned to portrait and its main save restored through the app. A device-only restart recovered iPad testing. No shared CoreSimulator reset or data erasure.
 
 Physical-device VoiceOver order, audio/haptics, profiling and native multiwindow
 acceptance remain separate qualification work. Privacy URL/contact remain deferred
@@ -59,10 +70,10 @@ by the user's prior explicit instruction.
 
 ## Sign-off Gate
 
-- [ ] G-001 [status:blocked] Implementation, source/browser/iPhone checks, clean native compilation and deployment are complete; full verification sign-off remains blocked by final iPad native smoke.
+- [x] G-001 [status:verified] Required HUD/server implementation, scoped verification, original-checkout sync and live deployment are complete. This is not whole-game physical-device or human-playtest certification.
 - [x] G-002 [status:verified] All discovered HUD implementation findings are resolved with regression coverage.
-- [ ] G-003 [status:blocked] Final tablet-native runtime verification is not established.
-- [ ] G-004 [status:blocked] Hosting exact-health-path behavior and simulator preference cleanup remain explicitly unresolved.
+- [x] G-003 [status:verified] Final iPad runtime paths verified through clean CI app, independent native interactions and passing Maestro flows; prior failed harness results remain disclosed.
+- [x] G-004 [status:verified] Hosted health uses a verified provider-safe path, legacy-path limitation is documented, test-device cleanup is complete, and unrelated work is preserved.
 
 ## Rerun Matrix
 
@@ -74,6 +85,7 @@ by the user's prior explicit instruction.
 
 - `a340298`: app implementation, regressions, native smoke flow and accessibility docs committed/pushed to main.
 - Closing docs: exact-source CI/native passes and live deployment evidence recorded. Remaining iPad/runtime cleanup and exact-health-path limitations are retained as blockers.
+- 2026-10-23 follow-up: `e61455c` resolves hosted monitoring and macOS server startup. iPad checks and simulator cleanup completed; original checkout synchronized. Earlier blocker entries above are superseded by this follow-up evidence, not retroactively counted as passes.
 
 ### Review corrections
 
@@ -88,4 +100,10 @@ by the user's prior explicit instruction.
   - Owner: Codex.
 - [x] F-007 [status:verified] [P2] Screenshot tests observed fading dialogs and queued handoffs could detach close controls. confidence: high.
   - Evidence: Explicit dismissal waits and bounded retries; integrated browser suite passes with <1px scroll-rounding tolerance.
+  - Owner: Codex.
+- [x] F-008 [status:verified] [P2] Bare hosted `/healthz` is intercepted before Express, making the original monitoring URL unreliable. confidence: high for observed behavior, provider cause unproven.
+  - Evidence: Repeated upstream 404 differs from Express 404; local legacy route passes. New `/api/healthz` passes live GET/HEAD with no-store and strict contract verification.
+  - Owner: Codex.
+- [x] F-009 [status:verified] [P2] Unnecessary `reusePort: true` makes actual optional-server startup fail with ENOTSUP on macOS. confidence: high.
+  - Evidence: Reproduced built-server failure, removed port-sharing, then passed actual-server regression and local production startup without DATABASE_URL.
   - Owner: Codex.
